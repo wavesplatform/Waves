@@ -9,13 +9,14 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.model.OrderValidator.ValidationResult
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.state.diffs.{CommonValidation, produce}
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.{AssetId, Proofs}
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
@@ -23,6 +24,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
+
 class OrderValidatorSpecification
     extends WordSpec
     with WithDB
@@ -150,6 +152,58 @@ class OrderValidatorSpecification
             validateByAssetPairWhitelist(Set(AssetPair.createAssetPair("A1", "A2").get))(order) should produce(
               s"Trading is not allowed for the pair: ${order.assetPair}"
             )
+        }
+      }
+
+      "matcherFee is not enough" in {
+        def setScriptsAndValidate(amountAssetScript: Option[Script], priceAssetScript: Option[Script], matcherAccountScript: Option[Script])(
+            disableExtraFeeForScript: Boolean)(order: Order): OrderValidator.ValidationResult = {
+
+          val blockchain = stub[Blockchain]
+
+          activate(blockchain, BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.SmartAssets -> 0)
+
+          def prepareAssets(assetsAndScripts: (Option[AssetId], Option[Script])*): Unit = assetsAndScripts foreach {
+            case (asset: Some[AssetId], scriptOption) =>
+              (blockchain.assetDescription _).when(asset.get).returns(mkAssetDescription(8))
+              (blockchain.assetScript _).when(asset.get).returns(scriptOption)
+              (blockchain.hasAssetScript _).when(asset.get).returns(scriptOption.isDefined)
+            case _ =>
+          }
+
+          prepareAssets(order.assetPair.amountAsset -> amountAssetScript, order.assetPair.priceAsset -> priceAssetScript)
+
+          (blockchain.accountScript _).when(MatcherAccount.toAddress).returns(matcherAccountScript)
+          (blockchain.hasScript _).when(MatcherAccount.toAddress).returns(matcherAccountScript.isDefined)
+
+          (blockchain.accountScript _).when(order.sender.toAddress).returns(None)
+          (blockchain.hasScript _).when(order.sender.toAddress).returns(false)
+
+          val transactionCreator = exchangeTransactionCreator(blockchain).createTransaction _
+
+          OrderValidator.blockchainAware(blockchain,
+                                         transactionCreator,
+                                         matcherSettings.minOrderFee,
+                                         MatcherAccount.toAddress,
+                                         ntpTime,
+                                         disableExtraFeeForScript)(order)
+        }
+
+        val trueScript             = Some(ExprScript(Terms.TRUE).explicitGet())
+        val minOrderWithScriptsFee = matcherSettings.minOrderFee + CommonValidation.ScriptExtraFee * 3
+
+        val preconditions = for {
+          assetPair <- distinctPairGen
+          sender    <- accountGen
+          order     <- orderGenerator(sender, assetPair)
+        } yield Order.sign(order.updateFee(matcherSettings.minOrderFee), sender)
+
+        forAll(preconditions) { order =>
+          def validateOrderWithAllScripts(disableExtraFeeForScript: Boolean): ValidationResult =
+            setScriptsAndValidate(trueScript, trueScript, trueScript)(disableExtraFeeForScript)(order)
+
+          validateOrderWithAllScripts(disableExtraFeeForScript = true) shouldBe 'right
+          validateOrderWithAllScripts(disableExtraFeeForScript = false) should produce(s"Order matcherFee should be >= $minOrderWithScriptsFee")
         }
       }
     }
