@@ -145,7 +145,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) {
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
-          Instrumented.withTimeMillis(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
+          Instrumented.withTimeMillis(
+            Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
         val (bytes, t1) = Instrumented.withTimeMillis(block.bytesWithoutSignature())
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
         val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))

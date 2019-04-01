@@ -16,8 +16,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
 
   private val state = new SynchronizedAppendState[MicroBlock, BlockId, (Diff, Long, Long)](_.totalResBlockSig)
 
-  private def microDiffs = state.mapping // microDiff, carryFee, timestamp
-  private def microBlocks     = state.stack   // fresh head
+  private def microDiffs  = state.mapping // microDiff, carryFee, timestamp
+  private def microBlocks = state.stack   // fresh head
 
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)

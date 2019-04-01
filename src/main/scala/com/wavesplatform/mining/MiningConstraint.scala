@@ -61,9 +61,7 @@ object MultiDimensionalMiningConstraint {
               Iterator.single(s"$curr -> $upd")
           }).flatten
     } else {
-      updatedRest.constraints
-        .toList
-        .iterator
+      updatedRest.constraints.toList.iterator
         .filter(_.isOverfilled)
         .map(_.toString)
     }

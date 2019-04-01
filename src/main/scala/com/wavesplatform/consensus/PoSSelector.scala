@@ -60,7 +60,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     blockchain.lastBlock
       .toRight(GenericError("No blocks in blockchain"))
       .map(b => generatorSignature(b.consensusData.generationSignature.arr, block.signerData.generator.publicKey))
-      .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(_ sameElements blockGS)
+      .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(
+        _ sameElements blockGS)
       .map(_ => ())
   }
 
