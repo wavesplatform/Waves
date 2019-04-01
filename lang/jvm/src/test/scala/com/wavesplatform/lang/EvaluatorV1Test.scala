@@ -7,9 +7,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -44,7 +44,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       defaultCryptoContext,
       pureContext,
       WavesContext.build(
-        DirectiveSet(V1, ScriptType.Account, ContentType.Expression).explicitGet(),
+        DirectiveSet(V1, Account, Expression).explicitGet(),
         environment
       )
     )

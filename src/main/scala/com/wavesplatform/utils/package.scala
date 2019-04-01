@@ -9,10 +9,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.ContentType._
-import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang._
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -94,9 +94,9 @@ package object utils extends ScorexLogging {
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX]] = {
     val directives = for {
-      version    <- StdLibVersion.SupportedVersions
-      cType      <- ContentType.SupportedTypes
-      scriptType <- ScriptType.SupportedTypes
+      version    <- DirectiveDictionary[StdLibVersion].all
+      cType      <- DirectiveDictionary[ContentType].all
+      scriptType <- DirectiveDictionary[ScriptType].all
     } yield DirectiveSet(version, scriptType, cType)
 
     val environment = new WavesEnvironment(
@@ -148,7 +148,7 @@ package object utils extends ScorexLogging {
   }
 
   val defaultDecompilerContext: DecompilerContext =
-    lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.DApp).explicitGet())().decompilerContext
+    lazyContexts(DirectiveSet(V3, Account, DApp).explicitGet())().decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet

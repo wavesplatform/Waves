@@ -4,8 +4,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.state.diffs.smart.predef.scriptWithAllFunctions
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
@@ -34,42 +34,42 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
   }
 
   private val ctxV1 = {
-    utils.functionCosts(StdLibVersion.V1)
+    utils.functionCosts(V1)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V1),
+          PureContext.build(V1),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V1, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
           )
         ))
   }
 
   private val ctxV2 = {
-    utils.functionCosts(StdLibVersion.V2)
+    utils.functionCosts(V2)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V2),
+          PureContext.build(V2),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(V2, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }
 
   private val ctxV3 = {
-    utils.functionCosts(StdLibVersion.V3)
+    utils.functionCosts(V3)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V3),
+          PureContext.build(V3),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V3, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
@@ -111,7 +111,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("func complexity map size is equal stdLib SupportedVersions count") {
-    val supportedVersionCount = StdLibVersion.SupportedVersions.size
+    val supportedVersionCount = DirectiveDictionary[StdLibVersion].all.size
 
     ctxV1.functions.foreach { func =>
       func.costByLibVersion.size shouldBe supportedVersionCount
@@ -128,12 +128,12 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
 
   property("estimate script with with all functions") {
     val exprV1 = ExpressionCompiler(ctxV1.compilerContext, getAllFuncExpression()).explicitGet()._1
-    estimate(exprV1, ctxV1, utils.functionCosts(StdLibVersion.V1)) shouldBe Right(2317)
+    estimate(exprV1, ctxV1, utils.functionCosts(V1)) shouldBe Right(2317)
 
     val exprV2 = ExpressionCompiler(ctxV2.compilerContext, getAllFuncExpression()).explicitGet()._1
-    estimate(exprV2, ctxV2, utils.functionCosts(StdLibVersion.V2)) shouldBe Right(2317)
+    estimate(exprV2, ctxV2, utils.functionCosts(V2)) shouldBe Right(2317)
 
     val exprV3 = ExpressionCompiler(ctxV3.compilerContext, getAllFuncExpression()).explicitGet()._1
-    estimate(exprV3, ctxV3, utils.functionCosts(StdLibVersion.V3)) shouldBe Right(2282)
+    estimate(exprV3, ctxV3, utils.functionCosts(V3)) shouldBe Right(2282)
   }
 }

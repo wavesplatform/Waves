@@ -2,8 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
@@ -28,7 +27,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
          | }
       """.stripMargin
     val untyped         = Parser.parseExpr(scriptText).get.value
-    val transferAllowed = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untyped).explicitGet()._1
+    val transferAllowed = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
 
     forAll(preconditionsTransferAndLease(transferAllowed)) {
       case (genesis, script, lease, transfer) =>

@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.diffs.ProduceError
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._

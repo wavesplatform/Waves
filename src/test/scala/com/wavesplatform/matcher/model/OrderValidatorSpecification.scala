@@ -7,7 +7,7 @@ import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
@@ -39,9 +39,9 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val wbtc          = mkAssetId("WBTC")
-  private val pairWavesBtc  = AssetPair(Waves, wbtc)
-  private val accountScript = ExprScript(V2, Terms.TRUE, checkSize = false).explicitGet()
+  private val wbtc               = mkAssetId("WBTC")
+  private val pairWavesBtc       = AssetPair(Waves, wbtc)
+  private lazy val accountScript = ExprScript(V2, Terms.TRUE, checkSize = false).explicitGet()
 
   private val defaultPortfolio     = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
   private val defaultAssetDecimals = 8

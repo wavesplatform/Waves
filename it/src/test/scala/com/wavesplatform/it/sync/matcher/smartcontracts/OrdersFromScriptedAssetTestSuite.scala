@@ -239,7 +239,7 @@ object OrdersFromScriptedAssetTestSuite {
 
   private val DenyBigAmountScript: Script = {
     val scriptText = s"""
-                        |{-# LANGUAGE_VERSION 2 #-}
+                        |{-# STDLIB_VERSION 2 #-}
                         |match tx {
                         | case tx: ExchangeTransaction => tx.sellOrder.amount <= 100000
                         | case other => true
