@@ -3,7 +3,7 @@ package com.wavesplatform.dexgen
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey, AddressOrAlias}
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -44,7 +44,7 @@ class Worker(workerSettings: Settings,
 
   private val endpoint: String = generatorSettings.sendTo.head.getHostString
 
-  private val matcherPublicKey = PublicKeyAccount.fromBase58String(matcherSettings.matcherKey).right.get
+  private val matcherPublicKey = PublicKey.fromBase58String(matcherSettings.matcherKey).right.get
   private val validAccounts    = generatorSettings.validAccounts
   private val invalidAccounts  = generatorSettings.invalidAccounts
   private val fakeAccounts     = generatorSettings.fakeAccounts
@@ -57,7 +57,7 @@ class Worker(workerSettings: Settings,
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(Random.nextInt(c.size))) else None
 
-  def buyOrder(amount: Long, price: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+  def buyOrder(amount: Long, price: Long, buyer: KeyPair, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
     to(matcherSettings.endpoint).orderHistory(buyer)
     to(matcherSettings.endpoint).orderBook(pair)
     val order = Order.buy(buyer, matcherPublicKey, pair, amount, price, now, now + 29.day.toMillis, fee)
@@ -73,7 +73,7 @@ class Worker(workerSettings: Settings,
     (order, response)
   }
 
-  def sellOrder(amount: Long, price: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+  def sellOrder(amount: Long, price: Long, seller: KeyPair, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
     to(matcherSettings.endpoint).orderHistory(seller)
     to(matcherSettings.endpoint).orderBook(pair)
     val order = Order.sell(seller, matcherPublicKey, pair, amount, price, now, now + 29.day.toMillis, fee)
@@ -89,9 +89,9 @@ class Worker(workerSettings: Settings,
     (order, response)
   }
 
-  def cancelOrder(pk: PrivateKeyAccount, pair: AssetPair, orderId: String)(implicit tag: String): Future[MatcherStatusResponse] = {
+  def cancelOrder(pk: KeyPair, pair: AssetPair, orderId: String)(implicit tag: String): Future[MatcherStatusResponse] = {
     log.info(s"[$tag] Cancel $orderId in $pair")
-    val request       = CancelOrderRequest(PublicKeyAccount(pk.publicKey), ByteStr.decodeBase58(orderId).toOption, None, Array.emptyByteArray)
+    val request       = CancelOrderRequest(pk.publicKey, ByteStr.decodeBase58(orderId).toOption, None, Array.emptyByteArray)
     val sig           = crypto.sign(pk, request.toSign)
     val signedRequest = request.copy(signature = sig)
     to(matcherSettings.endpoint).cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest).andThen {
@@ -99,13 +99,13 @@ class Worker(workerSettings: Settings,
     }
   }
 
-  def orderHistory(account: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
+  def orderHistory(account: KeyPair)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
     to(matcherSettings.endpoint).orderHistory(account)
   }
 
-  def cancelAllOrders(fakeAccounts: Seq[PrivateKeyAccount])(implicit tag: String): Future[Seq[MatcherStatusResponse]] = {
+  def cancelAllOrders(fakeAccounts: Seq[KeyPair])(implicit tag: String): Future[Seq[MatcherStatusResponse]] = {
     log.info(s"[$tag] Cancel orders of accounts: ${fakeAccounts.map(_.address).mkString(", ")}")
-    def cancelOrdersOf(account: PrivateKeyAccount): Future[Seq[MatcherStatusResponse]] = {
+    def cancelOrdersOf(account: KeyPair): Future[Seq[MatcherStatusResponse]] = {
       orderHistory(account).flatMap { orders =>
         Future.sequence {
           orders
@@ -123,7 +123,7 @@ class Worker(workerSettings: Settings,
   implicit val signedTransferRequestWrites: Writes[SignedTransferV1Request] =
     Json.writes[SignedTransferV1Request].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransferTransactionV1.typeId.toInt)))
 
-  def transfer(i: Long, sender: PrivateKeyAccount, assetId: Asset, recipient: PrivateKeyAccount, halfBalance: Boolean)(
+  def transfer(i: Long, sender: KeyPair, assetId: Asset, recipient: KeyPair, halfBalance: Boolean)(
       implicit tag: String): Future[Transaction] =
     to(endpoint).balance(sender.address, assetId).flatMap { balance =>
       val halfAmount     = if (halfBalance) balance / 2 else balance
@@ -131,7 +131,7 @@ class Worker(workerSettings: Settings,
 
       TransferTransactionV1.selfSigned(assetId,
                                        sender,
-                                       AddressOrAlias.fromString(PublicKeyAccount(recipient.publicKey).address).right.get,
+                                       AddressOrAlias.fromString(recipient.publicKey.address).right.get,
                                        transferAmount,
                                        now + i,
                                        Waves,
@@ -193,8 +193,8 @@ class Worker(workerSettings: Settings,
           }
 
       case GenOrderType.FakeSell =>
-        val seller: PrivateKeyAccount = fakeAccounts.head
-        val buyer: PrivateKeyAccount  = fakeAccounts(1)
+        val seller: KeyPair = fakeAccounts.head
+        val buyer: KeyPair  = fakeAccounts(1)
         val pair                      = AssetPair(randomFrom(tradingAssets.takeRight(2)).getOrElse(Waves), Waves)
         for {
           _ <- cancelAllOrders(fakeAccounts)
@@ -206,8 +206,8 @@ class Worker(workerSettings: Settings,
         } yield ()
 
       case GenOrderType.FakeBuy =>
-        val seller: PrivateKeyAccount = fakeAccounts(2)
-        val buyer: PrivateKeyAccount  = fakeAccounts(3)
+        val seller: KeyPair = fakeAccounts(2)
+        val buyer: KeyPair  = fakeAccounts(3)
         val pair                      = AssetPair(randomFrom(tradingAssets.takeRight(2)).getOrElse(Waves), Waves)
         for {
           _ <- cancelAllOrders(fakeAccounts)

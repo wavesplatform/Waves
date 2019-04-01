@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
@@ -11,7 +11,6 @@ import play.api.libs.json._
 import scala.util.{Failure, Success}
 
 object OrderJson {
-
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
 
@@ -34,17 +33,17 @@ object OrderJson {
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  implicit val publicKeyAccountReads: Reads[PublicKeyAccount] = {
+  implicit lazy val accountPublicKeyReads: Reads[PublicKey] = Reads {
     case JsString(s) =>
       Base58.tryDecodeWithLimit(s) match {
-        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
-        case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
+        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKey(bytes))
+        case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrectAccount"))))
       }
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  def readOrderV1V2(sender: PublicKeyAccount,
-                    matcher: PublicKeyAccount,
+  def readOrderV1V2(sender: PublicKey,
+                    matcher: PublicKey,
                     assetPair: AssetPair,
                     orderType: OrderType,
                     amount: Long,
@@ -78,8 +77,8 @@ object OrderJson {
     )
   }
 
-  def readOrderV3(sender: PublicKeyAccount,
-                  matcher: PublicKeyAccount,
+  def readOrderV3(sender: PublicKey,
+                  matcher: PublicKey,
                   assetPair: AssetPair,
                   orderType: OrderType,
                   amount: Long,
@@ -131,8 +130,8 @@ object OrderJson {
     JsPath.read[String].map(OrderType.apply)
 
   private val orderV1V2Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
+    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long] and
@@ -147,8 +146,8 @@ object OrderJson {
   }
 
   private val orderV3Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
+    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long] and

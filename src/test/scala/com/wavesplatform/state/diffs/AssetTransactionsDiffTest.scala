@@ -77,7 +77,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   property("Cannot reissue/burn non-owned alias") {
     val setup = for {
       ((gen, issue), (_, _)) <- issueReissueBurnTxs(isReissuable = true)
-      other                  <- accountGen.suchThat(_ != issue.sender.toAddress)
+      other                  <- accountGen.suchThat(_.toAddress != issue.sender.toAddress)
       quantity               <- positiveLongGen
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
