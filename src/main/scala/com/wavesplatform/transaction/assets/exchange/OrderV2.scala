@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -17,8 +17,8 @@ import scala.util.Try
 /**
   * Order to matcher service for asset exchange
   */
-case class OrderV2(senderPublicKey: PublicKeyAccount,
-                   matcherPublicKey: PublicKeyAccount,
+case class OrderV2(senderPublicKey: PublicKey,
+                   matcherPublicKey: PublicKey,
                    assetPair: AssetPair,
                    orderType: OrderType,
                    amount: Long,
@@ -34,7 +34,7 @@ case class OrderV2(senderPublicKey: PublicKeyAccount,
   override def signature: Array[Byte] = proofs.proofs(0).arr
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    (version +: senderPublicKey.publicKey) ++ matcherPublicKey.publicKey ++
+    (version +: senderPublicKey.arr) ++ matcherPublicKey.arr ++
       assetPair.bytes ++ orderType.bytes ++
       Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
@@ -47,8 +47,8 @@ case class OrderV2(senderPublicKey: PublicKeyAccount,
 object OrderV2 {
   private val AssetIdLength = 32
 
-  def buy(sender: PrivateKeyAccount,
-          matcher: PublicKeyAccount,
+  def buy(sender: KeyPair,
+          matcher: PublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -60,8 +60,8 @@ object OrderV2 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def sell(sender: PrivateKeyAccount,
-           matcher: PublicKeyAccount,
+  def sell(sender: KeyPair,
+           matcher: PublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -73,8 +73,8 @@ object OrderV2 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def apply(sender: PrivateKeyAccount,
-            matcher: PublicKeyAccount,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -105,8 +105,8 @@ object OrderV2 {
     val makeOrder = for {
       version <- readByte
       _ = if (version != 2) { throw new Exception(s"Incorrect order version: expect 2 but found $version") }
-      sender  <- read(PublicKeyAccount.apply, KeyLength)
-      matcher <- read(PublicKeyAccount.apply, KeyLength)
+      sender  <- read(PublicKey.apply, KeyLength)
+      matcher <- read(PublicKey.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
           case Some(arr) => IssuedAsset(ByteStr(arr))

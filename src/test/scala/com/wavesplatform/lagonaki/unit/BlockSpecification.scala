@@ -1,6 +1,6 @@
 package com.wavesplatform.lagonaki.unit
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -67,7 +67,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           assert(parsedBlock.signaturesValid().isRight)
           assert(parsedBlock.consensusData.generationSignature == generationSignature)
           assert(parsedBlock.version.toInt == version)
-          assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
+          assert(parsedBlock.signerData.generator == recipient.publicKey)
       }
     }
   }
@@ -118,13 +118,13 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         assert(parsedBlock.signaturesValid().isRight)
         assert(parsedBlock.consensusData.generationSignature == generationSignature)
         assert(parsedBlock.version.toInt == version)
-        assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
+        assert(parsedBlock.signerData.generator == recipient.publicKey)
         assert(parsedBlock.featureVotes == featureVotes)
     }
   }
 
   property("block signed by a weak public key is invalid") {
-    val weakAccount = PublicKeyAccount(Array.fill(32)(0: Byte))
+    val weakAccount = PublicKey(Array.fill(32)(0: Byte))
     forAll(blockGen) {
       case (baseTarget, reference, generationSignature, recipient, transactionData) =>
         val block = Block

@@ -17,7 +17,7 @@ import play.api.libs.json.Json
 
 import scala.util.Try
 
-case class SetScriptTransaction private (chainId: Byte, sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs)
+case class SetScriptTransaction private (chainId: Byte, sender: PublicKey, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
@@ -28,7 +28,7 @@ case class SetScriptTransaction private (chainId: Byte, sender: PublicKeyAccount
     Coeval.evalOnce(
       Bytes.concat(
         Array(builder.typeId, version, chainId),
-        sender.publicKey,
+        sender,
         Deser.serializeOption(script)(s => s.bytes().arr),
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp)
@@ -59,30 +59,30 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
     }
   }
 
-  def create(sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(sender: PublicKey, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
     } yield new SetScriptTransaction(chainId, sender, script, fee, timestamp, proofs)
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: PublicKey,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount, script: Option[Script], fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, script: Option[Script], fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, script, fee, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[SetScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       OptionBytes(index = tailIndex(3), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(3), "Script")),
       LongBytes(tailIndex(4), "Fee"),
       LongBytes(tailIndex(5), "Timestamp"),

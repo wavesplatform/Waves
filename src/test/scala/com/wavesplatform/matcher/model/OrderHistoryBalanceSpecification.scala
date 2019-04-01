@@ -5,7 +5,7 @@ import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
 import com.wavesplatform.NTPTime
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.{AddressActor, MatcherTestData}
@@ -148,7 +148,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("Two sell orders added") {
-    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk   = KeyPair("private".getBytes("utf-8"))
     val ord1 = sell(WavesBtc, 10000, 0.0005, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis()))
     val ord2 = sell(WavesBtc, 16000, 0.0008, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis() + 1))
 
@@ -458,7 +458,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("Partially with own order") {
-    val pk        = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk        = KeyPair("private".getBytes("utf-8"))
     val counter   = buy(WavesBtc, 100000000, 0.0008, Some(pk), Some(300000L))
     val submitted = sell(WavesBtc, 210000000, 0.00079, Some(pk), Some(300000L))
 
@@ -550,7 +550,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("Sorting by status then timestamp") {
-    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk   = KeyPair("private".getBytes("utf-8"))
     val ord1 = buy(WavesBtc, 110000000, 0.0008, Some(pk), Some(300000L), Some(1L)) // Filled
     val ord2 = buy(WavesBtc, 120000000, 0.0006, Some(pk), Some(300000L), Some(2L)) // Accepted
     val ord3 = buy(WavesBtc, 130000000, 0.0005, Some(pk), Some(300000L), Some(3L)) // Canceled
@@ -590,7 +590,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("History with more than max limit") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = KeyPair("private".getBytes("utf-8"))
     val origOrders = (0 until matcherSettings.maxOrdersPerRequest).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o)))
@@ -617,7 +617,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("History with canceled order and more than max limit") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = KeyPair("private".getBytes("utf-8"))
     val origOrders = (0 to matcherSettings.maxOrdersPerRequest).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o)))
@@ -639,7 +639,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("History by pair - added orders more than history by pair limit (200 active)") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = KeyPair("private".getBytes("utf-8"))
 
     val orders = (1 to MaxElements).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
@@ -663,7 +663,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("History by pair - added and canceled orders both more than history by pair limit (200 active, 10 canceled)") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = KeyPair("private".getBytes("utf-8"))
 
     val allOrders = (1 to MaxElements + 10).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
@@ -691,7 +691,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("History by pair contains more elements than in common") {
-    val pk    = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk    = KeyPair("private".getBytes("utf-8"))
     val pair1 = WavesBtc
     val pair2 = AssetPair(Waves, mkAssetId("ETH"))
 

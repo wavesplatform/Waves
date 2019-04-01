@@ -4,10 +4,9 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
-import com.wavesplatform.lang.StdLibVersion.V2
 import com.wavesplatform.lang.Testing.evaluated
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED}
@@ -15,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.Global
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
@@ -47,8 +47,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
        |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
-       |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
-       |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
+       |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender).base58}')
+       |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender).base58}'
        |   let version = t.version == $version
        |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
      """.stripMargin
@@ -287,7 +287,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             | case other => throw()
             | }
             |""".stripMargin
-      val result = runScriptWithCustomContext(script, Coproduct(t), T, StdLibVersion.V3)
+      val result = runScriptWithCustomContext(script, Coproduct(t), T, V3)
       result shouldBe evaluated(true)
     }
   }
@@ -401,9 +401,9 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         val oType = ord.orderType.toString
         val script = s"""
            |   let ${oType}Id = t.${oType}Order.id == base58'${ord.idStr()}'
-           |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender.publicKey).base58}')
-           |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender.publicKey).base58}'
-           |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'
+           |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender).base58}')
+           |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender).base58}'
+           |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey).base58}'
            |   let ${oType}Price = t.${oType}Order.price == ${ord.price}
            |   let ${oType}Amount = t.${oType}Order.amount == ${ord.amount}
            |   let ${oType}Timestamp = t.${oType}Order.timestamp == ${ord.timestamp}
@@ -473,9 +473,9 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |match tx {
                  | case t : Order =>
                  |   let id = t.id == base58'${t.id()}'
-                 |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
-                 |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
-                 |   let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(t.matcherPublicKey.publicKey).base58}'
+                 |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender).base58}')
+                 |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender).base58}'
+                 |   let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(t.matcherPublicKey).base58}'
                  |   let timestamp = t.timestamp == ${t.timestamp}
                  |   let price = t.price == ${t.price}
                  |   let amount = t.amount == ${t.amount}
@@ -576,7 +576,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           .build(Global) |+|
         WavesContext
           .build(
-            DirectiveSet(V2, ScriptType.Asset, ContentType.Expression).explicitGet(),
+            DirectiveSet(V2, Asset, Expression).explicitGet(),
             new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null))
           )
 
@@ -598,7 +598,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           .build(Global) |+|
         WavesContext
           .build(
-            DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
           )
 

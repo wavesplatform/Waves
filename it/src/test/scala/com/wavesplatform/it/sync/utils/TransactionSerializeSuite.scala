@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.utils
 
-import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -24,15 +24,15 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import scorex.crypto.encode.Base64
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
-  private val publicKey         = PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
+  private val publicKey         = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
   private val chainId: Byte     = AddressScheme.current.chainId
   private val ts: Long          = 1526287561757L
   private val tsOrderFrom: Long = 1526992336241L
   private val tsOrderTo: Long   = 1529584336241L
 
   private val buyV2 = OrderV2(
-    PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
-    PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
+    PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
+    PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.BUY,
     2,
@@ -44,8 +44,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   )
 
   val buyV1 = OrderV1(
-    PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
-    PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
+    PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
+    PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.BUY,
     2,
@@ -57,8 +57,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   )
 
   private val sell = OrderV1(
-    PublicKeyAccount.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").right.get,
-    PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
+    PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").right.get,
+    PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.SELL,
     3,
@@ -355,8 +355,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val invokeScript = InvokeScriptTransaction
     .create(
-      PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
-      PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
+      PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
+      PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
       Terms.FUNCTION_CALL(
         function = FunctionHeader.User("testfunc"),
         args = List(TRUE)

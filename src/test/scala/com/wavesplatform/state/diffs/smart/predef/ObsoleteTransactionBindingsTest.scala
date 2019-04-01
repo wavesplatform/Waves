@@ -3,8 +3,7 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -46,8 +45,8 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |     let payRecipient = pay.recipient == Address(base58'${p.recipient.address}')
       |
       |     let bodyBytes = pay.bodyBytes == base64'${ByteStr(p.bodyBytes.apply()).base64}'
-      |     let sender = pay.sender == addressFromPublicKey(base58'${ByteStr(p.sender.publicKey).base58}')
-      |     let senderPublicKey = pay.senderPublicKey == base58'${ByteStr(p.sender.publicKey).base58}'
+      |     let sender = pay.sender == addressFromPublicKey(base58'${ByteStr(p.sender).base58}')
+      |     let senderPublicKey = pay.senderPublicKey == base58'${ByteStr(p.sender).base58}'
       |     let signature = pay.proofs[0]== base58'${p.signature.base58}'
       |     let empty1 = pay.proofs[1]== base58''
       |     let empty2 = pay.proofs[2]== base58''
@@ -77,7 +76,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
     payment                     = PaymentTransaction.create(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
     untypedScript               = Parser.parseExpr(script(genesis, payment)).get.value
-    typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+    typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
       .explicitGet()
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction
       .selfSigned(recipient, Some(typedScript), 100000000L, ts)

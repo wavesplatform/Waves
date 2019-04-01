@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -13,7 +13,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class LeaseCancelTransactionV2 private (chainId: Byte, sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, proofs: Proofs)
+case class LeaseCancelTransactionV2 private (chainId: Byte, sender: PublicKey, leaseId: ByteStr, fee: Long, timestamp: Long, proofs: Proofs)
     extends LeaseCancelTransaction
     with FastHashId {
 
@@ -47,7 +47,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   }
 
   def create(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: PublicKey,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
@@ -59,24 +59,24 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   }
 
   def signed(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: PublicKey,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(chainId, sender, leaseId, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(chainId: Byte, sender: PrivateKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(chainId: Byte, sender: KeyPair, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(chainId, sender, leaseId, fee, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[LeaseCancelTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       LongBytes(tailIndex(3), "Fee"),
       LongBytes(tailIndex(4), "Timestamp"),
       ByteStrDefinedLength(tailIndex(5), "Lease ID", crypto.DigestSize),

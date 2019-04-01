@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ContentType, Global}
-import com.wavesplatform.lang.StdLibVersion.StdLibVersion
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -42,7 +42,7 @@ object ContractScript {
       (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
-            ScriptEstimator(varNames(version, ContentType.DApp),
+            ScriptEstimator(varNames(version, DAppType),
                             functionCosts(version),
                             constructExprFromFuncAndContext(contract.dec, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
