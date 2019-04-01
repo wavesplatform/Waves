@@ -18,6 +18,7 @@ import com.wavesplatform.utils.ScorexLogging
 
 object BlockDiffer extends ScorexLogging {
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
+  type GenResult = Result[MiningConstraint]
 
   def fromBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                 blockchain: Blockchain,

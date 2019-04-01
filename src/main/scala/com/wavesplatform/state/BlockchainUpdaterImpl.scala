@@ -283,7 +283,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
-              r <- {
+              blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
                 BlockDiffer.fromMicroBlock(functionalitySettings,
@@ -295,9 +295,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
                                            verify)
               }
             } yield {
-              val (diff, carry, updatedMdConstraint) = r
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint) = blockDifferResult
               restTotalConstraint = updatedMdConstraint.constraints.head
-              ng.append(microBlock, diff, carry, System.currentTimeMillis)
+              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
 
@@ -422,7 +422,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
 
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = readLock {
     (for {
-      ng               <- ngState
+      ng                  <- ngState
       (block, _, _, _, _) <- ng.totalDiffOf(blockId)
     } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
   }

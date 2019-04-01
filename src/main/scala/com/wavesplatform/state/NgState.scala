@@ -88,8 +88,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
-    microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
+  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): Unit = {
+    microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, microblockTotalFee, timestamp))
     microBlocks.prepend(m)
     internalCaches.invalidate(m.totalResBlockSig)
   }
