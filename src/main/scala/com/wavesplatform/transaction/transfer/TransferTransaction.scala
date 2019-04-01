@@ -40,7 +40,7 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
     val feeBytes        = Longs.toByteArray(fee)
 
     Bytes.concat(
-      sender.publicKey,
+      sender,
       assetIdBytes,
       feeAssetIdBytes,
       timestampBytes,

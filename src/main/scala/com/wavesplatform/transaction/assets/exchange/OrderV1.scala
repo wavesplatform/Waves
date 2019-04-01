@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
@@ -24,14 +24,14 @@ case class OrderV1(@ApiModelProperty(
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
                    )
-                   senderPublicKey: PublicKeyAccount,
+                   senderPublicKey: PublicKey,
                    @ApiModelProperty(
                      value = "Base58 encoded Matcher public key",
                      required = true,
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
                    )
-                   matcherPublicKey: PublicKeyAccount,
+                   matcherPublicKey: PublicKey,
                    @ApiModelProperty(value = "Asset pair", required = true)
                    assetPair: AssetPair,
                    @ApiModelProperty(
@@ -68,7 +68,7 @@ case class OrderV1(@ApiModelProperty(
 
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
+    senderPublicKey ++ matcherPublicKey ++
       assetPair.bytes ++ orderType.bytes ++
       Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
@@ -76,7 +76,7 @@ case class OrderV1(@ApiModelProperty(
   )
 
   @ApiModelProperty(hidden = true)
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey.publicKey))
+  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey))
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature)
@@ -85,8 +85,8 @@ case class OrderV1(@ApiModelProperty(
 object OrderV1 {
   private val AssetIdLength = 32
 
-  def apply(senderPublicKey: PublicKeyAccount,
-            matcherPublicKey: PublicKeyAccount,
+  def apply(senderPublicKey: PublicKey,
+            matcherPublicKey: PublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -107,8 +107,8 @@ object OrderV1 {
             Proofs(List(ByteStr(signature))))
   }
 
-  def buy(sender: PrivateKeyAccount,
-          matcher: PublicKeyAccount,
+  def buy(sender: KeyPair,
+          matcher: PublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -120,8 +120,8 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def sell(sender: PrivateKeyAccount,
-           matcher: PublicKeyAccount,
+  def sell(sender: KeyPair,
+           matcher: PublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -133,8 +133,8 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def apply(sender: PrivateKeyAccount,
-            matcher: PublicKeyAccount,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -160,8 +160,8 @@ object OrderV1 {
       (off, res)
     }
     val makeOrder = for {
-      sender  <- read(PublicKeyAccount.apply, KeyLength)
-      matcher <- read(PublicKeyAccount.apply, KeyLength)
+      sender  <- read(PublicKey.apply, KeyLength)
+      matcher <- read(PublicKey.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
           case Some(arr) => IssuedAsset(ByteStr(arr))

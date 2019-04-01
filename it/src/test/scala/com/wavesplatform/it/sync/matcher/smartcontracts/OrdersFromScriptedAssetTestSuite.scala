@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{KeyPair, AddressScheme}
 import com.wavesplatform.api.http.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -179,7 +179,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
 object OrdersFromScriptedAssetTestSuite {
 
-  private val matcherPk = PrivateKeyAccount.fromSeed(MatcherDefaultConfig.Configs.head.getString("account-seed")).right.get
+  private val matcherPk = KeyPair.fromSeed(MatcherDefaultConfig.Configs.head.getString("account-seed")).right.get
 
   private val UnscriptedAsset = IssueTransactionV1
     .selfSigned(

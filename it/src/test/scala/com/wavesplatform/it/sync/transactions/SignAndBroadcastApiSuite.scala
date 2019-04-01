@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -74,7 +74,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       val json =
         Json.obj(
           "type"            -> TransferTransaction.typeId,
-          "senderPublicKey" -> sender.publicKey.toString,
+          "senderPublicKey" -> PublicKey.toString(sender.publicKey),
           "recipient"       -> secondAddress,
           "fee"             -> 100000,
           "amount"          -> 1,
@@ -320,14 +320,14 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
     val signedRequest     = signedRequestJson.as[SignedTransferV1Request]
-    assert(PublicKeyAccount.fromBase58String(signedRequest.senderPublicKey).explicitGet().address == firstAddress)
+    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().address == firstAddress)
     assert(signedRequest.recipient == secondAddress)
     assert(signedRequest.fee == minFee)
     assert(signedRequest.amount == transferAmount)
     val signature  = Base58.tryDecodeWithLimit((signedRequestJson \ "signature").as[String]).get
     val tx         = signedRequest.toTx.explicitGet()
-    val privateKey = pkByAddress(thirdAddress)
-    assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
+    val keyPair = pkByAddress(thirdAddress)
+    assert(crypto.verify(signature, tx.bodyBytes(), keyPair.publicKey))
   }
 
   test("/transactions/broadcast should produce ExchangeTransaction with custom asset") {
@@ -422,7 +422,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: Byte): String = {
-    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> sender.publicKey.toString)
+    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> PublicKey.toString(sender.publicKey))
     val jsWithFee = jsWithPK ++ Json.obj("fee" -> sender.calculateFee(jsWithPK).feeAmount)
     val js        = if (Option(version).isDefined) jsWithFee ++ Json.obj("version" -> version) else jsWithFee
     val rs        = sender.postJsonWithApiKey("/transactions/sign", js)

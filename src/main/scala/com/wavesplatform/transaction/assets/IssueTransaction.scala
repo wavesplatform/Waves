@@ -37,7 +37,7 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
 
   final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
-      sender.publicKey,
+      sender,
       Deser.serializeArray(name),
       Deser.serializeArray(description),
       Longs.toByteArray(quantity),

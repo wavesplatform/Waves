@@ -2,7 +2,7 @@ package com.wavesplatform.generator.utils
 
 import java.util.concurrent.ThreadLocalRandom
 
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
@@ -44,7 +44,7 @@ object Gen {
     else
       s"if (${recString(n - 1)}) then true else false"
 
-  def oracleScript(oracle: PrivateKeyAccount, data: Set[DataEntry[_]]): Script = {
+  def oracleScript(oracle: KeyPair, data: Set[DataEntry[_]]): Script = {
     val conditions =
       data.map {
         case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
@@ -68,7 +68,7 @@ object Gen {
     script._1
   }
 
-  def multiSigScript(owners: Seq[PrivateKeyAccount], requiredProofsCount: Int): Script = {
+  def multiSigScript(owners: Seq[KeyPair], requiredProofsCount: Int): Script = {
     val accountsWithIndexes = owners.zipWithIndex
     val keyLets =
       accountsWithIndexes map {
@@ -106,13 +106,13 @@ object Gen {
     script
   }
 
-  def txs(minFee: Long, maxFee: Long, senderAccounts: Seq[PrivateKeyAccount], recipientGen: Iterator[Address]): Iterator[Transaction] = {
+  def txs(minFee: Long, maxFee: Long, senderAccounts: Seq[KeyPair], recipientGen: Iterator[Address]): Iterator[Transaction] = {
     val senderGen = Iterator.randomContinually(senderAccounts)
     val feeGen    = Iterator.continually(minFee + random.nextLong(maxFee - minFee))
     transfers(senderGen, recipientGen, feeGen)
   }
 
-  def transfers(senderGen: Iterator[PrivateKeyAccount], recipientGen: Iterator[Address], feeGen: Iterator[Long]): Iterator[Transaction] = {
+  def transfers(senderGen: Iterator[KeyPair], recipientGen: Iterator[Address], feeGen: Iterator[Long]): Iterator[Transaction] = {
     val now = System.currentTimeMillis()
 
     senderGen
@@ -126,7 +126,7 @@ object Gen {
       .collect { case Right(x) => x }
   }
 
-  def massTransfers(senderGen: Iterator[PrivateKeyAccount], recipientGen: Iterator[Address], amountGen: Iterator[Long]): Iterator[Transaction] = {
+  def massTransfers(senderGen: Iterator[KeyPair], recipientGen: Iterator[Address], amountGen: Iterator[Long]): Iterator[Transaction] = {
     val now              = System.currentTimeMillis()
     val transferCountGen = Iterator.continually(random.nextInt(MassTransferTransaction.MaxTransferCount + 1))
     senderGen
@@ -143,7 +143,7 @@ object Gen {
 
   val address: Iterator[Address] = Iterator.continually {
     val pk = Array.fill[Byte](KeyLength)(random.nextInt(Byte.MaxValue).toByte)
-    Address.fromPublicKey(pk)
+    Address.fromPublicKey(PublicKey(pk))
   }
 
   def address(uniqNumber: Int): Iterator[Address] = Iterator.randomContinually(address.take(uniqNumber).toSeq)

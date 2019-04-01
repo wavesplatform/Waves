@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
+import com.wavesplatform.account.Address
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.{PaymentTransaction, ValidationError}
 
@@ -22,7 +22,7 @@ object PaymentTransactionDiff {
           height = height,
           tx = tx,
           portfolios = Map(tx.recipient -> Portfolio(balance = tx.amount, LeaseBalance.empty, assets = Map.empty)) combine Map(
-            Address.fromPublicKey(tx.sender.publicKey) -> Portfolio(
+            Address.fromPublicKey(tx.sender) -> Portfolio(
               balance = -tx.amount - tx.fee,
               LeaseBalance.empty,
               assets = Map.empty

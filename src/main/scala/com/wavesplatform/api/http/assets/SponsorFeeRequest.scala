@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
@@ -40,7 +40,7 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(value = "Base58 encoded sen
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SponsorFeeTransaction] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _asset      <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(IssuedAsset)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)

@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -47,12 +47,12 @@ class TransactionsRouteSpec
   routePath("/calculateFee") - {
     "transfer with Waves fee" - {
       "TransferTransaction" in {
-        val sender: PublicKeyAccount = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -74,11 +74,11 @@ class TransactionsRouteSpec
       }
 
       "MassTransferTransaction" in {
-        val sender: PublicKeyAccount = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 11,
           "version"         -> 1,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "transfers" -> Json.arr(
             Json.obj(
               "recipient" -> accountGen.sample.get.toAddress,
@@ -112,13 +112,13 @@ class TransactionsRouteSpec
     "transfer with Asset fee" - {
       "without sponsorship" in {
         val assetId: ByteStr         = issueGen.sample.get.assetId()
-        val sender: PublicKeyAccount = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.base58,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -141,13 +141,13 @@ class TransactionsRouteSpec
 
       "with sponsorship" in {
         val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
-        val sender: PublicKeyAccount = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.id.base58,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -183,13 +183,13 @@ class TransactionsRouteSpec
 
       "with sponsorship, smart token and smart account" in {
         val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
-        val sender: PublicKeyAccount = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.id.base58,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 

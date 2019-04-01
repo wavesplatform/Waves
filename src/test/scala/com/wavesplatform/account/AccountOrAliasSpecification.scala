@@ -8,7 +8,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Account serialization round trip") {
-    forAll(accountGen) { account: PrivateKeyAccount =>
+    forAll(accountGen) { account =>
       val bytes   = account.bytes.arr
       val address = Address.fromBytes(bytes).explicitGet()
       address.stringRepr shouldBe account.stringRepr

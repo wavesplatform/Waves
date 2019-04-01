@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.{File, FileNotFoundException}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{KeyPair, Address, AddressScheme}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -53,8 +53,8 @@ object GenesisBlockGenerator extends App {
       seedText = seedText,
       seed = ByteStr(seedHash),
       accountSeed = ByteStr(acc.seed),
-      accountPrivateKey = ByteStr(acc.privateKey),
-      accountPublicKey = ByteStr(acc.publicKey),
+      accountPrivateKey = acc.privateKey,
+      accountPublicKey = acc.publicKey,
       accountAddress = acc.toAddress
     )
   }
@@ -87,7 +87,7 @@ object GenesisBlockGenerator extends App {
 
   val genesisBlock: Block = {
     val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
-    val genesisSigner = PrivateKeyAccount(Array.empty)
+    val genesisSigner = KeyPair(ByteStr.empty)
 
     Block
       .buildAndSign(

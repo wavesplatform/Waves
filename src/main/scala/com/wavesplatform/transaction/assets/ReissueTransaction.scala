@@ -28,7 +28,7 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
 
   protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
-      sender.publicKey,
+      sender,
       asset.id.arr,
       Longs.toByteArray(quantity),
       if (reissuable) Array(1: Byte) else Array(0: Byte),
