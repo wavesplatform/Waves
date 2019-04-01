@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account._
 import com.wavesplatform.api.http.assets.SignedTransferV2Request
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
@@ -42,7 +42,7 @@ trait TransferSending extends ScorexLogging {
 
     val sourceAndDest = (1 to n).map { _ =>
       val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      Address.fromPublicKey(destPk).address
+      Address.fromPublicKey(PublicKey(destPk)).address
     }
 
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
@@ -59,7 +59,7 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (config, _) =>
           val accountSeed = config.getString("account-seed")
-          (config, PrivateKeyAccount.fromSeed(accountSeed).explicitGet())
+          (config, KeyPair(Base58.decode(accountSeed)))
       }
 
     val sourceAndDest = (1 to n).map { _ =>
@@ -90,7 +90,7 @@ trait TransferSending extends ScorexLogging {
     val sourceAndDest = (1 to n).map { _ =>
       val srcSeed  = Random.shuffle(seeds).head
       val destPk   = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      val destAddr = Address.fromPublicKey(destPk).address
+      val destAddr = Address.fromPublicKey(PublicKey(destPk)).address
 
       (srcSeed, destAddr)
     }
@@ -114,7 +114,7 @@ trait TransferSending extends ScorexLogging {
             TransferTransactionV2
               .selfSigned(
                 assetId = Waves,
-                sender = PrivateKeyAccount.fromSeed(x.senderSeed).explicitGet(),
+                sender = KeyPair(Base58.decode(x.senderSeed)),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,
@@ -138,7 +138,7 @@ trait TransferSending extends ScorexLogging {
   protected def createSignedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,

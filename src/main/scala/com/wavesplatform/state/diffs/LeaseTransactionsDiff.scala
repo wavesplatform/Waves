@@ -15,7 +15,7 @@ import scala.util.{Left, Right}
 object LeaseTransactionsDiff {
 
   def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
-    val sender = Address.fromPublicKey(tx.sender.publicKey)
+    val sender = Address.fromPublicKey(tx.sender)
     blockchain.resolveAlias(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
@@ -48,7 +48,7 @@ object LeaseTransactionsDiff {
       _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
         Left(GenericError(s"Cannot cancel already cancelled lease"))
       else Right(())
-      canceller = Address.fromPublicKey(tx.sender.publicKey)
+      canceller = Address.fromPublicKey(tx.sender)
       portfolioDiff <- if (tx.sender == lease.sender) {
         Right(
           Monoid.combine(Map(canceller -> Portfolio(-tx.fee, LeaseBalance(0, -lease.amount), Map.empty)),

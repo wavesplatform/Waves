@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -21,7 +21,7 @@ import scala.util.Random
 
 class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForHeight2 with CancelAfterFailure {
 
-  val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
+  val signerPK = KeyPair.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
 
   implicit val nxtCDataReads = Reads { json =>
     val bt = (json \ "base-target").as[Long]
@@ -115,7 +115,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
   }
 
   test("Reject block with invalid signature") {
-    val otherNodePK = PrivateKeyAccount.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
+    val otherNodePK = KeyPair.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
 
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
@@ -199,16 +199,16 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
       .withSpecial(_.raw("waves.miner.enable = yes"))
       .buildNonConflicting()
 
-  private def generatorSignature(signature: Array[Byte], publicKey: Array[Byte]): Array[Byte] = {
+  private def generatorSignature(signature: Array[Byte], publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestSize * 2)
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
-    System.arraycopy(publicKey, 0, s, crypto.DigestSize, crypto.DigestSize)
+    System.arraycopy(publicKey.arr, 0, s, crypto.DigestSize, crypto.DigestSize)
     crypto.fastHash(s)
   }
 
-  def forgeBlock(height: Int, signerPK: PrivateKeyAccount)(updateDelay: Long => Long = identity,
-                                                           updateBaseTarget: Long => Long = identity,
-                                                           updateGenSig: ByteStr => ByteStr = identity): Block = {
+  def forgeBlock(height: Int, signerPK: KeyPair)(updateDelay: Long => Long = identity,
+                                                        updateBaseTarget: Long => Long = identity,
+                                                        updateGenSig: ByteStr => ByteStr = identity): Block = {
 
     val ggParentTS =
       if (height >= 3)
@@ -221,7 +221,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val genSig: ByteStr =
       updateGenSig(
-        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK.publicKey))
+        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK))
       )
 
     val validBlockDelay: Long = updateDelay(

@@ -16,8 +16,8 @@ import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
   private[this] val MaxTotalDiffs = 15
 
-  private val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
-  private val microBlocks: MList[MicroBlock]                = MList.empty // fresh head
+  private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
+  private[this] val microBlocks: MList[MicroBlock]                = MList.empty // fresh head
 
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)

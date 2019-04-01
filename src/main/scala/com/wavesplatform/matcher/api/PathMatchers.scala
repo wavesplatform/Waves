@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.api
 import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.server.PathMatcher.{Matched, Unmatched}
 import akka.http.scaladsl.server.{PathMatcher, PathMatcher1, PathMatchers => AkkaMatchers}
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
@@ -22,7 +22,7 @@ object PathMatchers {
 
   object ByteStrPM extends Base58[ByteStr](ByteStr.decodeBase58(_).toOption)
 
-  object PublicKeyPM extends Base58[PublicKeyAccount](PublicKeyAccount.fromBase58String(_).toOption)
+  object PublicKeyPM extends Base58[PublicKey](PublicKey.fromBase58String(_).toOption)
 
   object AddressPM extends Base58[Address](Address.fromString(_).toOption)
 }
