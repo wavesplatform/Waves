@@ -31,4 +31,38 @@ class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
             |
       """.stripMargin) shouldBe Right(List(Directive(SCRIPT_TYPE, Asset)))
   }
+
+  property("parse directives with wrong key should produce error") {
+    val wrongKey = "WRONG_DIRECTIVE_KEY"
+    parse(s"""
+            |
+            |{-# $wrongKey VALUE #-}
+            |
+      """.stripMargin) shouldBe Left("Illegal directive key " + wrongKey)
+
+    parse(s"""
+            |
+            |{-# STDLIB_VERSION 1 #-}
+            |{-# CONTENT_TYPE EXPRESSION #-}
+            |{-# $wrongKey VALUE #-}
+            |
+      """.stripMargin) shouldBe Left("Illegal directive key " + wrongKey)
+  }
+
+  property("parse directives with existing key and wrong value should produce error") {
+    val wrongValue = "WRONG"
+    parse(s"""
+            |
+            |{-# SCRIPT_TYPE $wrongValue #-}
+            |
+      """.stripMargin) shouldBe Left(s"Illegal directive value $wrongValue for key SCRIPT_TYPE")
+
+    parse(s"""
+            |
+            |{-# STDLIB_VERSION 1 #-}
+            |{-# CONTENT_TYPE EXPRESSION #-}
+            |{-# SCRIPT_TYPE $wrongValue #-}
+            |
+      """.stripMargin) shouldBe Left(s"Illegal directive value $wrongValue for key SCRIPT_TYPE")
+  }
 }
