@@ -7,7 +7,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
@@ -17,7 +16,7 @@ import com.wavesplatform.transaction.ValidationError.ActivationError
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import com.wavesplatform.utils.ScorexLogging
 
-object BlockDiffer extends ScorexLogging with Instrumented {
+object BlockDiffer extends ScorexLogging {
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
 
   def fromBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,

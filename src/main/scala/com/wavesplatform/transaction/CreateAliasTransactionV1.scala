@@ -11,7 +11,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class CreateAliasTransactionV1 private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)
+case class CreateAliasTransactionV1 private (sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)
     extends CreateAliasTransaction
     with SignedTransaction {
 
@@ -35,7 +35,7 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
     }
   }
 
-  def create(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
+  def create(sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
@@ -43,19 +43,19 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
     }
   }
 
-  def signed(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+  def signed(sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, alias, fee, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[CreateAliasTransactionV1] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      PublicKeyBytes(tailIndex(1), "Sender's public key"),
       AliasBytes(tailIndex(2), "Alias object"),
       LongBytes(tailIndex(3), "Fee"),
       LongBytes(tailIndex(4), "Timestamp"),

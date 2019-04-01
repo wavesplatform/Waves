@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class IssueTransactionV1 private (sender: PublicKeyAccount,
+case class IssueTransactionV1 private (sender: PublicKey,
                                        name: Array[Byte],
                                        description: Array[Byte],
                                        quantity: Long,
@@ -48,7 +48,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: PublicKey,
              name: Array[Byte],
              description: Array[Byte],
              quantity: Long,
@@ -62,7 +62,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
       .map(_ => IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: PublicKey,
              name: Array[Byte],
              description: Array[Byte],
              quantity: Long,
@@ -70,13 +70,13 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(sender: KeyPair,
                  name: Array[Byte],
                  description: Array[Byte],
                  quantity: Long,
@@ -91,7 +91,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
     (
       SignatureBytes(tailIndex(1), "Signature"),
       ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
-      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      PublicKeyBytes(tailIndex(3), "Sender's public key"),
       BytesArrayUndefinedLength(tailIndex(4), "Asset name"),
       BytesArrayUndefinedLength(tailIndex(5), "Description"),
       LongBytes(tailIndex(6), "Quantity"),

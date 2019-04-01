@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.StdLibVersion._
@@ -41,7 +41,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           PureContext.build(StdLibVersion.V1),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression),
+            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
           )
         ))
@@ -55,7 +55,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           PureContext.build(StdLibVersion.V2),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(V2, ScriptType.Account, ContentType.Expression),
+            DirectiveSet(V2, ScriptType.Account, ContentType.Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
@@ -69,7 +69,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           PureContext.build(StdLibVersion.V3),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression),
+            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
@@ -83,7 +83,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
 
     val dtx = DataTransaction
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
         List(entry1, entry2, entry3, entry4),
         100000,
         1526911531530L,
@@ -95,7 +95,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
     val ttx = TransferTransactionV2
       .create(
         Waves,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
         Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get,
         100000000,
         1526641218066L,

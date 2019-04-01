@@ -17,7 +17,7 @@ import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
-object Verifier extends Instrumented with ScorexLogging {
+object Verifier extends ScorexLogging {
 
   private val stats = TxProcessingStats
 
@@ -117,7 +117,7 @@ object Verifier extends Instrumented with ScorexLogging {
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
 
-    def buyerOrSellerOrderVerification(order: Order) = {
+    def orderVerification(order: Order) = {
       blockchain
         .accountScript(order.sender.toAddress)
         .map { script =>
@@ -142,26 +142,29 @@ object Verifier extends Instrumented with ScorexLogging {
         }
     }
 
-    def matcherFeeAssetVerification(order: Order) = {
-      if (order.matcherFeeAssetId == order.assetPair.amountAsset || order.matcherFeeAssetId == order.assetPair.priceAsset) Right(et)
-      else assetVerification(order.matcherFeeAssetId)
+    lazy val txAssetsVerification: ValidationResult[Transaction] = {
+      Set(
+        buyOrder.assetPair.amountAsset,
+        buyOrder.assetPair.priceAsset,
+        buyOrder.matcherFeeAssetId,
+        sellOrder.matcherFeeAssetId
+      ).foldLeft[ValidationResult[Transaction]](Right(et)) {
+        case (verificationResult, asset) => verificationResult flatMap (_ => assetVerification(asset))
+      }
     }
 
     for {
       _ <- matcherTxVerification
-      _ <- buyerOrSellerOrderVerification(sellOrder)
-      _ <- buyerOrSellerOrderVerification(buyOrder)
-      _ <- assetVerification(buyOrder.assetPair.amountAsset)
-      _ <- assetVerification(buyOrder.assetPair.priceAsset)
-      _ <- matcherFeeAssetVerification(buyOrder)
-      _ <- matcherFeeAssetVerification(sellOrder)
+      _ <- orderVerification(sellOrder)
+      _ <- orderVerification(buyOrder)
+      _ <- txAssetsVerification
     } yield et
   }
 
   def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): ValidationResult[T] =
     pt.proofs.proofs match {
       case p :: Nil =>
-        Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),
+        Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender),
                     pt,
                     GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))

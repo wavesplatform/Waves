@@ -2,13 +2,14 @@ package com.wavesplatform.matcher
 
 import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import net.ceedubs.ficus.Ficus._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.{FreeSpec, Matchers}
@@ -41,7 +42,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
        |  blacklisted-names = ["name$$"]
        |  price-assets = [${predefinedPriceAssets.map(_.id.base58).mkString(",")}]
        |}""".stripMargin)
-  private val settings    = MatcherSettings.fromConfig(loadConfig(priceAssets))
+  private val settings    = loadConfig(priceAssets).as[MatcherSettings]("waves.matcher")
   private val blockchain  = stub[Blockchain]
 
   private val builder = new AssetPairBuilder(settings, blockchain)
@@ -110,7 +111,7 @@ object AssetPairBuilderSpec {
   private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
   private def mkAssetDescription(assetName: String = ""): Option[AssetDescription] =
     Some(
-      AssetDescription(PublicKeyAccount(Array.emptyByteArray),
+      AssetDescription(PublicKey(Array.emptyByteArray),
                        assetName.getBytes(Charsets.UTF_8),
                        Array.emptyByteArray,
                        8,

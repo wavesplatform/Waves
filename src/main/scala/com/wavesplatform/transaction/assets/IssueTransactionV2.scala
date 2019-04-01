@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -11,13 +11,14 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
 case class IssueTransactionV2 private (chainId: Byte,
-                                       sender: PublicKeyAccount,
+                                       sender: PublicKey,
                                        name: Array[Byte],
                                        description: Array[Byte],
                                        quantity: Long,
@@ -66,7 +67,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   }
 
   def create(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: PublicKey,
              name: Array[Byte],
              description: Array[Byte],
              quantity: Long,
@@ -79,11 +80,14 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
     for {
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
+      _ <- Either.cond(script.forall(_.isInstanceOf[ExprScript]),
+                       (),
+                       ValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
     } yield IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
   }
 
   def signed(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: PublicKey,
              name: Array[Byte],
              description: Array[Byte],
              quantity: Long,
@@ -92,7 +96,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     for {
       unverified <- create(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
@@ -100,7 +104,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   }
 
   def selfSigned(chainId: Byte,
-                 sender: PrivateKeyAccount,
+                 sender: KeyPair,
                  name: Array[Byte],
                  description: Array[Byte],
                  quantity: Long,
@@ -115,7 +119,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   val byteTailDescription: ByteEntity[IssueTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       BytesArrayUndefinedLength(tailIndex(3), "Name"),
       BytesArrayUndefinedLength(tailIndex(4), "Description"),
       LongBytes(tailIndex(5), "Quantity"),

@@ -35,7 +35,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
             let totalAmountToGov = commonAmount == 2000000000
             let massTxSize = size(ttx.transfers) == 2
 
-            let accountPK = base58'${ByteStr(notMiner.publicKey.publicKey)}'
+            let accountPK = base58'${ByteStr(notMiner.publicKey)}'
             let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
 
             let txToUsers = (massTxSize && totalAmountToUsers)

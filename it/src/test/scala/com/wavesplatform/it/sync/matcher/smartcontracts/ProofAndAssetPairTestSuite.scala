@@ -54,7 +54,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
               |    let id = t.id == base58''
               |    #let sender = t.sender == (base58'${ByteStr(aliceAcc.publicKey).base58}')
               |    let senderPublicKey = t.senderPublicKey == base58'${ByteStr(aliceAcc.publicKey).base58}'
-              |    let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(matcherNode.publicKey.publicKey).base58}'
+              |    let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(matcherNode.publicKey).base58}'
               |    let timestamp = t.timestamp > 0
               |    let price = t.price > 0
               |    let amount = t.amount > 0
@@ -83,7 +83,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                  |  case t : Order => 
                  |        let pk1 = base58'${ByteStr(aliceAcc.publicKey)}'
                  |        let pk2 = base58'${ByteStr(bobAcc.publicKey)}'
-                 |        let pk3 = base58'${ByteStr(matcherNode.publicKey.publicKey)}'
+                 |        let pk3 = base58'${ByteStr(matcherNode.publicKey)}'
                  |        
                  |        let alice = if (sigVerify(t.bodyBytes,t.proofs[0],pk1)) then 1 else 0
                  |        let bob = if (sigVerify(t.bodyBytes,t.proofs[1],pk2)) then 1 else 0
@@ -109,7 +109,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     val sc8 = s"""
                  |match tx {
                  |  case t : Order => 
-                 |        let pk1 = base58'${ByteStr(aliceNode.publicKey.publicKey)}'
+                 |        let pk1 = base58'${ByteStr(aliceNode.publicKey)}'
                  |   sigVerify(t.bodyBytes,t.proofs[0],pk1)
                  |  case s : SetScriptTransaction => true
                  |  case _ => throw()

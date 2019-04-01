@@ -26,7 +26,7 @@ object RealTransactionWrapper {
       header(tx),
       Recipient.Address(ByteStr(tx.sender.bytes.arr)),
       ByteStr(tx.bodyBytes()),
-      ByteStr(tx.sender.publicKey),
+      ByteStr(tx.sender),
       tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
     )
 
@@ -35,8 +35,8 @@ object RealTransactionWrapper {
     Ord(
       id = ByteStr(o.id.value.arr),
       sender = Recipient.Address(ByteStr(o.sender.bytes.arr)),
-      senderPublicKey = ByteStr(o.senderPublicKey.publicKey),
-      matcherPublicKey = ByteStr(o.matcherPublicKey.publicKey),
+      senderPublicKey = ByteStr(o.senderPublicKey),
+      matcherPublicKey = ByteStr(o.matcherPublicKey),
       assetPair = o.assetPair,
       orderType = o.orderType match {
         case BUY  => OrdType.Buy
@@ -101,7 +101,7 @@ object RealTransactionWrapper {
           }.toIndexedSeq
         )
       case ci: InvokeScriptTransaction =>
-        Tx.CI(proven(ci), ci.contractAddress, ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)))
+        Tx.CI(proven(ci), ci.dappAddress, ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)), ci.feeAssetId.compatId)
     }
   }
 }

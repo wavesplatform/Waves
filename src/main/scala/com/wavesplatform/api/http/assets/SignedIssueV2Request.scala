@@ -2,7 +2,7 @@ package com.wavesplatform.api.http.assets
 
 import cats.implicits._
 import com.google.common.base.Charsets
-import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, AddressScheme}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.script.Script
@@ -59,7 +59,7 @@ case class SignedIssueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer
     extends BroadcastRequest {
   def toTx: Either[ValidationError, IssueTransactionV2] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _script <- script match {

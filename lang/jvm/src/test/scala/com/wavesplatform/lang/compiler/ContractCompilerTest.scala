@@ -1,9 +1,10 @@
 package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
@@ -24,7 +25,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext
-        .build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+        .build(
+          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+          Common.emptyBlockchainEnvironment()
+        )
         .compilerContext
     )
     val expr = {
@@ -47,7 +51,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     val expectedResult = Right(
-      Contract(
+      DApp(
         List.empty,
         List(CallableFunction(
           CallableAnnotation("invocation"),
@@ -79,7 +83,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   private val cmpCtx: CompilerContext =
-    WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment()).compilerContext
+    WavesContext
+      .build(
+        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+        Common.emptyBlockchainEnvironment()
+      )
+      .compilerContext
+
   property("contract compiles callable functions independently") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
@@ -224,7 +234,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         Seq(
           PureContext.build(StdLibVersion.V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+          WavesContext.build(
+            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+            Common.emptyBlockchainEnvironment()
+          )
         ))
       .compilerContext
     val expr = {
@@ -234,7 +247,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |	@Callable(i)
           |	func deposit() = {
           |   let pmt = i.payment.value()
-          |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
+          |   if (isDefined(pmt.assetId)) then throw("can hodl waves only at the moment")
           |   else {
           |	  	let currentKey = toBase58String(i.caller.bytes)
           |	  	let currentAmount = match getInteger(this, currentKey) {
@@ -259,9 +272,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |			then throw("Can't withdraw negative amount")
           |  else if (newAmount < 0)
           |			then throw("Not enough balance")
-          |			else ContractResult(
+          |			else ScriptResult(
           |					WriteSet([DataEntry(currentKey, newAmount)]),
-          |					TransferSet([ContractTransfer(i.caller, amount, unit)])
+          |					TransferSet([ScriptTransfer(i.caller, amount, unit)])
           |				)
           |	}
           |
@@ -287,7 +300,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func bar() = {
           |   if (true) then WriteSet([DataEntry("entr1","entr2")])
-          |   else TransferSet([ContractTransfer(i.caller, wavesBalance(this), base58'somestr')])
+          |   else TransferSet([ScriptTransfer(i.caller, wavesBalance(this), base58'somestr')])
           | }
           |
           | @Verifier(t)
@@ -415,7 +428,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           |  {-# STDLIB_VERSION 3 #-}
-          |  {-# CONTENT_TYPE CONTRACT #-}
+          |  {-# CONTENT_TYPE DAPP #-}
           |  let a = 42
           |
           |  @Verifier(tx)
@@ -433,4 +446,67 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 
+  property("matching case with non-existing type should produce error message with suitable types") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          |  @Verifier(tx)
+          |  func test() =
+          |    match tx {
+          |      case _: UndefinedType => true
+          |      case _                => false
+          |    }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
+
+  property("expression matching case with non-existing type should produce error message with suitable types") {
+    val ctx           = Monoid.combine(compilerContext, cmpCtx)
+    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+
+    val expr = {
+      val script =
+        s"""
+          |
+          |  func local(tx: ${verifierTypes.mkString("|")}) = tx
+          |
+          |  @Verifier(tx)
+          |  func test() =
+          |    match local(tx) {
+          |      case _: UndefinedType => true
+          |      case _                => false
+          |  }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
+
+  ignore("matching case with union type containing non-existing type should produce error message with suitable types") {
+    val ctx           = Monoid.combine(compilerContext, cmpCtx)
+    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+
+    val expr = {
+      val script =
+        s"""
+           |
+           |  @Verifier(tx)
+           |  func test() =
+           |    match tx {
+           |      case _: ${verifierTypes.head} | UndefinedType => true
+           |      case _                                        => false
+           |    }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
 }

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
@@ -91,7 +91,7 @@ object AssetTransactionsDiff {
     }
   }
 
-  private def validIssuer(issuerOnly: Boolean, sender: PublicKeyAccount, issuer: PublicKeyAccount): Boolean = {
+  private def validIssuer(issuerOnly: Boolean, sender: PublicKey, issuer: PublicKey): Boolean = {
     if (issuerOnly) sender equals issuer
     else true
   }
