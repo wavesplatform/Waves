@@ -133,8 +133,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 scripts: Map[Address, Option[Script]],
                 assetScripts: Map[IssuedAsset, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[IssuedAsset, Sponsorship],
-                totalFee: Long)
+                sponsorship: Map[IssuedAsset, Sponsorship])
 
 object Diff {
 
@@ -146,8 +145,7 @@ object Diff {
                scripts: Map[Address, Option[Script]] = Map.empty,
                assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
                accountData: Map[Address, AccountDataInfo] = Map.empty,
-               sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-               wavesFee: Long = 0): Diff =
+               sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
     Diff(
       transactions = Map(),
       portfolios = portfolios,
@@ -158,8 +156,7 @@ object Diff {
       scripts = scripts,
       assetScripts = assetScripts,
       accountData = accountData,
-      sponsorship = sponsorship,
-      totalFee = wavesFee
+      sponsorship = sponsorship
     )
 
   def apply(height: Int,
@@ -172,8 +169,7 @@ object Diff {
             scripts: Map[Address, Option[Script]] = Map.empty,
             assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
             accountData: Map[Address, AccountDataInfo] = Map.empty,
-            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-            wavesFee: Long = 0L): Diff =
+            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
     Diff(
       transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
       portfolios = portfolios,
@@ -184,11 +180,10 @@ object Diff {
       scripts = scripts,
       assetScripts = assetScripts,
       accountData = accountData,
-      sponsorship = sponsorship,
-      totalFee = wavesFee
+      sponsorship = sponsorship
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0L)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -204,8 +199,7 @@ object Diff {
         scripts = older.scripts ++ newer.scripts,
         assetScripts = older.assetScripts ++ newer.assetScripts,
         accountData = older.accountData.combine(newer.accountData),
-        sponsorship = older.sponsorship.combine(newer.sponsorship),
-        totalFee = older.totalFee + newer.totalFee
+        sponsorship = older.sponsorship.combine(newer.sponsorship)
       )
   }
 }

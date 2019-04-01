@@ -91,7 +91,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
           diffSponsorship.orElse(blockchain.assetDescription(asset).map(_.sponsorship))
         }
 
-        diff.copy(totalFee = Sponsorship.calcWavesFeeAmount(tx, getSponsorship))
+        diff.copy()
       }
     }
   }

@@ -165,12 +165,7 @@ object InvokeScriptTransactionDiff {
         .foldLeft(Map[Address, Portfolio]())(_ combine _)
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
         Right(
-          Diff(
-            height = height,
-            tx = tx,
-            portfolios = feePart combine payablePart,
-            accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-          ))
+          Diff(height = height, tx = tx, portfolios = feePart combine payablePart, accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))))
       else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
     }
   }
@@ -184,15 +179,13 @@ object InvokeScriptTransactionDiff {
         Asset.fromCompatId(asset) match {
           case Waves =>
             diffEi combine Right(
-              Diff.stateOps(
-                portfolios = Map(
+              Diff.stateOps(portfolios = Map(
                   address            -> Portfolio(amount, LeaseBalance.empty, Map.empty),
                   tx.contractAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
                 )))
           case a @ IssuedAsset(_) =>
             diffEi combine {
-              val nextDiff = Diff.stateOps(
-                portfolios = Map(
+              val nextDiff = Diff.stateOps(portfolios = Map(
                   address            -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
                   tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
                 ))

@@ -208,7 +208,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
                          sponsorship: Map[IssuedAsset, Sponsorship],
                          totalFee: Long): Unit
 
-  override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
+  override def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -308,7 +308,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.accountData.map { case (address, data) => addressId(address) -> data },
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship,
-      diff.totalFee
+      totalFee
     )
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))

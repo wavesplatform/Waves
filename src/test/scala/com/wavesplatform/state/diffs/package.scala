@@ -21,7 +21,7 @@ package object diffs extends WithState with Matchers {
 
     preconditions.foreach { precondition =>
       val (preconditionDiff, preconditionFees, _) = differ(state, precondition).explicitGet()
-      state.append(preconditionDiff, preconditionFees, precondition)
+      state.append(totalFee = , block = precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_._1))
@@ -34,7 +34,7 @@ package object diffs extends WithState with Matchers {
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val (diff, fees, _) = differ(state, prevBlock, curBlock).explicitGet()
-      state.append(diff, fees, curBlock)
+      state.append(diff, fees, , curBlock)
       Some(curBlock)
     }
 
@@ -42,7 +42,7 @@ package object diffs extends WithState with Matchers {
     val cb              = new CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 
-    state.append(diff, fees, block)
+    state.append(diff, fees, , block)
     assertion(diff, state)
   }
 
@@ -60,7 +60,7 @@ package object diffs extends WithState with Matchers {
 
       test(txs => {
         val block = TestBlock.create(txs)
-        differ(state, block).map(diff => state.append(diff._1, diff._2, block))
+        differ(state, block).map(diff => state.append(totalFee = , block = block))
       })
     }
 
