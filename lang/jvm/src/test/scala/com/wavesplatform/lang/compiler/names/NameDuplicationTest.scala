@@ -4,13 +4,14 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.compiler.compilerContext
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, ContentType, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Common
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -21,7 +22,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+          DirectiveSet(V3, Account, DAppType).explicitGet(),
           Common.emptyBlockchainEnvironment()
         )
         .compilerContext

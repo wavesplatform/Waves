@@ -1,15 +1,16 @@
 package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{KeyPair, Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -18,7 +19,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -158,14 +158,14 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     val ctx = {
-      utils.functionCosts(StdLibVersion.V3)
+      utils.functionCosts(V3)
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(StdLibVersion.V3),
+            PureContext.build(V3),
             CryptoContext.build(Global),
             WavesContext.build(
-              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
+              DirectiveSet(V3, Account, Expression).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
             )
           ))
@@ -190,7 +190,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       arg         <- genBoundedString(1, 32)
       funcBinding <- Gen.const("funcForTesting")
       contract    = simpleContract(funcBinding).explicitGet()
-      script      = ContractScript(StdLibVersion.V3, contract)
+      script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_STRING("Not-a-Number")))
@@ -231,7 +231,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       arg         <- genBoundedString(1, 32)
       funcBinding <- validAliasStringGen
       contract    <- senderBindingToContract(funcBinding)
-      script      = ContractScript(StdLibVersion.V3, contract)
+      script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
