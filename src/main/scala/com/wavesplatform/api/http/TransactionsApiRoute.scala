@@ -12,6 +12,7 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -258,12 +259,14 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     ))
   def broadcast: Route =
     (pathPrefix("broadcast") & post) {
-      (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
-        TransactionFactory
-          .fromSignedRequest(jsv)
-          .map(commonApi.broadcastTransaction)
+      (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
+        val result: Either[ApiError, VanillaTransaction] = TransactionFactory
+          .fromSignedRequest(transactionJson)
+          .flatMap(commonApi.broadcastTransaction)
           .left
           .map(ApiError.fromValidationError)
+
+        complete(result)
       }
     }
 
