@@ -68,7 +68,7 @@ object BlockDiffer extends ScorexLogging {
                                                      micro: MicroBlock,
                                                      timestamp: Long,
                                                      constraint: Constraint,
-                                                     verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                     verify: Boolean = true): Either[ValidationError, Result[Constraint]] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))

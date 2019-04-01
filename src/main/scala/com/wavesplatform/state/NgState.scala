@@ -71,7 +71,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     }
 
   def bestLiquidDiffAndFees: (Diff, Long, Long) =
-    micros.headOption.fold((baseBlockDiff, baseBlockCarry, baseBlockTotalFee))(m => diffFor(m.totalResBlockSig))
+    microBlocks.headOption.fold((baseBlockDiff, baseBlockCarry, baseBlockTotalFee))(m => diffFor(m.totalResBlockSig))
 
   def bestLiquidDiff: Diff =
     bestLiquidDiffAndFees._1
