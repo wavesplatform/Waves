@@ -95,7 +95,7 @@ object LevelDBWriterBenchmark {
     private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
     val db =
-      new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
+      new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000, false)
 
     @TearDown
     def close(): Unit = {

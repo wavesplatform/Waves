@@ -75,18 +75,17 @@ class LevelDBWriter(writableDB: DB,
                     fs: FunctionalitySettings,
                     val maxCacheSize: Int,
                     val maxRollbackDepth: Int,
-                    val rememberBlocksInterval: Long)
+                    val rememberBlocksInterval: Long,
+                    disableTxsByAddress1: Boolean)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
 
-  private[this] lazy val disableTxsByAddress = {
-    val propsDisabled = sys.props.get("waves.db.disable-txs-by-address").exists(s => s == "1" || s.toLowerCase == "true")
+  lazy val disableTxsByAddress = {
     val dbDisabled    = readOnly(_.get(Keys.DisableTxsByAddress).fold(false)(identity))
-
-    if (propsDisabled && !dbDisabled) readWrite(_.put(Keys.DisableTxsByAddress, Some(true)))
-    propsDisabled || dbDisabled
+    if (disableTxsByAddress1 && !dbDisabled) readWrite(_.put(Keys.DisableTxsByAddress, Some(true)))
+    disableTxsByAddress1 || dbDisabled
   }
 
   import LevelDBWriter._
@@ -365,7 +364,7 @@ class LevelDBWriter(writableDB: DB,
       }
     }
 
-    if (!disableTxsByAddress) for ((addressId, txIds) <- addressTransactions) {
+    if (!disableTxsByAddress1) for ((addressId, txIds) <- addressTransactions) {
       val kk        = Keys.addressTransactionSeqNr(addressId)
       val nextSeqNr = rw.get(kk) + 1
       val txTypeNumSeq = txIds.map { txId =>
@@ -471,7 +470,7 @@ class LevelDBWriter(writableDB: DB,
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
             discardLeaseBalance(address)
 
-            if (!disableTxsByAddress) {
+            if (!disableTxsByAddress1) {
               val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
               val txSeqNr  = rw.get(kTxSeqNr)
               val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
@@ -607,7 +606,7 @@ class LevelDBWriter(writableDB: DB,
   }
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    if (disableTxsByAddress)
+    if (disableTxsByAddress1)
       Left("Transactions by address are disabled, please enable it and rebuild the state")
     else
       readOnly { db =>

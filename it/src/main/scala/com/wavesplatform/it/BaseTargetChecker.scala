@@ -27,7 +27,7 @@ object BaseTargetChecker {
     val db               = openDB("/tmp/tmp-db")
     val time             = new NTP("ntp.pool.org")
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-    val bu               = StorageFactory(settings, db, time, portfolioChanges)
+    val bu               = StorageFactory(settings, db, time, portfolioChanges, false)
     val pos              = new PoSSelector(bu, settings.blockchainSettings, settings.synchronizationSettings)
     bu.processBlock(genesisBlock)
 
