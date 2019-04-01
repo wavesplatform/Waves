@@ -1,11 +1,10 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.{TransactionGen, WithDB}
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.lang.Global
@@ -13,11 +12,11 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.utils
-import monix.eval.Coeval
 import cats.kernel.Monoid
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.{TransactionGen, WithDB, utils}
+import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
@@ -68,7 +67,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     val tx = IssueTransactionV2
       .create(
         'T',
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes,
         "Gigacoin".getBytes,
         10000000000L,
@@ -119,7 +118,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     val tx = IssueTransactionV2
       .create(
         'T',
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes,
         "Gigacoin".getBytes,
         10000000000L,

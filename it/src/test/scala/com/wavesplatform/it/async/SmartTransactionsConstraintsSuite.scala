@@ -1,7 +1,7 @@
 package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.assets.SignedSetScriptRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -61,17 +61,17 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     .build(false)
 
   private def miner                   = nodes.head
-  private val smartAccountPrivateKey  = PrivateKeyAccount.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
-  private val simpleAccountPrivateKey = PrivateKeyAccount.fromSeed(NodeConfigs.Default(2).getString("account-seed")).explicitGet()
+  private val smartPrivateKey  = KeyPair.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
+  private val simplePrivateKey = KeyPair.fromSeed(NodeConfigs.Default(2).getString("account-seed")).explicitGet()
 
   s"Block is limited by size after activation" in result(
     for {
-      _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
-      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartPrivateKey))) + ("type" -> JsNumber(13)))
+      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.address))
       _ <- miner.waitForHeight(5)
-      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.address))
       _ <- scala.concurrent.Future.sequence((0 to 9).map(_ =>
-        processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simpleAccountPrivateKey.address))))
+        processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simplePrivateKey.address))))
       _                  <- miner.waitForHeight(6)
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
@@ -86,7 +86,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     12.minutes
   )
 
-  private def setScriptTx(sender: PrivateKeyAccount) =
+  private def setScriptTx(sender: KeyPair) =
     SetScriptTransaction
       .selfSigned(
         sender = sender,
@@ -97,7 +97,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .explicitGet()
 
   private def toRequest(tx: SetScriptTransaction): SignedSetScriptRequest = SignedSetScriptRequest(
-    senderPublicKey = Base58.encode(tx.sender.publicKey),
+    senderPublicKey = Base58.encode(tx.sender),
     script = tx.script.map(_.bytes().base64),
     fee = tx.fee,
     timestamp = tx.timestamp,

@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.transaction.Asset.Waves
@@ -38,9 +38,9 @@ class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
   "Reserved balance should empty after full rounded execution" in {
     val pair = AssetPair(mkAssetId("BTC"), mkAssetId("ETH"))
 
-    val alicePk   = PrivateKeyAccount("alice".getBytes("utf-8"))
+    val alicePk   = KeyPair("alice".getBytes("utf-8"))
     val counter   = buy(pair, 923431000L, 0.00031887, matcherFee = Some(300000), sender = Some(alicePk))
-    val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
+    val bobPk     = KeyPair("bob".getBytes("utf-8"))
     val submitted = sell(pair, 223345000L, 0.00031887, matcherFee = Some(300000), sender = Some(bobPk))
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L)

@@ -45,8 +45,8 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |     let payRecipient = pay.recipient == Address(base58'${p.recipient.address}')
       |
       |     let bodyBytes = pay.bodyBytes == base64'${ByteStr(p.bodyBytes.apply()).base64}'
-      |     let sender = pay.sender == addressFromPublicKey(base58'${ByteStr(p.sender.publicKey).base58}')
-      |     let senderPublicKey = pay.senderPublicKey == base58'${ByteStr(p.sender.publicKey).base58}'
+      |     let sender = pay.sender == addressFromPublicKey(base58'${ByteStr(p.sender).base58}')
+      |     let senderPublicKey = pay.senderPublicKey == base58'${ByteStr(p.sender).base58}'
       |     let signature = pay.proofs[0]== base58'${p.signature.base58}'
       |     let empty1 = pay.proofs[1]== base58''
       |     let empty2 = pay.proofs[2]== base58''
