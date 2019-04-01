@@ -104,9 +104,14 @@ class UtxPoolImpl(time: Time,
     removeExpired(time.correctedTime())
   }
 
+  private[this] def afterRemove(tx: Transaction): Unit = {
+    poolMetrics.removeTransaction(tx)
+    pessimisticPortfolios.remove(tx.id())
+  }
+
   private def remove(txId: ByteStr): Unit = {
-    Option(transactions.remove(txId)).foreach(poolMetrics.removeTransaction)
-    pessimisticPortfolios.remove(txId)
+    Option(transactions.remove(txId))
+      .foreach(afterRemove)
   }
 
   private[this] def removeInvalid(): Unit =
@@ -116,6 +121,7 @@ class UtxPoolImpl(time: Time,
         TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx) match {
           case Left(error) =>
             log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
+            afterRemove(tx)
             true
 
           case Right(_) =>
