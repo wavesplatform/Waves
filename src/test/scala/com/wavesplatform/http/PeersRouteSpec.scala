@@ -87,14 +87,14 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     val route      = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
     val connectUri = routePath("/connect")
     Post(connectUri, ConnectReq("example.com", 1)) ~> route should produce(ApiKeyNotValid)
-    Post(connectUri, "") ~> api_key(apiKey) ~> route ~> check(handled shouldEqual false)
-    Post(connectUri, Json.obj()) ~> api_key(apiKey) ~> route ~> check {
+    Post(connectUri, "") ~> ApiKeyHeader ~> route ~> check(handled shouldEqual false)
+    Post(connectUri, Json.obj()) ~> ApiKeyHeader ~> route ~> check {
       (responseAs[JsValue] \ "validationErrors").as[JsObject].keys should not be 'empty
     }
 
     val address = inetSocketAddressGen.sample.get
     connectToPeer.expects(address).once
-    val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> api_key(apiKey) ~> route ~> runRoute
+    val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> ApiKeyHeader ~> route ~> runRoute
     check {
       responseAs[ConnectResp].hostname shouldEqual address.getHostName
     }(result)

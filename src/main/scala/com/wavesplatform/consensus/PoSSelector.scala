@@ -3,6 +3,7 @@ package com.wavesplatform.consensus
 import cats.implicits._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -59,7 +60,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     blockchain.lastBlock
       .toRight(GenericError("No blocks in blockchain"))
       .map(b => generatorSignature(b.consensusData.generationSignature.arr, block.signerData.generator.publicKey))
-      .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = $vgs; Found = $blockGS"))(_ sameElements blockGS)
+      .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(
+        _ sameElements blockGS)
       .map(_ => ())
   }
 

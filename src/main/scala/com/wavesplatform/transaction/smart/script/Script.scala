@@ -49,11 +49,11 @@ object Script {
   def decompile(s: Script): (String, DirectiveMeta) = {
     val (scriptText, directives: DirectiveMeta) = s match {
       case e: ExprScript =>
-        val directives = HList(s.stdLibVersion, Expression).map(PolyDecompile).toList
+        val directives = HList((s.stdLibVersion, Expression)).map(PolyDecompile).toList
         val decompiler = Decompiler(e.expr, defaultDecompilerContext)
         (decompiler, directives)
       case ContractScriptImpl(_, contract, _) =>
-        val directives = HList(s.stdLibVersion, Account, DApp).map(PolyDecompile).toList
+        val directives = HList((s.stdLibVersion, Account, DApp)).map(PolyDecompile).toList
         val decompiler = Decompiler(contract, defaultDecompilerContext)
         (decompiler, directives)
     }

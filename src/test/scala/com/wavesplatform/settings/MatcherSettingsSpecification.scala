@@ -10,6 +10,7 @@ import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.settings.OrderFeeSettings._
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -17,7 +18,8 @@ import scala.util.Try
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
-  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] = Try(MatcherSettings.fromConfig(conf)).toEither.leftMap(_.getMessage)
+  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
+    Try(conf.as[MatcherSettings]("waves.matcher")).toEither.leftMap(_.getMessage)
 
   val correctOrderFeeStr: String =
     s"""
@@ -123,7 +125,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     val config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderAmountStr)
 
-    val settings = MatcherSettings.fromConfig(config)
+    val settings = config.as[MatcherSettings]("waves.matcher")
     settings.enable should be(true)
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
@@ -209,15 +211,15 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val settingsInvalidProfit       = getSettingByConfig(configStr(invalidProfit))
     val settingsInvalidLossAndFee   = getSettingByConfig(configStr(invalidLossAndFee))
 
-    settingsInvalidEnable shouldBe Left("Invalid setting waves.matcher.max-price-deviations.enable value: foobar")
+    settingsInvalidEnable shouldBe Left("Invalid setting max-price-deviations.enable value: foobar")
 
     settingsInvalidProfit shouldBe
-      Left("Invalid setting waves.matcher.max-price-deviations.profit value: -1000000, required 0 < percent")
+      Left("Invalid setting max-price-deviations.profit value: -1000000, required 0 < percent")
 
     settingsInvalidLossAndFee shouldBe
       Left(
-        "Invalid setting waves.matcher.max-price-deviations.loss value: 0, required 0 < percent, " +
-          "Invalid setting waves.matcher.max-price-deviations.fee value: -1000000, required 0 < percent")
+        "Invalid setting max-price-deviations.loss value: 0, required 0 < percent, " +
+          "Invalid setting max-price-deviations.fee value: -1000000, required 0 < percent")
   }
 
   "OrderFeeSettings in MatcherSettings" should "be validated" in {
@@ -300,20 +302,20 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val settingsInvalidAssetAndFee    = getSettingByConfig(configStr(invalidAssetAndFee))
     val settingsInvalidFeeInWaves     = getSettingByConfig(configStr(invalidFeeInWaves))
 
-    settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
+    settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.percent.asset-type value: test, " +
-          "Invalid setting waves.matcher.order-fee.percent.min-fee value: 121.2, required 0 < percent <= 100")
+        "Invalid setting order-fee.percent.asset-type value: test, " +
+          "Invalid setting order-fee.percent.min-fee value: 121.2, required 0 < percent <= 100")
 
     settingsInvalidAssetAndFee shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.fixed.asset value: ;;;;, " +
-          "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, required 0 < fee")
+        "Invalid setting order-fee.fixed.asset value: ;;;;, " +
+          "Invalid setting order-fee.fixed.min-fee value: -300000, required 0 < fee")
 
     settingsInvalidFeeInWaves shouldBe Left(
-      s"Invalid setting waves.matcher.order-fee.waves.base-fee value: -350000, required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount}"
+      s"Invalid setting order-fee.waves.base-fee value: -350000, required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount}"
     )
   }
 
@@ -353,11 +355,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin
 
     getSettingByConfig(configStr(incorrectAssetsCount)) should produce(
-      "Invalid setting waves.matcher.allowed-asset-pairs value: [WAVES-BTC, WAVES-BTC-ETH, ETH], Incorrect assets count (expected 2, but got 3): WAVES-BTC-ETH, Incorrect assets count (expected 2, but got 1): ETH"
+      "Invalid setting allowed-asset-pairs value: [WAVES-BTC, WAVES-BTC-ETH, ETH], Incorrect assets count (expected 2, but got 3): WAVES-BTC-ETH, Incorrect assets count (expected 2, but got 1): ETH"
     )
 
     getSettingByConfig(configStr(incorrectAssets)) should produce(
-      "Invalid setting waves.matcher.allowed-asset-pairs value: [WAVES-;;;, WAVES-BTC], requirement failed: Wrong char ';' in Base58 string ';;;'"
+      "Invalid setting allowed-asset-pairs value: [WAVES-;;;, WAVES-BTC], requirement failed: Wrong char ';' in Base58 string ';;;'"
     )
 
     getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2
@@ -436,13 +438,13 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       )
 
     getSettingByConfig(configStr(incorrectPairAndStepSize)) should produce(
-      "Invalid setting waves.matcher.order-amount-restrictions.0.step-size value: -0.013, required 0 < step size, " +
-        "Invalid setting waves.matcher.order-amount-restrictions.1.pair value: ETH-;;;"
+      "Invalid setting order-amount-restrictions.0.step-size value: -0.013, required 0 < step size, " +
+        "Invalid setting order-amount-restrictions.1.pair value: ETH-;;;"
     )
 
     getSettingByConfig(configStr(incorrectMinAndMaxAmount)) should produce(
-      "Invalid setting waves.matcher.order-amount-restrictions.0.min-amount value: 0.001, amount must be a multiple of step-size (0.013) and must be > 0, " +
-        "Invalid setting waves.matcher.order-amount-restrictions.0.max-amount value: 1000000, amount must be a multiple of step-size (0.013) and must be > 0"
+      "Invalid setting order-amount-restrictions.0.min-amount value: 0.001, amount must be a multiple of step-size (0.013) and must be > 0, " +
+        "Invalid setting order-amount-restrictions.0.max-amount value: 1000000, amount must be a multiple of step-size (0.013) and must be > 0"
     )
   }
 }
