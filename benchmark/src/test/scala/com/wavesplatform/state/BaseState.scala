@@ -73,7 +73,7 @@ trait BaseState {
   )
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next, MiningConstraint.Unlimited).explicitGet()._1
+    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next, MiningConstraint.Unlimited).explicitGet().diff
     state.append(preconditionDiff, 0, 0, next)
   }
 
