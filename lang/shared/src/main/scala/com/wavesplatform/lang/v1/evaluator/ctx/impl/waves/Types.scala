@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.StdLibVersion
-import com.wavesplatform.lang.StdLibVersion.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, DefinedType, UnionType}
 
@@ -15,12 +14,12 @@ object Types {
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
   val listTransfers        = LIST(transfer.typeRef)
-  val paymentType          = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount" -> LONG))
+  val paymentType          = CaseType("AttachedPayment", List("assetId" -> optionByteVector, "amount" -> LONG))
 
   val optionPayment = UNION(paymentType.typeRef, UNIT)
 
   val invocationType =
-    CaseType("Invocation", List("caller" -> addressType.typeRef, "payment" -> optionPayment))
+    CaseType("Invocation", List("caller" -> addressType.typeRef, "callerPublicKey" -> BYTESTR, "payment" -> optionPayment))
 
   private val header = List(
     "id"        -> BYTESTR,
@@ -81,7 +80,7 @@ object Types {
     "InvokeScriptTransaction",
     addProofsIfNeeded(
       List(
-        "contractAddress" -> addressType.typeRef,
+        "dappAddress" -> addressType.typeRef,
         "payment"     -> optionPayment,
         "feeAssetId" -> optionByteVector
       ) ++ header ++ proven,
@@ -264,7 +263,7 @@ object Types {
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
     buildSetAssetScriptTransactionType(proofsEnabled)
-  ) ++ (if (v == StdLibVersion.V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
+  ) ++ (if (v == V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++

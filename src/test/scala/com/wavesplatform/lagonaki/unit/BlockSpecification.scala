@@ -1,6 +1,6 @@
 package com.wavesplatform.lagonaki.unit
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -67,7 +67,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           assert(parsedBlock.signaturesValid().isRight)
           assert(parsedBlock.consensusData.generationSignature == generationSignature)
           assert(parsedBlock.version.toInt == version)
-          assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
+          assert(parsedBlock.signerData.generator == recipient.publicKey)
       }
     }
   }
@@ -118,13 +118,13 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         assert(parsedBlock.signaturesValid().isRight)
         assert(parsedBlock.consensusData.generationSignature == generationSignature)
         assert(parsedBlock.version.toInt == version)
-        assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
+        assert(parsedBlock.signerData.generator == recipient.publicKey)
         assert(parsedBlock.featureVotes == featureVotes)
     }
   }
 
   property("block signed by a weak public key is invalid") {
-    val weakAccount = PublicKeyAccount(Array.fill(32)(0: Byte))
+    val weakAccount = PublicKey(Array.fill(32)(0: Byte))
     forAll(blockGen) {
       case (baseTarget, reference, generationSignature, recipient, transactionData) =>
         val block = Block
@@ -146,10 +146,11 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) {
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
-          Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
-        val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature())
-        val (hash, t2)  = Instrumented.withTime(crypto.fastHash(bytes))
-        val (sig, t3)   = Instrumented.withTime(crypto.sign(acc, hash))
+          Instrumented.withTimeMillis(
+            Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
+        val (bytes, t1) = Instrumented.withTimeMillis(block.bytesWithoutSignature())
+        val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
+        val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))
         println((t0, t1, t2, t3))
     }
   }

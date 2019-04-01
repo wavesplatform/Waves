@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -40,7 +40,7 @@ import scala.util.Failure
 @Path("/matcher")
 @Api(value = "/matcher/")
 case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
-                           matcherPublicKey: PublicKeyAccount,
+                           matcherPublicKey: PublicKey,
                            matcher: ActorRef,
                            addressActor: ActorRef,
                            storeEvent: StoreEvent,
@@ -53,6 +53,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            db: DB,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
+                           lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long)
     extends ApiRoute
     with ScorexLogging {
@@ -72,7 +73,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings ~ getCurrentOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
+        getSettings ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
     }
   }
 
@@ -107,10 +108,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
-  private def signedGet(publicKey: PublicKeyAccount): Directive0 =
+  private def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
-        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey.publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey.publicKey),
+        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey),
                 "Incorrect signature")
         pass
     }
@@ -127,13 +128,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
   def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) {
-    complete(JsString(Base58.encode(matcherPublicKey.publicKey)))
+    complete(JsString(Base58.encode(matcherPublicKey)))
   }
 
   @Path("/settings")
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
-
     complete(
       StatusCodes.OK -> Json.obj(
         "priceAssets" -> matcherSettings.priceAssets,
@@ -194,19 +194,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def place: Route = path("orderbook") {
-    (pathEndOrSingleSlash & post) {
-      _json[Order] { order =>
-        unavailableOrderBookBarrier(order.assetPair) {
-          complete {
-            placeTimer.measureFuture {
-              orderValidator(order) match {
-                case Right(_) =>
-                  placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
-                case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
-              }
-            }
-          }
-        }
+    (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
+      unavailableOrderBookBarrier(order.assetPair) {
+        complete(placeTimer.measureFuture(orderValidator(order) match {
+          case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
+          case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
+        }))
       }
     }
   }
@@ -216,7 +209,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderbooks: Route = (path("orderbook") & pathEndOrSingleSlash & get) {
     complete((matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
       StatusCodes.OK -> Json.obj(
-        "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
+        "matcherPublicKey" -> Base58.encode(matcherPublicKey),
         "markets" -> JsArray(markets.map(m =>
           Json.obj(
             "amountAsset"     -> m.pair.amountAssetStr,
@@ -494,7 +487,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
-  @ApiOperation(value = "Remove Order Book for a given Asset Pair", notes = "Remove Order Book for a given Asset Pair", httpMethod = "DELETE")
+  @ApiOperation(
+    value = "Remove Order Book for a given Asset Pair",
+    notes = "Remove Order Book for a given Asset Pair. Attention! Use this method only when clients can't place orders on this pair!",
+    httpMethod = "DELETE"
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
@@ -502,7 +499,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
-      complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map(_ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")))
+      unavailableOrderBookBarrier(pair) {
+        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map(_ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")))
+      }
     }
   }
 
@@ -522,6 +521,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Get a current offset in the queue", notes = "", httpMethod = "GET")
   def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) {
     complete(StatusCodes.OK -> currentOffset())
+  }
+
+  @Path("/debug/lastOffset")
+  @ApiOperation(value = "Get the last offset in the queue", notes = "", httpMethod = "GET")
+  def getLastOffset: Route = (path("debug" / "lastOffset") & get & withAuth) {
+    complete(lastOffset().map(StatusCodes.OK -> _))
   }
 
   @Path("/debug/oldestSnapshotOffset")

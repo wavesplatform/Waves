@@ -1,7 +1,7 @@
 package com.wavesplatform.generator
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.Waves
@@ -20,13 +20,13 @@ object Preconditions {
   private val FEE = 1000000
 
   sealed abstract class PAction(val priority: Int)
-  final case class LeaseP(from: PrivateKeyAccount, to: Address, amount: Long)                                                       extends PAction(3)
-  final case class IssueP(name: String, issuer: PrivateKeyAccount, desc: String, amount: Long, decimals: Int, reissueable: Boolean) extends PAction(2)
-  final case class CreateAccountP(seed: String, balance: Long)                                                                      extends PAction(1)
+  final case class LeaseP(from: KeyPair, to: Address, amount: Long)                                                       extends PAction(3)
+  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean) extends PAction(2)
+  final case class CreateAccountP(seed: String, balance: Long)                                                                   extends PAction(1)
 
-  final case class PGenSettings(faucet: PrivateKeyAccount, actions: List[PAction])
+  final case class PGenSettings(faucet: KeyPair, actions: List[PAction])
 
-  final case class UniverseHolder(accountsWithBalances: List[(PrivateKeyAccount, Long)] = Nil,
+  final case class UniverseHolder(accountsWithBalances: List[(KeyPair, Long)] = Nil,
                                   issuedAssets: List[ByteStr] = Nil,
                                   leases: List[ByteStr] = Nil)
 
@@ -47,7 +47,7 @@ object Preconditions {
                 .explicitGet()
               (uni.copy(issuedAssets = tx.id() :: uni.issuedAssets), tx :: txs)
             case CreateAccountP(seed, balance) =>
-              val acc = PrivateKeyAccount
+              val acc = KeyPair
                 .fromSeed(seed)
                 .explicitGet()
               val tx = TransferTransactionV1
@@ -78,8 +78,8 @@ object Preconditions {
       val amount = conf.as[Long]("amount")
 
       LeaseP(
-        PrivateKeyAccount.fromSeed(from).explicitGet(),
-        PrivateKeyAccount.fromSeed(to).explicitGet(),
+        KeyPair.fromSeed(from).explicitGet(),
+        KeyPair.fromSeed(to).explicitGet(),
         amount
       )
     }
@@ -89,7 +89,7 @@ object Preconditions {
     override def read(config: Config, path: String): IssueP = {
       val conf = config.getConfig(path)
 
-      val issuer = PrivateKeyAccount
+      val issuer = KeyPair
         .fromSeed(conf.getString("issuer"))
         .explicitGet()
       val name        = conf.as[Option[String]]("name").getOrElse("")
@@ -104,7 +104,7 @@ object Preconditions {
 
   implicit val preconditionsReader = new ValueReader[PGenSettings] {
     override def read(config: Config, path: String): PGenSettings = {
-      val faucet = PrivateKeyAccount
+      val faucet = KeyPair
         .fromSeed(config.as[String](s"$path.faucet"))
         .explicitGet()
 

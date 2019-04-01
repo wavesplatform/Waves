@@ -3,9 +3,8 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ContentType, ScriptType}
-import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -23,18 +22,18 @@ object WavesContext {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
   lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
-  val contractTransfer =
-    CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-  lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-  lazy val contractResultType =
-    CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+  val scriptTransfer =
+    CaseType(FieldNames.ScriptTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+  lazy val scriptTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(scriptTransfer.typeRef)))
+  lazy val scriptResultType =
+    CaseType(FieldNames.ScriptResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> scriptTransferSetType.typeRef))
 
   def build(ds: DirectiveSet, env: Environment): CTX = {
 
     val version = ds.stdLibVersion
     val isTokenContext = ds.scriptType match {
-      case ScriptType.Account => false
-      case ScriptType.Asset   => true
+      case Account => false
+      case Asset   => true
     }
     val environmentFunctions = new EnvironmentFunctions(env)
 
@@ -289,7 +288,7 @@ object WavesContext {
             _.eliminate(
               o => orderObject(o, proofsEnabled).asRight[String],
               _.eliminate(
-                o => Bindings.contractTransfer(o).asRight[String],
+                o => Bindings.scriptTransfer(o).asRight[String],
                 _ => "Expected Transaction or Order".asLeft[CaseObj]
               )
             )
@@ -388,7 +387,7 @@ object WavesContext {
           ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
           ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
         )
-        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) else Map(thisVar)
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
       }
     )
@@ -419,9 +418,9 @@ object WavesContext {
 
     CTX(
       types ++ (if (version == V3) {
-                  List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType)
                 } else List.empty),
-      commonVars ++ vars(version),
+      commonVars ++ vars(version.id),
       functions ++ (if (version == V3) {
         List(
           getIntegerFromStateF,

@@ -36,7 +36,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
   "Order types verification with SmartContracts" - {
     val sco1 = s"""
-                 |{-# LANGUAGE_VERSION 2 #-}
+                 |{-# STDLIB_VERSION 2 #-}
                  |match tx {
                  | case o : Order =>
                  |   o.orderType == Buy
@@ -46,7 +46,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
                  |""".stripMargin
 
     val sco2 = s"""
-              |{-# LANGUAGE_VERSION 2 #-}
+              |{-# STDLIB_VERSION 2 #-}
               |match tx {
               | case o : Order =>
               |    o.orderType == Sell
@@ -56,7 +56,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
       """.stripMargin
 
     val sco3 = s"""
-                 |{-# LANGUAGE_VERSION 2 #-}
+                 |{-# STDLIB_VERSION 2 #-}
                  |match tx {
                  |  case o : Order =>
                  |        o.orderType == Buy || o.orderType == Sell

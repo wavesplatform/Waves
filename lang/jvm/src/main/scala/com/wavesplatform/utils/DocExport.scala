@@ -1,6 +1,5 @@
 import cats.kernel.Monoid
 import com.github.mustachejava._
-import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -8,7 +7,10 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Global
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 
 import scala.collection.JavaConverters._
 
@@ -17,9 +19,9 @@ object DocExport {
     if (args.size != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
-      val version = StdLibVersion(args(1).toInt)
+      val version = DirectiveDictionary[StdLibVersion].idMap(args(1).toInt)
       val wavesContext = WavesContext.build(
-        DirectiveSet(version, ScriptType.Account, ContentType.Contract),
+        DirectiveSet(version, Account, DApp).explicitGet(),
         new Environment {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66

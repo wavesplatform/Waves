@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -13,15 +12,16 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+
 import scala.collection.mutable.ArrayBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.ByteBuffer
 
-import scala.util.{Try, Success}
+import com.wavesplatform.lang.directives.values._
+
+import scala.util.{Success, Try}
 
 object PureContext {
-
-  import StdLibVersion._
 
   implicit def intToLong(num: Int): Long = num.toLong
 

@@ -4,7 +4,7 @@ import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.directives.values.V2
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs.CommonValidation
@@ -33,14 +33,42 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val base64 = ExprScript(script).explicitGet().bytes().base64
     Post(routePath("/script/decompile"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "script").as[String] shouldBe "(1 == 2)"
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 1
+      (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
+      (json \ "script").as[String] shouldBe "" +
+        "{-# STDLIB_VERSION 1 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "(1 == 2)"
+    }
+
+    Post(routePath("/script/decompile"), "AgZ7TN8j") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 2
+      (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
+      (json \ "script").as[String] shouldBe "" +
+        "{-# STDLIB_VERSION 2 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
+    }
+
+    Post(routePath("/script/decompile"), "AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAbAmSEV") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 3
+      (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
+      (json \ "SCRIPT_TYPE").as[String] shouldBe "ACCOUNT"
+      (json \ "script").as[String] shouldBe "" +
+        "{-# STDLIB_VERSION 3 #-}\n" +
+        "{-# SCRIPT_TYPE ACCOUNT #-}\n" +
+        "{-# CONTENT_TYPE DAPP #-}\n\n\n\n" +
+        "@Verifier(tx)\n" +
+        "func verify () = true\n"
     }
   }
 
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
-      val expectedScript = ExprScript(StdLibVersion.V2, script).explicitGet()
+      val expectedScript = ExprScript(V2, script).explicitGet()
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3

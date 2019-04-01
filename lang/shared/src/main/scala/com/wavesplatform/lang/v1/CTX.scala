@@ -2,14 +2,13 @@ package com.wavesplatform.lang.v1
 
 import cats.Monoid
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.parser.BinaryOperation
 
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
-
-import com.wavesplatform.lang.v1.parser.BinaryOperation
 
 @JSExportTopLevel("CTX")
 case class CTX(@(JSExport @field) types: Seq[DefinedType],
@@ -17,8 +16,8 @@ case class CTX(@(JSExport @field) types: Seq[DefinedType],
                @(JSExport @field) functions: Array[BaseFunction]) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap
   lazy val evaluationContext: EvaluationContext = {
-    if (functions.map(_.header).distinct.size != functions.size) {
-      val dups = functions.groupBy(_.header).filter(_._2.size != 1)
+    if (functions.map(_.header).distinct.length != functions.length) {
+      val dups = functions.groupBy(_.header).filter(_._2.length != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
     EvaluationContext(typeDefs = typeDefs, letDefs = vars.mapValues(_._2), functions = functions.map(f => f.header -> f).toMap)

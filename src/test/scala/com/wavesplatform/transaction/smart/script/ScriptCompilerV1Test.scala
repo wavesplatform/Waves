@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -16,22 +16,32 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(StdLibVersion.V1, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
   property("use version 2 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(StdLibVersion.V2, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {
     val script = scriptWithVersion("8".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Unsupported language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value 8 for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {
     val script = scriptWithVersion("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
+  }
+
+  property("fails on incorrect content type value") {
+    val script = scriptWithContentType("oOooOps".some)
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
+  }
+
+  property("fails on incorrect script type value") {
+    val script = scriptWithScriptType("oOooOps".some)
+    ScriptCompiler.compile(script) shouldBe Left("Illegal directive value oOooOps for key SCRIPT_TYPE")
   }
 
   property("fails with right error position") {
@@ -49,7 +59,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
-        | {-# CONTENT_TYPE CONTRACT #-}
+        | {-# CONTENT_TYPE DAPP #-}
         | {-# SCRIPT_TYPE ASSET #-}
       """.stripMargin
     ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
@@ -59,7 +69,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     val script =
       """
         | {-# STDLIB_VERSION 2 #-}
-        | {-# CONTENT_TYPE CONTRACT #-}
+        | {-# CONTENT_TYPE DAPP #-}
         | {-# SCRIPT_TYPE ACCOUNT #-}
       """.stripMargin
     ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
@@ -99,11 +109,41 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
         .getOrElse("")
 
     s"""
-      | $directive
-      |
+       | $directive
+       |
       | let x = 10
-      | 20 == x + x
-      |
+       | 20 == x + x
+       |
+      """.stripMargin
+  }
+
+  private def scriptWithContentType(contentTypeStr: Option[String]): String = {
+    val directive =
+      contentTypeStr
+        .map(v => s"{-# CONTENT_TYPE $v #-}")
+        .getOrElse("")
+
+    s"""
+       | $directive
+       |
+      | let x = 10
+       | 20 == x + x
+       |
+      """.stripMargin
+  }
+
+  private def scriptWithScriptType(scriptTypeStr: Option[String]): String = {
+    val directive =
+      scriptTypeStr
+        .map(v => s"{-# SCRIPT_TYPE $v #-}")
+        .getOrElse("")
+
+    s"""
+       | $directive
+       |
+      | let x = 10
+       | 20 == x + x
+       |
       """.stripMargin
   }
 }

@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.transfer._
@@ -17,8 +17,7 @@ import scala.util.{Failure, Success}
 
 package object http {
 
-  val Waves: Long  = 100000000L
-  val ApiKeyHeader = api_key("ridethewaves!")
+  val Waves: Long = 100000000L
 
   def sameSignature(target: Array[Byte])(actual: Array[Byte]): Boolean = target sameElements actual
 
@@ -43,14 +42,14 @@ package object http {
           case Failure(e) => JsError(e.getMessage)
         }
 
-      case _ => JsError("Can't read PublicKeyAccount")
+      case _ => JsError("Can't read PublicKey")
     },
     Writes(x => JsString(x.base58))
   )
 
-  implicit val publicKeyAccountFormat: Format[PublicKeyAccount] = byteStrFormat.inmap[PublicKeyAccount](
-    x => PublicKeyAccount(x.arr),
-    x => ByteStr(x.publicKey)
+  implicit val PublicKeyFormat: Format[PublicKey] = byteStrFormat.inmap[PublicKey](
+    x => PublicKey(x.arr),
+    x => ByteStr(x)
   )
 
   implicit val proofsFormat: Format[Proofs] = Format(
@@ -80,16 +79,16 @@ package object http {
           .toEither
           .flatMap(AddressOrAlias.fromBytes(_, 0))
           .map { case (x, _) => JsSuccess(x) }
-          .getOrElse(JsError("Can't read PublicKeyAccount"))
+          .getOrElse(JsError("Can't read PublicKey"))
 
-      case _ => JsError("Can't read PublicKeyAccount")
+      case _ => JsError("Can't read PublicKey")
     },
     Writes(x => JsString(x.bytes.base58))
   )
 
   implicit val transferTransactionFormat: Format[TransferTransactionV1] = (
     (JsPath \ "assetId").format[Asset] and
-      (JsPath \ "sender").format[PublicKeyAccount] and
+      (JsPath \ "sender").format[PublicKey] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
@@ -105,7 +104,7 @@ package object http {
   )(TransferTransactionV1.apply, unlift(TransferTransactionV1.unapply))
 
   implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
-    (JsPath \ "sender").format[PublicKeyAccount] and
+    (JsPath \ "sender").format[PublicKey] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "assetId").format[Asset] and
       (JsPath \ "amount").format[Long] and

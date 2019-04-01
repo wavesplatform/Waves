@@ -5,10 +5,10 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.directives.values.V3
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
-import com.wavesplatform.lang.StdLibVersion
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
 // [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -87,7 +87,7 @@ class AddressRouteSpec
     val account = allAccounts.head
     val path    = routePath(s"/seed/${account.address}")
     Get(path) ~> route should produce(ApiKeyNotValid)
-    Get(path) ~> api_key(apiKey) ~> route ~> check {
+    Get(path) ~> ApiKeyHeader ~> route ~> check {
       val json = responseAs[JsObject]
       (json \ "address").as[String] shouldEqual account.address
       (json \ "seed").as[String] shouldEqual Base58.encode(account.seed)
@@ -99,7 +99,7 @@ class AddressRouteSpec
       case (account, message) =>
         val uri = routePath(s"/$path/${account.address}")
         Post(uri, message) ~> route should produce(ApiKeyNotValid)
-        Post(uri, message) ~> api_key(apiKey) ~> route ~> check {
+        Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
           val resp      = responseAs[JsObject]
           val signature = Base58.tryDecodeWithLimit((resp \ "signature").as[String]).get
 
@@ -121,7 +121,7 @@ class AddressRouteSpec
         val messageBytes = message.getBytes()
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(
-          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else ("base64:" ++ Base64.encode(messageBytes)) else message),
+          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
           "publickey" -> JsString(Base58.encode(account.publicKey)),
           "signature" -> JsString(Base58.encode(signature))
         )
@@ -130,10 +130,10 @@ class AddressRouteSpec
           Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey)), "signature" -> JsString(""))
 
         Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
-        Post(uri, emptySignature) ~> api_key(apiKey) ~> route ~> check {
+        Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
           (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
         }
-        Post(uri, validBody) ~> api_key(apiKey) ~> route ~> check {
+        Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
           (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
         }
     }
@@ -144,13 +144,13 @@ class AddressRouteSpec
 
   routePath("") in {
     Post(routePath("")) ~> route should produce(ApiKeyNotValid)
-    Post(routePath("")) ~> api_key(apiKey) ~> route ~> check {
+    Post(routePath("")) ~> ApiKeyHeader ~> route ~> check {
       allAddresses should not contain (responseAs[JsObject] \ "address").as[String]
     }
   }
 
   routePath("/{address}") in {
-    Delete(routePath(s"/${allAddresses.head}")) ~> api_key(apiKey) ~> route ~> check {
+    Delete(routePath(s"/${allAddresses.head}")) ~> ApiKeyHeader ~> route ~> check {
       (responseAs[JsObject] \ "deleted").as[Boolean] shouldBe true
     }
   }
@@ -176,19 +176,19 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe 0
     }
 
-    val testContract = Contract(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    val testContract = DApp(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: Address) => Some(ContractScript(StdLibVersion.V3, testContract).explicitGet()))
+      .onCall((_: Address) => Some(ContractScript(V3, testContract).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AQAAAAZ2ZXJpZnkAAAAABiDCPeI="
-      (response \ "scriptText").as[String] shouldBe "Contract(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
 // [WAIT]                                           Decompiler(
 //      testContract,
-//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
+//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

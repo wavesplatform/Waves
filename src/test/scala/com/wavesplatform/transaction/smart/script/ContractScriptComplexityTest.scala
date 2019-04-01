@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
@@ -13,7 +13,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
   property("estimate contract script correctly") {
-    val contract = Contract(
+    val contract = DApp(
       List.empty,
       List(
         CallableFunction(
@@ -49,7 +49,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
   }
 
   property("estimate contract script with context correctly") {
-    val contract = Contract(
+    val contract = DApp(
       List(
         LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a"), CONST_STRING("b")))),
         LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c"), CONST_STRING("d"))))

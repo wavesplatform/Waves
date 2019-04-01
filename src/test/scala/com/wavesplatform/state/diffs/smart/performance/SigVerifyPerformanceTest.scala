@@ -1,10 +1,9 @@
 package com.wavesplatform.state.diffs.smart.performance
 
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
@@ -25,13 +24,13 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
   private val AmtOfTxs = 10000
 
-  private def simpleSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV1] =
+  private def simpleSendGen(from: KeyPair, to: PublicKey, ts: Long): Gen[TransferTransactionV1] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
     } yield TransferTransactionV1.selfSigned(Waves, from, to.toAddress, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
 
-  private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV2] =
+  private def scriptedSendGen(from: KeyPair, to: PublicKey, ts: Long): Gen[TransferTransactionV2] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
@@ -55,7 +54,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
   ignore("parallel native signature verification vs sequential scripted signature verification") {
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser.parseExpr(textScript).get.value
-    val typedScript   = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1
+    val typedScript   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>
@@ -65,8 +64,8 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
             case _ =>
           }
 
-        val simeplCheckTime   = Instrumented.withTime(simpleCheck())._2
-        val scriptedCheckTime = Instrumented.withTime(scriptedCheck())._2
+        val simeplCheckTime   = Instrumented.withTimeMillis(simpleCheck())._2
+        val scriptedCheckTime = Instrumented.withTimeMillis(scriptedCheck())._2
         println(s"[parallel] simple check time: $simeplCheckTime ms,\t [seqential] scripted check time: $scriptedCheckTime ms")
     }
 
