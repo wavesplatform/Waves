@@ -157,12 +157,14 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   private def checkAmounts(payments: Seq[Payment]): Either[NonPositiveAmount, Unit] =
     payments
       .find(_.amount <= 0)
-      .fold(().asRight[NonPositiveAmount])(p =>
-        ValidationError.NonPositiveAmount(
-          p.amount,
-          p.assetId.fold("Waves")(_.toString)
-        ).asLeft[Unit]
-      )
+      .fold(().asRight[NonPositiveAmount])(
+        p =>
+          ValidationError
+            .NonPositiveAmount(
+              p.amount,
+              p.assetId.fold("Waves")(_.toString)
+            )
+            .asLeft[Unit])
 
   def signed(sender: PublicKeyAccount,
              dappAddress: Address,
