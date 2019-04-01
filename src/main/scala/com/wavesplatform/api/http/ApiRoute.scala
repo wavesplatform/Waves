@@ -24,11 +24,12 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
     .result()
 
-  def _json[A: Reads](f: A => Route): Route                 = (handleRejections(jsonRejectionHandler) & entity(as[A])).apply(f)
-  def json[A: Reads](f: A => ToResponseMarshallable): Route = _json[A](a => complete(f(a)))
+  def jsonEntity[A: Reads]: Directive1[A]                   = handleRejections(jsonRejectionHandler) & entity(as[A])
+  def json[A: Reads](f: A => ToResponseMarshallable): Route = jsonEntity.apply(a => complete(f(a)))
 
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
+    case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
     case e: ApiErrorException                                           => complete(e.error)
     case e: ValidationErrorException                                    => complete(ApiError.fromValidationError(e.error))

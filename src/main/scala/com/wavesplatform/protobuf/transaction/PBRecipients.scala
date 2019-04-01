@@ -16,7 +16,7 @@ object PBRecipients {
   def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {
     case Recipient.Recipient.Address(bytes) =>
       val withHeader = Bytes.concat(Array(Address.AddressVersion, AddressScheme.current.chainId), bytes.toByteArray)
-      Right(Address.createUnsafe(Bytes.concat(withHeader, Address.calcCheckSum(withHeader))))
+      Address.fromBytes(Bytes.concat(withHeader, Address.calcCheckSum(withHeader)))
 
     case _ =>
       Left(GenericError(s"Not an address: $r"))

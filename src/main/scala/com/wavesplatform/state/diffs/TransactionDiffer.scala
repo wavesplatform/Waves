@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 
-object TransactionDiffer extends Instrumented with ScorexLogging {
+object TransactionDiffer extends ScorexLogging {
 
   private val stats = TxProcessingStats
 

@@ -14,8 +14,6 @@ import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.concurrent._
-
 @Path("/blocks")
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler) extends ApiRoute {
@@ -195,14 +193,14 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   def lastHeaderOnly: Route = (path("headers" / "last") & get)(last(includeTransactions = false))
 
   def last(includeTransactions: Boolean): StandardRoute = {
-    complete(Future {
+    complete {
       val height = blockchain.height
       (if (includeTransactions) {
          commonApi.lastBlock().map(_.json())
        } else {
          commonApi.lastBlockHeader().map(bhs => BlockHeader.json(bhs._1, bhs._2))
        }).map(_ + ("height" -> Json.toJson(height)))
-    })
+    }
   }
 
   @Path("/first")

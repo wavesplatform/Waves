@@ -256,9 +256,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
     ))
-  def broadcast: Route = (pathPrefix("broadcast") & post) {
-    handleExceptions(jsonExceptionHandler) {
-      json[JsObject] { jsv =>
+  def broadcast: Route =
+    (pathPrefix("broadcast") & post) {
+      (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
         TransactionFactory
           .fromSignedRequest(jsv)
           .map(commonApi.broadcastTransaction)
@@ -266,7 +266,6 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           .map(ApiError.fromValidationError)
       }
     }
-  }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -306,7 +305,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
     for {
       address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-      limit   <- Either.cond(limitParam <= settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
+      limit   <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
       maybeAfter <- maybeAfterParam match {
         case Some(v) =>
           ByteStr
