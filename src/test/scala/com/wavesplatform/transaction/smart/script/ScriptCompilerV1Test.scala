@@ -26,22 +26,22 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("fails on unsupported version") {
     val script = scriptWithVersion("8".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Unsupported language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value 8 for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {
     val script = scriptWithVersion("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
   }
 
   property("fails on incorrect content type value") {
     val script = scriptWithContentType("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Wrong content type")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
   }
 
   property("fails on incorrect script type value") {
     val script = scriptWithScriptType("oOooOps".some)
-    ScriptCompiler.compile(script) shouldBe Left("Wrong script type")
+    ScriptCompiler.compile(script) shouldBe Left("Illegal directive value oOooOps for key SCRIPT_TYPE")
   }
 
   property("fails with right error position") {

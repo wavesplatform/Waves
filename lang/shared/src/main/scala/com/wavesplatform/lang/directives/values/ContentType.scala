@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.directives.values
 
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.DirectiveKey.CONTENT_TYPE
 
-sealed abstract class ContentType(text: String, id: Int) extends DirectiveValue(CONTENT_TYPE, text, id) {
+sealed abstract class ContentType(text: String, id: Int) extends DirectiveValue(text, id) {
   override val value: Any = text
+  override def key        = resolveKey[ContentType]
 }
 case object Expression extends ContentType("EXPRESSION", 1)
 case object DApp       extends ContentType("DAPP", 2)

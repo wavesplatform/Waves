@@ -32,7 +32,7 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
     val scriptEthList =
       DirectiveDictionary[StdLibVersion].all.map { version =>
         ScriptCompiler.compile(s"""
-                                  |{-# STDLIB_VERSION $version #-}
+                                  |{-# STDLIB_VERSION ${version.value} #-}
                                   |  true
                                   """.stripMargin)
       }

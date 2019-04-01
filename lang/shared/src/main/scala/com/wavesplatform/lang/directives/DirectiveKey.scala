@@ -17,11 +17,11 @@ object DirectiveKey {
     override val valueDic: DirectiveDictionary[V] = dic
   }
 
-  val STDLIB_VERSION = DirectiveKey[StdLibVersion]("STDLIB_VERSION")
-  val CONTENT_TYPE   = DirectiveKey[ContentType]("CONTENT_TYPE")
-  val SCRIPT_TYPE    = DirectiveKey[ScriptType]("SCRIPT_TYPE")
+  implicit lazy val STDLIB_VERSION = DirectiveKey[StdLibVersion]("STDLIB_VERSION")
+  implicit lazy val CONTENT_TYPE   = DirectiveKey[ContentType]("CONTENT_TYPE")
+  implicit lazy val SCRIPT_TYPE    = DirectiveKey[ScriptType]("SCRIPT_TYPE")
 
-  val all: Set[DirectiveKey] =
+  lazy val all: Set[DirectiveKey] =
     Set(
       STDLIB_VERSION,
       CONTENT_TYPE,

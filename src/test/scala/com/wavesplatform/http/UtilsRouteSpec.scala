@@ -36,8 +36,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "STDLIB_VERSION").as[Int] shouldBe 1
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-        "{-#STDLIB_VERSION 1#-}\n" +
-        "{-#CONTENT_TYPE EXPRESSION#-}\n" +
+        "{-# STDLIB_VERSION 1 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
         "(1 == 2)"
     }
 
@@ -46,8 +46,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "STDLIB_VERSION").as[Int] shouldBe 2
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-        "{-#STDLIB_VERSION 2#-}\n" +
-        "{-#CONTENT_TYPE EXPRESSION#-}\n" +
+        "{-# STDLIB_VERSION 2 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
         "true"
     }
 
@@ -57,9 +57,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
       (json \ "SCRIPT_TYPE").as[String] shouldBe "ACCOUNT"
       (json \ "script").as[String] shouldBe "" +
-        "{-#STDLIB_VERSION 3#-}\n" +
-        "{-#SCRIPT_TYPE ACCOUNT#-}\n" +
-        "{-#CONTENT_TYPE DAPP#-}\n\n\n\n" +
+        "{-# STDLIB_VERSION 3 #-}\n" +
+        "{-# SCRIPT_TYPE ACCOUNT #-}\n" +
+        "{-# CONTENT_TYPE DAPP #-}\n\n\n\n" +
         "@Verifier(tx)\n" +
         "func verify () = true\n"
     }
