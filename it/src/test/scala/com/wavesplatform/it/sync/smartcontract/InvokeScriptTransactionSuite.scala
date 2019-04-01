@@ -68,7 +68,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
-        |{-# CONTENT_TYPE CONTRACT #-}
+        |{-# CONTENT_TYPE DAPP #-}
         |
         | @Callable(inv)
         | func foo(a:ByteVector) = {
@@ -112,7 +112,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = fc,
           p = Seq(),
           timestamp = System.currentTimeMillis(),
@@ -121,11 +121,11 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val invokeScriptId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
 
     sender.getData(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
     sender.getData(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)

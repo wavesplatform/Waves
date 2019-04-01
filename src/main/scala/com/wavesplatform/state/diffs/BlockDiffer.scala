@@ -3,21 +3,20 @@ package com.wavesplatform.state.diffs
 import cats.Monoid
 import cats.implicits._
 import cats.syntax.either.catsSyntaxEitherId
+import com.wavesplatform.account.Address
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.account.Address
-import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.transaction.ValidationError.ActivationError
 import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.utils.ScorexLogging
 
-object BlockDiffer extends ScorexLogging with Instrumented {
+object BlockDiffer extends ScorexLogging {
 
   def fromBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                 blockchain: Blockchain,

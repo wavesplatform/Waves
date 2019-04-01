@@ -1,10 +1,8 @@
 package com.wavesplatform.http
 
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.leasing.LeaseBroadcastApiRoute
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -18,17 +16,21 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
-class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+class LeaseBroadcastRouteSpec
+    extends RouteSpec("/leasing/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper {
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFailed" - {
-    val route = LeaseBroadcastApiRoute(settings, utx, allChannels).route
+    val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
-    val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
+    val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("lease", leaseGen.retryUntil(_.isInstanceOf[LeaseTransactionV1]), identity),
       ("cancel", leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransactionV1]), {
@@ -41,7 +43,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
 
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
-        forAll(gen) { (t: Transaction) =>
+        forAll(gen) { t: Transaction =>
           posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
         }
       }
@@ -49,7 +51,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(settings, utx, allChannels).route
+    val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("lease"), v) ~> route

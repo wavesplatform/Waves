@@ -542,4 +542,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """ "x42".parseIntValue() """
     eval[EVALUATED](src) shouldBe 'left
   }
+
+  property("matching case with non-existing type") {
+    val sampleScript =
+      """|
+         | let a = if (true) then 1 else "str"
+         | match a {
+         |   case _: UndefinedType => 0
+         |   case _                => 1
+         | }
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, None) should produce("all possible types are List(Int, String)")
+  }
 }

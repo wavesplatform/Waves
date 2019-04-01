@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
-import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -14,7 +14,7 @@ import monix.eval.Coeval
 import shapeless._
 
 object WavesEnvironment {
-  type In = Transaction :+: Order :+: ContractTransfer :+: CNil
+  type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
 }
 
 class WavesEnvironment(nByte: Byte,

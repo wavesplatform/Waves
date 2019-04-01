@@ -5,8 +5,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.StdLibVersion.V1
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -52,7 +52,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     fee <- smallFeeGen
     script = ContractScript(
       StdLibVersion.V3,
-      Contract(
+      DApp(
         List.empty,
         List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None

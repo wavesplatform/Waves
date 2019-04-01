@@ -2,12 +2,15 @@ package com.wavesplatform.settings
 
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.settings.fee.{AssetType, OrderFeeSettings}
-import com.wavesplatform.settings.fee.OrderFeeSettings._
+import com.wavesplatform.settings.OrderFeeSettings._
+import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.assets.exchange.AssetPair
+import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -15,7 +18,48 @@ import scala.util.Try
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
-  def configStrWithOrderFeeSettings(orderFeeSettings: String): Config = {
+  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
+    Try(conf.as[MatcherSettings]("waves.matcher")).toEither.leftMap(_.getMessage)
+
+  val correctOrderFeeStr: String =
+    s"""
+       |order-fee {
+       |  mode = percent
+       |  waves {
+       |    base-fee = 300000
+       |  }
+       |  fixed {
+       |    asset = WAVES
+       |    min-fee = 300000
+       |  }
+       |  percent {
+       |    asset-type = amount
+       |    min-fee = 0.1
+       |  }
+       |}
+       """.stripMargin
+
+  val correctDeviationsStr: String =
+    s"""
+       |max-price-deviations {
+       |  enable = yes
+       |  profit = 1000000
+       |  loss = 1000000
+       |  fee = 1000000
+       |}
+     """.stripMargin
+
+  val correctAllowedAssetPairsStr: String =
+    s"""
+       |allowed-asset-pairs = []
+     """.stripMargin
+
+  val correctOrderAmountStr: String =
+    s"""
+       |order-amount-restrictions = []
+     """.stripMargin
+
+  def configWithSettings(orderFeeStr: String)(deviationsStr: String)(allowedAssetPairsStr: String)(orderAmountStr: String): Config = {
     val configStr =
       s"""waves {
       |  directory = /waves
@@ -66,13 +110,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |        producer.buffer-size = 200
       |      }
       |    }
-      |    $orderFeeSettings
-      |    max-price-deviations {
-      |      enable = yes
-      |      profit = 1000000
-      |      loss = 1000000
-      |      fee = 1000000
-      |    }
+      |    $orderFeeStr
+      |    $deviationsStr
+      |    $allowedAssetPairsStr
+      |    allow-order-v3 = no
+      |    $orderAmountStr
       |  }
       |}""".stripMargin
 
@@ -81,27 +123,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "MatcherSettings" should "read values" in {
 
-    val correctOrderFeeSettings =
-      s"""
-         |order-fee {
-         |  mode = percent
-         |  waves {
-         |    base-fee = 300000
-         |  }
-         |  fixed {
-         |    asset = WAVES
-         |    min-fee = 300000
-         |  }
-         |  percent {
-         |    asset-type = amount
-         |    min-fee = 0.1
-         |  }
-         |}
-       """.stripMargin
+    val config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderAmountStr)
 
-    val config = configStrWithOrderFeeSettings(correctOrderFeeSettings)
-
-    val settings = MatcherSettings.fromConfig(config)
+    val settings = config.as[MatcherSettings]("waves.matcher")
     settings.enable should be(true)
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
@@ -143,11 +167,62 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         assetType shouldBe AssetType.AMOUNT
         minFee shouldBe 0.1
     }
+
+    settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
+    settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
+    settings.allowOrderV3 shouldBe false
+    settings.orderAmountRestrictions shouldBe Map.empty[AssetPair, OrderAmountSettings]
   }
 
-  "MatcherSettings" should "produce errors" in {
+  "DeviationsSettings in MatcherSettings" should "be validated" in {
 
-    def getSettingByConfig(conf: Config): Either[String, MatcherSettings] = Try(MatcherSettings.fromConfig(conf)).toEither.leftMap(_.getMessage)
+    val invalidEnable: String =
+      s"""
+         |max-price-deviations {
+         |  enable = foobar
+         |  profit = 1000000
+         |  loss = 1000000
+         |  fee = 1000000
+         |}
+     """.stripMargin
+
+    val invalidProfit: String =
+      s"""
+         |max-price-deviations {
+         |  enable = yes
+         |  profit = -1000000
+         |  loss = 1000000
+         |  fee = 1000000
+         |}
+     """.stripMargin
+
+    val invalidLossAndFee: String =
+      s"""
+         |max-price-deviations {
+         |  enable = yes
+         |  profit = 1000000
+         |  loss = 0
+         |  fee = -1000000
+         |}
+     """.stripMargin
+
+    val configStr: String => Config = configWithSettings(correctOrderFeeStr)(_)(correctAllowedAssetPairsStr)(correctOrderAmountStr)
+    val settingsInvalidEnable       = getSettingByConfig(configStr(invalidEnable))
+    val settingsInvalidProfit       = getSettingByConfig(configStr(invalidProfit))
+    val settingsInvalidLossAndFee   = getSettingByConfig(configStr(invalidLossAndFee))
+
+    settingsInvalidEnable shouldBe Left("Invalid setting max-price-deviations.enable value: foobar")
+
+    settingsInvalidProfit shouldBe
+      Left("Invalid setting max-price-deviations.profit value: -1000000, required 0 < percent")
+
+    settingsInvalidLossAndFee shouldBe
+      Left(
+        "Invalid setting max-price-deviations.loss value: 0, required 0 < percent, " +
+          "Invalid setting max-price-deviations.fee value: -1000000, required 0 < percent")
+  }
+
+  "OrderFeeSettings in MatcherSettings" should "be validated" in {
 
     val invalidMode =
       s"""
@@ -180,7 +255,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |  }
          |  percent {
          |    asset-type = test
-         |    min-fee = 121
+         |    min-fee = 121.2
          |  }
          |}
        """.stripMargin
@@ -221,25 +296,155 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val settingsInvalidMode           = getSettingByConfig(configStrWithOrderFeeSettings(invalidMode))
-    val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetTypeAndPercent))
-    val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetAndFee))
-    val settingsInvalidFeeInWaves     = getSettingByConfig(configStrWithOrderFeeSettings(invalidFeeInWaves))
+    val configStr: String => Config   = configWithSettings(_)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderAmountStr)
+    val settingsInvalidMode           = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidTypeAndPercent = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
+    val settingsInvalidAssetAndFee    = getSettingByConfig(configStr(invalidAssetAndFee))
+    val settingsInvalidFeeInWaves     = getSettingByConfig(configStr(invalidFeeInWaves))
 
-    settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
+    settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.percent.asset-type value: test, " +
-          "Invalid setting waves.matcher.order-fee.percent.min-fee value: 121.0, required 0 < percent <= 100")
+        "Invalid setting order-fee.percent.asset-type value: test, " +
+          "Invalid setting order-fee.percent.min-fee value: 121.2, required 0 < percent <= 100")
 
     settingsInvalidAssetAndFee shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.fixed.asset value: ;;;;, " +
-          "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, required 0 < fee")
+        "Invalid setting order-fee.fixed.asset value: ;;;;, " +
+          "Invalid setting order-fee.fixed.min-fee value: -300000, required 0 < fee")
 
     settingsInvalidFeeInWaves shouldBe Left(
-      s"Invalid setting waves.matcher.order-fee.waves.base-fee value: -350000, required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount}"
+      s"Invalid setting order-fee.waves.base-fee value: -350000, required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount}"
+    )
+  }
+
+  "Allowed asset pairs in MatcherSettings" should "be validated" in {
+
+    val configStr: String => Config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(_)(correctOrderAmountStr)
+
+    val incorrectAssetsCount =
+      """allowed-asset-pairs = [
+        | "WAVES-BTC",
+        | "WAVES-BTC-ETH",
+        | "ETH"
+        |]
+      """.stripMargin
+
+    val incorrectAssets =
+      """allowed-asset-pairs = [
+        | "WAVES-;;;",
+        | "WAVES-BTC"
+        |]
+      """.stripMargin
+
+    val duplicates =
+      """allowed-asset-pairs = [
+        | "WAVES-BTC",
+        | "WAVES-ETH",
+        | "WAVES-BTC"
+        |]
+      """.stripMargin
+
+    val nonEmptyCorrect =
+      """allowed-asset-pairs = [
+        | "WAVES-BTC",
+        | "WAVES-ETH",
+        | "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS-WAVES"
+        |]
+      """.stripMargin
+
+    getSettingByConfig(configStr(incorrectAssetsCount)) should produce(
+      "Invalid setting allowed-asset-pairs value: [WAVES-BTC, WAVES-BTC-ETH, ETH], Incorrect assets count (expected 2, but got 3): WAVES-BTC-ETH, Incorrect assets count (expected 2, but got 1): ETH"
+    )
+
+    getSettingByConfig(configStr(incorrectAssets)) should produce(
+      "Invalid setting allowed-asset-pairs value: [WAVES-;;;, WAVES-BTC], requirement failed: Wrong char ';' in Base58 string ';;;'"
+    )
+
+    getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2
+
+    getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().allowedAssetPairs shouldBe
+      Set(
+        AssetPair.createAssetPair("WAVES", "BTC").get,
+        AssetPair.createAssetPair("WAVES", "ETH").get,
+        AssetPair.createAssetPair("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "WAVES").get
+      )
+  }
+
+  "Order amount restrictions" should "be validated" in {
+
+    val configStr: String => Config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(correctAllowedAssetPairsStr)
+
+    val nonEmptyCorrect =
+      """order-amount-restrictions = [
+        | {
+        |   pair = "WAVES-BTC",
+        |   step-size = 0.001,
+        |   min-amount = 0.001,
+        |   max-amount = 1000000
+        | },
+        | {
+        |   pair = "ETH-USD",
+        |   step-size = 0.01,
+        |   min-amount = 0.05,
+        |   max-amount = 20000
+        | }
+        |]
+      """.stripMargin
+
+    val incorrectPairAndStepSize =
+      """order-amount-restrictions = [
+        | {
+        |   pair = "WAVES-BTC",
+        |   step-size = -0.013,
+        |   min-amount = 0.001,
+        |   max-amount = 1000000
+        | },
+        | {
+        |   pair = "ETH-;;;",
+        |   step-size = 0.01,
+        |   min-amount = 0.05,
+        |   max-amount = 20000
+        | }
+        |]
+      """.stripMargin
+
+    val incorrectMinAndMaxAmount =
+      """order-amount-restrictions = [
+        | {
+        |   pair = "WAVES-BTC",
+        |   step-size = 0.013,
+        |   min-amount = 0.001,
+        |   max-amount = 1000000
+        | }
+        |]
+      """.stripMargin
+
+    getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().orderAmountRestrictions shouldBe
+      Map(
+        AssetPair.createAssetPair("WAVES", "BTC").get ->
+          OrderAmountSettings(
+            0.001,
+            0.001,
+            1000000
+          ),
+        AssetPair.createAssetPair("ETH", "USD").get ->
+          OrderAmountSettings(
+            0.01,
+            0.05,
+            20000
+          )
+      )
+
+    getSettingByConfig(configStr(incorrectPairAndStepSize)) should produce(
+      "Invalid setting order-amount-restrictions.0.step-size value: -0.013, required 0 < step size, " +
+        "Invalid setting order-amount-restrictions.1.pair value: ETH-;;;"
+    )
+
+    getSettingByConfig(configStr(incorrectMinAndMaxAmount)) should produce(
+      "Invalid setting order-amount-restrictions.0.min-amount value: 0.001, amount must be a multiple of step-size (0.013) and must be > 0, " +
+        "Invalid setting order-amount-restrictions.0.max-amount value: 1000000, amount must be a multiple of step-size (0.013) and must be > 0"
     )
   }
 }

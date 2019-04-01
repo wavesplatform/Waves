@@ -51,7 +51,7 @@ object MultiDimensionalMiningConstraint {
       (for ((curr, upd) <- currRest.constraints.toList.iterator.zip(updatedRest.constraints.toList.iterator) if upd.isOverfilled)
         yield
           (curr, upd) match {
-            case (OneDimensionalMiningConstraint(rest, description, _), OneDimensionalMiningConstraint(newRest, _, _)) =>
+            case (OneDimensionalMiningConstraint(rest, _, description), OneDimensionalMiningConstraint(newRest, _, _)) =>
               Iterator.single(s"$description($rest -> $newRest)")
 
             case (m: MultiDimensionalMiningConstraint, m1: MultiDimensionalMiningConstraint) =>
@@ -61,9 +61,7 @@ object MultiDimensionalMiningConstraint {
               Iterator.single(s"$curr -> $upd")
           }).flatten
     } else {
-      updatedRest.constraints
-        .toList
-        .iterator
+      updatedRest.constraints.toList.iterator
         .filter(_.isOverfilled)
         .map(_.toString)
     }
