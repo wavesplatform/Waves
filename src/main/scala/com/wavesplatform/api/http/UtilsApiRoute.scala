@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
+import java.util.concurrent.Executors
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PrivateKey
@@ -13,6 +14,8 @@ import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
+
+import scala.concurrent.ExecutionContext
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
@@ -29,6 +32,8 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   override val route: Route = pathPrefix("utils") {
     decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
+
+  private[this] val decompilerExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
 
   @Path("/script/decompile")
   @ApiOperation(value = "Decompile", notes = "Decompiles base64 script representation to string code", httpMethod = "POST")
@@ -50,7 +55,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   def decompile: Route = path("script" / "decompile") {
     import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
-    (post & entity(as[String])) { code =>
+    (post & entity(as[String]) & withExecutionContext(decompilerExecutionContext)) { code =>
       Script.fromBase64String(code, checkComplexity = false) match {
         case Left(err) => complete(err)
         case Right(script) =>

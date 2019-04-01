@@ -17,6 +17,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
 import com.wavesplatform.{NTPTime, crypto}
+import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 
@@ -78,7 +79,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |  }
       |}""".stripMargin))
 
-  val matcherSettings = MatcherSettings.fromConfig(config)
+  val matcherSettings = config.as[MatcherSettings]("waves.matcher")
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample

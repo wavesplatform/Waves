@@ -1,12 +1,10 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -21,8 +19,12 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.Coproduct
 
-class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+class AssetsBroadcastRouteSpec
+    extends RouteSpec("/assets/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper {
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
@@ -30,7 +32,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   "returns StateCheckFailed" - {
 
-    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
@@ -60,7 +62,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   "returns appropriate error code when validation fails for" - {
     "issue transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastIssueReq) { ir =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
@@ -89,7 +91,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "reissue transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastReissueReq) { rr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
@@ -104,7 +106,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "burn transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastBurnReq) { br =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
@@ -121,7 +123,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "transfer transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastTransferReq) { tr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
@@ -161,7 +163,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       .onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture])
       .anyNumberOfTimes()
 
-    val route = AssetsBroadcastApiRoute(settings, alwaysApproveUtx, alwaysSendAllChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, alwaysApproveUtx, alwaysSendAllChannels).route
 
     val seed               = "seed".getBytes()
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

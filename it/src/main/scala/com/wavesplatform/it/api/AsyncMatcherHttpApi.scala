@@ -268,6 +268,7 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGetWithApiKey(s"/matcher/orders/${sender.address}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
 
     def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
+    def getLastOffset: Future[QueueEventWithMeta.Offset]    = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]
     def getOldestSnapshotOffset: Future[QueueEventWithMeta.Offset] =
       matcherGetWithApiKey("/matcher/debug/oldestSnapshotOffset").as[QueueEventWithMeta.Offset]
     def getAllSnapshotOffsets: Future[Map[String, QueueEventWithMeta.Offset]] =

@@ -20,8 +20,7 @@ import monix.execution.Scheduler
 
 import scala.util.Right
 
-object BlockAppender extends ScorexLogging with Instrumented {
-
+object BlockAppender extends ScorexLogging {
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
@@ -30,17 +29,14 @@ object BlockAppender extends ScorexLogging with Instrumented {
             scheduler: Scheduler,
             verify: Boolean = true)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      measureSuccessful(
-        blockProcessingTimeStats, {
-          if (blockchainUpdater.isLastBlockId(newBlock.reference)) {
-            appendBlock(blockchainUpdater, utxStorage, pos, time, settings, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-          } else if (blockchainUpdater.contains(newBlock.uniqueId)) {
-            Right(None)
-          } else {
-            Left(BlockAppendError("Block is not a child of the last block", newBlock))
-          }
-        }
-      )
+      metrics.blockProcessingTimeStats.measureSuccessful {
+        if (blockchainUpdater.isLastBlockId(newBlock.reference))
+          appendBlock(blockchainUpdater, utxStorage, pos, time, settings, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+        else if (blockchainUpdater.contains(newBlock.uniqueId) || blockchainUpdater.isLastBlockId(newBlock.uniqueId))
+          Right(None)
+        else
+          Left(BlockAppendError("Block is not a child of the last block", newBlock))
+      }
     }.executeOn(scheduler)
 
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
@@ -53,7 +49,8 @@ object BlockAppender extends ScorexLogging with Instrumented {
             miner: Miner,
             scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
-    blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
+    metrics.blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
+
     (for {
       _                <- EitherT(Task.now(newBlock.signaturesValid()))
       validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, settings, scheduler)(newBlock))
@@ -73,7 +70,8 @@ object BlockAppender extends ScorexLogging with Instrumented {
     }
   }
 
-  private val blockReceivingLag        = Kamon.histogram("block-receiving-lag")
-  private val blockProcessingTimeStats = Kamon.histogram("single-block-processing-time")
-
+  private[this] object metrics {
+    val blockReceivingLag        = Kamon.histogram("block-appender.receiving-lag")
+    val blockProcessingTimeStats = Kamon.timer("block-appender.processing-time")
+  }
 }

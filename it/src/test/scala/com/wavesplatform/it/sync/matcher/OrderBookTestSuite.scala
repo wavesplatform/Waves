@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
@@ -88,6 +89,23 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       val orderBook = matcherNode.orderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks shouldNot be(empty)
+    }
+
+    "matcher can start after multiple delete events" in {
+      // The hack will be fixed in the master branch
+      import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
+
+      def deleteWctWaves = async(matcherNode).deleteOrderBook(wctWavesPair)
+      val deleteMultipleTimes = deleteWctWaves
+        .zip(deleteWctWaves)
+        .map(_ => ())
+        .recover { case _ => () } // It's ok: either this should fail, or restartNode should work
+
+      SyncMatcherHttpApi.sync(deleteMultipleTimes)
+      val dockerMatcherNode = dockerNodes().head
+      dockerMatcherNode shouldBe matcherNode
+
+      docker.restartNode(dockerMatcherNode)
     }
   }
 }

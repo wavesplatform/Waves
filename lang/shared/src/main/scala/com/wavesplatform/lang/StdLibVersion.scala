@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.ContentType.ContentType
 import supertagged._
 
 object StdLibVersion extends TaggedType[Int] {

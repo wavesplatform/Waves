@@ -18,7 +18,7 @@ class ConfigSettingsValidator(config: Config) {
 
   import ConfigSettingsValidator.ErrorsListOr
 
-  private def createError[T](settingName: String, additionalErrorInfo: String = ""): List[String] = {
+  private def createError[T](settingName: String, additionalErrorInfo: String): List[String] = {
     val errorMsg = Option(additionalErrorInfo).filter(_.nonEmpty).fold("")(m => s", $m")
     List(s"Invalid setting $settingName value: ${config.getValue(settingName).unwrapped}$errorMsg")
   }
