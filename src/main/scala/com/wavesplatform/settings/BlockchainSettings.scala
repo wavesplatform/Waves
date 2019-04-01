@@ -147,7 +147,6 @@ object BlockchainSettings {
   implicit val blockChainSettingsValueReader: ValueReader[BlockchainSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
-
   // @deprecated("Use config.as[BlockchainSettings]", "0.17.0")
   def fromRootConfig(config: Config): BlockchainSettings = config.as[BlockchainSettings]("waves.blockchain")
 

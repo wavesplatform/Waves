@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
@@ -38,11 +39,12 @@ case class MatcherSettings(enable: Boolean,
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
                            balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
-                           disableExtraFeeForScript: Boolean)
+                           disableExtraFeeForScript: Boolean,
+                           allowedAssetPairs: Set[AssetPair])
 
 object MatcherSettings {
   implicit val addressReader: ValueReader[Address] = (cfg, path) => Address.fromString(cfg.getString(path)).explicitGet()
-  implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val chosenCase: NameMapper              = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
 
   case class EventsQueueSettings(tpe: String, local: LocalMatcherQueue.Settings, kafka: KafkaMatcherQueue.Settings)
   private[this] implicit val eventsQueueSettingsReader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
@@ -84,9 +86,20 @@ object MatcherSettings {
 
     val balanceWatchingBufferInterval = config.as[FiniteDuration]("balance-watching-buffer-interval")
 
-    val eventsQueue              = config.as[EventsQueueSettings](s"events-queue")
-    val recoverOrderHistory      = !new File(dataDirectory).exists()
-    val disableExtraFeeForScript = config.as[Boolean](s"disable-extra-fee-for-script")
+    val eventsQueue         = config.as[EventsQueueSettings](s"events-queue")
+    val recoverOrderHistory = !new File(dataDirectory).exists()
+
+    def getAssetPairFromString(source: String): AssetPair = {
+      val sourceArr = source.split("-")
+      val res = sourceArr match {
+        case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
+        case _                               => throw new Exception(s"Incorrect assets count (expected 2, but got ${sourceArr.size}): $source")
+      }
+      res fold (ex => throw new Exception(ex.getMessage), identity)
+    }
+
+    val allowedAssetPairs        = config.as[Set[String]]("allowed-asset-pairs").map(getAssetPairFromString)
+    val disableExtraFeeForScript = config.as[Boolean]("disable-extra-fee-for-script")
 
     MatcherSettings(
       enabled,
@@ -111,7 +124,8 @@ object MatcherSettings {
       orderBookSnapshotHttpCache,
       balanceWatchingBufferInterval,
       eventsQueue,
-      disableExtraFeeForScript
+      disableExtraFeeForScript,
+      allowedAssetPairs
     )
   }
 }

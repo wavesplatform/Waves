@@ -23,7 +23,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-
 class OrderValidatorSpecification
     extends WordSpec
     with WithDB
@@ -136,6 +135,22 @@ class OrderValidatorSpecification
                 matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
               )) should produce("Invalid price")
           }
+      }
+
+      "asset pair is not in whitelist" in {
+
+        def validateByAssetPairWhitelist(allowedAssetPairs: Set[AssetPair]): Order => OrderValidator.ValidationResult =
+          OrderValidator.matcherSettingsAware(MatcherAccount, Set.empty, Set.empty, allowedAssetPairs)
+
+        forAll(orderGenerator) {
+          case (order, _) =>
+            validateByAssetPairWhitelist(Set.empty[AssetPair])(order) shouldBe 'right
+            validateByAssetPairWhitelist(Set(order.assetPair))(order) shouldBe 'right
+
+            validateByAssetPairWhitelist(Set(AssetPair.createAssetPair("A1", "A2").get))(order) should produce(
+              s"Trading is not allowed for the pair: ${order.assetPair}"
+            )
+        }
       }
     }
 
@@ -320,5 +335,6 @@ class OrderValidatorSpecification
   )(f: Either[String, Order] => A): A =
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus)(o))
 
-  private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty) _
+  private def msa(ba: Set[Address], o: Order) =
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings.allowedAssetPairs) _
 }
