@@ -1,23 +1,20 @@
 package com.wavesplatform.database
-import java.util
 
 trait Key[V] {
   def name: String
-
   def keyBytes: Array[Byte]
-
   def parse(bytes: Array[Byte]): V
-
   def encode(v: V): Array[Byte]
 
   override lazy val toString: String = BigInt(keyBytes).toString(16)
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case that: Key[V] => that.keyBytes.sameElements(keyBytes)
+    case that: Key[V] => java.util.Arrays.equals(this.keyBytes, that.keyBytes)
     case _            => false
   }
 
-  override def hashCode(): Int = util.Arrays.hashCode(keyBytes)
+  override def hashCode(): Int =
+    java.util.Arrays.hashCode(keyBytes)
 }
 
 object Key {

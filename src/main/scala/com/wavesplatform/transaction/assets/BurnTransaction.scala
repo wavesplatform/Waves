@@ -34,7 +34,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
   val byteBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
-      sender.publicKey,
+      sender,
       asset.id.arr,
       Longs.toByteArray(quantity),
       Longs.toByteArray(fee),

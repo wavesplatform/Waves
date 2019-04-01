@@ -22,7 +22,7 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
-                                            sender: PublicKeyAccount,
+                                            sender: PublicKey,
                                             dappAddress: Address,
                                             fc: Terms.FUNCTION_CALL,
                                             payment: Seq[Payment],
@@ -43,7 +43,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       Bytes.concat(
         Array(builder.typeId, version, chainId),
-        sender.publicKey,
+        sender,
         dappAddress.bytes.arr,
         Serde.serialize(fc),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
@@ -118,7 +118,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: PublicKey,
              dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
@@ -166,20 +166,20 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
             )
             .asLeft[Unit])
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: PublicKey,
              dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+             signer: PrivateKey): Either[ValidationError, TransactionT] =
     for {
       tx     <- create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty)
       proofs <- Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes()))))
     } yield tx.copy(proofs = proofs)
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(sender: KeyPair,
                  dappAddress: Address,
                  fc: Terms.FUNCTION_CALL,
                  p: Seq[Payment],
@@ -192,7 +192,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
       FunctionCallBytes(tailIndex(4), "Function call"),
       SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),

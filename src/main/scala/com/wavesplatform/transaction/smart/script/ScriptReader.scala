@@ -26,7 +26,7 @@ object ScriptReader {
       (scriptType, stdLibVersion, offset) = a
       scriptBytes                         = bytes.drop(offset).dropRight(checksumLength)
 
-      _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
+      _ <- Either.cond(java.util.Arrays.equals(checkSum, computedCheckSum), (), ScriptParseError("Invalid checksum"))
       s <- scriptType match {
         case ContentType.Expression =>
           for {

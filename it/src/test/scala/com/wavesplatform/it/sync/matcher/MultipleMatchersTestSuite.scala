@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -14,6 +14,7 @@ import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
+import scala.util.control.NonFatal
 
 // Works only with kafka
 class MultipleMatchersTestSuite extends MatcherSuiteBase {
@@ -77,12 +78,18 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   }
 
   "Wait until all requests are processed" in {
-    val offset1 = matcher1Node.waitForStableOffset(10, 100, 200.millis)
-    matcher2Node.waitFor[Long](s"Offset is $offset1")(_.getCurrentOffset, _ == offset1, 2.seconds)
+    try {
+      val offset1 = matcher1Node.waitForStableOffset(10, 100, 200.millis)
+      matcher2Node.waitFor[Long](s"Offset is $offset1")(_.getCurrentOffset, _ == offset1, 2.seconds)
 
-    withClue("Last command processed") {
-      matcher1Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
-      matcher2Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+      withClue("Last command processed") {
+        matcher1Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+        matcher2Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+      }
+    } catch {
+      case NonFatal(e) =>
+        log.info(s"Last offsets: node1=${matcher1Node.getLastOffset}, node2=${matcher2Node.getLastOffset}")
+        throw e
     }
   }
 
@@ -92,7 +99,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     state1 shouldBe state2
   }
 
-  private def mkOrders(account: PrivateKeyAccount) =
+  private def mkOrders(account: KeyPair) =
     Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcherPublicKey, account, assetPairs)).sample.get
 
   private def state(matcherNode: Node) = clean(matcherNode.matcherState(assetPairs, orders, Seq(aliceAcc, bobAcc)))

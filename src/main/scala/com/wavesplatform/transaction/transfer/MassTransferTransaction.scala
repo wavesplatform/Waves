@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
@@ -20,7 +20,7 @@ import scala.annotation.meta.field
 import scala.util.{Either, Try}
 
 case class MassTransferTransaction private (assetId: Asset,
-                                            sender: PublicKeyAccount,
+                                            sender: PublicKey,
                                             transfers: List[ParsedTransfer],
                                             timestamp: Long,
                                             fee: Long,
@@ -41,7 +41,7 @@ case class MassTransferTransaction private (assetId: Asset,
 
     Bytes.concat(
       Array(builder.typeId, version),
-      sender.publicKey,
+      sender,
       assetIdBytes,
       Shorts.toByteArray(transfers.size.toShort),
       transferBytes,
@@ -114,7 +114,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   }
 
   def create(assetId: Asset,
-             sender: PublicKeyAccount,
+             sender: PublicKey,
              transfers: List[ParsedTransfer],
              timestamp: Long,
              feeAmount: Long,
@@ -140,19 +140,19 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   }
 
   def signed(assetId: Asset,
-             sender: PublicKeyAccount,
+             sender: PublicKey,
              transfers: List[ParsedTransfer],
              timestamp: Long,
              feeAmount: Long,
              attachment: Array[Byte],
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
   def selfSigned(assetId: Asset,
-                 sender: PrivateKeyAccount,
+                 sender: KeyPair,
                  transfers: List[ParsedTransfer],
                  timestamp: Long,
                  feeAmount: Long,
@@ -173,7 +173,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   val byteTailDescription: ByteEntity[MassTransferTransaction] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      PublicKeyBytes(tailIndex(1), "Sender's public key"),
       OptionBytes(index = tailIndex(2), name = "Asset ID", nestedByteEntity = AssetIdBytes(tailIndex(2), "Asset ID")),
       TransfersBytes(tailIndex(3)),
       LongBytes(tailIndex(4), "Timestamp"),

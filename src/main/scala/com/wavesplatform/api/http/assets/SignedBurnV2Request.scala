@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, AddressScheme}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.{Proofs, ValidationError}
@@ -25,7 +25,7 @@ case class SignedBurnV2Request(@ApiModelProperty(value = "Base58 encoded Issuer 
 
   def toTx: Either[ValidationError, BurnTransactionV2] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToAsset(assetId)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)

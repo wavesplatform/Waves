@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -47,7 +47,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
     """),
        SetScriptTransaction
          .create(
-           PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+           PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
            None,
            100000,
            1526983936610L,
@@ -60,7 +60,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
 
   property("SetScriptTransaction id doesn't depend on proof (spec)") {
     forAll(accountGen, proofsGen, proofsGen, contractOrExpr) {
-      case (acc: PrivateKeyAccount, proofs1, proofs2, script) =>
+      case (acc: KeyPair, proofs1, proofs2, script) =>
         val tx1 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs1).explicitGet()
         val tx2 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs2).explicitGet()
         tx1.id() shouldBe tx2.id()

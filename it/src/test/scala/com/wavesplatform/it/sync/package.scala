@@ -47,7 +47,7 @@ package object sync {
   def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
     import tx._
     SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       new String(name),
       new String(description),
       quantity,
@@ -62,7 +62,7 @@ package object sync {
   def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
     import tx._
     SignedIssueV2Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       new String(name),
       new String(description),
       quantity,

@@ -2,6 +2,7 @@ package com.wavesplatform.account
 
 import java.nio.ByteBuffer
 
+import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -17,44 +18,59 @@ sealed trait Address extends AddressOrAlias {
 
 //noinspection ScalaDeprecation
 object Address extends ScorexLogging {
-  val Prefix = "address:"
-
+  val Prefix               = "address:"
   val AddressVersion: Byte = 1
   val ChecksumLength       = 4
   val HashLength           = 20
   val AddressLength        = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength  = base58Length(AddressLength)
 
-  def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
-    val withoutChecksum = ByteBuffer
-      .allocate(1 + 1 + HashLength)
-      .put(AddressVersion)
-      .put(chainId)
-      .put(crypto.secureHash(publicKey), 0, HashLength)
-      .array()
+  private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = CacheBuilder.newBuilder()
+    .weakKeys()
+    .maximumSize(1000000)
+    .build()
 
-    val bytes = ByteBuffer
-      .allocate(AddressLength)
-      .put(withoutChecksum)
-      .put(calcCheckSum(withoutChecksum), 0, ChecksumLength)
-      .array()
+  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder.newBuilder()
+    .weakKeys()
+    .maximumSize(1000000)
+    .build()
 
-    createUnsafe(bytes)
+  def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
+    publicKeyBytesCache.get(
+      publicKey, { () =>
+        val withoutChecksum = ByteBuffer
+          .allocate(1 + 1 + HashLength)
+          .put(AddressVersion)
+          .put(chainId)
+          .put(crypto.secureHash(publicKey), 0, HashLength)
+          .array()
+
+        val bytes = ByteBuffer
+          .allocate(AddressLength)
+          .put(withoutChecksum)
+          .put(calcCheckSum(withoutChecksum), 0, ChecksumLength)
+          .array()
+
+        createUnsafe(bytes)
+      }
+    )
   }
 
-  def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
-    val version = addressBytes.head
-    val network = addressBytes.tail.head
-    (for {
-      _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-      _ <- Either.cond(network == chainId, (), s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
-      _ <- Either.cond(addressBytes.length == Address.AddressLength,
-                       (),
-                       s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
-      checkSum          = addressBytes.takeRight(ChecksumLength)
-      checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-      _ <- Either.cond(checkSum.sameElements(checkSumGenerated), (), s"Bad address checksum")
-    } yield createUnsafe(addressBytes)).left.map(InvalidAddress)
+  def fromBytes(addressBytes: ByteStr, chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
+    bytesCache.get(addressBytes, { () =>
+      val Array(version, network, _*) = addressBytes.arr
+
+      (for {
+        _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+        _ <- Either.cond(network == chainId, (), s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
+        _ <- Either.cond(addressBytes.length == Address.AddressLength,
+          (),
+          s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
+        checkSum          = addressBytes.takeRight(ChecksumLength)
+        checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+        _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+      } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
+    })
   }
 
   def fromString(addressStr: String): Either[ValidationError, Address] = {
@@ -76,7 +92,6 @@ object Address extends ScorexLogging {
   @inline
   private[this] def scheme: AddressScheme = AddressScheme.current
 
-  @deprecated("Use fromBytes")
   private[wavesplatform] def createUnsafe(address: ByteStr): Address = {
     final case class AddressImpl(bytes: ByteStr) extends Address
     AddressImpl(address)
