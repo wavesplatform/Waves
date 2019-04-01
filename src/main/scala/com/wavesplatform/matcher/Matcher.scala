@@ -121,7 +121,8 @@ class Matcher(actorSystem: ActorSystem,
                                           transactionCreator.createTransaction,
                                           matcherPublicKey.toAddress,
                                           time,
-                                          matcherSettings.orderFee)(o)
+                                          matcherSettings.orderFee,
+                                          matcherSettings.orderAmountRestrictions)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
   }
