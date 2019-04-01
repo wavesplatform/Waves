@@ -83,7 +83,9 @@ object Types {
       List(
         "dappAddress" -> addressType.typeRef,
         "payment"     -> optionPayment,
-        "feeAssetId" -> optionByteVector
+        "feeAssetId"  -> optionByteVector,
+        "function"    -> STRING,
+        "args"        -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
       ) ++ header ++ proven,
       proofsEnabled
     )

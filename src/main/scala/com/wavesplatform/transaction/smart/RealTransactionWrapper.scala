@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
@@ -101,7 +102,14 @@ object RealTransactionWrapper {
           }.toIndexedSeq
         )
       case ci: InvokeScriptTransaction =>
-        Tx.CI(proven(ci), ci.dappAddress, ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)), ci.feeAssetId.compatId)
+        Tx.CI(
+          proven(ci),
+          ci.dappAddress,
+          ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)),
+          ci.feeAssetId.compatId,
+          ci.fc.function.funcName,
+          ci.fc.args.map(_.asInstanceOf[EVALUATED])
+        )
     }
   }
 }
