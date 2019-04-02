@@ -31,7 +31,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
-class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransactioaddnBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val T = 'T'.toByte
 
   def letProof(p: Proofs, prefix: String)(i: Int) =
