@@ -19,7 +19,11 @@ case class ByteStr(arr: Array[Byte]) {
 
   lazy val trim: String = base58.toString.take(7) + "..."
 
-  override lazy val toString: String = base58
+  override lazy val toString: String = if (arr.length < 1024) {
+    base58
+  } else {
+    base64
+  }
 
   def isEmpty: Boolean = arr.length == 0
 
