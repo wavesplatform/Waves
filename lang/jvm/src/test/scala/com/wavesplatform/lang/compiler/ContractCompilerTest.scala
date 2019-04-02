@@ -510,7 +510,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
   }
 
-  property("contract compiles if script uses InvokeScriptTransaction.fc field") {
+  property("contract compiles if script uses InvokeScriptTransaction function and args field") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
@@ -519,8 +519,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
            | @Verifier(tx)
            | func verify() = {
            |   match tx {
-           |     case t:InvokeScriptTransaction => isDefined(t.function)
-           |     case _ => true
+           |     case ist: InvokeScriptTransaction => isDefined(ist.function) && isDefined(ist.args)
+           |     case _ => false
            |   }
            | }
            |
