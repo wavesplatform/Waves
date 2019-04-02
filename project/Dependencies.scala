@@ -123,7 +123,6 @@ object Dependencies {
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
-      ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava"),
       // "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0",
       jacksonModule("core", "databind"),
@@ -136,7 +135,8 @@ object Dependencies {
       monixModule("reactive").value,
       nettyModule("handler"),
       akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test
+      akkaHttpModule("akka-http-testkit") % Test,
+      ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava") % Test
     ) ++ test
   )
 

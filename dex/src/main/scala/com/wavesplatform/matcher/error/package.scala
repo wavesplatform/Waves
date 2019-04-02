@@ -8,7 +8,8 @@ package object error {
       val (message, template, params) = parts.zipWithIndex.foldLeft(("", "", Map.empty[String, String])) {
         case ((m, t, p), (x, i)) =>
           val (argName, argValue) = args(i)
-          (s"$m$x${argValue.toString}", s"$t$x{{${argName.name}}}", p + (argName.name -> argValue.toString))
+          val strValue            = Option(argValue).getOrElse("<null>").toString
+          (s"$m$x$strValue", s"$t$x{{${argName.name}}}", p + (argName.name -> strValue))
       }
 
       MatcherErrorMessage(

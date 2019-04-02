@@ -425,7 +425,7 @@ class OrderValidatorSpecification
 
           orderFeeSettings match {
             case _: FixedSettings =>
-              setFeeAssetScriptAndValidate(Some(invalidScript)) should produce("AssetScriptException")
+              setFeeAssetScriptAndValidate(Some(invalidScript)) should produce("AssetScriptReturnedError")
               setFeeAssetScriptAndValidate(Some(falseScript)) should produce("AssetScriptDeniedOrder")
               setFeeAssetScriptAndValidate(None) shouldBe 'right
             case _ =>

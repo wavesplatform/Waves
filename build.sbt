@@ -66,21 +66,13 @@ lazy val `dex-it` = project
 
 lazy val `dex-generator` = project.dependsOn(dex, `dex-it` % "compile->test")
 
-lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
+lazy val it = project
+  .settings(
+    description := "Hack for near future to support builds in TeamCity for old and new branches both",
+    Test / test := (`node-it` / Test / test).dependsOn(`dex-it` / Test / test).value
+  )
 
 lazy val root = (project in file("."))
-  .settings(
-    checkPRRaw := {
-      try {
-        clean.value // Hack to run clean before all tasks
-      } finally {
-        test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
-        (commonJS / Compile / fastOptJS).value
-        (langJS / Compile / fastOptJS).value
-        compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
-      }
-    }
-  )
   .aggregate(
     commonJS,
     commonJVM,
@@ -133,15 +125,29 @@ inScope(Global)(
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
+// root project settings
+
 // TODO: https://stackoverflow.com/a/14274715
 addCommandAlias(
   "checkPR",
   // set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
   """;
-    |Global / checkPRRaw;
+    |root / checkPRRaw;
     |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
   """.stripMargin
 )
+
+lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
+checkPRRaw := {
+  try {
+    clean.value // Hack to run clean before all tasks
+  } finally {
+    test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
+    (commonJS / Compile / fastOptJS).value
+    (langJS / Compile / fastOptJS).value
+    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
+  }
+}
 
 commands += Command.command("packageAll") { state =>
   "node/clean" :: "node/assembly" :: "node/debian:packageBin" :: state
