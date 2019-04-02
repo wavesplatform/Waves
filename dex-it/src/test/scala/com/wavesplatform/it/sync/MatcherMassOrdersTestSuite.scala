@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -154,10 +154,9 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       val aliceOrderHistoryByPair = node.orderHistoryByPair(alice, aliceWavesPair)
       aliceOrderHistoryByPair.size shouldBe orderLimit
     }
-
   }
 
-  private def ordersRequestsGen(n: Int, sender: PrivateKeyAccount, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
+  private def ordersRequestsGen(n: Int, sender: KeyPair, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
     val orderIds = 1 to n map (_ => {
       node
         .placeOrder(sender, assetPair, orderType, amount, Order.PriceConstant, matcherFee, orderVersion, (120 + Random.nextInt(70)).seconds)
@@ -167,6 +166,6 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     orderIds
   }
 
-  private def orderStatus(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, expectedStatus: String) =
+  private def orderStatus(sender: KeyPair, assetPair: AssetPair, orderId: String, expectedStatus: String) =
     node.waitOrderStatus(assetPair, orderId, expectedStatus)
 }

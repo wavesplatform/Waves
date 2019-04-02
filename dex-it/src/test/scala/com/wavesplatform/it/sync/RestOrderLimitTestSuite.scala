@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr.decodeBase58
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -31,10 +31,10 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
     allOrders
   }
 
-  private def activeOrdersBy(pair: AssetPair, n: PrivateKeyAccount = alice): Seq[String] =
+  private def activeOrdersBy(pair: AssetPair, n: KeyPair = alice): Seq[String] =
     node.orderHistoryByPair(n, pair, activeOnly = true).map(_.id)
 
-  private def allOrdersBy(pair: AssetPair, n: PrivateKeyAccount = alice): Seq[String] = node.orderHistoryByPair(n, pair).map(_.id)
+  private def allOrdersBy(pair: AssetPair, n: KeyPair = alice): Seq[String] = node.orderHistoryByPair(n, pair).map(_.id)
 
   markup("""Test suite checks only Alice's OrderHistory.
           |Bob places orders only for matching Alice's orders.""".stripMargin)

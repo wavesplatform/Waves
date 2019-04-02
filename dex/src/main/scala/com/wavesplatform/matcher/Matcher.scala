@@ -9,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db._
@@ -35,10 +35,12 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private val settings = context.settings.config.as[MatcherSettings]("waves.matcher")
 
-  private val matcherPrivateKey = (for {
+  private val matcherKeyPair = (for {
     address <- Address.fromString(settings.account)
-    pk      <- context.wallet.privateKeyAccount(address) // TODO: generate wallet file and copy it to the node
+    pk      <- context.wallet.privateKeyAccount(address)
   } yield pk).explicitGet()
+
+  private def matcherPublicKey: PublicKey = matcherKeyPair
 
   private implicit val as: ActorSystem                 = context.actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
@@ -61,7 +63,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherPrivateKey, settings.orderFee)
+  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings.orderFee)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -199,7 +201,6 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     )
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-  private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
 
   private lazy val db = openDB(settings.dataDir)
 

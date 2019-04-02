@@ -1,11 +1,11 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto
+import com.wavesplatform.{NoShrink, crypto}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AccountSpecification extends PropSpec with PropertyChecks with Matchers {
+class AccountSpecification extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   property("Account.isValidAddress should return false for another address version") {
     forAll { (data: Array[Byte], AddressVersion2: Byte) =>
@@ -16,10 +16,10 @@ class AccountSpecification extends PropSpec with PropertyChecks with Matchers {
     }
   }
 
-  property("PublicKeyAccount should return Address as it's string representation") {
+  property("PublicKey should return Address as it's string representation") {
     forAll { bytes: Array[Byte] =>
-      val a = PublicKeyAccount.apply(bytes)
-      a.toString shouldBe a.toAddress.address
+      val a = KeyPair(bytes).publicKey
+      PublicKey.toString(a) shouldBe a.toAddress.address
     }
   }
 

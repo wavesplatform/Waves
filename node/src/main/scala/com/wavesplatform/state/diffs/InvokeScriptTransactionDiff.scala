@@ -7,7 +7,6 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -16,6 +15,8 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -46,14 +47,14 @@ object InvokeScriptTransactionDiff {
       )
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-      val invocation                                    = ContractEvaluator.Invocation(tx.fc, Recipient.Address(invoker), tx.sender.publicKey, maybePayment, tx.dappAddress.bytes)
+      val invocation                                    = ContractEvaluator.Invocation(tx.fc, Recipient.Address(invoker), tx.sender, maybePayment, tx.dappAddress.bytes)
       for {
-        directives <- DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp)
+        directives <- DirectiveSet(V3, Account, DAppType)
         evaluator <- ContractEvaluator(
           Monoid
             .combineAll(
               Seq(
-                PureContext.build(StdLibVersion.V3),
+                PureContext.build(V3),
                 CryptoContext.build(Global),
                 WavesContext.build(directives, environment)
               )

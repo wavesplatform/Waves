@@ -4,12 +4,12 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
-import com.wavesplatform.common.utils.EitherExt2
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
@@ -18,8 +18,8 @@ import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEn
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.asynchttpclient.Response
@@ -72,9 +72,9 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime = 50.seconds
+  val RequestAwaitTime: FiniteDuration = 50.seconds
 
-  def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime) =
+  def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
@@ -155,7 +155,7 @@ object SyncHttpApi extends Assertions {
 
     def debugPortfoliosFor(address: String, considerUnspent: Boolean): Portfolio = sync(async(n).debugPortfoliosFor(address, considerUnspent))
 
-    def broadcastIssue(source: PrivateKeyAccount,
+    def broadcastIssue(source: KeyPair,
                        name: String,
                        description: String,
                        quantity: Long,
@@ -234,7 +234,7 @@ object SyncHttpApi extends Assertions {
     def aliasByAddress(targetAddress: String): Seq[String] =
       sync(async(n).aliasByAddress(targetAddress))
 
-    def broadcastTransfer(source: PrivateKeyAccount,
+    def broadcastTransfer(source: KeyPair,
                           recipient: String,
                           amount: Long,
                           fee: Long,
@@ -276,11 +276,7 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
     }
 
-    def broadcastLease(source: PrivateKeyAccount,
-                       recipient: String,
-                       leasingAmount: Long,
-                       leasingFee: Long,
-                       waitForTx: Boolean = false): Transaction = {
+    def broadcastLease(source: KeyPair, recipient: String, leasingAmount: Long, leasingFee: Long, waitForTx: Boolean = false): Transaction = {
       val tx = LeaseTransactionV2
         .selfSigned(
           sender = source,
@@ -317,7 +313,7 @@ object SyncHttpApi extends Assertions {
     def activeLeases(sourceAddress: String): Seq[Transaction] =
       sync(async(n).activeLeases(sourceAddress))
 
-    def broadcastCancelLease(source: PrivateKeyAccount, leaseId: String, fee: Long, waitForTx: Boolean = false): Transaction = {
+    def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long, waitForTx: Boolean = false): Transaction = {
       val tx = LeaseCancelTransactionV2
         .selfSigned(
           chainId = AddressScheme.current.chainId,

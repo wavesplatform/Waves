@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicLong
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, OrderValidator, SellLimitOrder}
@@ -30,8 +30,8 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val bytes32gen: Gen[Array[Byte]]       = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
   val WalletSeed                         = ByteStr("Matcher".getBytes())
   val MatcherSeed: Array[Byte]           = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
-  val MatcherAccount                     = PrivateKeyAccount(MatcherSeed)
-  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
+  val MatcherAccount                     = KeyPair(MatcherSeed)
+  val accountGen: Gen[KeyPair] = bytes32gen.map(seed => KeyPair(seed))
   val positiveLongGen: Gen[Long]         = Gen.choose(1, Long.MaxValue)
 
   private val seqNr = new AtomicLong(-1)
@@ -95,12 +95,12 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def buyGenerator(pair: AssetPair,
                    amount: Long,
                    price: Long,
-                   sender: Option[PrivateKeyAccount] = None,
+                   sender: Option[KeyPair] = None,
                    matcherFee: Option[Long] = None,
                    version: Byte = 1,
-                   timestamp: Option[Long]): Gen[(Order, PrivateKeyAccount)] =
+                   timestamp: Option[Long]): Gen[(Order, KeyPair)] =
     for {
-      sender: PrivateKeyAccount <- sender.map(Gen.const).getOrElse(accountGen)
+      sender: KeyPair <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long           <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
       expiration: Long          <- maxTimeGen
       matcherFee: Long          <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
@@ -109,12 +109,12 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def sellGenerator(pair: AssetPair,
                     amount: Price,
                     price: Price,
-                    sender: Option[PrivateKeyAccount] = None,
+                    sender: Option[KeyPair] = None,
                     matcherFee: Option[Price] = None,
                     timestamp: Option[Price],
-                    version: Byte = 1): Gen[(Order, PrivateKeyAccount)] =
+                    version: Byte = 1): Gen[(Order, KeyPair)] =
     for {
-      sender: PrivateKeyAccount <- sender.map(Gen.const).getOrElse(accountGen)
+      sender: KeyPair <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long           <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
       expiration: Long          <- maxTimeGen
       matcherFee: Long          <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
@@ -123,7 +123,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def buy(pair: AssetPair,
           amount: Price,
           price: BigDecimal,
-          sender: Option[PrivateKeyAccount] = None,
+          sender: Option[KeyPair] = None,
           matcherFee: Option[Price] = None,
           ts: Option[Price] = None,
           version: Byte = 1): Order = rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version)
@@ -131,7 +131,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def rawBuy(pair: AssetPair,
              amount: Price,
              price: Price,
-             sender: Option[PrivateKeyAccount] = None,
+             sender: Option[KeyPair] = None,
              matcherFee: Option[Price] = None,
              ts: Option[Price] = None,
              version: Byte = 1): Order =
@@ -140,7 +140,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def sell(pair: AssetPair,
            amount: Price,
            price: BigDecimal,
-           sender: Option[PrivateKeyAccount] = None,
+           sender: Option[KeyPair] = None,
            matcherFee: Option[Price] = None,
            ts: Option[Price] = None,
            version: Byte = 1): Order = rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version)
@@ -148,7 +148,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def rawSell(pair: AssetPair,
               amount: Price,
               price: Price,
-              sender: Option[PrivateKeyAccount] = None,
+              sender: Option[KeyPair] = None,
               matcherFee: Option[Price] = None,
               ts: Option[Price] = None,
               version: Byte = 1): Order =
@@ -156,7 +156,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
-  def orderGenerator(sender: PrivateKeyAccount, pair: AssetPair): Gen[Order] =
+  def orderGenerator(sender: KeyPair, pair: AssetPair): Gen[Order] =
     for {
       orderType          <- orderTypeGenerator
       amount: Long       <- maxWavesAmountGen
@@ -173,14 +173,14 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       else Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion)
     }
 
-  val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
-    sender: PrivateKeyAccount <- accountGen
+  val orderGenerator: Gen[(Order, KeyPair)] = for {
+    sender: KeyPair <- accountGen
     pair                      <- assetPairGen
     order                     <- orderGenerator(sender, pair)
   } yield order -> sender
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
-    sender: PrivateKeyAccount <- accountGen
+    sender: KeyPair <- accountGen
     pair                      <- assetPairGen
     amount: Long              <- maxWavesAmountGen
     price: Long               <- maxWavesAmountGen
@@ -191,7 +191,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   } yield BuyLimitOrder(amount, matcherFee, Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
 
   val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
-    sender: PrivateKeyAccount <- accountGen
+    sender: KeyPair <- accountGen
     pair                      <- assetPairGen
     amount: Long              <- maxWavesAmountGen
     price: Long               <- maxWavesAmountGen
@@ -203,7 +203,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val orderV3Generator: Gen[Order] =
     for {
-      sender: PrivateKeyAccount <- accountGen
+      sender: KeyPair <- accountGen
       pair                      <- assetPairGen
       orderType                 <- orderTypeGenerator
       amount: Long              <- maxWavesAmountGen
@@ -217,9 +217,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
     }
 
-  def orderV3WithPredefinedFeeAssetGenerator(matcherFeeAsset: Option[Asset] = None): Gen[(PrivateKeyAccount, Order)] = {
+  def orderV3WithPredefinedFeeAssetGenerator(matcherFeeAsset: Option[Asset] = None): Gen[(KeyPair, Order)] = {
     for {
-      sender: PrivateKeyAccount <- accountGen
+      sender: KeyPair <- accountGen
       pair                      <- distinctPairGen
       orderType                 <- orderTypeGenerator
       amount: Long              <- maxWavesAmountGen
@@ -243,10 +243,10 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     }
   }
 
-  val orderV3PairGenerator: Gen[((PrivateKeyAccount, Order), (PrivateKeyAccount, Order))] =
+  val orderV3PairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
     for {
-      senderBuy: PrivateKeyAccount  <- accountGen
-      senderSell: PrivateKeyAccount <- accountGen
+      senderBuy: KeyPair  <- accountGen
+      senderSell: KeyPair <- accountGen
       pair                          <- assetPairGen
       amount: Long                  <- maxWavesAmountGen
       price: Long                   <- Gen.choose(1, (Long.MaxValue / amount) - 100)
@@ -302,7 +302,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     } yield orderFeeSettings
   }
 
-  val orderWithFeeSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
+  val orderWithFeeSettingsGenerator: Gen[(Order, KeyPair, OrderFeeSettings)] = {
     for {
       orderFeeSettings <- orderFeeSettingsGenerator()
       (order, sender)  <- orderGenerator
@@ -314,7 +314,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   def orderWithFeeSettingsGenerator(tpe: OrderType, price: Long): Gen[(Order, OrderFeeSettings)] =
     for {
-      sender: PrivateKeyAccount <- accountGen
+      sender: KeyPair <- accountGen
       pair                      <- assetPairGen
       amount: Long              <- maxWavesAmountGen
       timestamp: Long           <- createdTimeGen
@@ -336,9 +336,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       correctedOrder -> orderFeeSettings
     }
 
-  val orderWithoutWavesInPairAndWithFeeSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
+  val orderWithoutWavesInPairAndWithFeeSettingsGenerator: Gen[(Order, KeyPair, OrderFeeSettings)] = {
     for {
-      sender: PrivateKeyAccount <- accountGen
+      sender: KeyPair <- accountGen
       amountAsset               <- arbitraryAssetIdGen
       priceAsset                <- arbitraryAssetIdGen
       orderFeeSettings          <- orderFeeSettingsGenerator()
@@ -358,7 +358,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     }
   }
 
-  private def correctOrderByFeeSettings(order: Order, sender: PrivateKeyAccount, orderFeeSettings: OrderFeeSettings): Order = {
+  private def correctOrderByFeeSettings(order: Order, sender: KeyPair, orderFeeSettings: OrderFeeSettings): Order = {
     val correctedOrder = (order.version, orderFeeSettings) match {
       case (3, FixedSettings(defaultAssetId, minFee)) =>
         order

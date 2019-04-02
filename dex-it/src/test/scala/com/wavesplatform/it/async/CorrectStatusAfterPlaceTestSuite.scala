@@ -1,7 +1,7 @@
 package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncMatcherHttpApi._
@@ -49,7 +49,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   override protected val nodeConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback)
 
-  private val traders: Seq[PrivateKeyAccount] = (1 to 10).map(_ => PrivateKeyAccount(Random.nextString(20).getBytes))
+  private val traders: Seq[KeyPair] = (1 to 10).map(_ => KeyPair(Random.nextString(20).getBytes))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

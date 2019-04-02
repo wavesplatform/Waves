@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.directives
 
+import com.wavesplatform.lang.ExecutionError
 import fastparse.WhitespaceApi
 import fastparse.core.Parsed.Success
+import cats.implicits._
 
 object DirectiveParser {
 
@@ -13,25 +15,34 @@ object DirectiveParser {
   import White._
   import fastparse.noApi._
 
+  val start = "{-#"
+  val end   = "#-}"
+
   private val space: P[Unit] =
-    P( CharIn(" ", "\t", "\r", "\n").rep )
+    P(CharIn(" ", "\t", "\r", "\n").rep)
 
-  private val directiveKeyP: P[DirectiveKey] =
-    P( StringIn(DirectiveKey.dictionary.keys.toSeq: _*).! )
-      .map(DirectiveKey.dictionary)
-
-  private val directiveValueP: P[String] =
-    P( CharIn('a' to 'z') | CharIn('A' to 'Z') | CharIn('0' to '9') )
+  private val directiveKeyP: P[String] =
+    P(CharIn('a' to 'z') | CharIn('A' to 'Z') | CharIn('0' to '9') | CharIn("_"))
       .repX(min = 1).!
 
-  private val parser: P[Directive] =
-    P(space ~ "{-#" ~ directiveKeyP ~ directiveValueP ~ "#-}" ~ space)
-      .map({ case (k, v) => Directive(k, v) })
+  private val directiveValueP: P[String] =
+    P(CharIn('a' to 'z') | CharIn('A' to 'Z') | CharIn('0' to '9'))
+      .repX(min = 1).!
 
-  def apply(input: String): List[Directive] = {
+  private val parser: P[Either[ExecutionError, Directive]] =
+    P(space ~ start ~ directiveKeyP ~ directiveValueP ~ end ~ space)
+      .map {
+        case (keyRaw, valueRaw) =>
+          for {
+            key   <- DirectiveKey.textMap.get(keyRaw).toRight(s"Illegal directive key $keyRaw")
+            value <- key.valueDic.textMap.get(valueRaw).toRight(s"Illegal directive value $valueRaw for key $keyRaw")
+          } yield Directive(key, value)
+      }
+
+  def apply(input: String): Either[ExecutionError, List[Directive]] =
     input.split("\n")
-      .map(str => parser.parse(str))
-      .collect({ case Success(value, _) => value })
+      .map(parser.parse(_))
+      .collect { case Success(value, _) => value }
       .toList
-  }
+      .sequence
 }

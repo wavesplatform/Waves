@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -16,32 +16,32 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(StdLibVersion.V1, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
   property("use version 2 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(StdLibVersion.V2, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {
     val script = scriptWithVersion("8".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Unsupported language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value 8 for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {
     val script = scriptWithVersion("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
   }
 
   property("fails on incorrect content type value") {
     val script = scriptWithContentType("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Wrong content type")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
   }
 
   property("fails on incorrect script type value") {
     val script = scriptWithScriptType("oOooOps".some)
-    ScriptCompiler.compile(script) shouldBe Left("Wrong script type")
+    ScriptCompiler.compile(script) shouldBe Left("Illegal directive value oOooOps for key SCRIPT_TYPE")
   }
 
   property("fails with right error position") {

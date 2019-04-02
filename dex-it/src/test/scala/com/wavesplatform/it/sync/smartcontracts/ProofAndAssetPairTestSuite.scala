@@ -103,7 +103,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     val sc8 = s"""
                  |match tx {
                  |  case t : Order => 
-                 |        let pk1 = base58'${ByteStr(matcher.publicKey)}'
+                 |   let pk1 = base58'${ByteStr(matcher.publicKey)}' # here was alice
                  |   sigVerify(t.bodyBytes,t.proofs[0],pk1)
                  |  case s : SetScriptTransaction => true
                  |  case _ => throw()

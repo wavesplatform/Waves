@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
@@ -435,8 +435,8 @@ case class AddressApiRoute(settings: RestAPISettings,
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-        val account = PublicKeyAccount(pubKeyBytes)
-        val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
+        val account = PublicKey(pubKeyBytes)
+        val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }
@@ -451,7 +451,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.tryDecodeWithLimit(publicKey) match {
       case Success(pubKeyBytes) =>
-        val account = Address.fromPublicKey(pubKeyBytes)
+        val account = Address.fromPublicKey(PublicKey(pubKeyBytes))
         complete(Json.obj("address" -> account.address))
       case Failure(_) => complete(InvalidPublicKey)
     }

@@ -2,7 +2,7 @@ package com.wavesplatform.matcher
 
 import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
@@ -112,7 +112,7 @@ object AssetPairBuilderSpec {
   private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
   private def mkAssetDescription(assetName: String = ""): Option[AssetDescription] =
     Some(
-      AssetDescription(PublicKeyAccount(Array.emptyByteArray),
+      AssetDescription(PublicKey(Array.emptyByteArray),
                        assetName.getBytes(Charsets.UTF_8),
                        Array.emptyByteArray,
                        8,

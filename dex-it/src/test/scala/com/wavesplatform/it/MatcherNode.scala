@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
@@ -12,7 +12,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   this: Suite =>
 
-  def setContract(contractText: Option[String], acc: PrivateKeyAccount): String = {
+  def setContract(contractText: Option[String], acc: KeyPair): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
       ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1

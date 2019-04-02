@@ -1,10 +1,9 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
@@ -27,7 +26,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
 
     val dtx = DataTransaction
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
         List(entry1, entry2, entry3, entry4),
         100000,
         1526911531530L,
@@ -39,7 +38,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
     val ttx = TransferTransactionV2
       .create(
         Waves,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
         Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get,
         100000000,
         1526641218066L,
@@ -52,7 +51,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
       .get
 
     val untypedScript  = Parser.parseExpr(scriptWithAllFunctions(dtx, ttx)).get.value
-    val compiledScript = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1
+    val compiledScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
     val bytes = Array[Byte](4, 0, 0, 0, 3, 114, 110, 100, 9, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 106, 0, 0, 0, 2, 8, 5, 0, 0, 0, 2, 116, 120, 0, 0, 0, 9,
       116, 105, 109, 101, 115, 116, 97, 109, 112, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 7, 108, 111, 110, 103, 65, 108,
       108, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 104, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, -24, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,

@@ -106,7 +106,7 @@ inScope(Global)(
       "-Ypartial-unification"
     ),
     crossPaths := false,
-    scalafmtOnCompile := true,
+    scalafmtOnCompile := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
     logBuffered := false,

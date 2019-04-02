@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
@@ -27,7 +27,7 @@ object MatcherPriceAssetConfig {
     override val chainId: Byte = genesisConfig.getString("genesis-generator.network-type").head.toByte
   }
 
-  val accounts: Map[String, PrivateKeyAccount] = {
+  val accounts: Map[String, KeyPair] = {
     val config           = ConfigFactory.parseResources("genesis.conf")
     val distributionsKey = "genesis-generator.distributions"
     val distributions    = config.getObject(distributionsKey)
@@ -43,9 +43,9 @@ object MatcherPriceAssetConfig {
       .toMap
   }
 
-  val matcher: PrivateKeyAccount = accounts("matcher")
-  val alice: PrivateKeyAccount   = accounts("alice")
-  val bob: PrivateKeyAccount     = accounts("bob")
+  val matcher: KeyPair = accounts("matcher")
+  val alice: KeyPair   = accounts("alice")
+  val bob: KeyPair     = accounts("bob")
 
   val Decimals: Byte = 2
 
@@ -179,17 +179,14 @@ object MatcherPriceAssetConfig {
       AssetPair(a2, a1)
   }
 
-  def issueAssetPair(issuer: PrivateKeyAccount,
-                     amountAssetDecimals: Byte,
-                     priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
+  def issueAssetPair(issuer: KeyPair, amountAssetDecimals: Byte, priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
     issueAssetPair(issuer, issuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def issueAssetPair(amountAssetIssuer: PrivateKeyAccount,
-                     priceAssetIssuer: PrivateKeyAccount,
+  def issueAssetPair(amountAssetIssuer: KeyPair,
+                     priceAssetIssuer: KeyPair,
                      amountAssetDecimals: Byte,
                      priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
-
     val issueAmountAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = amountAssetIssuer,
@@ -227,8 +224,7 @@ object MatcherPriceAssetConfig {
       issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
-
+  def assetPairIssuePriceAsset(issuer: KeyPair, amountAssetId: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = issuer,

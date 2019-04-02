@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.ExchangeTransactionData.{BuySellOrders, Orders}
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -19,7 +19,7 @@ object PBTransactions {
 
   private[this] val NoChainId: Byte = 0: Byte
 
-  def create(sender: com.wavesplatform.account.PublicKeyAccount = PublicKeyAccount.empty,
+  def create(sender: com.wavesplatform.account.PublicKey = PublicKey.empty,
              chainId: Byte = 0,
              fee: Long = 0L,
              feeAssetId: VanillaAssetId = Waves,
@@ -29,7 +29,7 @@ object PBTransactions {
              data: com.wavesplatform.protobuf.transaction.Transaction.Data = com.wavesplatform.protobuf.transaction.Transaction.Data.Empty)
     : SignedTransaction = {
     new SignedTransaction(
-      Some(Transaction(chainId, sender.publicKey: ByteStr, Some((feeAssetId, fee): Amount), timestamp, version, data)),
+      Some(Transaction(chainId, sender: ByteStr, Some((feeAssetId, fee): Amount), timestamp, version, data)),
       proofsArray.map(bs => ByteString.copyFrom(bs.arr))
     )
   }
@@ -46,7 +46,7 @@ object PBTransactions {
       fee       <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
       _         <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
       feeAmount <- toAmountAndAssetId(fee)
-      sender = PublicKeyAccount(parsedTx.senderPublicKey.toByteArray)
+      sender = PublicKey(parsedTx.senderPublicKey.toByteArray)
       tx <- if (unsafe)
         Right(
           createVanillaUnsafe(
@@ -75,7 +75,7 @@ object PBTransactions {
 
   private[this] def createVanilla(version: Int,
                                   chainId: Byte,
-                                  sender: PublicKeyAccount,
+                                  sender: PublicKey,
                                   feeAmount: Long,
                                   feeAssetId: VanillaAssetId,
                                   timestamp: Long,
@@ -312,7 +312,7 @@ object PBTransactions {
 
   private[this] def createVanillaUnsafe(version: Int,
                                         chainId: Byte,
-                                        sender: PublicKeyAccount,
+                                        sender: PublicKey,
                                         feeAmount: Long,
                                         feeAssetId: VanillaAssetId,
                                         timestamp: Long,
@@ -542,7 +542,7 @@ object PBTransactions {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)
-        PBTransactions.create(sender = PublicKeyAccount(Array.emptyByteArray), timestamp = timestamp, version = 1, data = Data.Genesis(data))
+        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
         val data = PaymentTransactionData(ByteString.copyFrom(recipient.bytes), amount)

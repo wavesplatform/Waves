@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
@@ -17,7 +17,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   }
 
   case class ReservedBalances(wct: Long, usd: Long, waves: Long)
-  def reservedBalancesOf(pk: PrivateKeyAccount): ReservedBalances = {
+  def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
     val reservedBalances = node.reservedBalance(pk)
     ReservedBalances(
       reservedBalances.getOrElse(WctId.toString, 0),

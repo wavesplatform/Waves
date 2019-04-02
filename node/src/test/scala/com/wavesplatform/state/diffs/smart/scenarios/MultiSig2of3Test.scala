@@ -1,11 +1,10 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
@@ -24,13 +23,13 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  def multisigTypedExpr(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): EXPR = {
+  def multisigTypedExpr(pk0: PublicKey, pk1: PublicKey, pk2: PublicKey): EXPR = {
     val script =
       s"""
          |
-         |let A = base58'${ByteStr(pk0.publicKey)}'
-         |let B = base58'${ByteStr(pk1.publicKey)}'
-         |let C = base58'${ByteStr(pk2.publicKey)}'
+         |let A = base58'${ByteStr(pk0)}'
+         |let B = base58'${ByteStr(pk1)}'
+         |let C = base58'${ByteStr(pk2)}'
          |
          |let proofs = tx.proofs
          |let AC = if(sigVerify(tx.bodyBytes,proofs[0],A)) then 1 else 0
@@ -41,7 +40,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |
       """.stripMargin
     val untyped = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untyped).explicitGet()._1
+    ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
   }
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, TransferTransactionV2, Seq[ByteStr])] = for {

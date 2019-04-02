@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account._
 import com.wavesplatform.api.http.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
@@ -66,8 +66,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
     val tx = InvokeScriptTransaction
       .selfSigned(
-        PrivateKeyAccount("test3".getBytes()),
-        PrivateKeyAccount("test4".getBytes()),
+        KeyPair("test3".getBytes()),
+        KeyPair("test4".getBytes()),
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)))),
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
@@ -101,7 +101,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     import com.wavesplatform.common.state.diffs.ProduceError._
-    val pk = PublicKeyAccount.fromBase58String(publicKey).explicitGet()
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       pk,
       pk.toAddress,
@@ -117,7 +117,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
     import com.wavesplatform.common.state.diffs.ProduceError._
-    val pk = PublicKeyAccount.fromBase58String(publicKey).explicitGet()
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       pk,
       pk.toAddress,
