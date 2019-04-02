@@ -1,15 +1,14 @@
 import cats.kernel.Monoid
 import com.github.mustachejava._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.collection.JavaConverters._
 
@@ -69,7 +68,7 @@ object DocExport {
 
       val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
 
-      def getTypes() = fullContext.types.map(v => typeRepr(v.typeRef)(v.name))
+      def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 
       case class VarDoc(name: String, `type`: TypeDoc, doc: String)
       def getVarsDoc() = fullContext.vars.map(v => VarDoc(v._1, typeRepr(v._2._1._1)(), v._2._1._2))
@@ -104,13 +103,13 @@ object DocExport {
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
       case class FieldTypes(name: String, types: java.util.List[TransactionField])
       val transactionsType       = fullContext.types.filter(v => v.name == "Transaction")
-      val transactionsTypesNames = transactionsType.flatMap({ case UnionType(_, union) => union.map(_.name) }).toSet
-      def transactionDocs(types: Seq[DefinedType], fieldsFlt: String => Boolean = (_ => true)) = {
+      val transactionsTypesNames = transactionsType.flatMap({ case UNION(union) => union.map(_.name) }).toSet
+      def transactionDocs(types: Seq[FINAL], fieldsFlt: String => Boolean = (_ => true)) = {
         val transactionsTypes =
           types.flatMap({
-            case UnionType(_, union) => union
-            case t: CaseType         => Seq(t.typeRef)
-            case t                   => println(t.toString); Seq()
+            case UNION(union)   => union
+            case t: CASETYPEREF => Seq(t)
+            case t              => println(t.toString); Seq()
           })
         val transactionsFields =
           transactionsTypes

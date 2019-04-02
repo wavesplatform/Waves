@@ -92,7 +92,7 @@ object JsAPI {
   @JSExportTopLevel("getTypes")
   def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext, isContract).types
-      .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef)))
+      .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v)))
       .toJSArray
 
   @JSExportTopLevel("getVarsDoc")

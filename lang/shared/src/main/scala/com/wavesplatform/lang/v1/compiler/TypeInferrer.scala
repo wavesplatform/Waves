@@ -2,12 +2,11 @@ package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {
 
   case class MatchResult(tpe: FINAL, name: TYPEPARAM)
-  def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
+  def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, FINAL] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
     val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
@@ -40,7 +39,7 @@ object TypeInferrer {
     }
   }
 
-  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
+  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL]): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
