@@ -15,9 +15,14 @@ case class ByteStr(arr: Array[Byte]) {
 
   lazy val base58: String = Base58.encode(arr)
 
-  lazy val base64: String = "base64:" + Base64.encode(arr)
+  lazy val base64_row: String = Base64.encode(arr)
+  lazy val base64: String = "base64:" + base64_row
 
-  lazy val trim: String = base58.toString.take(7) + "..."
+  lazy val trim: String = (if (arr.length < 1024) {
+    base58.toString.take(7)
+  } else {
+    base64_row
+  }) + "..."
 
   override lazy val toString: String = if (arr.length < 1024) {
     base58
@@ -26,6 +31,8 @@ case class ByteStr(arr: Array[Byte]) {
   }
 
   def isEmpty: Boolean = arr.length == 0
+
+  def size: Int = arr.length
 
   def ++(other: ByteStr): ByteStr = if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
 
