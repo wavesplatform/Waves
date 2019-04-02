@@ -62,7 +62,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, settings.restAPISettings.transactionByAddressLimit <= 0)
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, settings.restAPISettings.transactionsByAddressLimit <= 0)
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
