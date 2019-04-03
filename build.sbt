@@ -69,7 +69,13 @@ lazy val `dex-generator` = project.dependsOn(dex, `dex-it` % "compile->test")
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
-    Test / test := (`node-it` / Test / test).dependsOn(`dex-it` / Test / test).value
+    Test / test := Def
+      .sequential(
+        `dex-it` / Docker / docker,
+        `node-it` / Test / test,
+        `dex-it` / Test / test
+      )
+      .value
   )
 
 lazy val root = (project in file("."))
