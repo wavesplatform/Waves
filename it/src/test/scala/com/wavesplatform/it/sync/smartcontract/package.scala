@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.transaction.{Asset, DataTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order}
