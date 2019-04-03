@@ -530,4 +530,38 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'f1'(ByteVector) or it is @Callable")
   }
+
+  property("list for sets from user functions") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          | {-#STDLIB_VERSION 3#-}
+          | {-#SCRIPT_TYPE ACCOUNT#-}
+          | {-#CONTENT_TYPE DAPP#-}
+          |
+          | func wSet() = {
+          |     [
+          |       DataEntry("a", 1),
+          |       DataEntry("b", 2),
+          |     ]
+          | }
+          |
+          | func tSet(caller: Address) = {
+          |     [
+          |       ScriptTransfer(caller, 1, unit),
+          |       ScriptTransfer(caller, 2, unit)
+          |     ]
+          | }
+          |
+          | @Callable(i)
+          | func test() = {
+          |     ScriptResult(WriteSet(wSet()), TransferSet(tSet(i.caller)))
+          | }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
 }
