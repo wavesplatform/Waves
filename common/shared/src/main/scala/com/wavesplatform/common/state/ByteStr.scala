@@ -15,13 +15,13 @@ case class ByteStr(arr: Array[Byte]) {
 
   lazy val base58: String = Base58.encode(arr)
 
-  lazy val base64_row: String = Base64.encode(arr)
-  lazy val base64: String = "base64:" + base64_row
+  lazy val base64Raw: String = Base64.encode(arr)
+  lazy val base64: String = "base64:" + base64Raw
 
   lazy val trim: String = (if (arr.length < 1024) {
     base58.toString.take(7)
   } else {
-    base64_row
+    base64Raw
   }) + "..."
 
   override lazy val toString: String = if (arr.length < 1024) {
