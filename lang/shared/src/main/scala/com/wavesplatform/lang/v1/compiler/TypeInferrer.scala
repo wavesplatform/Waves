@@ -54,13 +54,13 @@ object TypeInferrer {
         val parameterized = l
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])
-        if (conctretes >= UNION.create(argType.l)) Right(None)
+        if (conctretes >= UNION.create(argType.typeList)) Right(None)
         else
           parameterized match {
             case singlePlaceholder :: Nil =>
               val nonMatchedArgTypes = argType match {
                 case NOTHING         => ???
-                case UNION(argTypes, _) => UNION(argTypes.filterNot(conctretes.l.contains))
+                case UNION(argTypes, _) => UNION(argTypes.filterNot(conctretes.typeList.contains))
                 case s: SINGLE       => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
@@ -69,7 +69,7 @@ object TypeInferrer {
 
       case (LIST(tp), LIST(t)) => matchTypes(t, tp, knownTypes)
       case (placeholder: FINAL, _) =>
-        Either.cond(placeholder >= UNION.create(argType.l), None, err)
+        Either.cond(placeholder >= UNION.create(argType.typeList), None, err)
     }
   }
 
@@ -94,8 +94,8 @@ object TypeInferrer {
         case p: SINGLE => LIST(p)
       }
     case (p1: SINGLE, p2: SINGLE) => if (p1 == p2) p1 else UNION.create(List(p1, p2))
-    case (r: UNION, a: UNION)     => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
-    case (u: UNION, t: SINGLE)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
-    case (t: SINGLE, u: UNION)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+    case (r: UNION, a: UNION)     => UNION.create((r.typeList.toSet ++ a.typeList.toSet).toSeq)
+    case (u: UNION, t: SINGLE)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
+    case (t: SINGLE, u: UNION)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
   }
 }

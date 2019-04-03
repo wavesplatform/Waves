@@ -108,7 +108,7 @@ object ExpressionCompiler {
             .cond(
               (cases.last.types.isEmpty && (exprTypes >= matchedTypes)) || (exprTypes equivalent matchedTypes),
               (),
-              MatchNotExhaustive(p.start, p.end, exprTypes.l, matchedTypes.l)
+              MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchedTypes.typeList)
             )
             .toCompileM
         })
@@ -211,7 +211,7 @@ object ExpressionCompiler {
       ctx         <- get[CompilerContext, CompilationError]
       field       <- handlePart(fieldPart)
       compiledRef <- compileExpr(refExpr)
-      result      <- mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
+      result      <- mkGetter(p, ctx, compiledRef._2.typeList, field, compiledRef._1).toCompileM
     } yield result
   }
 
@@ -310,7 +310,7 @@ object ExpressionCompiler {
                   mc.position.start,
                   mc.position.end,
                   mc.types.toString(),
-                  exprTypes.l.map(_.name)
+                  exprTypes.typeList.map(_.name)
                 )
               )
             case hType :: tTypes =>

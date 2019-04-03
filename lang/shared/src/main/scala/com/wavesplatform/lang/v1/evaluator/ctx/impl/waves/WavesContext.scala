@@ -123,7 +123,7 @@ object WavesContext {
         f.name ++ "Value",
         "@extr" ++ f.header.toString,
         f.costByLibVersion,
-        f.signature.result.asInstanceOf[UNION].l.find(_ != UNIT).get,
+        f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
         f.docString ++ " (fail on error)",
         args: _*
       ) {
@@ -305,7 +305,7 @@ object WavesContext {
           buildActiveTransactionTypes(proofsEnabled, version)))
 
     val txByIdF: BaseFunction = {
-      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
+      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
       NativeFunction("transactionById",
                      Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500),
                      GETTRANSACTIONBYID,
