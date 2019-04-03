@@ -62,7 +62,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     dtx = DataTransaction.selfSigned(acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
     sender.signedBroadcast(dtx.json(), waitForTx = true)
   }
-  /*
+
   test("set contracts and put exchange transaction in blockchain") {
     val sc4 = Some(cryptoContextScript(true))
     val sc5 = Some(pureContextScript(dtx, true))
@@ -203,7 +203,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       (None, acc2),
     )
   }
-   */
+
   test("positive - exchange tx with asset/smartasset matcherFee") {
     val buyer   = acc0
     val seller  = acc1
