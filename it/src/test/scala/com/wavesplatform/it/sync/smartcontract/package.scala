@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, DataTransaction}
@@ -163,7 +164,11 @@ package object smartcontract {
              time: Time,
              matcherFeeOrder1: Asset,
              matcherFeeOrder2: Asset,
+<<<<<<< HEAD
              accounts: PrivateKeyAccount*): (Order, Order) = {
+=======
+             accounts: KeyPair*): (Order, Order) = {
+>>>>>>> added matcherFeeAssetId tests in ExchangeTransactionSuite and ExchangeWithContractsSuite
 
     val buyer               = accounts.head // first one
     val seller              = accounts.tail.head // second one
