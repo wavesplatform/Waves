@@ -1,20 +1,16 @@
-package com.wavesplatform.settings
+package com.wavesplatform.matcher.settings
 
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
-import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.settings.OrderFeeSettings._
+import com.wavesplatform.settings.{AssetType, DeviationsSettings, OrderAmountSettings, OrderFeeSettings, loadConfig}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
-import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.settings.AssetType
-import com.wavesplatform.settings.OrderFeeSettings._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
