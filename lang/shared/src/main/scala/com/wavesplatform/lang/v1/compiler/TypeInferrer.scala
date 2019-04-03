@@ -19,7 +19,7 @@ object TypeInferrer {
             commonType match {
               case NOTHING   => Right(NOTHING)
               case p: SINGLE => Right(p)
-              case u @ UNION(plainTypes) =>
+              case u @ UNION(plainTypes, _) =>
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => e >= p)
                 }
@@ -31,7 +31,7 @@ object TypeInferrer {
           case None =>
             Right(resolved.mapValues { t =>
               t.explicitGet() match {
-                case UNION(x :: Nil) => x
+                case UNION(x :: Nil, _) => x
                 case x               => x
               }
             })
@@ -60,7 +60,7 @@ object TypeInferrer {
             case singlePlaceholder :: Nil =>
               val nonMatchedArgTypes = argType match {
                 case NOTHING         => ???
-                case UNION(argTypes) => UNION(argTypes.filterNot(conctretes.l.contains))
+                case UNION(argTypes, _) => UNION(argTypes.filterNot(conctretes.l.contains))
                 case s: SINGLE       => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
@@ -90,7 +90,7 @@ object TypeInferrer {
     case (r @ LIST(it1), a @ LIST(it2)) =>
       findCommonType(it1, it2) match {
         case NOTHING   => NOTHING
-        case UNION(_)  => UNION(List(r, a))
+        case UNION(_, _)  => UNION(List(r, a))
         case p: SINGLE => LIST(p)
       }
     case (p1: SINGLE, p2: SINGLE) => if (p1 == p2) p1 else UNION.create(List(p1, p2))

@@ -282,7 +282,7 @@ object Types {
 
     val activeTxTypes                    = buildActiveTransactionTypes(proofsEnabled, v)
     val obsoleteTxTypes                  = buildObsoleteTransactionTypes(proofsEnabled)
-    val transactionsCommonType           = UNION.create(activeTxTypes)
+    val transactionsCommonType           = UNION.create(activeTxTypes, Some("Transaction"))
     val transactionTypes: List[CASETYPEREF] = obsoleteTxTypes ++ activeTxTypes
 
     Seq(

@@ -57,9 +57,9 @@ object DocExport {
       }
 
       def typeRepr(t: FINAL)(name: String = t.name): TypeDoc = t match {
-        case UNION(Seq(UNIT, l)) => OptionOf(typeRepr(l)())
-        case UNION(Seq(l, UNIT)) => OptionOf(typeRepr(l)())
-        case UNION(l)            => UnionDoc(name, l.map(t => typeRepr(t)()).asJava)
+        case UNION(Seq(UNIT, l), _) => OptionOf(typeRepr(l)())
+        case UNION(Seq(l, UNIT), _) => OptionOf(typeRepr(l)())
+        case UNION(l, _)            => UnionDoc(name, l.map(t => typeRepr(t)()).asJava)
         case CASETYPEREF(_, fields) =>
           objDoc(name, fields.map(f => Field(f._1, typeRepr(f._2)())).asJava)
         case LIST(t) => ListOf(typeRepr(t)())
@@ -103,13 +103,13 @@ object DocExport {
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
       case class FieldTypes(name: String, types: java.util.List[TransactionField])
       val transactionsType       = fullContext.types.filter(v => v.name == "Transaction")
-      val transactionsTypesNames = transactionsType.flatMap({ case UNION(union) => union.map(_.name) }).toSet
+      val transactionsTypesNames = transactionsType.flatMap({ case UNION(union, _) => union.map(_.name) }).toSet
       def transactionDocs(types: Seq[FINAL], fieldsFlt: String => Boolean = (_ => true)) = {
         val transactionsTypes =
           types.flatMap({
-            case UNION(union)   => union
-            case t: CASETYPEREF => Seq(t)
-            case t              => println(t.toString); Seq()
+            case UNION(union, _) => union
+            case t: CASETYPEREF  => Seq(t)
+            case t               => println(t.toString); Seq()
           })
         val transactionsFields =
           transactionsTypes

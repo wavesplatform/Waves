@@ -57,7 +57,9 @@ object Common {
 
   val pointDInstance2 = CaseObj(pointTypeD, Map("YB" -> unit))
 
-  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UNION.create(AorB.l), UNION.create(BorC.l), UNION.create(CorD.l))
+  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UNION.create(AorB.l, Some("PointAB")),
+                                                                               UNION.create(BorC.l, Some("PointBC")),
+                                                                               UNION.create(CorD.l, Some("PointCD")))
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)

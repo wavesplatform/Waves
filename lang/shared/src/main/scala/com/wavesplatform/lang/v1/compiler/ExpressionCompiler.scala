@@ -69,7 +69,7 @@ object ExpressionCompiler {
   def flat(typeDefs: Map[String, FINAL], tl: List[String]): List[FINAL] =
     tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
-        case Some(UNION(unionTypes)) => unionTypes
+        case Some(UNION(unionTypes, _)) => unionTypes
         case Some(realType)          => List(realType)
         case None                    => List.empty
     })

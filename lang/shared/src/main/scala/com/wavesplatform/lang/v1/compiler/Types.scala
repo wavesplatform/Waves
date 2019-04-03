@@ -26,9 +26,9 @@ object Types {
     override lazy val name: String = "LIST(" ++ innerType.toString ++ ")"
     override def l: List[REAL]     = List(this)
   }
-  case class UNION(override val l: List[REAL]) extends FINAL {
+  case class UNION(override val l: List[REAL], n: Option[String] = None) extends FINAL {
     override lazy val fields = l.map(_.fields.toSet).reduce(_ intersect _).toList
-    override val name        = "UNION(" ++ l.sortBy(_.toString).mkString("|") ++ ")"
+    override val name        = if (n.nonEmpty) n.get else "UNION(" ++ l.sortBy(_.toString).mkString("|") ++ ")"
   }
 
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)]) extends REAL {
@@ -46,12 +46,12 @@ object Types {
   }
 
   object UNION {
-    def create(l: Seq[FINAL]): UNION = {
+    def create(l: Seq[FINAL], n: Option[String] = None): UNION = {
       UNION(l.flatMap {
         case NOTHING      => List.empty
-        case UNION(inner) => inner
+        case UNION(inner, _) => inner
         case s: REAL      => List(s)
-      }.toList.distinct)
+      }.toList.distinct, n)
     }
     def apply(l: REAL*): UNION = create(l.toList)
 

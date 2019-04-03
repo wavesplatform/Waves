@@ -444,5 +444,5 @@ object WavesContext {
     )
   }
 
-  val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)))
+  val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)), Some("VerifierInput"))
 }
