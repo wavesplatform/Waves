@@ -185,7 +185,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | func foo() = {
           |  true
           | }
-          | 
+          |
           | @Verifier(tx)
           | func bar() = {
           |  false
@@ -473,16 +473,16 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val expr = {
       val script =
         s"""
-          |
+           |
           |  func local(tx: ${verifierTypes.mkString("|")}) = tx
-          |
+           |
           |  @Verifier(tx)
-          |  func test() =
-          |    match local(tx) {
-          |      case _: UndefinedType => true
-          |      case _                => false
-          |  }
-          |
+           |  func test() =
+           |    match local(tx) {
+           |      case _: UndefinedType => true
+           |      case _                => false
+           |  }
+           |
         """.stripMargin
       Parser.parseContract(script).get.value
     }
@@ -529,5 +529,25 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'f1'(ByteVector) or it is @Callable")
+  }
+
+  property("contract compiles if script uses InvokeScriptTransaction function and args field") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        s"""
+           |
+           | @Verifier(tx)
+           | func verify() = {
+           |   match tx {
+           |     case ist: InvokeScriptTransaction => isDefined(ist.function) && isDefined(ist.args)
+           |     case _ => false
+           |   }
+           | }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 }

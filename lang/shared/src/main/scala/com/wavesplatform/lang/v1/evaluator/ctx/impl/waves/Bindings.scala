@@ -176,13 +176,15 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment, feeAssetId) =>
+      case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled).typeRef,
           combine(Map(
                     "dappAddress" -> mapRecipient(address)._2,
                     "payment"     -> buildPayment(maybePayment),
-                    "feeAssetId"     -> feeAssetId
+                    "feeAssetId"  -> feeAssetId,
+                    "function"    -> funcName,
+                    "args"        -> funcArgs
                   ),
                   provenTxPart(p, proofsEnabled))
         )
