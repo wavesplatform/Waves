@@ -22,12 +22,12 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
+  lazy val writeSetType = CASETYPEREF(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType)))
   val scriptTransfer =
-    CaseType(FieldNames.ScriptTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-  lazy val scriptTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(scriptTransfer.typeRef)))
+    CASETYPEREF(FieldNames.ScriptTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+  lazy val scriptTransferSetType = CASETYPEREF(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(scriptTransfer)))
   lazy val scriptResultType =
-    CaseType(FieldNames.ScriptResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> scriptTransferSetType.typeRef))
+    CASETYPEREF(FieldNames.ScriptResult, List(FieldNames.Data -> writeSetType, FieldNames.Transfers -> scriptTransferSetType))
 
   def build(ds: DirectiveSet, env: Environment): CTX = {
 
@@ -76,7 +76,7 @@ object WavesContext {
         internalName,
         UNION(dataType.innerType, UNIT),
         "Find and extract data by key",
-        ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
+        ("data", LIST(dataEntryType), "DataEntry vector, usally tx.data"),
         ("key", STRING, "key")
       ) {
         case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
@@ -101,7 +101,7 @@ object WavesContext {
         30,
         UNION(dataType.innerType, UNIT),
         "Extract data by index",
-        ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
+        ("@data", LIST(dataEntryType), "DataEntry vector, usally tx.data"),
         ("@index", LONG, "index")
       ) {
         LET_BLOCK(
@@ -123,7 +123,7 @@ object WavesContext {
         f.name ++ "Value",
         "@extr" ++ f.header.toString,
         f.costByLibVersion,
-        f.signature.result.asInstanceOf[UNION].l.find(_ != UNIT).get,
+        f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
         f.docString ++ " (fail on error)",
         args: _*
       ) {
@@ -142,7 +142,7 @@ object WavesContext {
     )
 
     lazy val addressFromPublicKeyF: BaseFunction =
-      UserFunction("addressFromPublicKey", 82, addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
+      UserFunction("addressFromPublicKey", 82, addressType, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
 
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
@@ -269,15 +269,15 @@ object WavesContext {
         "addressFromRecipient",
         100,
         ADDRESSFROMRECIPIENT,
-        addressType.typeRef,
+        addressType,
         "Extract address or lookup alias",
         ("AddressOrAlias", addressOrAliasType, "address or alias, usually tx.recipient")
       ) {
-        case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
-        case CaseObj(aliasType.typeRef, fields) :: Nil =>
+        case (c @ CaseObj(`addressType`, _)) :: Nil => Right(c)
+        case CaseObj(`aliasType`, fields) :: Nil =>
           environmentFunctions
             .addressFromAlias(fields("alias").asInstanceOf[CONST_STRING].s)
-            .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> CONST_BYTESTR(resolved.bytes))))
+            .map(resolved => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(resolved.bytes))))
         case _ => ???
       }
 
@@ -302,10 +302,10 @@ object WavesContext {
     val anyTransactionType =
       UNION(
         (buildObsoleteTransactionTypes(proofsEnabled) ++
-          buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
+          buildActiveTransactionTypes(proofsEnabled, version)))
 
     val txByIdF: BaseFunction = {
-      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
+      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
       NativeFunction("transactionById",
                      Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500),
                      GETTRANSACTIONBYID,
@@ -320,9 +320,9 @@ object WavesContext {
     }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
-      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
-      case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
-      case _                        => ???
+      case addressType.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
+      case aliasType.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
+      case _                => ???
     }
 
     val assetBalanceF: BaseFunction =
@@ -365,16 +365,16 @@ object WavesContext {
 
     val scriptInputType =
       if (isTokenContext)
-        UNION(buildAssetSupportedTransactions(proofsEnabled, version).map(_.typeRef))
+        UNION(buildAssetSupportedTransactions(proofsEnabled, version))
       else
-        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
+        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)))
 
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
     )
 
     val txVar   = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
-    val thisVar = ("this", ((addressType.typeRef, "Script address"), LazyVal(EitherT(thisCoeval))))
+    val thisVar = ("this", ((addressType, "Script address"), LazyVal(EitherT(thisCoeval))))
 
     val vars = Map(
       1 -> Map(txVar),
@@ -385,8 +385,8 @@ object WavesContext {
       ),
       3 -> {
         val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
-          ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-          ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+          ("Sell", ((sellType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
         )
         val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar, thisVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
@@ -423,28 +423,26 @@ object WavesContext {
                 } else List.empty),
       commonVars ++ vars(version),
       functions ++ (if (version == V3) {
-        List(
-          getIntegerFromStateF,
-          getBooleanFromStateF,
-          getBinaryFromStateF,
-          getStringFromStateF,
-          getIntegerFromArrayF,
-          getBooleanFromArrayF,
-          getBinaryFromArrayF,
-          getStringFromArrayF,
-          getIntegerByIndexF,
-          getBooleanByIndexF,
-          getBinaryByIndexF,
-          getStringByIndexF,
-          addressFromStringF
-        ).map(withExtract)
-      } else {
-        List()
-      })
+                      List(
+                        getIntegerFromStateF,
+                        getBooleanFromStateF,
+                        getBinaryFromStateF,
+                        getStringFromStateF,
+                        getIntegerFromArrayF,
+                        getBooleanFromArrayF,
+                        getBinaryFromArrayF,
+                        getStringFromArrayF,
+                        getIntegerByIndexF,
+                        getBooleanByIndexF,
+                        getBinaryByIndexF,
+                        getStringByIndexF,
+                        addressFromStringF
+                      ).map(withExtract)
+                    } else {
+                      List()
+                    })
     )
   }
 
-  val verifierInput =
-    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, V3)).map(_.typeRef))
-
+  val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)), Some("VerifierInput"))
 }

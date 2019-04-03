@@ -462,13 +462,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
     compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
   }
 
   property("expression matching case with non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
-    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
 
     val expr = {
       val script =
@@ -491,7 +491,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
   ignore("matching case with union type containing non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
-    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
 
     val expr = {
       val script =

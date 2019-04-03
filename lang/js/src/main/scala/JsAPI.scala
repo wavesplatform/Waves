@@ -71,7 +71,7 @@ object JsAPI {
   private val letBLockVersions = Set(StdLibVersion.V1, StdLibVersion.V2)
 
   private def typeRepr(t: TYPE): js.Any = t match {
-    case UNION(l) => l.map(typeRepr).toJSArray
+    case UNION(l, _) => l.map(typeRepr).toJSArray
     case CASETYPEREF(name, fields) =>
       js.Dynamic.literal("typeName" -> name, "fields" -> fields.map(f => js.Dynamic.literal("name" -> f._1, "type" -> typeRepr(f._2))).toJSArray)
     case LIST(t) => js.Dynamic.literal("listOf" -> typeRepr(t))
@@ -92,7 +92,7 @@ object JsAPI {
   @JSExportTopLevel("getTypes")
   def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext, isContract).types
-      .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef)))
+      .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v)))
       .toJSArray
 
   @JSExportTopLevel("getVarsDoc")

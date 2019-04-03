@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.ContentType._
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
