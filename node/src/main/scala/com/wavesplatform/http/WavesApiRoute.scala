@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.server.{Directive, Route}
 import com.wavesplatform.api.http.assets.TransferV1Request
-import com.wavesplatform.api.http.{ApiRoute, DiscontinuedApi}
+import com.wavesplatform.api.http.{ApiRoute, DiscontinuedApi, WithSettings}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time
@@ -17,7 +17,8 @@ import com.wavesplatform.wallet.Wallet
 @Deprecated
 case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
     extends ApiRoute
-    with BroadcastRoute {
+    with BroadcastRoute
+    with WithSettings {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment

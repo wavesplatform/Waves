@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
-import com.wavesplatform.it.matcher.MatcherState
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -35,7 +35,7 @@ object SyncMatcherHttpApi extends Assertions {
     case _          => Assertions.fail(s"Expecting not found error")
   }
 
-  def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime) =
+  def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
@@ -90,8 +90,8 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
 
-    def transactionsByOrder(orderId: String): Seq[ExchangeTransaction] =
-      sync(async(m).transactionsByOrder(orderId))
+    def waitTransactionsByOrder(orderId: String, min: Int): Seq[ExchangeTransaction] =
+      sync(async(m).waitTransactionsByOrder(orderId, min))
 
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
@@ -132,7 +132,7 @@ object SyncMatcherHttpApi extends Assertions {
     def waitOrderInBlockchain(orderId: String,
                               retryInterval: FiniteDuration = 1.second,
                               waitTime: Duration = OrderRequestAwaitTime): Seq[TransactionInfo] =
-      sync(async(m).waitOrderInBlockchain(orderId, retryInterval), waitTime)
+      sync(async(m).waitForOrderInBlockchain(orderId, retryInterval), waitTime)
 
     def reservedBalance(sender: KeyPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       sync(async(m).reservedBalance(sender), waitTime)
@@ -167,10 +167,7 @@ object SyncMatcherHttpApi extends Assertions {
     def expectCancelRejected(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
 
-    def cancelOrder(sender: KeyPair,
-                    assetPair: AssetPair,
-                    orderId: String,
-                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+    def cancelOrder(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).cancelOrder(sender, assetPair, orderId), waitTime)
 
     def cancelOrdersForPair(sender: KeyPair,
@@ -210,8 +207,7 @@ object SyncMatcherHttpApi extends Assertions {
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
-      val matcherPublicKey    = m.publicKey
-      val unsigned            = Order(sender, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, fee, Proofs.empty, version)
+      val unsigned            = Order(sender, matcher, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, fee, Proofs.empty, version)
       Order.sign(unsigned, sender)
     }
 

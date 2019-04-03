@@ -88,8 +88,8 @@ object MatcherError {
       )
   case class OrderCommonValidationFailed(details: String)
       extends MatcherError(order, commonEntity, commonClass, e"The order is invalid: ${'details -> details}")
-  case class AssetPairCommonValidationFailed(details: String)
-      extends MatcherError(assetPair, commonEntity, commonClass, e"The asset pair is invalid: ${'details -> details}")
+  case class AssetPairCommonValidationFailed(ap: AssetPair, details: String)
+      extends MatcherError(assetPair, commonEntity, commonClass, e"The asset pair '${'assetPair -> ap.key}' is invalid: ${'details -> details}")
 
   case class AmountAssetBlacklisted(assetId: Asset)
       extends MatcherError(asset, amount, blacklisted, e"The amount asset ${'assetId -> assetId} is blacklisted")

@@ -21,17 +21,20 @@ import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {
 
-  private type SeedText = String
-  private type Share    = Long
+  private type AccountName = String
+  private type SeedText    = String
+  private type Share       = Long
+
+  case class DistributionItem(seedText: String, nonce: Int, amount: Share)
 
   case class Settings(networkType: String,
-                      initialBalance: Long,
+                      initialBalance: Share,
                       baseTarget: Long,
                       averageBlockDelay: FiniteDuration,
                       timestamp: Option[Long],
-                      distributions: Map[SeedText, Share]) {
+                      distributions: Map[AccountName, DistributionItem]) {
 
-    private[this] val distributionsSum = distributions.values.sum
+    private[this] val distributionsSum = distributions.values.map(_.amount).sum
     require(
       distributionsSum == initialBalance,
       s"The sum of all balances should be == $initialBalance, but it is $distributionsSum"
@@ -47,12 +50,12 @@ object GenesisBlockGenerator extends App {
                              accountPublicKey: ByteStr,
                              accountAddress: Address)
 
-  private def toFullAddressInfo(seedText: SeedText): FullAddressInfo = {
-    val seedHash = seedText.getBytes
-    val acc      = Wallet.generateNewAccount(seedHash, 0)
+  private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
+    val seedHash = item.seedText.getBytes
+    val acc      = Wallet.generateNewAccount(seedHash, item.nonce)
 
     FullAddressInfo(
-      seedText = seedText,
+      seedText = item.seedText,
       seed = ByteStr(seedHash),
       accountSeed = ByteStr(acc.seed),
       accountPrivateKey = acc.privateKey,
@@ -78,16 +81,19 @@ object GenesisBlockGenerator extends App {
     override val chainId: Byte = settings.chainId
   }
 
-  val shares: Map[FullAddressInfo, Share] = {
-    settings.distributions.map { case (seedText, part) => toFullAddressInfo(seedText) -> part }
-  }
+  val shares: Seq[(AccountName, FullAddressInfo, Share)] = settings.distributions
+    .map {
+      case (accountName, x) => (accountName, toFullAddressInfo(x), x.amount)
+    }
+    .toSeq
+    .sortBy(_._1)
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
-    case (addrInfo, part) =>
+    case (_, addrInfo, part) =>
       GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
-  }.toSeq
+  }
 
   val genesisBlock: Block = {
     val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
@@ -109,10 +115,10 @@ object GenesisBlockGenerator extends App {
   val signature = genesisBlock.signerData.signature
 
   report(
-    addrInfos = shares.keysIterator,
+    addrInfos = shares.map(x => (x._1, x._2)),
     settings = GenesisSettings(
-      timestamp,
       genesisBlock.timestamp,
+      timestamp,
       settings.initialBalance,
       Some(signature),
       genesisTxs.map { tx =>
@@ -123,38 +129,34 @@ object GenesisBlockGenerator extends App {
     )
   )
 
-  private def report(addrInfos: Iterator[FullAddressInfo], settings: GenesisSettings): Unit = {
+  private def report(addrInfos: Iterable[(AccountName, FullAddressInfo)], settings: GenesisSettings): Unit = {
     val output = new StringBuilder(8192)
     output.append("Addresses:\n")
-    addrInfos.zipWithIndex.foreach {
-      case (acc, n) =>
-        output.append(s"""($n):
-           | Seed text:           ${acc.seedText}
-           | Seed:                ${acc.seed}
-           | Account seed:        ${acc.accountSeed}
-           | Private account key: ${acc.accountPrivateKey}
-           | Public account key:  ${acc.accountPublicKey}
-           | Account address:     ${acc.accountAddress}
-           |
-           |""".stripMargin)
+    addrInfos.foreach {
+      case (accountName, acc) =>
+        output.append(s"""$accountName:
+                         | Seed text:           ${acc.seedText}
+                         | Seed:                ${acc.seed}
+                         | Account seed:        ${acc.accountSeed}
+                         | Private account key: ${acc.accountPrivateKey}
+                         | Public account key:  ${acc.accountPublicKey}
+                         | Account address:     ${acc.accountAddress}
+                         |
+                         |""".stripMargin)
     }
 
     val confBody = s"""genesis {
-                      |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
-                      |  initial-base-target: ${settings.initialBaseTarget}
-                      |  timestamp: ${settings.timestamp}
-                      |  block-timestamp: ${settings.blockTimestamp}
-                      |  signature: "${settings.signature.get}"
-                      |  initial-balance: ${settings.initialBalance}
-                      |  transactions = [
-                      |    ${settings.transactions
-                        .map { x =>
-                          s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
-                        }
-                        .mkString(",\n    ")}
-                      |  ]
-                      |}
-                      |""".stripMargin
+         |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
+         |  initial-base-target: ${settings.initialBaseTarget}
+         |  timestamp: ${settings.timestamp}
+         |  block-timestamp: ${settings.blockTimestamp}
+         |  signature: "${settings.signature.get}"
+         |  initial-balance: ${settings.initialBalance}
+         |  transactions = [
+         |    ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}
+         |  ]
+         |}
+         |""".stripMargin
 
     output.append("Settings:\n")
     output.append(confBody)

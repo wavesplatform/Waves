@@ -1,13 +1,13 @@
-package com.wavesplatform.settings
+package com.wavesplatform.matcher.settings
 
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.settings.OrderFeeSettings._
+import com.wavesplatform.settings.{AssetType, DeviationsSettings, OrderAmountSettings, OrderFeeSettings, loadConfig}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
@@ -64,7 +64,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""waves {
       |  directory = /waves
       |  matcher {
-      |    enable = yes
       |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
       |    bind-address = 127.0.0.1
       |    port = 6886
@@ -126,7 +125,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderAmountStr)
 
     val settings = config.as[MatcherSettings]("waves.matcher")
-    settings.enable should be(true)
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)

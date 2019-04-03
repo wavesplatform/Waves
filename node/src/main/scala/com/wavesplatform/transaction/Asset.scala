@@ -44,6 +44,10 @@ object Asset {
     AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
 
+  def fromString(maybeStr: Option[String]): Asset = {
+    maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)
+  }
+
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
     maybeBStr.map(IssuedAsset).getOrElse(Waves)
   }

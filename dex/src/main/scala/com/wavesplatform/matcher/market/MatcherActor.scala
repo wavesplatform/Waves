@@ -5,12 +5,12 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, Props, SupervisorStrategy, Terminated}
 import akka.persistence._
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
 import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -227,7 +227,7 @@ class MatcherActor(settings: MatcherSettings,
     )
 
     log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, newestEventNr: $newestEventNr")
-    log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
+    log.trace(s"Expecting next snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
     unstashAll()
     recoveryCompletedWithEventNr(Right((self, oldestEventNr)))

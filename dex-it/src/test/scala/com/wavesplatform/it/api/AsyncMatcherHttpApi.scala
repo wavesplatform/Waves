@@ -1,5 +1,7 @@
 package com.wavesplatform.it.api
 
+import java.net.URL
+
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
@@ -7,9 +9,9 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
-import com.wavesplatform.it.matcher.MatcherState
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
-import com.wavesplatform.it.{Node, matcher}
+import com.wavesplatform.it.{Node, api}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Proofs
@@ -45,17 +47,19 @@ object AsyncMatcherHttpApi extends Assertions {
 
   implicit class MatcherAsyncHttpApi(matcherNode: Node) extends NodeAsyncHttpApi(matcherNode) {
 
+    def matcherApiEndpoint: URL = new URL(s"http://localhost:${matcherNode.nodeExternalPort(matcherNode.config.getInt("waves.matcher.port"))}")
+
     def matcherGet(path: String,
                    f: RequestBuilder => RequestBuilder = identity,
                    statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
                    waitForStatus: Boolean = false): Future[Response] =
-      retrying(f(_get(s"${matcherNode.matcherApiEndpoint}$path")).build(), statusCode = statusCode, waitForStatus = waitForStatus)
+      retrying(f(_get(s"$matcherApiEndpoint$path")).build(), statusCode = statusCode, waitForStatus = waitForStatus)
 
     def matcherGetWithApiKey(path: String,
                              f: RequestBuilder => RequestBuilder = identity,
                              statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
                              waitForStatus: Boolean = false): Future[Response] = retrying(
-      _get(s"${matcherNode.matcherApiEndpoint}$path")
+      _get(s"$matcherApiEndpoint$path")
         .withApiKey(matcherNode.apiKey)
         .build()
     )
@@ -65,7 +69,7 @@ object AsyncMatcherHttpApi extends Assertions {
                                 timestamp: Long = System.currentTimeMillis(),
                                 f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying {
-        _get(s"${matcherNode.matcherApiEndpoint}$path")
+        _get(s"$matcherApiEndpoint$path")
           .setHeader("Timestamp", timestamp)
           .setHeader("Signature", Base58.encode(crypto.sign(sender, sender.publicKey ++ Longs.toByteArray(timestamp))))
           .build()
@@ -76,7 +80,7 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def matcherPost[A: Writes](path: String, body: A, waitForStatus: Boolean = false): Future[Response] =
       post(
-        s"${matcherNode.matcherApiEndpoint}$path",
+        s"$matcherApiEndpoint$path",
         (rb: RequestBuilder) =>
           rb.setHeader("Content-type", "application/json")
             .setHeader("Accept", "application/json")
@@ -86,7 +90,7 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def postWithAPiKey(path: String): Future[Response] =
       post(
-        s"${matcherNode.matcherApiEndpoint}$path",
+        s"$matcherApiEndpoint$path",
         (rb: RequestBuilder) =>
           rb.withApiKey(matcherNode.apiKey)
             .setHeader("Content-type", "application/json;charset=utf-8")
@@ -120,11 +124,15 @@ object AsyncMatcherHttpApi extends Assertions {
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
-    def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
-      matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
+    def waitTransactionsByOrder(orderId: String, min: Int, retryInterval: FiniteDuration = 1.second): Future[Seq[ExchangeTransaction]] =
+      waitFor[Seq[ExchangeTransaction]](s"At least $min transactions for order $orderId")(
+        _.matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]],
+        _.length >= min,
+        retryInterval
+      )
 
-    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Future[Seq[TransactionInfo]] =
-      waitFor[Seq[ExchangeTransaction]](s"Exchange transactions for order $orderId")(_.transactionsByOrder(orderId), _.nonEmpty, retryInterval)
+    def waitForOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Future[Seq[TransactionInfo]] =
+      waitTransactionsByOrder(orderId, 1, retryInterval)
         .flatMap { txs =>
           assert(txs.nonEmpty, s"There is no exchange transaction for $orderId")
           Future.sequence { txs.map(tx => waitForTransaction(tx.id, retryInterval)) }
@@ -134,8 +142,7 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 
     def deleteOrderBook(assetPair: AssetPair): Future[MessageMatcherResponse] =
-      retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build(),
-               statusCode = 202)
+      retrying(_delete(s"$matcherApiEndpoint/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build(), statusCode = 202)
         .as[MessageMatcherResponse]
 
     def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] =
@@ -219,8 +226,8 @@ object AsyncMatcherHttpApi extends Assertions {
                      timestamp: Long = System.currentTimeMillis(),
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
-      val matcherPublicKey    = matcherNode.publicKey
-      val unsigned            = Order(sender, matcherPublicKey, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+      val unsigned =
+        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
       Order.sign(unsigned, sender)
     }
 
@@ -315,12 +322,12 @@ object AsyncMatcherHttpApi extends Assertions {
           }
 
         clean {
-          matcher.MatcherState(offset,
-                               TreeMap(snapshots.toSeq: _*),
-                               TreeMap(orderBooks: _*),
-                               TreeMap(orderStatuses: _*),
-                               TreeMap(reservedBalances: _*),
-                               TreeMap(orderHistoryMap.toSeq: _*))
+          api.MatcherState(offset,
+                           TreeMap(snapshots.toSeq: _*),
+                           TreeMap(orderBooks: _*),
+                           TreeMap(orderStatuses: _*),
+                           TreeMap(reservedBalances: _*),
+                           TreeMap(orderHistoryMap.toSeq: _*))
         }
       }
 
@@ -337,6 +344,6 @@ object AsyncMatcherHttpApi extends Assertions {
     def toUri: String = s"${AssetPair.assetIdStr(p.amountAsset)}/${AssetPair.assetIdStr(p.priceAsset)}"
   }
 
-  private implicit val assetPairOrd: Ordering[AssetPair]           = Ordering.by[AssetPair, String](_.key)
-  private implicit val KeyPairOrd: Ordering[KeyPair] = Ordering.by[KeyPair, String](_.stringRepr)
+  private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
+  private implicit val KeyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
 }

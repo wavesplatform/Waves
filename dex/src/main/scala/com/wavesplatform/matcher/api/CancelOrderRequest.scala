@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.api
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
@@ -41,7 +41,7 @@ object CancelOrderRequest {
     pk => JsString(Base58.encode(pk))
   )
 
-  protected implicit val byteStrWrites = com.wavesplatform.utils.byteStrWrites
+  protected implicit val byteStrWrites: Format[ByteStr] = com.wavesplatform.utils.byteStrWrites
 
   implicit val format: OFormat[CancelOrderRequest] = Json.format
 }

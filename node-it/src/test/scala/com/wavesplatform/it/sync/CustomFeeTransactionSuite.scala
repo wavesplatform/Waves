@@ -67,10 +67,10 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 }
 
 object CustomFeeTransactionSuite {
-  val minerAddress             = Default.head.getString("address")
-  val senderAddress            = Default(2).getString("address")
-  val defaultAssetQuantity     = 999999999999l
-  val featureCheckBlocksPeriod = 13
+  private val minerAddress             = Default.head.getString("address")
+  private val senderAddress            = Default(2).getString("address")
+  private val defaultAssetQuantity     = 999999999999l
+  private val featureCheckBlocksPeriod = 13
 
   private val seed = Default(2).getString("account-seed")
   private val pk   = KeyPair.fromSeed(seed).explicitGet()
@@ -91,12 +91,12 @@ object CustomFeeTransactionSuite {
   val assetId = assetTx.id()
 
   private val minerConfig = ConfigFactory.parseString(s"""
-      | waves.fees.transfer.$assetId = 100000
-      | waves.blockchain.custom.functionality {
-      |   feature-check-blocks-period = $featureCheckBlocksPeriod
-      |   blocks-for-feature-activation = $featureCheckBlocksPeriod
-      |   pre-activated-features = { 7 = 0 }
-      |}""".stripMargin)
+                                                         | waves.fees.transfer.$assetId = 100000
+                                                         | waves.blockchain.custom.functionality {
+                                                         |   feature-check-blocks-period = $featureCheckBlocksPeriod
+                                                         |   blocks-for-feature-activation = $featureCheckBlocksPeriod
+                                                         |   pre-activated-features = { 7 = 0 }
+                                                         |}""".stripMargin)
 
   private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(minerConfig)
 

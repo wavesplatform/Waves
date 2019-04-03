@@ -1,34 +1,24 @@
-package com.wavesplatform.it.sync.matcher
+package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.MatcherSuiteBase
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 
 class OrderBookTestSuite extends MatcherSuiteBase {
 
-  override protected def nodeConfigs: Seq[Config] = Configs
-
-  Seq(IssueUsdTx, IssueWctTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { tx =>
-    nodes.waitForTransaction(tx.id)
-  }
-
-  Seq(
-    aliceNode.transfer(IssueUsdTx.sender.toAddress.stringRepr, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2),
-    bobNode.transfer(IssueWctTx.sender.toAddress.stringRepr, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None, 2)
-  ).foreach { tx =>
-    nodes.waitForTransaction(tx.id)
+  {
+    val xs = Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_))
+    xs.foreach(x => node.waitForTransaction(x.id))
   }
 
   case class ReservedBalances(wct: Long, usd: Long, waves: Long)
   def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
-    val reservedBalances = matcherNode.reservedBalance(pk)
+    val reservedBalances = node.reservedBalance(pk)
     ReservedBalances(
       reservedBalances.getOrElse(WctId.toString, 0),
       reservedBalances.getOrElse(UsdId.toString, 0),
@@ -39,43 +29,43 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   val (amount, price) = (1000L, PriceConstant)
 
   "When delete order book" - {
-    val buyOrder        = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, 2 * amount, price, matcherFee).message.id
-    val anotherBuyOrder = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, amount, price, matcherFee).message.id
+    val buyOrder        = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, price, matcherFee).message.id
+    val anotherBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, amount, price, matcherFee).message.id
 
-    val submitted = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, amount, price, matcherFee).message.id
+    val submitted = node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
 
-    val sellOrder = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, amount, 2 * price, matcherFee).message.id
+    val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 2 * price, matcherFee).message.id
 
-    matcherNode.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
-    matcherNode.waitOrderStatus(wctUsdPair, submitted, "Filled")
+    node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
+    node.waitOrderStatus(wctUsdPair, submitted, "Filled")
 
-    val (aliceRBForOnePair, bobRBForOnePair) = (reservedBalancesOf(aliceAcc), reservedBalancesOf(bobAcc))
+    val (aliceRBForOnePair, bobRBForOnePair) = (reservedBalancesOf(alice), reservedBalancesOf(bob))
 
-    val buyOrderForAnotherPair = matcherNode.placeOrder(aliceAcc, wctWavesPair, BUY, amount, price, matcherFee).message.id
+    val buyOrderForAnotherPair = node.placeOrder(alice, wctWavesPair, BUY, amount, price, matcherFee).message.id
     val sellOrderForAnotherPair =
-      matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, amount, 2 * price, matcherFee).message.id
+      node.placeOrder(bob, wctWavesPair, SELL, amount, 2 * price, matcherFee).message.id
 
-    matcherNode.waitOrderStatus(wctWavesPair, buyOrderForAnotherPair, "Accepted")
-    matcherNode.waitOrderStatus(wctWavesPair, sellOrderForAnotherPair, "Accepted")
+    node.waitOrderStatus(wctWavesPair, buyOrderForAnotherPair, "Accepted")
+    node.waitOrderStatus(wctWavesPair, sellOrderForAnotherPair, "Accepted")
 
-    val (aliceRBForBothPairs, bobRBForBothPairs) = (reservedBalancesOf(aliceAcc), reservedBalancesOf(bobAcc))
+    val (aliceRBForBothPairs, bobRBForBothPairs) = (reservedBalancesOf(alice), reservedBalancesOf(bob))
 
-    matcherNode.deleteOrderBook(wctUsdPair)
+    node.deleteOrderBook(wctUsdPair)
 
     "orders by the pair should be canceled" in {
-      matcherNode.waitOrderStatus(wctUsdPair, buyOrder, "Cancelled")
-      matcherNode.waitOrderStatus(wctUsdPair, anotherBuyOrder, "Cancelled")
-      matcherNode.waitOrderStatus(wctUsdPair, sellOrder, "Cancelled")
+      node.waitOrderStatus(wctUsdPair, buyOrder, "Cancelled")
+      node.waitOrderStatus(wctUsdPair, anotherBuyOrder, "Cancelled")
+      node.waitOrderStatus(wctUsdPair, sellOrder, "Cancelled")
     }
 
     "orderbook was really deleted" in {
-      val orderBook = matcherNode.orderBook(wctUsdPair)
+      val orderBook = node.orderBook(wctUsdPair)
       orderBook.bids shouldBe empty
       orderBook.asks shouldBe empty
     }
 
     "reserved balances should be released for the pair" in {
-      val (aliceReservedBalances, bobReservedBalances) = (reservedBalancesOf(aliceAcc), reservedBalancesOf(bobAcc))
+      val (aliceReservedBalances, bobReservedBalances) = (reservedBalancesOf(alice), reservedBalancesOf(bob))
       aliceReservedBalances.usd shouldBe 0
       aliceReservedBalances.waves shouldBe (aliceRBForBothPairs.waves - aliceRBForOnePair.waves)
       bobReservedBalances.wct shouldBe (bobRBForBothPairs.wct - bobRBForOnePair.wct)
@@ -83,29 +73,26 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "it should not affect other pairs and their orders" in {
-      matcherNode.orderStatus(buyOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
-      matcherNode.orderStatus(sellOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
+      node.orderStatus(buyOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
+      node.orderStatus(sellOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
 
-      val orderBook = matcherNode.orderBook(wctWavesPair)
+      val orderBook = node.orderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks shouldNot be(empty)
     }
 
     "matcher can start after multiple delete events" in {
-      // The hack will be fixed in the master branch
       import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
 
-      def deleteWctWaves = async(matcherNode).deleteOrderBook(wctWavesPair)
+      def deleteWctWaves = async(node).deleteOrderBook(wctWavesPair)
       val deleteMultipleTimes = deleteWctWaves
         .zip(deleteWctWaves)
         .map(_ => ())
         .recover { case _ => () } // It's ok: either this should fail, or restartNode should work
 
       SyncMatcherHttpApi.sync(deleteMultipleTimes)
-      val dockerMatcherNode = dockerNodes().head
-      dockerMatcherNode shouldBe matcherNode
 
-      docker.restartNode(dockerMatcherNode)
+      docker.restartNode(node)
     }
   }
 }

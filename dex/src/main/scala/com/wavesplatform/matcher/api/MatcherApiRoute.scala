@@ -19,9 +19,9 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOff
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher}
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -48,22 +48,21 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            getMarketStatus: AssetPair => Option[MarketStatus],
                            orderValidator: Order => Either[MatcherError, Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
-                           wavesSettings: WavesSettings,
+                           matcherSettings: MatcherSettings,
                            matcherStatus: () => Matcher.Status,
                            db: DB,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: Long)
+                           matcherAccountFee: Long,
+                           apiKeyHash: Option[Array[Byte]])
     extends ApiRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
   import PathMatchers._
-  import wavesSettings._
 
-  override val settings: RestAPISettings = restAPISettings
-  private implicit val timeout: Timeout  = wavesSettings.matcherSettings.actorResponseTimeout
+  private implicit val timeout: Timeout = matcherSettings.actorResponseTimeout
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")

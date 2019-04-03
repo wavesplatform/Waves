@@ -90,7 +90,4 @@ trait Blockchain {
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
-
-  def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit
-  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]]
 }

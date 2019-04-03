@@ -1,8 +1,9 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.it.api.AsyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.MatcherCommand
+import com.wavesplatform.it.api.MatcherCommand
+import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalacheck.Gen
 
@@ -12,7 +13,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 import scala.util.control.NonFatal
 
-package object matcher {
+package object it {
   def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Unit =
     Await.ready(Future.sequence(xs.map(executeCommand(_))), timeout)
 

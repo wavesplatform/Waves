@@ -14,10 +14,9 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
-  val settings: RestAPISettings
   val route: Route
 
-  private lazy val apiKeyHash = Base58.tryDecodeWithLimit(settings.apiKeyHash).toOption
+  protected def apiKeyHash: Option[Array[Byte]]
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()
@@ -52,4 +51,9 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     (path(pathMatcher) & post & withAuth) {
       json[A](f)
     }
+}
+
+trait WithSettings { this: ApiRoute =>
+  def settings: RestAPISettings
+  protected override lazy val apiKeyHash: Option[Array[Byte]] = Base58.tryDecode(settings.apiKeyHash).toOption
 }

@@ -1,35 +1,28 @@
-package com.wavesplatform.it.async.matcher
+package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.AsyncHttpApi.NodesAsyncHttpApi
 import com.wavesplatform.it.api.AsyncMatcherHttpApi._
-import com.wavesplatform.it.async.matcher.CorrectStatusAfterPlaceTestSuite._
-import com.wavesplatform.it.sync.createSignedIssueRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.api.UnexpectedStatusCodeException
+import com.wavesplatform.it.async.CorrectStatusAfterPlaceTestSuite._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import org.scalatest._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with NodesFromDocker {
+class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private val matcherConfig = ConfigFactory.parseString(
     s"""waves {
-       |  miner.enable = no
        |  matcher {
-       |    enable = yes
-       |    account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-       |    bind-address = "0.0.0.0"
        |    price-assets = ["${Asset1.id()}", "${Asset2.id()}"]
        |    rest-order-limit = 100
        |    events-queue {
@@ -45,9 +38,7 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
        |  }
        |}
        |
-       |akka.kafka.consumer {
-       |  poll-interval = 1s
-       |}""".stripMargin
+       |akka.kafka.consumer.poll-interval = 1s""".stripMargin
   )
 
   private val pairs = Seq(
@@ -56,15 +47,9 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
     AssetPair(IssuedAsset(Asset2.id()), IssuedAsset(Asset1.id())),
   )
 
-  override protected val nodeConfigs: Seq[Config] =
-    List(NodeConfigs.Default.last, Random.shuffle(NodeConfigs.Default.init).head)
-      .zip(List(matcherConfig, ConfigFactory.empty()))
-      .map { case (n, o) => o.withFallback(ConfigFactory.parseString("waves.miner.quorum=1")).withFallback(n) }
+  override protected val nodeConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback)
 
-  private def matcherNode = nodes.head
-  private def minerNode   = nodes.last
-
-  private val traders = AllPrivateKeys.filterNot(_ == Issuer).take(10).distinct
+  private val traders: Seq[KeyPair] = (1 to 10).map(_ => KeyPair(Random.nextString(20).getBytes))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -72,12 +57,28 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
     val startTs    = System.currentTimeMillis()
     val sendAmount = Long.MaxValue / (traders.size + 1)
     val issueAndDistribute = for {
-      // issue
-      issueTxs <- Future.traverse(Assets)(asset => nodes.head.signedIssue(createSignedIssueRequest(asset)))
-      _        <- Future.traverse(issueTxs)(tx => nodes.waitForTransaction(tx.id))
+      // distribute waves
+      transferWavesTx <- {
+        val transferTx = MassTransferTransaction
+          .selfSigned(
+            sender = bob,
+            assetId = Waves,
+            transfers = traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, 100.waves)).toList,
+            timestamp = startTs,
+            feeAmount = 0.006.waves,
+            attachment = Array.emptyByteArray
+          )
+          .explicitGet()
 
-      // distribute
-      transferTxs <- Future.sequence {
+        node.broadcastRequest(transferTx.json())
+      }
+
+      // issue
+      issueTxs <- Future.traverse(Assets)(asset => node.broadcastRequest(asset.json()))
+      _        <- Future.traverse(issueTxs)(tx => node.waitForTransaction(tx.id))
+
+      // distribute assets
+      transferAssetsTxs <- Future.sequence {
         Assets.map { issueTx =>
           val transferTx = MassTransferTransaction
             .selfSigned(
@@ -90,10 +91,12 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
             )
             .explicitGet()
 
-          minerNode.broadcastRequest(transferTx.json())
+          node.broadcastRequest(transferTx.json())
         }
       }
-      _ <- Future.traverse(transferTxs)(tx => nodes.waitForTransaction(tx.id))
+
+      _ <- node.waitForTransaction(transferWavesTx.id)
+      _ <- Future.traverse(transferAssetsTxs)(tx => node.waitForTransaction(tx.id))
     } yield ()
 
     Await.result(issueAndDistribute, 5.minute)
@@ -106,7 +109,7 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
       account <- traders
       pair    <- pairs
       i       <- 1 to 60
-    } yield matcherNode.prepareOrder(account, pair, OrderType.SELL, 100000L, 10000L, 0.003.waves, 1, timestamp = ts + i)
+    } yield node.prepareOrder(account, pair, OrderType.SELL, 100000L, 10000L, 0.003.waves, 1, timestamp = ts + i)
 
     val r = Await.result(Future.traverse(orders.grouped(orders.size / 5))(requests), 5.minutes).flatten
     r.foreach {
@@ -116,16 +119,17 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
 
   private def request(order: Order): Future[(String, String)] =
     for {
-      _      <- matcherNode.placeOrder(order)
-      status <- matcherNode.orderStatus(order.idStr(), order.assetPair, waitForStatus = false)
+      _ <- node.placeOrder(order).recover {
+        case e: UnexpectedStatusCodeException if e.statusCode == 503 => // Acceptable
+      }
+      status <- node.orderStatus(order.idStr(), order.assetPair, waitForStatus = false)
     } yield (order.idStr(), status.status)
 
   private def requests(orders: Seq[Order]): Future[Seq[(String, String)]] = Future.traverse(orders)(request)
 }
 
 object CorrectStatusAfterPlaceTestSuite {
-  private val AllPrivateKeys = NodeConfigs.Default.map(c => KeyPair.fromSeed(c.getString("account-seed")).right.get)
-  private val Issuer         = AllPrivateKeys.head
+  private val Issuer = alice
 
   private val Asset1 = IssueTransactionV1
     .selfSigned(

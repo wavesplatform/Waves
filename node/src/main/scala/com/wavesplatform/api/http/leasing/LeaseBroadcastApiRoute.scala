@@ -7,7 +7,10 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 
-case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
+case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup)
+    extends ApiRoute
+    with BroadcastRoute
+    with WithSettings {
   override val route = pathPrefix("leasing" / "broadcast") {
     signedLease ~ signedLeaseCancel
   }

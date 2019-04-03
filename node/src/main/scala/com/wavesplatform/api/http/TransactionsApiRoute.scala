@@ -41,7 +41,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                                 time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with CommonApiFunctions {
+    with CommonApiFunctions
+    with WithSettings {
 
   override lazy val route =
     pathPrefix("transactions") {

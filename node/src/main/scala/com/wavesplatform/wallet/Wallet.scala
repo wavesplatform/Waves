@@ -21,6 +21,7 @@ trait Wallet {
   def privateKeyAccounts: Seq[KeyPair]
   def generateNewAccounts(howMany: Int): Seq[KeyPair]
   def generateNewAccount(): Option[KeyPair]
+  def generateNewAccount(nonce: Int): Option[KeyPair]
   def deleteAccount(account: KeyPair): Boolean
   def privateKeyAccount(account: Address): Either[ValidationError, KeyPair]
 }
@@ -113,7 +114,11 @@ object Wallet extends ScorexLogging {
         .tap(_ => this.saveWalletFile())
 
     override def generateNewAccount(): Option[KeyPair] = WalletLock.write {
-      generateNewAccountWithoutSave().map(acc => {
+      generateNewAccount(getAndIncrementNonce())
+    }
+
+    override def generateNewAccount(nonce: Int): Option[KeyPair] = WalletLock.write {
+      generateNewAccountWithoutSave(nonce).map(acc => {
         this.saveWalletFile()
         acc
       })
@@ -137,7 +142,10 @@ object Wallet extends ScorexLogging {
       maybeFile.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(encryptionKey)))
 
     private[this] def generateNewAccountWithoutSave(): Option[KeyPair] = WalletLock.write {
-      val nonce   = getAndIncrementNonce()
+      generateNewAccountWithoutSave(getAndIncrementNonce())
+    }
+
+    private[this] def generateNewAccountWithoutSave(nonce: Int): Option[KeyPair] = WalletLock.write {
       val account = Wallet.generateNewAccount(seed, nonce)
 
       val address = account.address

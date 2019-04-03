@@ -208,7 +208,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
                          sponsorship: Map[IssuedAsset, Sponsorship],
                          totalFee: Long): Unit
 
-  override def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
+  def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -325,7 +325,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
 
-  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = {
+  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = {
     for {
       height <- heightOf(targetBlockId)
         .toRight(s"No block with signature: $targetBlockId found in blockchain")

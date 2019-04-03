@@ -13,7 +13,7 @@ import play.api.libs.json._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup) extends ApiRoute with WithSettings {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100

@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.matcher
+package com.wavesplatform.it.sync
 
 package object smartcontracts {
   val sc1 = s"""true"""

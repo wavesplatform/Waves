@@ -34,6 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings,
                            time: Time,
                            functionalitySettings: FunctionalitySettings)
     extends ApiRoute
+    with WithSettings
     with BroadcastRoute {
 
   import AddressApiRoute._

@@ -20,7 +20,8 @@ case class PeersApiRoute(settings: RestAPISettings,
                          connectToPeer: InetSocketAddress => Unit,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo])
-    extends ApiRoute {
+    extends ApiRoute
+    with WithSettings {
 
   import PeersApiRoute._
 

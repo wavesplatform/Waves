@@ -8,9 +8,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.error._
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.OrderFeeSettings._
@@ -37,8 +37,8 @@ object OrderValidator {
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
-  val MinExpiration: Long   = 60 * 1000L
-  val MaxActiveOrders: Long = 200
+  val MinExpiration: Long  = 60 * 1000L
+  val MaxActiveOrders: Int = 200
 
   val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
 
@@ -72,7 +72,8 @@ object OrderValidator {
           case (_, Right(TRUE))     => success
           case (_, Right(x))        => MatcherError.AssetScriptUnexpectResult(asset, x.toString).asLeft
         } catch {
-          case NonFatal(e) => MatcherError.AssetScriptException(asset, e.getClass.getCanonicalName, e.getMessage).asLeft
+          case NonFatal(e) =>
+            MatcherError.AssetScriptException(asset, e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")).asLeft
         }
     }
 

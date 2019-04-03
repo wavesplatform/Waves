@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -19,25 +20,26 @@ import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.openDB
+import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
-import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter}
+import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import kamon.influxdb.CustomInfluxDBReporter
+import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
@@ -45,14 +47,14 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
-import org.slf4j.bridge.SLF4JBridgeHandler
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.Try
 import scala.util.control.NonFatal
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
+  app =>
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
@@ -83,10 +85,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
 
-  private var matcher: Option[Matcher]                                         = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
+
+  private var extensions = Seq.empty[Extension]
 
   def apiShutdown(): Unit = {
     for {
@@ -106,10 +109,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val utxStorage =
       new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
     maybeUtx = Some(utxStorage)
-
-    matcher = if (settings.matcherSettings.enable) {
-      Matcher(actorSystem, time, wallet, utxStorage, allChannels, blockchainUpdater, spendableBalanceChanged, settings)
-    } else None
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -204,6 +203,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val as: ActorSystem                 = actorSystem
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
+    val extensionContext = new Context {
+      override def settings: WavesSettings                                  = app.settings
+      override def blockchain: Blockchain                                   = app.blockchainUpdater
+      override def time: Time                                               = app.time
+      override def wallet: Wallet                                           = app.wallet
+      override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
+      override def spendableBalance(address: Address, assetId: Asset): Long = utxStorage.spendableBalance(address, assetId)
+      override def addToUtx(tx: Transaction): Unit                          = utxStorage.putIfNew(tx)
+      override def actorSystem: ActorSystem                                 = app.actorSystem
+    }
+
+    extensions = settings.extensions.map { extensionClassName =>
+      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+      val ctor           = extensionClass.getConstructor(classOf[Context])
+      ctor.newInstance(extensionContext)
+    }
+
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
@@ -270,13 +286,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         classOf[LeaseApiRoute],
         classOf[AliasApiRoute]
       )
+
       val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    //on unexpected shutdown
+    extensions.foreach(_.start())
+
+    // on unexpected shutdown
     sys.addShutdownHook {
       Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
@@ -284,12 +303,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
   }
 
-  @volatile var shutdownInProgress           = false
+  private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS): Unit = {
-    if (!shutdownInProgress) {
-      shutdownInProgress = true
+  def shutdown(utx: UtxPool, network: NS): Unit =
+    if (shutdownInProgress.compareAndSet(false, true)) {
+
+      if (extensions.nonEmpty) {
+        log.info(s"Shutting down extensions")
+        Future.sequence(extensions.map(_.shutdown()))
+      }
 
       spendableBalanceChanged.onComplete()
       utx.close()
@@ -303,8 +326,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
         upnp.deletePort(addr.getPort)
       }
-
-      matcher.foreach(_.shutdown())
 
       log.debug("Closing peer database")
       peerDatabase.close()
@@ -330,7 +351,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       time.close()
       log.info("Shutdown complete")
     }
-  }
 
   private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: FiniteDuration = 1.minute): Unit = {
     log.debug(s"Shutting down $name")
@@ -369,10 +389,6 @@ object Application extends ScorexLogging {
     // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
     System.setProperty("org.aspectj.tracing.factory", "default")
 
-    // j.u.l should log messages using the projects' conventions
-    SLF4JBridgeHandler.removeHandlersForRootLogger()
-    SLF4JBridgeHandler.install()
-
     val config = readConfig(args.headOption)
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
@@ -392,7 +408,7 @@ object Application extends ScorexLogging {
     if (config.getBoolean("kamon.enable")) {
       log.info("Aggregated metrics are enabled")
       Kamon.reconfigure(config)
-      Kamon.addReporter(new CustomInfluxDBReporter())
+      Kamon.addReporter(new InfluxDBReporter())
       SystemMetrics.startCollecting()
     }
 

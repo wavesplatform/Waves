@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
@@ -26,7 +27,7 @@ import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging {
@@ -644,14 +645,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
 
       blockchain.collectLposPortfolios(pf) ++ b.result()
     }
-  }
-
-  override def append(diff: Diff, carry: Long, totalFee: Long, block: Block): Unit = readLock {
-    blockchain.append(diff, carry, totalFee, block)
-  }
-
-  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = readLock {
-    blockchain.rollbackTo(targetBlockId)
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {

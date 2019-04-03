@@ -1,13 +1,13 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.matcher.settings
 
 import java.io.File
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.settings.DeviationsSettings._
 import com.wavesplatform.settings.OrderAmountSettings._
 import com.wavesplatform.settings.OrderFeeSettings._
@@ -22,8 +22,7 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(enable: Boolean,
-                           account: String,
+case class MatcherSettings(account: String,
                            bindAddress: String,
                            port: Int,
                            actorResponseTimeout: FiniteDuration,
@@ -68,7 +67,6 @@ object MatcherSettings {
     (cfg, path) => fromConfig(cfg.getConfig(path))
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
-    val enabled                      = config.as[Boolean]("enable")
     val account                      = config.as[String]("account")
     val bindAddress                  = config.as[String]("bind-address")
     val port                         = config.as[Int]("port")
@@ -101,7 +99,6 @@ object MatcherSettings {
     val allowOrderV3            = config.as[Boolean]("allow-order-v3")
 
     MatcherSettings(
-      enabled,
       account,
       bindAddress,
       port,

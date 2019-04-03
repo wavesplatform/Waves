@@ -578,13 +578,14 @@ object AsyncHttpApi extends Assertions {
     }
 
     def once(r: Request): Future[Response] = {
-      n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}")
+      val id = UUID.randomUUID()
+      n.log.trace(s"[$id] Executing request ${r.getMethod} ${r.getUrl}")
       n.client
         .executeRequest(
           r,
           new AsyncCompletionHandler[Response] {
             override def onCompleted(response: Response): Response = {
-              n.log.debug(s"Response for ${r.getUrl} is ${response.getStatusCode}")
+              n.log.debug(s"[$id] Response for ${r.getUrl} is ${response.getStatusCode}")
               response
             }
           }

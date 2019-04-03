@@ -185,7 +185,6 @@ package object utils extends ScorexLogging {
   @tailrec def doWhile[T](z: T)(cond: T => Boolean)(f: T => T): T = if (cond(z)) doWhile(f(z))(cond)(f) else z
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
-
     override def writes(o: ByteStr): JsValue = JsString(o.base58)
 
     override def reads(json: JsValue): JsResult[ByteStr] = json match {

@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.persistence._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -11,6 +10,7 @@ import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}

@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
-import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -87,9 +86,6 @@ object Explorer extends ScorexLogging {
   )
 
   def main(args: Array[String]): Unit = {
-    SLF4JBridgeHandler.removeHandlersForRootLogger()
-    SLF4JBridgeHandler.install()
-
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
 
     val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))

@@ -9,7 +9,7 @@ import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
-import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions}
+import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
 import com.wavesplatform.utils.ScorexLogging
 
 @Path("/node")
@@ -17,6 +17,7 @@ import com.wavesplatform.utils.ScorexLogging
 case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, application: Shutdownable)
     extends ApiRoute
     with CommonApiFunctions
+    with WithSettings
     with ScorexLogging {
 
   override lazy val route = pathPrefix("node") {

@@ -59,6 +59,7 @@ case class DebugApiRoute(ws: WavesSettings,
                          scoreReporter: Coeval[RxScoreObserver.Stats],
                          configRoot: ConfigObject)
     extends ApiRoute
+    with WithSettings
     with ScorexLogging {
 
   import DebugApiRoute._

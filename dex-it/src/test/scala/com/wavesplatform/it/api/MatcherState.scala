@@ -1,7 +1,6 @@
-package com.wavesplatform.it.matcher
+package com.wavesplatform.it.api
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.api.{MatcherStatusResponse, OrderBookResponse, OrderbookHistory}
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 

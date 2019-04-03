@@ -30,7 +30,6 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
       settings.networkSettings should not be null
       settings.walletSettings should not be null
       settings.blockchainSettings should not be null
-      settings.matcherSettings should not be null
       settings.minerSettings should not be null
       settings.restAPISettings should not be null
       settings.synchronizationSettings should not be null
@@ -57,8 +56,6 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     settings.ntpServer should be("example.com")
     settings.networkSettings.file should be(Some(new File("/xxx/peers.dat")))
     settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))
-    settings.matcherSettings.journalDataDir should be("/xxx/matcher/journal")
-    settings.matcherSettings.snapshotsDataDir should be("/xxx/matcher/snapshots")
   }
 
 }

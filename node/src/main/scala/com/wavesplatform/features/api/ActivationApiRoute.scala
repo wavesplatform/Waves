@@ -8,7 +8,7 @@ import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
-import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions}
+import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
 import com.wavesplatform.utils.ScorexLogging
 
 @Path("/activation")
@@ -19,6 +19,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
                               blockchain: Blockchain)
     extends ApiRoute
     with CommonApiFunctions
+    with WithSettings
     with ScorexLogging {
 
   override lazy val route: Route = pathPrefix("activation") {

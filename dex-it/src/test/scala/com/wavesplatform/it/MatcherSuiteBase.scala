@@ -1,10 +1,14 @@
-package com.wavesplatform.it.matcher
+package com.wavesplatform.it
 
-import com.typesafe.config.Config
-import com.wavesplatform.it._
+import java.util.concurrent.ThreadLocalRandom
+
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.MatcherSuiteBase.baseConfig
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest._
 import com.wavesplatform.it.util._
+import org.scalatest._
+
 import scala.concurrent.ExecutionContext
 
 abstract class MatcherSuiteBase
@@ -18,8 +22,6 @@ abstract class MatcherSuiteBase
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  val defaultAssetQuantity = 999999999999L
-
   val smartFee         = 0.004.waves
   val minFee           = 0.001.waves + smartFee
   val issueFee         = 1.waves
@@ -29,9 +31,27 @@ abstract class MatcherSuiteBase
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
-  protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .withDefault(4)
-      .buildNonConflicting()
+  protected override def createDocker: Docker = new Docker(
+    imageName = "com.wavesplatform/dex-it:latest",
+    tag = getClass.getSimpleName,
+    suiteConfig = baseConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
+  )
 
+  protected def node = dockerNodes().head
+
+  protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
+
+}
+
+object MatcherSuiteBase {
+  private def baseConfig(seed: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
+    ConfigFactory.parseString(s"""
+         |waves.matcher.events-queue {
+         |  type = kafka
+         |  kafka {
+         |    servers = "$kafkaServer"
+         |    topic = "dex-$seed"
+         |  }
+         |}""".stripMargin)
+  }
 }

@@ -15,15 +15,11 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
-import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    SLF4JBridgeHandler.removeHandlersForRootLogger()
-    SLF4JBridgeHandler.install()
-
     val configFilename       = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val outputFilenamePrefix = Try(args(1)).toOption.getOrElse("blockchain")
     val exportHeight         = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)

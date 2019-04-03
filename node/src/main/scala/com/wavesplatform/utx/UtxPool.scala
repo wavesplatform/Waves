@@ -7,8 +7,6 @@ import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction._
 
 trait UtxPool extends AutoCloseable {
-  self =>
-
   def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)]
 
   def removeAll(txs: Traversable[Transaction]): Unit

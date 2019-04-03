@@ -17,6 +17,7 @@ import com.wavesplatform.wallet.Wallet
 @Deprecated
 case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
     extends ApiRoute
+    with WithSettings
     with BroadcastRoute {
 
   override lazy val route = payment
