@@ -39,10 +39,10 @@ object DApp {
     }
   }
   case class CallableAnnotation(invocationArgName: String) extends Annotation {
-    lazy val dic = Map(invocationArgName -> com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType.typeRef)
+    lazy val dic = Map(invocationArgName -> com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType)
   }
   case class VerifierAnnotation(invocationArgName: String) extends Annotation {
-    lazy val dic = Map(invocationArgName -> WavesContext.verifierInput.typeRef)
+    lazy val dic = Map(invocationArgName -> WavesContext.verifierInput)
   }
 
   sealed trait AnnotatedFunction {

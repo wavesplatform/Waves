@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 
 case class TransferItem(recipient: Recipient, amount: Long)
 
@@ -25,14 +26,23 @@ object Tx {
       extends Tx
   case class Issue(p: Proven, quantity: Long, name: ByteStr, description: ByteStr, reissuable: Boolean, decimals: Long, script: Option[ByteStr])
       extends Tx
-  case class ReIssue(p: Proven, quantity: Long, assetId: ByteStr, reissuable: Boolean)                         extends Tx
-  case class Burn(p: Proven, quantity: Long, assetId: ByteStr)                                                 extends Tx
-  case class CI(p: Proven, dappAddress: Recipient, maybePayment: Option[Pmt], feeAssetId: Option[ByteStr]) extends Tx
-  case class Lease(p: Proven, amount: Long, recipient: Recipient)                                              extends Tx
-  case class LeaseCancel(p: Proven, leaseId: ByteStr)                                                          extends Tx
-  case class CreateAlias(p: Proven, alias: String)                                                             extends Tx
-  case class SetScript(p: Proven, script: Option[ByteStr])                                                     extends Tx
-  case class SetAssetScript(p: Proven, assetId: ByteStr, script: Option[ByteStr])                              extends Tx
+  case class ReIssue(p: Proven, quantity: Long, assetId: ByteStr, reissuable: Boolean) extends Tx
+  case class Burn(p: Proven, quantity: Long, assetId: ByteStr)                         extends Tx
+
+  case class CI(
+      p:            Proven,
+      dappAddress:  Recipient,
+      maybePayment: Option[Pmt],
+      feeAssetId:   Option[ByteStr],
+      funcName:     String,
+      funcArgs:     List[EVALUATED]
+  ) extends Tx
+
+  case class Lease(p: Proven, amount: Long, recipient: Recipient)                 extends Tx
+  case class LeaseCancel(p: Proven, leaseId: ByteStr)                             extends Tx
+  case class CreateAlias(p: Proven, alias: String)                                extends Tx
+  case class SetScript(p: Proven, script: Option[ByteStr])                        extends Tx
+  case class SetAssetScript(p: Proven, assetId: ByteStr, script: Option[ByteStr]) extends Tx
   case class MassTransfer(p: Proven,
                           assetId: Option[ByteStr],
                           transferCount: Long,

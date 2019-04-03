@@ -46,8 +46,10 @@ object ScriptRunner {
           true,
           Coeval(scriptContainerAddress)
         )
-        val evalContract = in.eliminate(t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.apply(t)),
-                                        _.eliminate(t => ContractEvaluator.verify(decls,vf, RealTransactionWrapper.ord(t)), _ => ???))
+        val evalContract = in.eliminate(
+          t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.apply(t)),
+          _.eliminate(t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)), _ => ???)
+        )
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, None), _) =>

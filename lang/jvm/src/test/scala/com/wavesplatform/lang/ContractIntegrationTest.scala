@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
 import com.wavesplatform.lang.utils.DirectiveSet
-import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -150,5 +150,43 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       """.stripMargin,
       dummyTx
     ) shouldBe Testing.evaluated(false)
+  }
+
+  property("contract compiles if script uses InvokeScriptTransaction.fc field") {
+    val bytes = ByteStr.fill(1)(1)
+    val invokeScript = Tx.CI(
+      p = Tx.Proven(
+        h = Tx.Header(id = ByteStr.empty, fee = 0, timestamp = 0, version = 0),
+        sender = Recipient.Address(ByteStr.empty),
+        bodyBytes = ByteStr.empty,
+        senderPk = ByteStr.empty,
+        proofs = IndexedSeq.empty
+      ),
+      dappAddress = Recipient.Address(ByteStr.empty),
+      maybePayment = None,
+      feeAssetId = None,
+      funcName = "foo",
+      funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes), CONST_STRING("ok"))
+    )
+    parseCompileAndVerify(
+      s"""
+         |
+         | @Verifier(tx)
+         | func verify() = {
+         |   let expected = [1, true, base64'${bytes.base64}', "ok"]
+         |   match tx {
+         |     case ist: InvokeScriptTransaction =>
+         |       ist.function == "foo"       &&
+         |       ist.args[0]  == expected[0] &&
+         |       ist.args[1]  == expected[1] &&
+         |       ist.args[2]  == expected[2] &&
+         |       ist.args[3]  == expected[3]
+         |     case _ => false
+         |   }
+         | }
+         |
+        """.stripMargin,
+      invokeScript
+    ) shouldBe Testing.evaluated(true)
   }
 }
