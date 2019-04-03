@@ -543,7 +543,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | func wSet() = {
           |     [
           |       DataEntry("a", 1),
-          |       DataEntry("b", 2),
+          |       DataEntry("b", 2)
           |     ]
           | }
           |
