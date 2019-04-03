@@ -88,6 +88,39 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
       ) shouldBe 'right
   }
 
+  property("account script with 'this' address link") {
+    ScriptCompiler
+      .compile(
+        s"""
+           |
+           |{-# STDLIB_VERSION 3 #-}
+           |
+           |let a = this
+           |
+           |match tx {
+           |  case tx:TransferTransaction => true
+           |  case _ => false
+           |}""".stripMargin,
+      ) shouldBe 'right
+  }
+
+  property("asset script with 'this' address link") {
+    ScriptCompiler
+      .compile(
+        s"""
+           |
+           |{-# STDLIB_VERSION 3 #-}
+           |{-# SCRIPT_TYPE ASSET #-}
+           |
+           |let a = this
+           |
+           |match tx {
+           |  case tx:TransferTransaction => true
+           |  case _ => false
+           |}""".stripMargin,
+      ) shouldBe 'right
+  }
+
   private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(

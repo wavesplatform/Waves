@@ -228,7 +228,7 @@ class UtxPoolImpl(time: Time,
         diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction)
       } yield diff
     }
-      
+
     def isScripted(transaction: Transaction): Boolean = {
       transaction match {
         case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)
