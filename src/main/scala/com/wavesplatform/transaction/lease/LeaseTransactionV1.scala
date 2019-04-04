@@ -12,12 +12,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class LeaseTransactionV1 private (sender: PublicKey,
-                                       amount: Long,
-                                       fee: Long,
-                                       timestamp: Long,
-                                       recipient: AddressOrAlias,
-                                       signature: ByteStr)
+case class LeaseTransactionV1 private (sender: PublicKey, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias, signature: ByteStr)
     extends LeaseTransaction
     with SignedTransaction
     with FastHashId {
@@ -64,11 +59,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
     }
   }
 
-  def selfSigned(sender: KeyPair,
-                 amount: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(sender, amount, fee, timestamp, recipient, sender)
   }
 

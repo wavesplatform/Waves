@@ -111,8 +111,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
-        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey),
-                "Incorrect signature")
+        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey), "Incorrect signature")
         pass
     }
 

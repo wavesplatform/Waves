@@ -89,8 +89,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
-  private def generateOneBlockTask(account: KeyPair)(
-      delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
+  private def generateOneBlockTask(account: KeyPair)(delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
     Task {
       forgeBlock(account)
     }.delayExecution(delay)
@@ -361,9 +360,9 @@ object Miner {
   val MaxTransactionsPerMicroblock: Int = 500
 
   case object Disabled extends Miner with MinerDebugInfo {
-    override def scheduleMining(): Unit                                                                = ()
+    override def scheduleMining(): Unit                                                         = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
-    override val state                                                                                 = MinerDebugInfo.Disabled
+    override val state                                                                          = MinerDebugInfo.Disabled
   }
 
   sealed trait MicroblockMiningResult

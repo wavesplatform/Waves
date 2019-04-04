@@ -70,11 +70,7 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
     } yield unverified.copy(proofs = proofs)
   }
 
-  def selfSigned(sender: KeyPair,
-                 amount: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(sender, amount, fee, timestamp, recipient, sender)
   }
 

@@ -24,8 +24,8 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
       "timestamp" -> timestamp
     ))
 
-  protected final val bytesBase = Coeval.evalOnce(
-    Bytes.concat(sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
+  protected final val bytesBase =
+    Coeval.evalOnce(Bytes.concat(sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
 }
 
 object LeaseTransaction {
