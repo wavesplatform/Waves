@@ -92,16 +92,24 @@ object Explorer extends ScorexLogging {
 
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
 
-    val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
+    val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    log.info(s"Data directory: ${settings.dataDirectory}")
+    log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-    val db               = openDB(settings.dataDirectory)
-    val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, maxCacheSize = settings.maxCacheSize, maxRollbackDepth = settings.maxRollbackDepth, rememberBlocksInterval = settings.rememberBlocks.toMillis, false)
+    val db               = openDB(settings.dbSettings.directory)
+    val reader = new LevelDBWriter(
+      db,
+      portfolioChanges,
+      settings.blockchainSettings.functionalitySettings,
+      maxCacheSize = settings.maxCacheSize,
+      maxRollbackDepth = settings.maxRollbackDepth,
+      rememberBlocksInterval = settings.rememberBlocks.toMillis,
+      false
+    )
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")

@@ -4,7 +4,7 @@ import com.wavesplatform.settings.WavesSettings
 
 trait DBCacheSettings {
   lazy val maxCacheSize: Int = {
-    val settings = WavesSettings.fromConfig(ConfigFactory.load())
+    val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
     settings.maxCacheSize
   }
 }

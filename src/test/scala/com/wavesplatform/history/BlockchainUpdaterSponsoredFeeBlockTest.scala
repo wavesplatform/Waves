@@ -103,7 +103,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
             blocksForFeatureActivation = 1,
             preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0, BlockchainFeatures.NG.id -> 0)))
 
-  val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)
+  val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(dbSettings = , blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)
 
   property("not enough waves to sponsor sponsored tx") {
     scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {

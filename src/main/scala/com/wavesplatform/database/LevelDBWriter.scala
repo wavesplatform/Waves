@@ -76,18 +76,11 @@ class LevelDBWriter(writableDB: DB,
                     val maxCacheSize: Int,
                     val maxRollbackDepth: Int,
                     val rememberBlocksInterval: Long,
-                    disableTxsByAddress1: Boolean)
+                    val storeTransactionsByAddress: Boolean)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
-
-  lazy val disableTxsByAddress = {
-    val dbDisabled    = readOnly(_.get(Keys.DisableTxsByAddress).fold(false)(identity))
-    if (disableTxsByAddress1 && !dbDisabled) readWrite(_.put(Keys.DisableTxsByAddress, Some(true)))
-    disableTxsByAddress1 || dbDisabled
-  }
-
   import LevelDBWriter._
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -364,7 +357,7 @@ class LevelDBWriter(writableDB: DB,
       }
     }
 
-    if (!disableTxsByAddress1) for ((addressId, txIds) <- addressTransactions) {
+    if (storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
       val kk        = Keys.addressTransactionSeqNr(addressId)
       val nextSeqNr = rw.get(kk) + 1
       val txTypeNumSeq = txIds.map { txId =>
@@ -470,7 +463,7 @@ class LevelDBWriter(writableDB: DB,
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
             discardLeaseBalance(address)
 
-            if (!disableTxsByAddress1) {
+            if (storeTransactionsByAddress) {
               val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
               val txSeqNr  = rw.get(kTxSeqNr)
               val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
@@ -606,7 +599,7 @@ class LevelDBWriter(writableDB: DB,
   }
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    if (disableTxsByAddress1)
+    if (!storeTransactionsByAddress)
       Left("Transactions by address are disabled, please enable it and rebuild the state")
     else
       readOnly { db =>

@@ -23,7 +23,7 @@ package object history {
   )
 
   val config   = ConfigFactory.load()
-  val settings = WavesSettings.fromConfig(config)
+  val settings = WavesSettings.fromRootConfig(config)
 
   val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
@@ -33,12 +33,11 @@ package object history {
       functionalitySettings =
         DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)))
 
-  val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
+  val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(dbSettings = , blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 
-  val TransfersV2ActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = TransfersV2ActivatedAt0BlockchainSettings)
+  val TransfersV2ActivatedAt0WavesSettings: WavesSettings = settings.copy(dbSettings = , blockchainSettings = TransfersV2ActivatedAt0BlockchainSettings)
 
-  val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings,
-                                                          featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+  val DefaultWavesSettings: WavesSettings = settings.copy(dbSettings = , blockchainSettings = DefaultBlockchainSettings, featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
   val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))

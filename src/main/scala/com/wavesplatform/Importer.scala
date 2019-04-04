@@ -50,7 +50,7 @@ object Importer extends ScorexLogging {
       .intern()
 
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
-    val settings = WavesSettings.fromConfig(config)
+    val settings = WavesSettings.fromRootConfig(config)
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
@@ -75,7 +75,7 @@ object Importer extends ScorexLogging {
 
         createInputStream(filename) match {
           case Success(inputStream) =>
-            val db                = openDB(settings.dataDirectory)
+            val db                = openDB(settings.dbSettings.directory)
             val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), false)
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
             val extAppender       = BlockAppender(blockchainUpdater, time, utxPoolStub, pos, settings, scheduler, verifyTransactions) _

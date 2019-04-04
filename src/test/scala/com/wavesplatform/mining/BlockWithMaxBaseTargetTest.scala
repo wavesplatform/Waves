@@ -4,7 +4,7 @@ import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -111,7 +111,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   def withEnv(f: Env => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
 
-    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
     val blockchainSettings0 = settings0.blockchainSettings.copy(
       functionalitySettings = settings0.blockchainSettings.functionalitySettings.copy(
@@ -119,12 +119,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       )
     )
     val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTargetOpt = Some(1L))
-    val settings = settings0.copy(
-      blockchainSettings = blockchainSettings0,
-      minerSettings = minerSettings,
-      synchronizationSettings = synchronizationSettings0,
-      featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
-    )
+    val settings = settings0.copy(dbSettings = , blockchainSettings = blockchainSettings0, minerSettings = minerSettings, synchronizationSettings = synchronizationSettings0, featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)

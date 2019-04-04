@@ -111,7 +111,7 @@ object WavesEnvironmentBenchmark {
     protected val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
     private val wavesSettings: WavesSettings = {
       val config = loadConfig(ConfigFactory.parseFile(new File(benchSettings.networkConfigFile)))
-      WavesSettings.fromConfig(config)
+      WavesSettings.fromRootConfig(config)
     }
 
     AddressScheme.current = new AddressScheme {
@@ -119,8 +119,8 @@ object WavesEnvironmentBenchmark {
     }
 
     private val db: DB = {
-      val dir = new File(wavesSettings.dataDirectory)
-      if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dataDirectory}'")
+      val dir = new File(wavesSettings.dbSettings.directory)
+      if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
       LevelDBFactory.factory.open(dir, new Options)
     }
 

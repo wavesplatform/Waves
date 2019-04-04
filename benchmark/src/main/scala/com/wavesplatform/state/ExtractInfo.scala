@@ -37,7 +37,7 @@ object ExtractInfo extends App with ScorexLogging {
   val benchSettings = Settings.fromConfig(ConfigFactory.load())
   val wavesSettings = {
     val config = loadConfig(ConfigFactory.parseFile(new File(args.head)))
-    WavesSettings.fromConfig(config)
+    WavesSettings.fromRootConfig(config)
   }
 
   AddressScheme.current = new AddressScheme {
@@ -45,8 +45,8 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   val db: DB = {
-    val dir = new File(wavesSettings.dataDirectory)
-    if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dataDirectory}'")
+    val dir = new File(wavesSettings.dbSettings.directory)
+    if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
     LevelDBFactory.factory.open(dir, new Options)
   }
 

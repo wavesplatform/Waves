@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform
 import com.wavesplatform._
-import com.wavesplatform.account.{KeyPair, PublicKey, Address}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -74,9 +74,8 @@ class UtxPoolSpecification
   private def mkBlockchain(senderAccount: Address, senderBalance: Long) = {
     val config          = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val origSettings    = WavesSettings.fromConfig(config)
-    val settings = origSettings.copy(
-      blockchainSettings = BlockchainSettings(
+    val origSettings    = WavesSettings.fromRootConfig(config)
+    val settings = origSettings.copy(dbSettings = , blockchainSettings = BlockchainSettings(
         'T',
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
@@ -85,9 +84,7 @@ class UtxPoolSpecification
             BlockchainFeatures.Ride4DApps.id    -> 0
           )),
         genesisSettings
-      ),
-      featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
-    )
+      ), featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings)
     val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), ignoreSpendableBalanceChanged, false)

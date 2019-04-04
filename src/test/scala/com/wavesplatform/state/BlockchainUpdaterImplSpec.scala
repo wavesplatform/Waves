@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
@@ -21,7 +21,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
-    val settings      = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings      = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
