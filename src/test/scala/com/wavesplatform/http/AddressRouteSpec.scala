@@ -5,8 +5,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.directives.values.V3
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
-import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
 // [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
@@ -179,7 +179,7 @@ class AddressRouteSpec
     val testContract = DApp(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: Address) => Some(ContractScript(StdLibVersion.V3, testContract).explicitGet()))
+      .onCall((_: Address) => Some(ContractScript(V3, testContract).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
@@ -188,7 +188,7 @@ class AddressRouteSpec
       (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
 // [WAIT]                                           Decompiler(
 //      testContract,
-//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
+//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

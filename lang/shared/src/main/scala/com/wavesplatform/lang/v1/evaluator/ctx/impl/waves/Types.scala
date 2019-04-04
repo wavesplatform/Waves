@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.StdLibVersion
-import com.wavesplatform.lang.StdLibVersion.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, DefinedType, UnionType}
 
@@ -264,7 +263,7 @@ object Types {
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
     buildSetAssetScriptTransactionType(proofsEnabled)
-  ) ++ (if (v == StdLibVersion.V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
+  ) ++ (if (v == V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++

@@ -2,11 +2,11 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.{ContentType, Global, StdLibVersion}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
@@ -50,7 +50,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       .map(x => Parser.parseExpr(x).get.value)
 
     typedScript = {
-      val compilerScript = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1
+      val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
       ExprScript(compilerScript).explicitGet()
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(recipient, Some(typedScript), 100000000L, ts).explicitGet()
@@ -116,7 +116,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |}
                |""".stripMargin,
           Coproduct(tx),
-          StdLibVersion.V3
+          V3
         )
         result shouldBe evaluated(true)
     }

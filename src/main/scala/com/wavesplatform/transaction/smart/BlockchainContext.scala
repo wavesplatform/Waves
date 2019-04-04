@@ -2,9 +2,10 @@ package com.wavesplatform.transaction.smart
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
-import com.wavesplatform.lang.{ContentType, ExecutionError, Global, ScriptType}
-import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.{ExecutionError, Global}
+import com.wavesplatform.lang.directives.values.{ContentType, ScriptType}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}

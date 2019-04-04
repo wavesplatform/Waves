@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
@@ -15,7 +15,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, ContentType, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.directives.DirectiveSet
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -26,7 +27,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+          DirectiveSet(V3, Account, DAppType).explicitGet(),
           Common.emptyBlockchainEnvironment()
         )
         .compilerContext
@@ -85,7 +86,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   private val cmpCtx: CompilerContext =
     WavesContext
       .build(
-        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+        DirectiveSet(V3, Account, DAppType).explicitGet(),
         Common.emptyBlockchainEnvironment()
       )
       .compilerContext
@@ -232,10 +233,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V3),
+          PureContext.build(V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+            DirectiveSet(V3, Account, DAppType).explicitGet(),
             Common.emptyBlockchainEnvironment()
           )
         ))

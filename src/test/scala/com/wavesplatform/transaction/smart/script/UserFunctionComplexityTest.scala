@@ -3,15 +3,15 @@ package com.wavesplatform.transaction.smart.script
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion.V2
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils
 import com.wavesplatform.utils.EmptyBlockchain
@@ -26,19 +26,19 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
   }
 
   private val ctxV1 = {
-    utils.functionCosts(StdLibVersion.V1)
+    utils.functionCosts(V1)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V1),
+          PureContext.build(V1),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V1, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
           )
         ))
   }
-  private val funcCostsV1 = utils.functionCosts(StdLibVersion.V1)
+  private val funcCostsV1 = utils.functionCosts(V1)
 
   property("estimate script for stdLib V1 with UserFunctions") {
 
@@ -91,19 +91,19 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
   }
 
   private val ctxV2 = {
-    utils.functionCosts(StdLibVersion.V2)
+    utils.functionCosts(V2)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V2),
+          PureContext.build(V2),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(V2, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }
-  private val funcCostsV2 = utils.functionCosts(StdLibVersion.V2)
+  private val funcCostsV2 = utils.functionCosts(V2)
 
   property("estimate script for stdLib V2 with UserFunctions") {
 
@@ -156,19 +156,19 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
   }
 
   private val ctxV3 = {
-    utils.functionCosts(StdLibVersion.V3)
+    utils.functionCosts(V3)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V3),
+          PureContext.build(V3),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
+            DirectiveSet(V3, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }
-  private val funcCostsV3 = utils.functionCosts(StdLibVersion.V3)
+  private val funcCostsV3 = utils.functionCosts(V3)
 
   property("estimate script for stdLib V3 with UserFunctions") {
 
