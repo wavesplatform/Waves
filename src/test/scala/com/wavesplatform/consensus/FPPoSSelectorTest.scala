@@ -205,7 +205,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: Env => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-    val settings      = settings0.copy(dbSettings = , featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     val pos           = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
     try {

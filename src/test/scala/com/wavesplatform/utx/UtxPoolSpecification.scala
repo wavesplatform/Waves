@@ -75,7 +75,7 @@ class UtxPoolSpecification
     val config          = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val origSettings    = WavesSettings.fromRootConfig(config)
-    val settings = origSettings.copy(dbSettings = , blockchainSettings = BlockchainSettings(
+    val settings = origSettings.copy(blockchainSettings = BlockchainSettings(
         'T',
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(

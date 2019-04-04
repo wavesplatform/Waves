@@ -113,7 +113,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-    val settings      = settings0.copy(dbSettings = , featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
@@ -133,7 +133,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   def testWithBlocks(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, Seq[Block], KeyPair) => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000, false)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-    val settings      = settings0.copy(dbSettings = , featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
@@ -178,7 +178,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   "correctly reassemble block from header and transactions" in {
     val rw        = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000, false)
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-    val settings  = settings0.copy(dbSettings = , featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {
       val master    = KeyPair("master".getBytes())
@@ -269,7 +269,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
 
       val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000, false)
       val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-      val settings      = settings0.copy(dbSettings = , featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+      val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
       val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
       try {
 

@@ -83,7 +83,7 @@ class BlockchainUpdaterLiquidBlockTest
 
   property("miner settings don't interfere with micro block processing") {
     val oneTxPerMicroSettings = MicroblocksActivatedAt0WavesSettings
-      .copy(dbSettings = , minerSettings = MicroblocksActivatedAt0WavesSettings.minerSettings.copy(
+      .copy(minerSettings = MicroblocksActivatedAt0WavesSettings.minerSettings.copy(
           maxTransactionsInMicroBlock = 1
         ))
     forAll(preconditionsAndPayments(10, Block.MaxTransactionsPerBlockVer3)) {
