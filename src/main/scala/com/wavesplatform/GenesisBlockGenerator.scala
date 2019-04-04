@@ -1,9 +1,11 @@
 package com.wavesplatform
 
 import java.io.{File, FileNotFoundException}
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{KeyPair, Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -59,15 +61,17 @@ object GenesisBlockGenerator extends App {
     )
   }
 
-  private val settings: Settings = {
+  val inputConfFile = new File(args.headOption.getOrElse(throw new IllegalArgumentException("Specify a path to genesis.conf")))
+  if (!inputConfFile.exists()) throw new FileNotFoundException(inputConfFile.getCanonicalPath)
+
+  val outputConfFile = args
+    .drop(1)
+    .headOption
+    .map(new File(_).ensuring(f => f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
+
+  val settings: Settings = {
     implicit val _ = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-
-    val file = new File(args.headOption.getOrElse(throw new IllegalArgumentException("Specify a path to genesis.conf")))
-    if (!file.exists()) {
-      throw new FileNotFoundException(file.getCanonicalPath)
-    }
-
-    ConfigFactory.parseFile(file).as[Settings]("genesis-generator")
+    ConfigFactory.parseFile(inputConfFile).as[Settings]("genesis-generator")
   }
 
   com.wavesplatform.account.AddressScheme.current = new AddressScheme {
@@ -120,8 +124,7 @@ object GenesisBlockGenerator extends App {
   )
 
   private def report(addrInfos: Iterator[FullAddressInfo], settings: GenesisSettings): Unit = {
-
-    val output = new StringBuilder
+    val output = new StringBuilder(8192)
     output.append("Addresses:\n")
     addrInfos.zipWithIndex.foreach {
       case (acc, n) =>
@@ -136,28 +139,26 @@ object GenesisBlockGenerator extends App {
            |""".stripMargin)
     }
 
-    output.append(
-      s"""Settings:
-         |genesis {
-         |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
-         |  initial-base-target: ${settings.initialBaseTarget}
-         |  timestamp: ${settings.timestamp}
-         |  block-timestamp: ${settings.blockTimestamp}
-         |  signature: "${settings.signature.get}"
-         |  initial-balance: ${settings.initialBalance}
-         |  transactions = [
-         |    ${settings.transactions
-           .map { x =>
-             s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
-           }
-           .mkString(",\n    ")}
-         |  ]
-         |}
-         |""".stripMargin
-    )
+    val confBody = s"""genesis {
+                      |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
+                      |  initial-base-target: ${settings.initialBaseTarget}
+                      |  timestamp: ${settings.timestamp}
+                      |  block-timestamp: ${settings.blockTimestamp}
+                      |  signature: "${settings.signature.get}"
+                      |  initial-balance: ${settings.initialBalance}
+                      |  transactions = [
+                      |    ${settings.transactions
+      .map { x =>
+        s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
+      }
+      .mkString(",\n    ")}
+                      |  ]
+                      |}
+                      |""".stripMargin
 
-    output.append("\nDon't forget to delete the data!")
-    System.out.print(output)
-
+    output.append("Settings:\n")
+    output.append(confBody)
+    System.out.print(output.result())
+    outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.getBytes(StandardCharsets.UTF_8)))
   }
 }
