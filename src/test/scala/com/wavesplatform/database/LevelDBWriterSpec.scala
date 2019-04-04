@@ -111,7 +111,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   }
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
+    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, true)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
