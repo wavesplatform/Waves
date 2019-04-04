@@ -19,7 +19,7 @@ trait WithState extends DBCacheSettings {
   protected def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)
-    try f(new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, maxCacheSize, 2000, 120 * 60 * 1000, false))
+    try f(new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, maxCacheSize, 2000, 120 * 60 * 1000, true))
     finally {
       db.close()
       TestHelpers.deleteRecursively(path)
