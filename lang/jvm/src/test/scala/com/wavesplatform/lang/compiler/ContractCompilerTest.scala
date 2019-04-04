@@ -550,4 +550,40 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
+
+  property("compiler error if user function defined below usage") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+           |
+           | let a = foo()
+           | func foo() = (1)
+           |
+           | @Verifier(tx)
+           | func bar() = { a == 1 }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function")
+  }
+
+  property("compiler error if variable defined below usage") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | func foo() = (a)
+          | let a = 1
+          |
+          | @Verifier(tx)
+          | func bar() = { foo() == 1 }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("A definition of 'a' is not found")
+  }
 }
