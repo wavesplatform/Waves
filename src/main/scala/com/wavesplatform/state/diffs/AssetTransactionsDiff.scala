@@ -17,7 +17,13 @@ object AssetTransactionsDiff {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
     Right(
-      Diff(height = height, tx = tx, portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))), assetInfos = Map(asset               -> info), assetScripts = if (tx.script.isEmpty) { Map() } else { Map(asset -> tx.script) }))
+      Diff(
+        height = height,
+        tx = tx,
+        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
+        assetInfos = Map(asset               -> info),
+        assetScripts = if (tx.script.isEmpty) { Map() } else { Map(asset -> tx.script) }
+      ))
   }
 
   def setAssetScript(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
@@ -25,7 +31,12 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
         Right(
-          Diff(height = height, tx = tx, portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)), assetScripts = Map(tx.asset          -> tx.script)))
+          Diff(
+            height = height,
+            tx = tx,
+            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+            assetScripts = Map(tx.asset          -> tx.script)
+          ))
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
       }
@@ -51,7 +62,12 @@ object AssetTransactionsDiff {
           Left(GenericError("Asset total value overflow"))
         } else {
           Right(
-            Diff(height = height, tx = tx, portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))), assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable))))
+            Diff(
+              height = height,
+              tx = tx,
+              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))),
+              assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable))
+            ))
         }
       } else {
         Left(GenericError("Asset is not reissuable"))
@@ -62,7 +78,12 @@ object AssetTransactionsDiff {
     val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
 
     validateAsset(tx, blockchain, tx.asset, !burnAnyTokensEnabled).map { _ =>
-      Diff(height = height, tx = tx, portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))), assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity)))
+      Diff(
+        height = height,
+        tx = tx,
+        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))),
+        assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity))
+      )
     }
   }
 
@@ -71,7 +92,12 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       Either.cond(
         !blockchain.hasAssetScript(tx.asset),
-        Diff(height = height, tx = tx, portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)), sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0)))),
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0)))
+        ),
         GenericError("Sponsorship smart assets is disabled.")
       )
     }

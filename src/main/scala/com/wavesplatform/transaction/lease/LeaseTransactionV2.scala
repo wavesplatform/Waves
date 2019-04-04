@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -70,11 +70,7 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
     } yield unverified.copy(proofs = proofs)
   }
 
-  def selfSigned(sender: KeyPair,
-                 amount: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(sender, amount, fee, timestamp, recipient, sender)
   }
 

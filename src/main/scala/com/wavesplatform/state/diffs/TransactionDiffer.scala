@@ -85,7 +85,7 @@ object TransactionDiffer extends ScorexLogging {
         def getSponsorship(asset: IssuedAsset) = {
           val diffSponsorship = diff.sponsorship.get(asset).collect {
             case SponsorshipValue(value) => value
-            case SponsorshipNoInfo => 0L
+            case SponsorshipNoInfo       => 0L
           }
 
           diffSponsorship.orElse(blockchain.assetDescription(asset).map(_.sponsorship))

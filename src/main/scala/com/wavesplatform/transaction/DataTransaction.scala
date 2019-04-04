@@ -63,11 +63,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
       )
   }
 
-  def create(sender: PublicKey,
-             data: List[DataEntry[_]],
-             feeAmount: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(sender: PublicKey, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
 
     val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
     validateTxContent(tx)

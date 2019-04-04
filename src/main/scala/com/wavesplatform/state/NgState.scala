@@ -32,7 +32,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         totalResBlockSig, { () =>
           microBlocks.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
-              val (prevDiff, prevCarry, prevTotalFee)    = this.diffFor(current.prevResBlockSig)
+              val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.prevResBlockSig)
               val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(totalResBlockSig)
               (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 

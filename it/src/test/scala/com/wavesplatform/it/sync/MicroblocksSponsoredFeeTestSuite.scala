@@ -26,6 +26,7 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
     })
   }
 
+  // TODO: Validate totalFee in blocks API
   "fee distribution with sponsorship" - {
     val sponsorAssetId = sponsor
       .issue(sponsor.address, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
