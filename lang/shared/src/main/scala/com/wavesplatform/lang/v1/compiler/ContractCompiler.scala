@@ -42,9 +42,9 @@ object ContractCompiler {
             .cond(
               tpe match {
                 case _
-                    if tpe <= UNION(WavesContext.writeSetType.typeRef,
-                                    WavesContext.scriptTransferSetType.typeRef,
-                                    WavesContext.scriptResultType.typeRef) =>
+                    if tpe <= UNION(WavesContext.writeSetType,
+                                    WavesContext.scriptTransferSetType,
+                                    WavesContext.scriptResultType) =>
                   true
                 case _ => false
               },

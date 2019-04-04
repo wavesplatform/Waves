@@ -19,14 +19,14 @@ object MatcherScriptRunner {
       val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
       EvaluatorV1.applywithLogging(ctx, s.expr)
 
-    case ContractScript.ContractScriptImpl(_, DApp(_, _, Some(vf)), _) =>
+    case ContractScript.ContractScriptImpl(_, DApp(decls, _, Some(vf)), _) =>
       val ctx = MatcherContext.build(
         script.stdLibVersion,
         AddressScheme.current.chainId,
         Coeval.evalOnce(???) /*order not used in global context where @Verifier annotation is used */,
         proofsEnabled = true
       )
-      val evalContract = ContractEvaluator.verify(vf, RealTransactionWrapper.ord(order))
+      val evalContract = ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(order))
       EvaluatorV1.evalWithLogging(ctx, evalContract)
 
     case ContractScript.ContractScriptImpl(_, DApp(_, _, None), _) =>
