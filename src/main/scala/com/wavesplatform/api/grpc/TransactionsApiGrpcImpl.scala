@@ -1,6 +1,6 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.TransactionNotExists
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction}
@@ -66,7 +66,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
         tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
       } yield tx
 
-    val signerAddress: PublicKeyAccount = if (request.signer.isEmpty) request.getTransaction.sender else request.signer.toPublicKeyAccount
+    val signerAddress: PublicKey = if (request.signer.isEmpty) request.getTransaction.sender else request.signer.toPublicKeyAccount
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString).toFuture
   }
 
