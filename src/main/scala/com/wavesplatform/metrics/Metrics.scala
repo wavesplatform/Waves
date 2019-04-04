@@ -7,6 +7,9 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ValueReader
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 
@@ -24,6 +27,11 @@ object Metrics extends ScorexLogging {
                               batchFlashDuration: FiniteDuration)
 
   case class Settings(enable: Boolean, nodeId: Int, influxDb: InfluxDbSettings)
+
+  object Settings {
+    import com.wavesplatform.settings._ // implicit hypherCase
+    implicit val metricsSettingsValueReader: ValueReader[Settings] = arbitraryTypeValueReader
+  }
 
   private implicit val scheduler: SchedulerService = Scheduler.singleThread("metrics")
 

@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.duration._
 
@@ -26,11 +25,6 @@ case class WavesSettings(directory: String,
                          metrics: Metrics.Settings)
 
 object WavesSettings {
-
-  import BlockchainSettings.blockChainSettingsValueReader
-  import MatcherSettings.matcherSettingsValueReader
-  import NetworkSettings.networkSettingsValueReader
-
   def fromRootConfig(rootConfig: Config): WavesSettings = {
     val waves = rootConfig.getConfig("waves")
 

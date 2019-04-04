@@ -2,6 +2,9 @@ package com.wavesplatform.settings
 
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
 import com.wavesplatform.settings.SynchronizationSettings._
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -28,4 +31,6 @@ object SynchronizationSettings {
                                      parallelism: Int,
                                      maxThreads: Int,
                                      maxQueueSize: Int)
+
+  implicit val synchronizationSettingsValueReader: ValueReader[SynchronizationSettings] = arbitraryTypeValueReader
 }
