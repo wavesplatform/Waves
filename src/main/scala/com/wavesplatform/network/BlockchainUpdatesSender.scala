@@ -5,14 +5,12 @@ import java.util
 import com.wavesplatform.settings._
 import com.wavesplatform.state.{BlockAdded, BlockchainUpdated, MicroBlockAdded, RollbackCompleted}
 import monix.execution.{Ack, Scheduler}
-import monix.execution.Ack.{Continue, Stop}
+import monix.execution.Ack.Continue
 import monix.reactive.{Observable, Observer}
 import com.wavesplatform.protobuf.events.PBEvents
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.common.serialization.{IntegerSerializer, Serializer}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
-
-import scala.concurrent.Future
 
 private object BlockchainUpdatedSerializer extends Serializer[BlockchainUpdated] {
   override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {}
@@ -38,28 +36,22 @@ class BlockchainUpdatesSender(settings: WavesSettings, blockchainUpdated: Observ
   // @todo check on startup if Kafka is available?
   private[this] val producer = new KafkaProducer[Int, BlockchainUpdated](createProperties(), IntSerializer, BlockchainUpdatedSerializer)
 
-  blockchainUpdated.subscribe(new Observer[BlockchainUpdated] {
-    override def onNext(evt: BlockchainUpdated): Future[Ack] =
-      Future {
-        try {
-          producer.send(createProducerRecord(evt)).get
-          Continue
-        } catch {
-          case e: Throwable =>
-            log.error("Error sending blockchain updates", e)
-            Stop
-        }
-      }(scheduler)
+  blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
+    override def onNext(evt: BlockchainUpdated): Ack = {
+      // @todo guarantees/backpressure
+      producer.send(createProducerRecord(evt))
+      Continue
+    }
 
     override def onError(ex: Throwable): Unit = {
       log.error("Error sending blockchain updates", ex)
-      shutdown()
+//      shutdown()
     }
 
     override def onComplete(): Unit = {
       // @todo proper complete/shutdown actions
       log.info("Blockchain updates channel closed")
-      shutdown()
+//      shutdown()
     }
   })(scheduler)
 
