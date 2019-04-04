@@ -65,11 +65,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
     } yield new SetScriptTransaction(chainId, sender, script, fee, timestamp, proofs)
   }
 
-  def signed(sender: PublicKey,
-             script: Option[Script],
-             fee: Long,
-             timestamp: Long,
-             signer: PrivateKey): Either[ValidationError, TransactionT] = {
+  def signed(sender: PublicKey, script: Option[Script], fee: Long, timestamp: Long, signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }

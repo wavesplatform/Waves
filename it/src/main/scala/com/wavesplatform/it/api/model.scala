@@ -157,7 +157,8 @@ case class BlockHeaders(signature: String,
                         generator: String,
                         transactionCount: Int,
                         blocksize: Int,
-                        features: Option[Set[Short]])
+                        features: Option[Set[Short]],
+                        totalFee: Long)
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
 }

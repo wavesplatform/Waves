@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{KeyPair, PublicKey, Address}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -24,12 +24,7 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
   override val json: Coeval[JsObject]     = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(Array(builder.typeId),
-                 Longs.toByteArray(timestamp),
-                 sender,
-                 recipient.bytes.arr,
-                 Longs.toByteArray(amount),
-                 Longs.toByteArray(fee)))
+    Bytes.concat(Array(builder.typeId), Longs.toByteArray(timestamp), sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee)))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Ints.toByteArray(builder.typeId),

@@ -13,29 +13,31 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
-class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
+class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val baseBlockTotalFee: Long, val approvedFeatures: Set[Short])
+    extends ScorexLogging {
+  private[this] final case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
   private[this] val MaxTotalDiffs = 15
 
-  private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
-  private[this] val microBlocks: MList[MicroBlock]                = MList.empty // fresh head
+  private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty
+  private[this] val microBlocks: MList[MicroBlock]             = MList.empty // fresh head
 
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)
 
-  def diffFor(totalResBlockSig: BlockId): (Diff, Long) =
+  def diffFor(totalResBlockSig: BlockId): (Diff, Long, Long) =
     if (totalResBlockSig == base.uniqueId)
-      (baseBlockDiff, baseBlockCarry)
+      (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
     else
       internalCaches.blockDiffCache.get(
         totalResBlockSig, { () =>
           microBlocks.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
-              val (prevDiff, prevCarry)    = this.diffFor(current.prevResBlockSig)
-              val (currDiff, currCarry, _) = this.microDiffs(totalResBlockSig)
-              (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
+              val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.prevResBlockSig)
+              val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(totalResBlockSig)
+              (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
             case None =>
-              (Diff.empty, 0L)
+              (Diff.empty, 0L, 0L)
           }
         }
       )
@@ -63,15 +65,18 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
           block
       }
 
-  def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, DiscardedMicroBlocks)] =
+  def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map {
       case (block, discarded) =>
-        val (diff, carry) = this.diffFor(id)
-        (block, diff, carry, discarded)
+        val (diff, carry, totalFee) = this.diffFor(id)
+        (block, diff, carry, totalFee, discarded)
     }
 
+  def bestLiquidDiffAndFees: (Diff, Long, Long) =
+    microBlocks.headOption.fold((baseBlockDiff, baseBlockCarry, baseBlockTotalFee))(m => diffFor(m.totalResBlockSig))
+
   def bestLiquidDiff: Diff =
-    microBlocks.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
+    bestLiquidDiffAndFees._1
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
@@ -79,19 +84,20 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
-      .find(micro => microDiffs(micro.totalResBlockSig)._3 <= maxTimeStamp)
+      .find(micro => microDiffs(micro.totalResBlockSig).timestamp <= maxTimeStamp)
       .map(_.totalResBlockSig)
       .getOrElse(base.uniqueId)
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
-    microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
+  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): Unit = {
+    microDiffs.put(m.totalResBlockSig, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
     microBlocks.prepend(m)
     internalCaches.invalidate(m.totalResBlockSig)
   }
 
-  def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
+  def carryFee: Long =
+    baseBlockCarry + microDiffs.values.map(_.carryFee).sum
 
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
     internalCaches.forgedBlockCache.get(
@@ -124,7 +130,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
       .newBuilder()
       .maximumSize(MaxTotalDiffs)
       .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, (Diff, Long)]()
+      .build[BlockId, (Diff, Long, Long)]()
 
     val forgedBlockCache = CacheBuilder
       .newBuilder()
