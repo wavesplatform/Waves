@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -26,7 +27,6 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
     })
   }
 
-  // TODO: Validate totalFee in blocks API
   "fee distribution with sponsorship" - {
     val sponsorAssetId = sponsor
       .issue(sponsor.address, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
@@ -59,6 +59,10 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
         case Seq((minerBalance1, blockFee1), (minerBalance2, blockFee2)) =>
           minerBalance2 should be(minerBalance1 + blockFee1 * 6 / 10 + blockFee2 * 4 / 10)
       }
+
+      val block = notMiner.blockAt(height)
+      val realFee = block.transactions.map(tx => Sponsorship.toWaves(tx.fee, Token)).sum
+      blockHeadersSeq(1).totalFee shouldBe realFee
     }
   }
 
