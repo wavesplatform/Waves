@@ -8,6 +8,7 @@ sealed abstract class StdLibVersion(id: Int) extends DirectiveValue(id.toString,
 case object V1 extends StdLibVersion(1)
 case object V2 extends StdLibVersion(2)
 case object V3 extends StdLibVersion(3)
+case object V4 extends StdLibVersion(4)
 
 object StdLibVersion {
     implicit object VersionDic extends DirectiveDictionary[StdLibVersion] {

@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
@@ -85,7 +85,7 @@ object MerkleTreeBenchmark {
       v
     }
 
-    protected override def txGenP(sender: PrivateKeyAccount, ts: Long): Gen[Transaction] =
+    protected override def txGenP(sender: KeyPair, ts: Long): Gen[Transaction] =
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen

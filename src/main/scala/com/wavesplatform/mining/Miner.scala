@@ -2,8 +2,7 @@ package com.wavesplatform.mining
 
 import cats.data.EitherT
 import cats.implicits._
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -131,7 +130,6 @@ class MinerImpl(allChannels: ChannelGroup,
     lazy val balance        = GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, account.toAddress, refBlockID)
 
     metrics.blockBuildTimeStats.measureSuccessful(
-
       for {
         _ <- checkQuorumAvailable()
         validBlockDelay <- pos
@@ -146,10 +144,18 @@ class MinerImpl(allChannels: ChannelGroup,
         mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
         (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(utx.packUnconfirmed(mdConstraint))
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        (txHash, bsHash, effBsHash)        = calculateHashesIfNeeded(blockchainUpdater, unconfirmed)block <- Block
-          .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed,txHash,
-            bsHash,
-            effBsHash, account, blockFeatures(version))
+        (txHash, bsHash, effBsHash)        = calculateHashesIfNeeded(blockchainUpdater, unconfirmed)
+        block <- Block
+          .buildAndSign(version.toByte,
+                        currentTime,
+                        refBlockID,
+                        consensusData,
+                        unconfirmed,
+                        txHash,
+                        bsHash,
+                        effBsHash,
+                        account,
+                        blockFeatures(version))
           .leftMap(_.err)
       } yield (estimators, block, updatedMdConstraint.constraints.head)
     )
