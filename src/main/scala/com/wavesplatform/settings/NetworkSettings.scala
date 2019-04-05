@@ -40,16 +40,17 @@ case class NetworkSettings(file: Option[File],
 
 object NetworkSettings {
   private val MaxNodeNameBytesLength = 127
-  implicit val networkSettingsValueReader: ValueReader[NetworkSettings] =
+
+  implicit val valueReader: ValueReader[NetworkSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
-  implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
-    val x = cfg.getInt(path)
-    if (x.isValidByte) x.toByte
-    else throw new IllegalArgumentException(s"$path has an invalid value: '$x' expected to be a byte")
-  }
+  private[this] def fromConfig(config: Config): NetworkSettings = {
+    implicit val _: ValueReader[Byte] = { (cfg: Config, path: String) =>
+      val x = cfg.getInt(path)
+      if (x.isValidByte) x.toByte
+      else throw new IllegalArgumentException(s"$path has an invalid value: '$x' expected to be a byte")
+    }
 
-  private def fromConfig(config: Config): NetworkSettings = {
     val file        = config.getAs[File]("file")
     val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val nonce       = config.getOrElse("nonce", randomNonce)
