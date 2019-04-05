@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import monix.eval.Coeval
 
 import scala.util.{Either, Try}
 
-case class LeaseTransactionV2 private (sender: PublicKeyAccount, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias, proofs: Proofs)
+case class LeaseTransactionV2 private (sender: PublicKey, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias, proofs: Proofs)
     extends LeaseTransaction
     with FastHashId {
 
@@ -47,7 +47,7 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: PublicKey,
              amount: Long,
              fee: Long,
              timestamp: Long,
@@ -58,30 +58,26 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
     } yield LeaseTransactionV2(sender, amount, fee, timestamp, recipient, proofs)
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: PublicKey,
              amount: Long,
              fee: Long,
              timestamp: Long,
              recipient: AddressOrAlias,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     for {
       unverified <- create(sender, amount, fee, timestamp, recipient, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
     } yield unverified.copy(proofs = proofs)
   }
 
-  def selfSigned(sender: PrivateKeyAccount,
-                 amount: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(sender, amount, fee, timestamp, recipient, sender)
   }
 
   val byteTailDescription: ByteEntity[LeaseTransactionV2] = {
     (
       OptionBytes(tailIndex(1), "Leasing asset", AssetIdBytes(tailIndex(1), "Leasing asset"), "flag (1 - asset, 0 - Waves)"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressOrAliasBytes(tailIndex(3), "Recipient"),
       LongBytes(tailIndex(4), "Amount"),
       LongBytes(tailIndex(5), "Fee"),

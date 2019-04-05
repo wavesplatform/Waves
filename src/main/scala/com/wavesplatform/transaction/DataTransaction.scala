@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import play.api.libs.json._
 
 import scala.util.Try
 
-case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
+case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
@@ -25,7 +25,7 @@ case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEnt
     Coeval.evalOnce {
       Bytes.concat(
         Array(builder.typeId, version),
-        sender.publicKey,
+        sender,
         Shorts.toByteArray(data.size.toShort),
         data.flatMap(_.toBytes).toArray,
         Longs.toByteArray(timestamp),
@@ -63,11 +63,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
       )
   }
 
-  def create(sender: PublicKeyAccount,
-             data: List[DataEntry[_]],
-             feeAmount: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(sender: PublicKey, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
 
     val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
     validateTxContent(tx)
@@ -87,23 +83,23 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     }
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: PublicKey,
              data: List[DataEntry[_]],
              feeAmount: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, data, feeAmount, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[DataTransaction] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      PublicKeyBytes(tailIndex(1), "Sender's public key"),
       ListDataEntryBytes(tailIndex(2)),
       LongBytes(tailIndex(3), "Timestamp"),
       LongBytes(tailIndex(4), "Fee"),

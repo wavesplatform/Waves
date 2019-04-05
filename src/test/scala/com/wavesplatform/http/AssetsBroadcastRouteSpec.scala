@@ -1,12 +1,10 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -21,8 +19,12 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.Coproduct
 
-class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+class AssetsBroadcastRouteSpec
+    extends RouteSpec("/assets/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper {
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
@@ -30,7 +32,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   "returns StateCheckFailed" - {
 
-    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
@@ -60,7 +62,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   "returns appropriate error code when validation fails for" - {
     "issue transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastIssueReq) { ir =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
@@ -68,7 +70,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           posting(ir.copy(fee = q)) should produce(InsufficientFee())
         }
         forAll(nonPositiveLong) { q =>
-          posting(ir.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(ir.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(invalidDecimals) { d =>
           posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation)
@@ -89,13 +91,13 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "reissue transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastReissueReq) { rr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
         // todo: invalid sender
         forAll(nonPositiveLong) { q =>
-          posting(rr.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(rr.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
           posting(rr.copy(fee = fee)) should produce(InsufficientFee())
@@ -104,7 +106,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "burn transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastBurnReq) { br =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
@@ -121,12 +123,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "transfer transaction" in {
-      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
       forAll(broadcastTransferReq) { tr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
+          posting(tr.copy(amount = q)) should produce(NonPositiveAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
         }
         forAll(invalidBase58) { pk =>
           posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)
@@ -161,7 +163,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       .onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture])
       .anyNumberOfTimes()
 
-    val route = AssetsBroadcastApiRoute(settings, alwaysApproveUtx, alwaysSendAllChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, alwaysApproveUtx, alwaysSendAllChannels).route
 
     val seed               = "seed".getBytes()
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -259,7 +261,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
     SignedTransferV1Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
@@ -274,7 +276,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,

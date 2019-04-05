@@ -33,6 +33,8 @@ trait Blockchain {
 
   def parent(block: Block, back: Int = 1): Option[Block]
 
+  def totalFee(height: Int): Option[Long]
+
   /** Features related */
   def approvedFeatures: Map[Short, Int]
   def activatedFeatures: Map[Short, Int]
@@ -90,6 +92,6 @@ trait Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
-  def append(diff: Diff, carryFee: Long, block: Block): Unit
+  def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit
   def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]]
 }

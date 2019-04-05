@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script.v1
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ContentType, Global}
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -18,10 +18,12 @@ object ExprScript {
 
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
-  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
+  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true, checkComplexity: Boolean = true): Either[String, Script] =
     for {
-      scriptComplexity <- ScriptEstimator(varNames(version, ContentType.Expression), functionCosts(version), x)
-      _                <- Either.cond(scriptComplexity <= MaxExprComplexity, (), s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
+      scriptComplexity <- ScriptEstimator(varNames(version, Expression), functionCosts(version), x)
+      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxExprComplexity,
+                       (),
+                       s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
       s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s

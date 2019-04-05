@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, TRUE}
 import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, UserFunction}
@@ -17,7 +17,7 @@ class UtilsSpecification extends FreeSpec with Matchers {
         letDefs = Map.empty,
         functions = Seq(caller, callee).map(f => f.header -> f)(collection.breakOut)
       )
-      estimate(StdLibVersion.V3, ctx).size shouldBe 2
+      estimate(V3, ctx).size shouldBe 2
     }
   }
 }

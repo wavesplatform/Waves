@@ -10,7 +10,7 @@ import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
+import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -23,15 +23,13 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import kamon.metric.MeasurementUnit
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
-    with ScorexLogging
-    with Instrumented {
+    with ScorexLogging {
 
   import com.wavesplatform.state.BlockchainUpdaterImpl._
   import settings.blockchainSettings.functionalitySettings
@@ -174,13 +172,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
                   s"Competitors liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore()}))",
                   block))
             } else
-              measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
+              metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.reference)) match {
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                case Some((referencedForgedBlock, referencedLiquidDiff, carry, discarded)) =>
+                case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                   if (referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
-                      microBlockForkStats.increment()
-                      microBlockForkHeightStats.record(discarded.size)
+                      metrics.microBlockForkStats.increment()
+                      metrics.microBlockForkHeightStats.record(discarded.size)
                     }
 
                     val constraint: MiningConstraint = {
@@ -200,7 +198,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
                       )
 
                     diff.map { hardenedDiff =>
-                      blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
+                      blockchain.append(referencedLiquidDiff, carry, totalFee, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
@@ -212,11 +210,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
               }
         }).map {
           _ map {
-            case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
+            case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint), discarded) =>
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
-              ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
+              ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
               notifyChangedSpendable(prevNgState, ngState)
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
 
@@ -233,7 +231,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
 
     val prevNgState = ngState
-    val r = if (prevNgState.exists(_.contains(blockId))) {
+    val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
       Right(Seq.empty)
     } else {
@@ -246,7 +244,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    r
+    internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, blockchainReady))
+    result
   }
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
@@ -276,15 +275,15 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
       case Some(ng) =>
         ng.lastMicroBlock match {
           case None if ng.base.uniqueId != microBlock.prevResBlockSig =>
-            blockMicroForkStats.increment()
+            metrics.blockMicroForkStats.increment()
             Left(MicroBlockAppendError("It's first micro and it doesn't reference base block(which exists)", microBlock))
           case Some(prevMicro) if prevMicro.totalResBlockSig != microBlock.prevResBlockSig =>
-            microMicroForkStats.increment()
+            metrics.microMicroForkStats.increment()
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
-              r <- {
+              blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
                 BlockDiffer.fromMicroBlock(functionalitySettings,
@@ -296,9 +295,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
                                            verify)
               }
             } yield {
-              val (diff, carry, updatedMdConstraint) = r
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint) = blockDifferResult
               restTotalConstraint = updatedMdConstraint.constraints.head
-              ng.append(microBlock, diff, carry, System.currentTimeMillis)
+              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
 
@@ -423,8 +422,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
 
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = readLock {
     (for {
-      ng               <- ngState
-      (block, _, _, _) <- ng.totalDiffOf(blockId)
+      ng                  <- ngState
+      (block, _, _, _, _) <- ng.totalDiffOf(blockId)
     } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
   }
 
@@ -445,6 +444,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
       case _ =>
         blockchain.parent(block, back)
     }
+  }
+
+  override def totalFee(height: Int): Option[Long] = readLock {
+    if (height == this.height)
+      ngState.map(_.bestLiquidDiffAndFees._3)
+    else
+      blockchain.totalFee(height)
   }
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
@@ -644,8 +650,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     }
   }
 
-  override def append(diff: Diff, carry: Long, block: Block): Unit = readLock {
-    blockchain.append(diff, carry, block)
+  override def append(diff: Diff, carry: Long, totalFee: Long, block: Block): Unit = readLock {
+    blockchain.append(diff, carry, totalFee, block)
   }
 
   override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = readLock {
@@ -675,16 +681,17 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
         blockchain.leaseBalance(address)
     }
   }
+
+  private[this] object metrics {
+    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
+    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
+    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork")
+    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height")
+    val forgeBlockTimeStats       = Kamon.timer("blockchain-updater.forge-block-time")
+  }
 }
 
 object BlockchainUpdaterImpl extends ScorexLogging {
-
-  private val blockMicroForkStats       = Kamon.counter("block-micro-fork")
-  private val microMicroForkStats       = Kamon.counter("micro-micro-fork")
-  private val microBlockForkStats       = Kamon.counter("micro-block-fork")
-  private val microBlockForkHeightStats = Kamon.histogram("micro-block-fork-height")
-  private val forgeBlockTimeStats       = Kamon.histogram("forge-block-time", MeasurementUnit.time.milliseconds)
-
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&

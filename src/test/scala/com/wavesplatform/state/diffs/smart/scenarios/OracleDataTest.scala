@@ -4,9 +4,8 @@ import com.wavesplatform.api.http.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.Global.MaxBase58Bytes
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
@@ -59,7 +58,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser.parseExpr(allFieldsRequiredScript).get.value
         val typedAllFieldsRequiredScript =
-          ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
+          ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)

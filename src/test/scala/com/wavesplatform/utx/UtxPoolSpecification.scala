@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform
 import com.wavesplatform._
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey, Address}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -95,7 +95,7 @@ class UtxPoolSpecification
     bcu
   }
 
-  private def transfer(sender: PrivateKeyAccount, maxAmount: Long, time: Time) =
+  private def transfer(sender: KeyPair, maxAmount: Long, time: Time) =
     (for {
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
@@ -103,14 +103,14 @@ class UtxPoolSpecification
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferTransaction")
 
-  private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
+  private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferWithRecipient")
 
-  private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
+  private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val minFee    = CommonValidation.FeeConstants(TransferTransaction.typeId) + CommonValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
@@ -212,7 +212,7 @@ class UtxPoolSpecification
     (for {
       (sender, senderBalance, bcu) <- stateGen
       addressGen = Gen.listOf(accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
-      recipients <- addressGen
+      recipients <- addressGen.map(_.map(_.publicKey))
       time = new TestTime()
       txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
     } yield {
@@ -272,7 +272,7 @@ class UtxPoolSpecification
 
   private val script: Script = ExprScript(expr).explicitGet()
 
-  private def preconditionsGen(lastBlockId: ByteStr, master: PrivateKeyAccount): Gen[Seq[Block]] =
+  private def preconditionsGen(lastBlockId: ByteStr, master: KeyPair): Gen[Seq[Block]] =
     for {
       version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       ts      <- timestampGen
@@ -281,7 +281,7 @@ class UtxPoolSpecification
       Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
     }
 
-  private def withScriptedAccount(scEnabled: Boolean): Gen[(PrivateKeyAccount, Long, UtxPoolImpl, Long)] =
+  private def withScriptedAccount(scEnabled: Boolean): Gen[(KeyPair, Long, UtxPoolImpl, Long)] =
     for {
       (sender, senderBalance, bcu) <- stateGen
       preconditions                <- preconditionsGen(bcu.lastBlockId.get, sender)
@@ -299,11 +299,11 @@ class UtxPoolSpecification
       (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
     }
 
-  private def transactionV1Gen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
+  private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
     TransferTransactionV1.selfSigned(Waves, sender, recipient, waves(1), ts, Waves, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
-  private def transactionV2Gen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV2] = accountGen.map { recipient =>
+  private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransactionV2] = accountGen.map { recipient =>
     TransferTransactionV2.selfSigned(Waves, sender, recipient, waves(1), ts, Waves, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
@@ -348,18 +348,6 @@ class UtxPoolSpecification
       utx.putIfNew(txs.head) should matchPattern { case Right((false, _)) => }
     }
 
-    "evicts expired transactions when removeAll is called" in forAll(dualTxGen) {
-      case (utx, time, txs1, txs2) =>
-        all(txs1.map(utx.putIfNew)) shouldBe 'right
-        utx.all.size shouldEqual txs1.size
-
-        time.advance(maxAge + 1000.millis)
-        utx.removeAll(Seq.empty)
-
-        all(txs2.map(utx.putIfNew)) shouldBe 'right
-        utx.all.size shouldEqual txs2.size
-    }
-
     "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) {
       case (utx, time, txs, _) =>
         all(txs.map(utx.putIfNew)) shouldBe 'right
@@ -399,7 +387,7 @@ class UtxPoolSpecification
 
     "correctly process constrainst in packUnconfirmed" in {
       withDomain(wavesplatform.history.TransfersV2ActivatedAt0WavesSettings) { d =>
-        val generateBlock: Gen[(PrivateKeyAccount, Block, Seq[Transaction], Seq[Transaction])] =
+        val generateBlock: Gen[(KeyPair, Block, Seq[Transaction], Seq[Transaction])] =
           for {
             richAccount   <- accountGen
             randomAccount <- accountGen

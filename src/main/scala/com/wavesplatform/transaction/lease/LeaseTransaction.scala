@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKeyAccount}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval
@@ -24,8 +24,8 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
       "timestamp" -> timestamp
     ))
 
-  protected final val bytesBase = Coeval.evalOnce(
-    Bytes.concat(sender.publicKey, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
+  protected final val bytesBase =
+    Coeval.evalOnce(Bytes.concat(sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
 }
 
 object LeaseTransaction {
@@ -41,9 +41,9 @@ object LeaseTransaction {
     validateLeaseParams(tx.amount, tx.fee, tx.recipient, tx.sender)
   }
 
-  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKeyAccount): Either[ValidationError, Unit] =
+  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKey): Either[ValidationError, Unit] =
     if (amount <= 0) {
-      Left(ValidationError.NegativeAmount(amount, "waves"))
+      Left(ValidationError.NonPositiveAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError)
     } else if (fee <= 0) {

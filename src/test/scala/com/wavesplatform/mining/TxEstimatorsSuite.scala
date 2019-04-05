@@ -1,10 +1,10 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -64,8 +64,8 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
   private val transferWavesTx = TransferTransactionV1
     .selfSigned(
       assetId = Waves,
-      sender = PrivateKeyAccount("sender".getBytes()),
-      recipient = PrivateKeyAccount("recipient".getBytes()),
+      sender = KeyPair("sender".getBytes()),
+      recipient = KeyPair("recipient".getBytes()),
       amount = 1,
       timestamp = System.currentTimeMillis(),
       feeAssetId = Waves,
@@ -77,8 +77,8 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
   private val transferAssetsTx = TransferTransactionV1
     .selfSigned(
       assetId = IssuedAsset(assetId),
-      sender = PrivateKeyAccount("sender".getBytes()),
-      recipient = PrivateKeyAccount("recipient".getBytes()),
+      sender = KeyPair("sender".getBytes()),
+      recipient = KeyPair("recipient".getBytes()),
       amount = 1,
       timestamp = System.currentTimeMillis(),
       feeAssetId = Waves,
@@ -88,7 +88,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
     .explicitGet()
 
   private val assetDescription = AssetDescription(
-    issuer = PrivateKeyAccount("sender".getBytes()),
+    issuer = KeyPair("sender".getBytes()),
     name = "coin".getBytes(),
     description = "description".getBytes(),
     decimals = 2,

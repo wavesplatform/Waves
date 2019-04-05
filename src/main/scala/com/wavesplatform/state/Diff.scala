@@ -2,15 +2,15 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -50,7 +50,7 @@ object AssetInfo {
   }
 }
 
-case class AssetDescription(issuer: PublicKeyAccount,
+case class AssetDescription(issuer: PublicKey,
                             name: Array[Byte],
                             description: Array[Byte],
                             decimals: Int,
@@ -61,8 +61,8 @@ case class AssetDescription(issuer: PublicKeyAccount,
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
-        o.name.sameElements(name) &&
-        o.description.sameElements(description) &&
+        java.util.Arrays.equals(o.name, name) &&
+        java.util.Arrays.equals(o.description, description) &&
         o.decimals == decimals &&
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
@@ -96,6 +96,15 @@ object Sponsorship {
     }
   }
 
+  def calcWavesFeeAmount(tx: Transaction, getSponsorship: IssuedAsset => Option[Long]): Long = tx.assetFee match {
+    case (asset @ IssuedAsset(_), amountInAsset) =>
+      val sponsorship = getSponsorship(asset).getOrElse(0L)
+      Sponsorship.toWaves(amountInAsset, sponsorship)
+
+    case (Asset.Waves, amountInWaves) =>
+      amountInWaves
+  }
+
   def sponsoredFeesSwitchHeight(blockchain: Blockchain, fs: FunctionalitySettings): Int =
     blockchain
       .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
@@ -103,19 +112,15 @@ object Sponsorship {
       .getOrElse(Int.MaxValue)
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {
-    val waves = (BigDecimal(assetFee) * BigDecimal(CommonValidation.FeeUnit)) / BigDecimal(sponsorship)
-    if (waves > Long.MaxValue) {
-      throw new java.lang.ArithmeticException("Overflow")
-    }
-    waves.toLong
+    if (sponsorship == 0) return Long.MaxValue
+    val waves = BigInt(assetFee) * CommonValidation.FeeUnit / sponsorship
+    waves.bigInteger.longValueExact()
   }
 
   def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
-    val assetFee = (BigDecimal(wavesFee) / BigDecimal(CommonValidation.FeeUnit)) * BigDecimal(sponsorship)
-    if (assetFee > Long.MaxValue) {
-      throw new java.lang.ArithmeticException("Overflow")
-    }
-    assetFee.toLong
+    if (wavesFee == 0 || sponsorship == 0) return 0
+    val assetFee = BigInt(wavesFee) * sponsorship / CommonValidation.FeeUnit
+    assetFee.bigInteger.longValueExact()
   }
 }
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -22,30 +22,18 @@ import scala.util.Try
   * Order to matcher service for asset exchange
   */
 trait Order extends BytesSerializable with JsonSerializable with Proven {
-  def senderPublicKey: PublicKeyAccount
-
-  def matcherPublicKey: PublicKeyAccount
-
+  def senderPublicKey: PublicKey
+  def matcherPublicKey: PublicKey
   def assetPair: AssetPair
-
   def orderType: OrderType
-
   def amount: Long
-
   def price: Long
-
   def timestamp: Long
-
   def expiration: Long
-
   def matcherFee: Long
-
   def proofs: Proofs
-
   def version: Byte
-
-  def signature: Array[Byte] = proofs.proofs(0).arr
-
+  def signature: Array[Byte]   = proofs.toSignature
   def matcherFeeAssetId: Asset = Waves
 
   import Order._
@@ -125,8 +113,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
       "version"          -> version,
       "id"               -> idStr(),
       "sender"           -> senderPublicKey.address,
-      "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
-      "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
+      "senderPublicKey"  -> Base58.encode(senderPublicKey),
+      "matcherPublicKey" -> Base58.encode(matcherPublicKey),
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
       "amount"           -> amount,
@@ -176,8 +164,8 @@ object Order {
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
 
-  def apply(senderPublicKey: PublicKeyAccount,
-            matcherPublicKey: PublicKeyAccount,
+  def apply(senderPublicKey: PublicKey,
+            matcherPublicKey: PublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -191,8 +179,8 @@ object Order {
     case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
   }
 
-  def apply(senderPublicKey: PublicKeyAccount,
-            matcherPublicKey: PublicKeyAccount,
+  def apply(senderPublicKey: PublicKey,
+            matcherPublicKey: PublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -214,8 +202,8 @@ object Order {
 
   def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
-  def buy(sender: PrivateKeyAccount,
-          matcher: PublicKeyAccount,
+  def buy(sender: KeyPair,
+          matcher: PublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -232,8 +220,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def sell(sender: PrivateKeyAccount,
-           matcher: PublicKeyAccount,
+  def sell(sender: KeyPair,
+           matcher: PublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -250,8 +238,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def apply(sender: PrivateKeyAccount,
-            matcher: PublicKeyAccount,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -264,8 +252,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def apply(sender: PrivateKeyAccount,
-            matcher: PublicKeyAccount,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -279,8 +267,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
-    require(unsigned.senderPublicKey == sender)
+  def sign(unsigned: Order, sender: KeyPair): Order = {
+    require(unsigned.senderPublicKey == sender.publicKey)
     val sig = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }

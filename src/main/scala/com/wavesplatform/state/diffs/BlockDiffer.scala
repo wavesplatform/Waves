@@ -3,28 +3,29 @@ package com.wavesplatform.state.diffs
 import cats.Monoid
 import cats.implicits._
 import cats.syntax.either.catsSyntaxEitherId
+import com.wavesplatform.account.Address
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.account.Address
-import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.transaction.ValidationError.ActivationError
 import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.utils.ScorexLogging
 
-object BlockDiffer extends ScorexLogging with Instrumented {
+object BlockDiffer extends ScorexLogging {
+  final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
+  type GenResult = Result[MiningConstraint]
 
   def fromBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                 blockchain: Blockchain,
                                                 maybePrevBlock: Option[Block],
                                                 block: Block,
                                                 constraint: Constraint,
-                                                verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                verify: Boolean = true): Either[ValidationError, Result[Constraint]] = {
     val stateHeight = blockchain.height
 
     // height switch is next after activation
@@ -68,7 +69,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                      micro: MicroBlock,
                                                      timestamp: Long,
                                                      constraint: Constraint,
-                                                     verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                     verify: Boolean = true): Either[ValidationError, Result[Constraint]] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
@@ -99,7 +100,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                     timestamp: Long,
                                                     txs: Seq[Transaction],
                                                     currentBlockHeight: Int,
-                                                    verify: Boolean): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                    verify: Boolean): Either[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction): Constraint =
       constraint.put(blockchain, tx).asInstanceOf[Constraint]
 
@@ -129,9 +130,9 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     }
 
     txs
-      .foldLeft((initDiff, 0L, initConstraint).asRight[ValidationError]) {
+      .foldLeft(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError]) {
         case (r @ Left(_), _) => r
-        case (Right((currDiff, carryFee, currConstraint)), tx) =>
+        case (Right(Result(currDiff, carryFee, currTotalFee, currConstraint)), tx) =>
           val updatedBlockchain = composite(blockchain, currDiff)
           val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
           if (updatedConstraint.isOverfilled)
@@ -139,19 +140,24 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           else
             txDiffer(updatedBlockchain, tx).map { newDiff =>
               val updatedDiff = currDiff.combine(newDiff)
+
+              val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
+              val totalWavesFee                = currTotalFee + curBlockFees.balance + nextBlockFee
+
               if (hasNg) {
-                val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
-                val diff                         = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
-                (diff, carryFee + nextBlockFee, updatedConstraint)
-              } else (updatedDiff, 0L, updatedConstraint)
+                val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
+                Result(diff, carryFee + nextBlockFee, totalWavesFee, updatedConstraint)
+              } else {
+                Result(updatedDiff, 0L, totalWavesFee, updatedConstraint)
+              }
             }
       }
       .map {
-        case (d, carry, constraint) =>
+        case Result(diff, carry, totalFee, constraint) =>
           val diffWithCancelledLeases =
             if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-              Monoid.combine(d, CancelAllLeases(composite(blockchain, d)))
-            else d
+              Monoid.combine(diff, CancelAllLeases(composite(blockchain, diff)))
+            else diff
 
           val diffWithLeasePatches =
             if (currentBlockHeight == settings.blockVersion3AfterHeight)
@@ -163,7 +169,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
               Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
             else diffWithLeasePatches
 
-          (diffWithCancelledLeaseIns, carry, constraint)
+          Result(diffWithCancelledLeaseIns, carry, totalFee, constraint)
       }
   }
 }

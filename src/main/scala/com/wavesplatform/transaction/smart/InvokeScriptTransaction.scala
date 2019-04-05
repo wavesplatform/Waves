@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.ValidationError.{GenericError, NonPositiveAmount}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -22,8 +22,8 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
-                                            sender: PublicKeyAccount,
-                                            contractAddress: Address,
+                                            sender: PublicKey,
+                                            dappAddress: Address,
                                             fc: Terms.FUNCTION_CALL,
                                             payment: Seq[Payment],
                                             fee: Long,
@@ -43,8 +43,8 @@ case class InvokeScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       Bytes.concat(
         Array(builder.typeId, version, chainId),
-        sender.publicKey,
-        contractAddress.bytes.arr,
+        sender,
+        dappAddress.bytes.arr,
         Serde.serialize(fc),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
         Longs.toByteArray(fee),
@@ -58,10 +58,10 @@ case class InvokeScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       jsonBase()
         ++ Json.obj(
-          "version"         -> version,
-          "contractAddress" -> contractAddress.bytes,
-          "call"            -> InvokeScriptTransaction.functionCallToJson(fc),
-          "payment"         -> payment
+          "version"     -> version,
+          "dappAddress" -> dappAddress.bytes,
+          "call"        -> InvokeScriptTransaction.functionCallToJson(fc),
+          "payment"     -> payment
         )
     )
 
@@ -108,18 +108,18 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         .flatMap(_ =>
           Either.cond(tx.payment.forall(_.amount > 0),
                       (),
-                      ValidationError.NegativeAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
+                      ValidationError.NonPositiveAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
         .flatMap(_ =>
           Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                       (),
-                      GenericError("all arguments of contractInvocation must be EVALUATED")))
+                      GenericError("all arguments of invokeScript must be EVALUATED")))
         .map(_ => tx)
         .foldToTry
     }
   }
 
-  def create(sender: PublicKeyAccount,
-             contractAddress: Address,
+  def create(sender: PublicKey,
+             dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
@@ -131,7 +131,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       _ <- Either.cond(
         fc.args.size <= ContractLimits.MaxInvokeScriptArgs,
         (),
-        ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
+        ValidationError.GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
       )
       _ <- Either.cond(
         fc.function match {
@@ -141,46 +141,58 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         (),
         ValidationError.GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes} bytes")
       )
-      _ <- Either.cond(p.forall(_.amount > 0), (), ValidationError.NegativeAmount(0, p.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString)))
+      _ <- checkAmounts(p)
       _ <- Either.cond(p.length <= 1, (), ValidationError.GenericError("Multiple payment isn't allowed now"))
-      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), ValidationError.GenericError("dublicate payments"))
+      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), ValidationError.GenericError("duplicate payments"))
 
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
-                       GenericError("all arguments of contractInvocation must be EVALUATED"))
-      tx   = new InvokeScriptTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
+                       GenericError("all arguments of invokeScript must be EVALUATED"))
+      tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
       _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), ValidationError.TooBigArray)
     } yield tx
   }
 
-  def signed(sender: PublicKeyAccount,
-             contractAddress: Address,
+  private def checkAmounts(payments: Seq[Payment]): Either[NonPositiveAmount, Unit] =
+    payments
+      .find(_.amount <= 0)
+      .fold(().asRight[NonPositiveAmount])(
+        p =>
+          ValidationError
+            .NonPositiveAmount(
+              p.amount,
+              p.assetId.fold("Waves")(_.toString)
+            )
+            .asLeft[Unit])
+
+  def signed(sender: PublicKey,
+             dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
-    }
-  }
+             signer: PrivateKey): Either[ValidationError, TransactionT] =
+    for {
+      tx     <- create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty)
+      proofs <- Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes()))))
+    } yield tx.copy(proofs = proofs)
 
-  def selfSigned(sender: PrivateKeyAccount,
-                 contractAddress: Address,
+  def selfSigned(sender: KeyPair,
+                 dappAddress: Address,
                  fc: Terms.FUNCTION_CALL,
                  p: Seq[Payment],
                  fee: Long,
                  feeAssetId: Asset,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, sender)
+    signed(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
       FunctionCallBytes(tailIndex(4), "Function call"),
       SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),

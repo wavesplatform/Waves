@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.block
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.SignerData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -20,7 +20,7 @@ object PBBlocks {
                minerBalancesTreeHash: Digest32,
                minerEffectiveBalancesTreeHash: Digest32,
                featureVotes: Set[Short],
-               generator: PublicKeyAccount,
+               generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
       VanillaBlock(
         timestamp,
@@ -56,7 +56,7 @@ object PBBlocks {
         Digest32 @@ header.minerBalancesTreeHash.toByteArray,
         Digest32 @@ header.minerEffectiveBalancesTreeHash.toByteArray,
         header.featureVotes.map(intToShort).toSet,
-        PublicKeyAccount(header.generator.toByteArray),
+        PublicKey(header.generator.toByteArray),
         ByteStr(signedHeader.signature.toByteArray)
       )
     } yield result
@@ -78,7 +78,7 @@ object PBBlocks {
             featureVotes.map(shortToInt).toSeq,
             timestamp,
             version,
-            ByteString.copyFrom(generator.publicKey),
+            ByteString.copyFrom(generator),
             ByteString.copyFrom(transactionTreeHash),
             ByteString.copyFrom(minerWavesBalancesTreeHash),
             ByteString.copyFrom(minerEffectiveBalancesTreeHash)

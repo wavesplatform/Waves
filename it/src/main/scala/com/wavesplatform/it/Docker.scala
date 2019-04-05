@@ -228,7 +228,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         val maxCacheSize = Option(System.getenv("MAX_CACHE_SIZE")).fold("")(x => s"-Dwaves.max-cache-size=$x ")
         val kafkaServer = Option(System.getenv("KAFKA_SERVER")).fold("") { x =>
           val prefix = "-Dwaves.matcher.events-queue"
-          val topic  = s"dex-$networkSeed-${System.currentTimeMillis() / 1000 / 60}"
+          val topic  = s"dex-$networkSeed-$hashCode"
           s"$prefix.type=kafka $prefix.kafka.topic=$topic -Dakka.kafka.consumer.kafka-clients.bootstrap.servers=$x "
         }
 

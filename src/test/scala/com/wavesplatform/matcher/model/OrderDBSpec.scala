@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.matcher.{MatcherTestData, OrderDB}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.{NoShrink, WithDB}
@@ -17,7 +17,7 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
       status       <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
     } yield o -> o.toInfo(status)
 
-  private def finalizedOrderSeqGen(orderCount: Int): Gen[(PrivateKeyAccount, AssetPair, Seq[(Order, OrderInfo[OrderStatus.Final])])] =
+  private def finalizedOrderSeqGen(orderCount: Int): Gen[(KeyPair, AssetPair, Seq[(Order, OrderInfo[OrderStatus.Final])])] =
     for {
       sender    <- accountGen
       pair      <- distinctPairGen

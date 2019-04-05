@@ -20,7 +20,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     def defaultChecks: Assertion = {
       left.bytes() shouldEqual right.bytes()
       left.idStr() shouldBe right.idStr()
-      left.senderPublicKey.publicKey shouldBe right.senderPublicKey.publicKey
+      left.senderPublicKey shouldBe right.senderPublicKey
       left.matcherPublicKey shouldBe right.matcherPublicKey
       left.assetPair shouldBe right.assetPair
       left.orderType shouldBe right.orderType

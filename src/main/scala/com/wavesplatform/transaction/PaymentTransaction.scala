@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -15,7 +15,7 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
+case class PaymentTransaction private (sender: PublicKey, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction {
 
   override val builder: TransactionParser = PaymentTransaction
@@ -24,17 +24,12 @@ case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Addr
   override val json: Coeval[JsObject]     = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(Array(builder.typeId),
-                 Longs.toByteArray(timestamp),
-                 sender.publicKey,
-                 recipient.bytes.arr,
-                 Longs.toByteArray(amount),
-                 Longs.toByteArray(fee)))
+    Bytes.concat(Array(builder.typeId), Longs.toByteArray(timestamp), sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee)))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Ints.toByteArray(builder.typeId),
                  Longs.toByteArray(timestamp),
-                 sender.publicKey,
+                 sender,
                  recipient.bytes.arr,
                  Longs.toByteArray(amount),
                  Longs.toByteArray(fee)))
@@ -54,20 +49,20 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   private val FeeLength    = 8
   private val BaseLength   = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
-  def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: PublicKey,
              recipient: Address,
              amount: Long,
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] = {
     if (amount <= 0) {
-      Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NonPositiveAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
@@ -85,7 +80,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
       byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
         (
           if (tx.amount <= 0) {
-            Left(ValidationError.NegativeAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
+            Left(ValidationError.NonPositiveAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
           } else if (tx.fee <= 0) {
             Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
           } else if (Try(Math.addExact(tx.amount, tx.fee)).isFailure) {
@@ -101,7 +96,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   val byteTailDescription: ByteEntity[PaymentTransaction] = {
     (
       LongBytes(tailIndex(1), "Timestamp"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Recipient's address"),
       LongBytes(tailIndex(4), "Amount"),
       LongBytes(tailIndex(5), "Fee"),

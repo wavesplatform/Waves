@@ -4,8 +4,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract._
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
@@ -22,7 +23,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   val CTX: CTX =
-    Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global)))
+    Monoid.combineAll(Seq(PureContext.build(V3), CryptoContext.build(Global)))
 
   val decompilerContext = CTX.decompilerContext
 
@@ -210,7 +211,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("Invoke contract with verifier decompilation") {
-    val contract = Contract(
+    val contract = DApp(
       List(FUNC("foo", List(), FALSE), FUNC("bar", List(), IF(FUNCTION_CALL(User("foo"), List()), TRUE, FALSE))),
       List(
         CallableFunction(
@@ -248,7 +249,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )),
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    Decompiler(contract: Contract, decompilerContext) shouldEq
+    Decompiler(contract: DApp, decompilerContext) shouldEq
       """|func foo () = false
          |
          |
@@ -272,7 +273,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("Invoke contract decompilation") {
-    val contract = Contract(
+    val contract = DApp(
       List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(

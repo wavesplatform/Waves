@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
@@ -48,7 +48,7 @@ class IssueTransactionV1Specification extends PropSpec with PropertyChecks with 
 
     val tx = IssueTransactionV1
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes,
         "Gigacoin".getBytes,
         10000000000L,

@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, PublicKey, Address}
 import com.wavesplatform.block.fields.FeaturesBlockField
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -110,7 +110,7 @@ object BlockHeader extends ScorexLogging {
           timestamp,
           version,
           reference,
-          SignerData(PublicKeyAccount(genPK), signature),
+          SignerData(PublicKey(genPK), signature),
           consData,
           txCount,
           Merkle.EMPTY_ROOT_HASH,
@@ -209,7 +209,7 @@ case class Block private[block] (override val timestamp: Long,
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-    import signerData.generator.publicKey
+    val publicKey = signerData.generator
     !crypto.isWeakPublicKey(publicKey) && crypto.verify(signerData.signature.arr, bytesWithoutSignature(), publicKey)
   }
 
@@ -317,7 +317,7 @@ object Block extends ScorexLogging {
     (for {
       _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
       _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
-      _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
+      _ <- Either.cond(signerData.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
     } yield
@@ -344,7 +344,7 @@ object Block extends ScorexLogging {
                    transactionTreeHash: Digest32,
                    minerBalancesTreeHash: Digest32,
                    minerEffectiveBalancesTreeHash: Digest32,
-                   signer: PrivateKeyAccount,
+                   signer: KeyPair,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
     build(
       version,
@@ -368,8 +368,7 @@ object Block extends ScorexLogging {
   }
 
   def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
-
-    val genesisSigner = PrivateKeyAccount(Array.empty)
+    val genesisSigner = KeyPair(ByteStr.empty)
 
     val transactionGenesisData      = genesisTransactions(genesisSettings)
     val transactionGenesisDataField = TransactionsBlockFieldVersion1or2(transactionGenesisData)
@@ -388,7 +387,7 @@ object Block extends ScorexLogging {
       reference ++
       cBytes ++
       txBytes ++
-      genesisSigner.publicKey
+      genesisSigner.publicKey.arr
 
     val signature = genesisSettings.signature.fold(crypto.sign(genesisSigner, toSign))(_.arr)
 

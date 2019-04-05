@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -41,14 +41,14 @@ package object history {
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings,
                                                           featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
-  val defaultSigner       = PrivateKeyAccount(Array.fill(KeyLength)(0))
+  val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, 0L)
 
   def customBuildBlockOfTxs(refTo: ByteStr,
                             txs: Seq[Transaction],
-                            signer: PrivateKeyAccount,
+                            signer: KeyPair,
                             version: Byte,
                             timestamp: Long,
                             bTarget: Long = DefaultBaseTarget): Block =
@@ -70,7 +70,7 @@ package object history {
   def customBuildMicroBlockOfTxs(totalRefTo: ByteStr,
                                  prevTotal: Block,
                                  txs: Seq[Transaction],
-                                 signer: PrivateKeyAccount,
+                                 signer: KeyPair,
                                  version: Byte,
                                  ts: Long): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
@@ -85,7 +85,7 @@ package object history {
     (newTotalBlock, nonSigned)
   }
 
-  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: PrivateKeyAccount): (Block, MicroBlock) = {
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val nonSigned = MicroBlock
       .buildAndSign(
@@ -117,7 +117,7 @@ package object history {
   def chainBaseAndMicro(totalRefTo: ByteStr,
                         base: Seq[Transaction],
                         micros: Seq[Seq[Transaction]],
-                        signer: PrivateKeyAccount,
+                        signer: KeyPair,
                         version: Byte,
                         timestamp: Long): (Block, Seq[MicroBlock]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)

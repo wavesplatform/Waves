@@ -8,7 +8,7 @@ import akka.persistence.serialization.Snapshot
 import akka.serialization.SerializationExtension
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import com.wavesplatform.NTPTime
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData, SaveSnapshot}
@@ -39,7 +39,7 @@ class MatcherActorSpecification
   private val blockchain: Blockchain = stub[Blockchain]
   (blockchain.assetDescription _)
     .when(*)
-    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
+    .returns(Some(AssetDescription(KeyPair(ByteStr.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
     .anyNumberOfTimes()
 
   "MatcherActor" should {

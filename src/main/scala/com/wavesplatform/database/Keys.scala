@@ -154,7 +154,15 @@ object Keys {
       writeTransactionHN
     )
 
-  val MinerBalancesInfoAtHeightPrefix: Short = 54
+  val BlockTransactionsFeePrefix: Short = 55
+  def blockTransactionsFee(height: Int): Key[Long] =
+    Key(
+      "block-transactions-fee",
+      h(BlockTransactionsFeePrefix, height),
+      Longs.fromByteArray,
+      Longs.toByteArray
+    )
+  val MinerBalancesInfoAtHeightPrefix: Short = 56
   def minerBalancesInfoAtHeight(height: Height): Key[Map[AddressId, MinerBalanceInfo]] =
     Key(
       "miner-balances-info-at-height",

@@ -1,12 +1,12 @@
 package com.wavesplatform.generator
 
 import cats.Show
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.generator.WideTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.transaction.Transaction
 
-class WideTransactionGenerator(settings: Settings, accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
+class WideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]) extends TransactionGenerator {
   require(accounts.nonEmpty)
 
   private val limitedRecipientGen = Gen.address(settings.limitDestAccounts)

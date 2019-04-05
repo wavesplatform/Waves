@@ -9,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
@@ -43,7 +43,7 @@ class Matcher(actorSystem: ActorSystem,
               blockchain: Blockchain,
               spendableBalanceChanged: Observable[(Address, Asset)],
               settings: WavesSettings,
-              matcherPrivateKey: PrivateKeyAccount)
+              matcherPrivateKey: KeyPair)
     extends ScorexLogging {
 
   import settings._
@@ -114,14 +114,15 @@ class Matcher(actorSystem: ActorSystem,
   private def validateOrder(o: Order) = {
     import com.wavesplatform.matcher.error._
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings.orderFee)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(matcherSettings.orderFee, matcherSettings.deviation, getMarketStatus(o.assetPair))(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
                                           matcherPublicKey.toAddress,
                                           time,
-                                          matcherSettings.orderFee)(o)
+                                          matcherSettings.orderFee,
+                                          matcherSettings.orderAmountRestrictions)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
   }
@@ -134,7 +135,7 @@ class Matcher(actorSystem: ActorSystem,
       addressActors,
       matcherQueue.storeEvent,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
-      getMarketStatus,
+      p => Option(marketStatuses.get(p)),
       validateOrder,
       orderBooksSnapshotCache,
       settings,
@@ -142,6 +143,7 @@ class Matcher(actorSystem: ActorSystem,
       db,
       time,
       () => currentOffset,
+      () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )
@@ -205,7 +207,7 @@ class Matcher(actorSystem: ActorSystem,
     )
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-  private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
+  private lazy val matcherPublicKey     = matcherPrivateKey
 
   private lazy val db = openDB(matcherSettings.dataDir)
 

@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto._
@@ -175,14 +175,14 @@ object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
     Try(
       MicroBlockInv(
-        sender = PublicKeyAccount.apply(bytes.take(KeyLength)),
+        sender = PublicKey.apply(bytes.take(KeyLength)),
         totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
         prevBlockSig = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
         signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)
       ))
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {
-    inv.sender.publicKey ++ inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ inv.signature.arr
+    inv.sender ++ inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ inv.signature.arr
   }
 
   override val maxLength: Int = 300

@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
@@ -111,10 +111,10 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
         val block1 = customBuildBlockOfTxs(microBlocks.last.totalResBlockSig,
                                            Seq.empty,
-                                           PrivateKeyAccount(Array.fill(KeyLength)(1)),
+                                           KeyPair(Array.fill(KeyLength)(1: Byte)),
                                            3: Byte,
                                            sponsor.timestamp + 1)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, PrivateKeyAccount(Array.fill(KeyLength)(1)), 3: Byte, sponsor.timestamp + 1)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
         val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
         val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))
 
@@ -126,7 +126,35 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         domain.blockchainUpdater.processBlock(block2).explicitGet()
         domain.blockchainUpdater.processBlock(block3).explicitGet()
         domain.blockchainUpdater.processBlock(block4) should produce("negative waves balance" /*"unavailable funds"*/ )
+    }
+  }
 
+  property("calculates valid total fee for microblocks") {
+    scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {
+      case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
+        val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(masterToAlice, feeAsset, sponsor), Seq(aliceToBob, bobToMaster)))
+
+        val block0TotalFee = block0.transactionData
+          .filter(_.assetFee._1 == Waves)
+          .map(_.assetFee._2)
+          .sum
+
+        {
+          domain.blockchainUpdater.processBlock(block0) shouldBe 'right
+          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee)
+        }
+
+        {
+          domain.blockchainUpdater.processMicroBlock(microBlocks(0)) shouldBe 'right
+          domain.blockchainUpdater.processMicroBlock(microBlocks(1)) shouldBe 'right
+
+          val microBlocksWavesFee = microBlocks
+            .flatMap(_.transactionData)
+            .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
+            .sum
+
+          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee + microBlocksWavesFee)
+        }
     }
   }
 

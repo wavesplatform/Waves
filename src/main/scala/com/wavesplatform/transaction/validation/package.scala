@@ -31,7 +31,7 @@ package object validation {
       .condNel(
         amount > 0,
         amount,
-        ValidationError.NegativeAmount(amount, of)
+        ValidationError.NonPositiveAmount(amount, of)
       )
   }
 

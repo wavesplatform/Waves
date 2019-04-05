@@ -1,7 +1,7 @@
 package com.wavesplatform.block
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
@@ -9,6 +9,8 @@ import com.wavesplatform.transaction.Transaction
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.hash.Digest32
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 
 abstract class BlockField[T] extends BytesSerializable with JsonSerializable {
   val name: String
@@ -52,10 +54,10 @@ case class TransactionBlockField(override val name: String, override val value: 
   protected override def b = value.bytes()
 }
 
-case class SignerData(generator: PublicKeyAccount, signature: ByteStr)
+case class SignerData(generator: PublicKey, signature: ByteStr)
 
 case class SignerDataBlockField(override val name: String, override val value: SignerData) extends BlockField[SignerData] {
-  protected override def j = Json.obj("generator" -> value.generator.toString, "signature" -> value.signature.base58)
+  protected override def j = Json.obj("generator" -> PublicKey.toString(value.generator), "signature" -> value.signature.base58)
 
-  protected override def b = value.generator.publicKey ++ value.signature.arr
+  protected override def b = value.generator.arr ++ value.signature.arr
 }

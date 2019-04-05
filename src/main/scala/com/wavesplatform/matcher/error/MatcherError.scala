@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.error
 
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.matcher.error.MatcherError._
-import com.wavesplatform.settings.DeviationsSettings
+import com.wavesplatform.settings.{DeviationsSettings, OrderAmountSettings}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
@@ -51,12 +51,12 @@ object MatcherError {
 
   case object CancelRequestIsIncomplete extends MatcherError(request, commonEntity, unexpected, e"Either timestamp or orderId must be specified")
 
-  case class UnexpectedMatcherPublicKey(required: PublicKeyAccount, given: PublicKeyAccount)
+  case class UnexpectedMatcherPublicKey(required: PublicKey, given: PublicKey)
       extends MatcherError(
         order,
         pubKey,
         unexpected,
-        e"The required matcher public key for this DEX is ${'required -> Base58.encode(required.publicKey)}, but given ${'given -> Base58.encode(given.publicKey)}"
+        e"The required matcher public key for this DEX is ${'required -> Base58.encode(required)}, but given ${'given -> Base58.encode(given)}"
       )
   case class UnexpectedSender(required: Address, given: Address)
       extends MatcherError(order, pubKey, unexpected, e"The sender ${'given -> given} does not match expected ${'required -> required}")
@@ -201,6 +201,32 @@ object MatcherError {
         fee,
         outOfBound,
         e"The order's matcher fee ${'matcherFee -> ord.matcherFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxPriceFee}%, in relation to the best-bid/ask)"
+      )
+
+  case class AssetPairIsNotAllowed(orderAssetPair: AssetPair)
+      extends MatcherError(
+        order,
+        assetPair,
+        denied,
+        e"Trading is not allowed for the pair: ${'amountAssetId -> orderAssetPair.amountAsset} - ${'priceAssetId -> orderAssetPair.priceAsset}"
+      )
+
+  case object OrderV3IsNotAllowed
+      extends MatcherError(
+        order,
+        commonEntity,
+        denied,
+        e"The orders of version 3 are not allowed by matcher"
+      )
+
+  case class OrderInvalidAmount(ord: Order, amtSettings: OrderAmountSettings)
+      extends MatcherError(
+        order,
+        amount,
+        denied,
+        e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> ord.amount}) does not meet matcher requirements: max amount = ${'maxAmount -> BigDecimal
+          .valueOf(amtSettings.maxAmount)}, min amount = ${'minAmount -> BigDecimal
+          .valueOf(amtSettings.minAmount)}, step size = ${'stepSize   -> BigDecimal.valueOf(amtSettings.stepSize)}"
       )
 
   sealed abstract class Entity(val code: Int)

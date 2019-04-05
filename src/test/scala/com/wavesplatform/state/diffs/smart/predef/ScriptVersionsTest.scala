@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.{ContentType, Testing}
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.Testing
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.parser.Parser
@@ -25,10 +25,10 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
                            blockchain: Blockchain = EmptyBlockchain): Either[String, EVALUATED] = {
     val Success(expr, _) = Parser.parseExpr(script)
     for {
-      compileResult <- ExpressionCompiler(compilerContext(version, ContentType.Expression, isAssetScript = false), expr)
+      compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       s <- ExprScript(version, typedExpr, checkSize = false)
-      r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isTokenScript = false, null)._2
+      r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isAssetScript = false, null)._2
     } yield r
 
   }

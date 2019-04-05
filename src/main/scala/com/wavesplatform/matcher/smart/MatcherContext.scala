@@ -4,9 +4,8 @@ import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj}
-import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, UNIT}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{ordType, orderObject}
@@ -14,7 +13,9 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.OrdType
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.lang.{Global, StdLibVersion}
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.RealTransactionWrapper
 import monix.eval.Coeval
@@ -32,12 +33,12 @@ object MatcherContext {
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Left("height is inaccessible when running script on matcher"))
 
-    val orderType: CaseType = buildOrderType(proofsEnabled)
-    val matcherTypes        = Seq(addressType, orderType, assetPairType)
+    val orderType: CASETYPEREF = buildOrderType(proofsEnabled)
+    val matcherTypes           = Seq(addressType, orderType, assetPairType)
 
     val txMap: Map[String, ((FINAL, String), LazyVal)] =
       if (version == V1 || version == V2)
-        Map(("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval)))))
+        Map(("tx", ((orderType, "Processing order"), LazyVal(EitherT(inputEntityCoeval)))))
       else Map.empty
 
     val commonMatcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
@@ -56,7 +57,7 @@ object MatcherContext {
       val msg = s"Function $name is inaccessible when running script on matcher"
       NativeFunction(
         name,
-        StdLibVersion.SupportedVersions.map(_ -> 1L).toMap,
+        DirectiveDictionary[StdLibVersion].all.map(_ -> 1L).toMap,
         FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
         _ => msg.asLeft,
         msg,

@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,16 +14,16 @@ trait BlockGen extends TransactionGen { _: Suite =>
 
   import BlockGen._
 
-  val blockParamGen: Gen[(Seq[ProvenTransaction], PrivateKeyAccount)] = for {
+  val blockParamGen: Gen[(Seq[ProvenTransaction], KeyPair)] = for {
     count        <- Gen.choose(minTransactionsInBlockCount, maxTransactionsInBlockCount)
     transactions <- randomTransactionsGen(count)
     signer       <- accountGen
   } yield (transactions, signer)
 
-  def versionedBlockGen(txs: Seq[Transaction], signer: PrivateKeyAccount, version: Byte): Gen[Block] =
+  def versionedBlockGen(txs: Seq[Transaction], signer: KeyPair, version: Byte): Gen[Block] =
     byteArrayGen(Block.BlockIdLength).flatMap(ref => versionedBlockGen(ByteStr(ref), txs, signer, version))
 
-  def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: PrivateKeyAccount, version: Byte): Gen[Block] =
+  def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: KeyPair, version: Byte): Gen[Block] =
     for {
       baseTarget          <- Gen.posNum[Long]
       generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
@@ -44,7 +44,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
         )
         .explicitGet()
 
-  def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = versionedBlockGen(txs, signer, 1)
+  def blockGen(txs: Seq[Transaction], signer: KeyPair): Gen[Block] = versionedBlockGen(txs, signer, 1)
 
   val randomSignerBlockGen: Gen[Block] = for {
     (transactions, signer) <- blockParamGen
@@ -78,5 +78,5 @@ trait BlockGen extends TransactionGen { _: Suite =>
 object BlockGen {
   val minTransactionsInBlockCount                   = 1
   val maxTransactionsInBlockCount                   = 100
-  val predefinedSignerPrivateKey: PrivateKeyAccount = PrivateKeyAccount((1 to 10).map(_.toByte).toArray)
+  val predefinedSignerPrivateKey: KeyPair = KeyPair((1 to 10).map(_.toByte).toArray)
 }
