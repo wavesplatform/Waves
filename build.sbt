@@ -58,7 +58,8 @@ inThisBuild(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-Ypartial-unification",
-      "-opt:l:inline"
+      "-opt:l:inline",
+      "-opt-inline-from:**"
     )
   ))
 
