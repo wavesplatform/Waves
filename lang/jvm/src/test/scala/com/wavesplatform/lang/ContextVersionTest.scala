@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.directives.{values => StdLibVersion}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import org.scalatest.{FreeSpec, Matchers}
 
