@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import cats.implicits._
 import com.google.common.base.Throwables
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
@@ -39,44 +40,44 @@ object Verifier extends ScorexLogging {
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_, Some(script)) =>
             stats.accountScriptExecution
-              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, isTokenScript = false))
+              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, None))
           case _ =>
             stats.signatureVerification
               .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
         }
-    }).flatMap(
-      tx =>
-        tx.checkedAssets()
-          .flatMap {
-            case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script)
-            case _                  => None
-          }
-          .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
-            txr.right.flatMap(tx =>
-              stats.assetScriptExecution
-                .measureForType(tx.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, tx, isTokenScript = true)))
-        })
+    }).flatMap { tx =>
+      tx.checkedAssets()
+        .flatMap {
+          case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
+          case _                  => None
+        }
+        .foldRight(Either.right[ValidationError, Transaction](tx)) { (assetInfo, txr) =>
+          txr.right.flatMap(tx =>
+            stats.assetScriptExecution
+              .measureForType(tx.builder.typeId)(verifyTx(blockchain, assetInfo._1, currentBlockHeight, tx, Some(assetInfo._2.id))))
+        }
+    }
 
-  def verifyTx(blockchain: Blockchain, script: Script, height: Int, transaction: Transaction, isTokenScript: Boolean): ValidationResult[Transaction] =
+  def verifyTx(blockchain: Blockchain,
+               script: Script,
+               height: Int,
+               transaction: Transaction,
+               assetIdOpt: Option[ByteStr]): ValidationResult[Transaction] =
     Try {
+      val containerAddress = if (assetIdOpt.nonEmpty) assetIdOpt.get else transaction.asInstanceOf[Authorized].sender.toAddress.bytes
       logged(
         s"transaction ${transaction.id()}",
-        ScriptRunner(height,
-                     Coproduct[ScriptRunner.TxOrd](transaction),
-                     blockchain,
-                     script,
-                     isTokenScript,
-                     transaction.asInstanceOf[Authorized].sender.toAddress)
+        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, assetIdOpt.nonEmpty, containerAddress)
       ) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, assetIdOpt.nonEmpty))
         case (log, Right(FALSE)) =>
-          Left(TransactionNotAllowedByScript(log, isTokenScript))
+          Left(TransactionNotAllowedByScript(log, assetIdOpt.nonEmpty))
         case (_, Right(TRUE)) => Right(transaction)
         case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isTokenScript))
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, assetIdOpt.nonEmpty))
       case Success(s) => s
     }
 
@@ -84,15 +85,15 @@ object Verifier extends ScorexLogging {
     Try {
       logged(
         s"order ${order.idStr()}",
-        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isTokenScript = false, order.sender.toAddress)
+        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
       ) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript = false))
-        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isTokenScript = false))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAssetScript = false))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAssetScript = false))
         case (_, Right(TRUE))       => Right(order)
         case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
-      case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", List.empty, isTokenScript = false))
+      case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", List.empty, isAssetScript = false))
       case Success(s) => s
     }
 
@@ -110,7 +111,7 @@ object Verifier extends ScorexLogging {
         .map { script =>
           if (et.version != 1) {
             stats.accountScriptExecution
-              .measureForType(typeId)(verifyTx(blockchain, script, height, et, isTokenScript = false))
+              .measureForType(typeId)(verifyTx(blockchain, script, height, et, None))
           } else {
             Left(GenericError("Can't process transaction with signature from scripted account"))
           }
@@ -134,10 +135,10 @@ object Verifier extends ScorexLogging {
       case Waves => Right(et)
       case asset: IssuedAsset =>
         blockchain.assetScript(asset).fold[ValidationResult[Transaction]](Right(et)) { script =>
-          verifyTx(blockchain, script, height, et, isTokenScript = true) leftMap {
+          verifyTx(blockchain, script, height, et, assetId.compatId) leftMap {
             case x: HasScriptType => x
-            case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
-            case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
+            case GenericError(x)  => ScriptExecutionError(x, List.empty, isAssetScript = true)
+            case x                => ScriptExecutionError(x.toString, List.empty, isAssetScript = true)
           }
         }
     }

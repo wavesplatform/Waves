@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{PublicKey, Address, AddressOrAlias}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval

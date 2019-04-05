@@ -7,7 +7,7 @@ import org.scalatest.CancelAfterFailure
 
 class SponsorshipForContactsSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  test("sporsor continues to be a sponsor after setScript for account, fee not changed for others") {
+  test("sponsor continues to be a sponsor after setScript for account, fee not changed for others") {
     val acc0    = pkByAddress(firstAddress)
     val assetId = sender.issue(firstAddress, "asset", "decr", someAssetAmount, 0, reissuable = false, issueFee, 2, None, waitForTx = true).id
     sender.sponsorAsset(firstAddress, assetId, 100, sponsorFee, waitForTx = true)

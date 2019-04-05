@@ -174,7 +174,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
             } else
               metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.reference)) match {
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                case Some((referencedForgedBlock, referencedLiquidDiff, carry, discarded)) =>
+                case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                   if (referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
                       metrics.microBlockForkStats.increment()
@@ -198,7 +198,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
                       )
 
                     diff.map { hardenedDiff =>
-                      blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
+                      blockchain.append(referencedLiquidDiff, carry, totalFee, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
@@ -210,11 +210,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
               }
         }).map {
           _ map {
-            case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
+            case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint), discarded) =>
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
-              ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
+              ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
               notifyChangedSpendable(prevNgState, ngState)
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
 
@@ -283,7 +283,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
-              r <- {
+              blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
                 BlockDiffer.fromMicroBlock(functionalitySettings,
@@ -295,9 +295,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
                                            verify)
               }
             } yield {
-              val (diff, carry, updatedMdConstraint) = r
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint) = blockDifferResult
               restTotalConstraint = updatedMdConstraint.constraints.head
-              ng.append(microBlock, diff, carry, System.currentTimeMillis)
+              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
 
@@ -422,8 +422,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
 
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = readLock {
     (for {
-      ng               <- ngState
-      (block, _, _, _) <- ng.totalDiffOf(blockId)
+      ng                  <- ngState
+      (block, _, _, _, _) <- ng.totalDiffOf(blockId)
     } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
   }
 
@@ -444,6 +444,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
       case _ =>
         blockchain.parent(block, back)
     }
+  }
+
+  override def totalFee(height: Int): Option[Long] = readLock {
+    if (height == this.height)
+      ngState.map(_.bestLiquidDiffAndFees._3)
+    else
+      blockchain.totalFee(height)
   }
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
@@ -639,8 +646,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     }
   }
 
-  override def append(diff: Diff, carry: Long, block: Block): Unit = readLock {
-    blockchain.append(diff, carry, block)
+  override def append(diff: Diff, carry: Long, totalFee: Long, block: Block): Unit = readLock {
+    blockchain.append(diff, carry, totalFee, block)
   }
 
   override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = readLock {

@@ -51,17 +51,20 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "true"
     }
 
+    val NEW_LINE = scala.util.Properties.lineSeparator
+
     Post(routePath("/script/decompile"), "AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAbAmSEV") ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
       (json \ "SCRIPT_TYPE").as[String] shouldBe "ACCOUNT"
-      (json \ "script").as[String] shouldBe "" +
-        "{-# STDLIB_VERSION 3 #-}\n" +
-        "{-# SCRIPT_TYPE ACCOUNT #-}\n" +
-        "{-# CONTENT_TYPE DAPP #-}\n\n\n\n" +
-        "@Verifier(tx)\n" +
-        "func verify () = true\n"
+
+      val expectedResult =
+        s"""{-# STDLIB_VERSION 3 #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |$NEW_LINE$NEW_LINE$NEW_LINE@Verifier(tx)${NEW_LINE}func verify () = true$NEW_LINE""".stripMargin
+      (json \ "script").as[String] shouldBe expectedResult
     }
   }
 

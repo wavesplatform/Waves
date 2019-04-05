@@ -45,7 +45,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
             }
             .filter(_._1.signerData.generator.address == address)
             .map { pair =>
-              pair._1.json() + ("height" -> Json.toJson(pair._2))
+              pair._1.json().addBlockFields(pair._2)
             })
         complete(blocks)
       } else complete(TooBigArrayAllocation)
@@ -62,7 +62,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       val childJson = for {
         h <- blockchain.heightOf(block.uniqueId)
         b <- blockchain.blockAt(h + 1)
-      } yield b.json()
+      } yield b.json().addBlockFields(h + 1)
 
       complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
     }
@@ -139,7 +139,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
      } else {
        blockchain.blockHeaderAndSize(height).map { case (bh, s) => BlockHeader.json(bh, s) }
      }) match {
-      case Some(json) => complete(json + ("height" -> JsNumber(height)))
+      case Some(json) => complete(json.addBlockFields(height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
     }
   }
@@ -173,7 +173,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
            blockchain.blockAt(height).map(_.json())
          } else {
            blockchain.blockHeaderAndSize(height).map { case (bh, s) => BlockHeader.json(bh, s) }
-         }).map(_ + ("height" -> Json.toJson(height)))
+         }).map(_.addBlockFields(height))
       })
       complete(blocks)
     } else complete(TooBigArrayAllocation)
@@ -197,7 +197,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
          } else {
            val bhs = blockchain.blockHeaderAndSize(height).get
            BlockHeader.json(bhs._1, bhs._2)
-         }) + ("height" -> Json.toJson(height))
+         }).addBlockFields(height)
       }
     }
   }
@@ -205,7 +205,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   @Path("/first")
   @ApiOperation(value = "Genesis block", notes = "Get genesis block", httpMethod = "GET")
   def first: Route = (path("first") & get) {
-    complete(blockchain.genesis.json() + ("height" -> Json.toJson(1)))
+    complete(blockchain.genesis.json().addBlockFields(1))
   }
 
   @Path("/signature/{signature}")
@@ -222,9 +222,20 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
         .toOption
         .toRight(InvalidSignature)
         .flatMap(s => blockchain.blockById(s).toRight(BlockDoesNotExist)) match {
-        case Right(block) => complete(block.json() + ("height" -> blockchain.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
+        case Right(block) => complete(block.json().addBlockFields(block.uniqueId))
         case Left(e)      => complete(e)
       }
     }
+  }
+
+  private[this] implicit class JsonObjectOps(json: JsObject) {
+    def addBlockFields(blockId: ByteStr): JsObject =
+      json ++ blockchain
+        .heightOf(blockId)
+        .map(height => Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))))
+        .getOrElse(JsObject.empty)
+
+    def addBlockFields(height: Int): JsObject =
+      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)))
   }
 }
