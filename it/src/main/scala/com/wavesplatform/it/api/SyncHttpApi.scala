@@ -202,7 +202,7 @@ object SyncHttpApi extends Assertions {
                  fee: Long,
                  assetId: Option[String] = None,
                  feeAssetId: Option[String] = None,
-                 version: Byte = 2,
+                 version: Byte = 1,
                  waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version)), waitForTx)
     }

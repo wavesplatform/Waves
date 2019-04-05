@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -8,9 +8,8 @@ import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.common.utils.EitherExt2
 import play.api.libs.json.{JsNumber, JsString, Json}
 
@@ -126,51 +125,33 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val buyer  = acc0
     val seller = acc1
 
-    val assetDescription = "my asset description"
+    val assetId: ByteStr = ByteStr.decodeBase58(
+      sender.issue(
+      sourceAddress = buyer.address,
+      name = "SomeAsset",
+      description = "description",
+      quantity = someAssetAmount,
+      decimals = 8,
+      reissuable = true,
+      script = None,
+      fee = issueFee,
+      waitForTx = true)
+      .id)
+    .get
 
-    val IssueTx: IssueTransactionV1 = IssueTransactionV1
-      .selfSigned(
-        sender = buyer,
-        name = "myasset".getBytes(),
-        description = assetDescription.getBytes(),
+    val smartAssetId: ByteStr = ByteStr.decodeBase58(
+      sender.issue(
+        sourceAddress = buyer.address,
+        name = "ScriptedAsset",
+        description = "asset with script = \"true\"",
         quantity = someAssetAmount,
         decimals = 8,
         reissuable = true,
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
+        script = Some(scriptBase64),
+        fee = issueFee,
+        waitForTx = true)
+        .id)
       .get
-
-    val scriptV2 = ScriptCompiler.compile("""
-                                            |func isTrue() = true
-                                            |isTrue()
-                                          """.stripMargin).explicitGet()._1
-
-    val IssueTxV2: IssueTransactionV2 = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        sender = buyer,
-        name = "scriptedasset".getBytes,
-        description = assetDescription.getBytes,
-        quantity = someAssetAmount,
-        decimals = 8,
-        reissuable = true,
-        script = Some(scriptV2),
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
-      .get
-
-    val assetId      = IssueTx.id()
-    val smartAssetId = IssueTxV2.id()
-
-    sender.postJson("/transactions/broadcast", IssueTx.json())
-    sender.postJson("/transactions/broadcast", IssueTxV2.json())
-
-    nodes.waitForHeightAriseAndTxPresent(assetId.base58)
-    nodes.waitForHeightAriseAndTxPresent(smartAssetId.base58)
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
@@ -190,12 +171,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val expirationTimestamp      = ts + Order.MaxLiveTime
       var assetBalanceBefore: Long = 0l
 
-      if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(assetId)) {
-        assetBalanceBefore = sender.assetBalance(secondAddress, assetId.base58).balance
-        sender.transfer(buyer.address, seller.address, 100000, minFee, Some(assetId.base58), waitForTx = true)
-      } else if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(smartAssetId)) {
-        assetBalanceBefore = sender.assetBalance(secondAddress, smartAssetId.base58).balance
-        sender.transfer(buyer.address, seller.address, 300000, minFee + smartFee, Some(smartAssetId.base58), waitForTx = true)
+      (matcherFeeOrder1, matcherFeeOrder2) match {
+        case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == assetId =>
+          assetBalanceBefore = sender.assetBalance(seller.address, issuedAssetId.base58).balance
+          sender.transfer(buyer.address, seller.address, 100000, minFee + 2*smartFee, Some(issuedAssetId.base58), version = 2, waitForTx = true)
+        case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == smartAssetId =>
+          assetBalanceBefore = sender.assetBalance(seller.address, issuedAssetId.base58).balance
+          sender.transfer(buyer.address, seller.address, 300000, minFee + 2*smartFee, Some(issuedAssetId.base58), version = 2, waitForTx = true)
+        case _ =>
       }
 
       val buyPrice   = 500000
@@ -220,17 +203,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
             fee = matcherFee,
             timestamp = ntpTime.correctedTime()
           )
-          .right
-          .get
+          .explicitGet()
+          .json()
 
-      sender.postJson("/transactions/broadcast", tx.json())
+      sender.signedBroadcast(tx, waitForTx = true)
 
-      nodes.waitForHeightAriseAndTxPresent(tx.id().base58)
-
-      if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(assetId)) {
-        sender.assetBalance(secondAddress, assetId.base58).balance shouldBe assetBalanceBefore
-      } else if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(smartAssetId)) {
-        sender.assetBalance(secondAddress, smartAssetId.base58).balance shouldBe assetBalanceBefore
+      (matcherFeeOrder1, matcherFeeOrder2) match {
+        case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == assetId =>
+          sender.assetBalance(seller.address, issuedAssetId.base58).balance shouldBe assetBalanceBefore
+        case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == smartAssetId =>
+          sender.assetBalance(seller.address, issuedAssetId.base58).balance shouldBe assetBalanceBefore
+        case _ =>
       }
     }
   }
