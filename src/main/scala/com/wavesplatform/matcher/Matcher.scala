@@ -122,7 +122,7 @@ class Matcher(actorSystem: ActorSystem,
                                           matcherPublicKey.toAddress,
                                           time,
                                           matcherSettings.orderFee,
-                                          matcherSettings.orderAmountRestrictions)(o)
+                                          matcherSettings.orderRestrictions)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
   }
