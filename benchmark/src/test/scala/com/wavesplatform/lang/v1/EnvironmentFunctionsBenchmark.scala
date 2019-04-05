@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
 import com.wavesplatform.lang.{Common, Global}
 import org.openjdk.jmh.annotations._
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
@@ -84,6 +84,9 @@ object EnvironmentFunctionsBenchmark {
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def tthis: Recipient.Address                                                                        = ???
+    override def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = ???
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
+    override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

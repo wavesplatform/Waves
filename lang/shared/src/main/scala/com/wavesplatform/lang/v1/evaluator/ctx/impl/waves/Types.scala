@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Types._
 
 object Types {
@@ -9,11 +9,29 @@ object Types {
   val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
   val addressOrAliasType = UNION(addressType, aliasType)
 
-  val transfer         = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
+  val blockHeader = CASETYPEREF(
+    "BlockHeader",
+    List(
+      "timestamp"                      -> LONG,
+      "version"                        -> LONG,
+      "reference"                      -> BYTESTR,
+      "generator"                      -> BYTESTR,
+      "signature"                      -> BYTESTR,
+      "baseTarget"                     -> LONG,
+      "generationSignature"            -> BYTESTR,
+      "transactionCount"               -> LONG,
+      "transactionTreeHash"            -> BYTESTR,
+      "minerWavesBalancesTreeHash"     -> BYTESTR,
+      "minerEffectiveBalancesTreeHash" -> BYTESTR,
+      "featureVotes"                   -> LIST(LONG)
+    )
+  )
 
-  val optionAddress        = UNION(addressType, UNIT)
-  val listTransfers        = LIST(transfer)
-  val paymentType          = CASETYPEREF("AttachedPayment", List("assetId" -> optionByteVector, "amount" -> LONG))
+  val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
+
+  val optionAddress = UNION(addressType, UNIT)
+  val listTransfers = LIST(transfer)
+  val paymentType   = CASETYPEREF("AttachedPayment", List("assetId" -> optionByteVector, "amount" -> LONG))
 
   val optionPayment = UNION(paymentType, UNIT)
 
@@ -257,14 +275,15 @@ object Types {
     List(genesisTransactionType, buildPaymentTransactionType(proofsEnabled))
   }
 
-  def buildAssetSupportedTransactions(proofsEnabled: Boolean, v: StdLibVersion) = List(
-    buildReissueTransactionType(proofsEnabled),
-    buildBurnTransactionType(proofsEnabled),
-    buildMassTransferTransactionType(proofsEnabled),
-    buildExchangeTransactionType(proofsEnabled),
-    buildTransferTransactionType(proofsEnabled),
-    buildSetAssetScriptTransactionType(proofsEnabled)
-  ) ++ (if (v == V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
+  def buildAssetSupportedTransactions(proofsEnabled: Boolean, v: StdLibVersion) =
+    List(
+      buildReissueTransactionType(proofsEnabled),
+      buildBurnTransactionType(proofsEnabled),
+      buildMassTransferTransactionType(proofsEnabled),
+      buildExchangeTransactionType(proofsEnabled),
+      buildTransferTransactionType(proofsEnabled),
+      buildSetAssetScriptTransactionType(proofsEnabled)
+    ) ++ (if (v == V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++
@@ -281,9 +300,9 @@ object Types {
 
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[FINAL] = {
 
-    val activeTxTypes                    = buildActiveTransactionTypes(proofsEnabled, v)
-    val obsoleteTxTypes                  = buildObsoleteTransactionTypes(proofsEnabled)
-    val transactionsCommonType           = UNION.create(activeTxTypes, Some("Transaction"))
+    val activeTxTypes                       = buildActiveTransactionTypes(proofsEnabled, v)
+    val obsoleteTxTypes                     = buildObsoleteTransactionTypes(proofsEnabled)
+    val transactionsCommonType              = UNION.create(activeTxTypes, Some("Transaction"))
     val transactionTypes: List[CASETYPEREF] = obsoleteTxTypes ++ activeTxTypes
 
     Seq(
@@ -294,6 +313,8 @@ object Types {
       dataEntryType,
       buildOrderType(proofsEnabled),
       transactionsCommonType
-    ) ++ transactionTypes
+    ) ++
+      transactionTypes ++
+      (if (v == V4) List(blockHeader) else Nil)
   }
 }

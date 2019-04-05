@@ -414,6 +414,84 @@ object WavesContext {
       wavesBalanceF
     )
 
+    val blockHeaderFromBytesF: BaseFunction =
+      NativeFunction(
+        "blockHeaderFromBytes",
+        100,
+        BLOCKHEADER_FROM_BYTES,
+        UNION.create(UNIT :: anyTransactionType.typeList),
+        "parse block header from bytes",
+        ("blockHeaderBytes", BYTESTR, "block header bytes")
+      ) {
+        case CONST_BYTESTR(headerBytes) :: Nil =>
+          val maybeHeaderObj =
+            env
+              .blockHeaderParser(headerBytes)
+              .map(Bindings.blockHeaderObject)
+
+          fromOptionCO(maybeHeaderObj).asRight[String]
+
+        case _ => ???
+      }
+
+    val transactionFromBytesF: BaseFunction =
+      NativeFunction(
+        "transactionFromBytes",
+        100,
+        TRANSACTION_FROM_BYTES,
+        UNION.create(UNIT :: anyTransactionType.typeList),
+        "parse transaction from bytes",
+        ("transactionBytes", BYTESTR, "transaction bytes")
+      ) {
+        case CONST_BYTESTR(txBytes) :: Nil =>
+          val maybeTxObj =
+            env
+              .transactionParser(txBytes)
+              .map(Bindings.transactionObject(_, proofsEnabled))
+
+          fromOptionCO(maybeTxObj).asRight[String]
+      }
+
+    val calculatePosDelayF: BaseFunction = {
+      NativeFunction(
+        "calculatePosDelay",
+        100,
+        CALCULATE_POS_DELAY,
+        LONG,
+        "calculate PoS delay in milliseconds",
+        ("hit", BYTESTR, ""),
+        ("baseTarget", LONG, "base target"),
+        ("balance", LONG, "miner effective balance")
+      ) {
+        case CONST_BYTESTR(hit) :: CONST_LONG(baseTarget) :: CONST_LONG(balance) :: Nil =>
+          val delay = env.calculatePoSDelay(hit, baseTarget, balance)
+          CONST_LONG(delay).asRight[String]
+        case _ => ???
+      }
+    }
+
+    val v3Functions = List(
+      getIntegerFromStateF,
+      getBooleanFromStateF,
+      getBinaryFromStateF,
+      getStringFromStateF,
+      getIntegerFromArrayF,
+      getBooleanFromArrayF,
+      getBinaryFromArrayF,
+      getStringFromArrayF,
+      getIntegerByIndexF,
+      getBooleanByIndexF,
+      getBinaryByIndexF,
+      getStringByIndexF,
+      addressFromStringF
+    )
+
+    val v4Functions = List(
+      blockHeaderFromBytesF,
+      transactionFromBytesF,
+      calculatePosDelayF
+    )
+
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
@@ -421,27 +499,15 @@ object WavesContext {
                   List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType)
                 } else List.empty),
       commonVars ++ vars(version.id),
-      functions ++ (if (version == V3) {
-                      List(
-                        getIntegerFromStateF,
-                        getBooleanFromStateF,
-                        getBinaryFromStateF,
-                        getStringFromStateF,
-                        getIntegerFromArrayF,
-                        getBooleanFromArrayF,
-                        getBinaryFromArrayF,
-                        getStringFromArrayF,
-                        getIntegerByIndexF,
-                        getBooleanByIndexF,
-                        getBinaryByIndexF,
-                        getStringByIndexF,
-                        addressFromStringF
-                      ).map(withExtract)
-                    } else {
-                      List()
-                    })
+      functions ++
+        versioned(version, V3, v3Functions).map(withExtract) ++
+        versioned(version, V4, v4Functions)
     )
   }
+
+  def versioned[A](actual: StdLibVersion, expected: StdLibVersion, xs: => List[A]): List[A] =
+    if (expected == actual) xs
+    else List.empty[A]
 
   val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)), Some("VerifierInput"))
 }

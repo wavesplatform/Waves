@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.impl
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.DataType
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
 
 import scala.scalajs.js.annotation.JSGlobalScope
 import scala.scalajs.{js => platform}
@@ -23,4 +24,7 @@ object Environment extends scalajs.js.Object {
   def resolveAddress(name: String): Either[String, Recipient.Address] = platform.native
 
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = platform.native
+  def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = platform.native
+  def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = platform.native
+  def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = platform.native
 }

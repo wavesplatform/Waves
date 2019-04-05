@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 object WavesContext {
@@ -15,6 +16,9 @@ object WavesContext {
     override def resolveAlias(name: String): Either[String, Recipient.Address] = impl.Environment.resolveAddress(name)
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] =
       impl.Environment.accountBalanceOf(addressOrAlias, assetId)
-    override def tthis: Recipient.Address = ???
+    override def tthis: Recipient.Address                                               = ???
+    override def transactionParser(bytes: Array[Byte]): Option[Tx]                      = impl.Environment.transactionParser(bytes)
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]             = impl.Environment.blockHeaderParser(bytes)
+    override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long = impl.Environment.calculatePoSDelay(hit, baseTarget, balance)
   }
 }

@@ -3,13 +3,16 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParsers}
 import monix.eval.Coeval
 import shapeless._
 
@@ -19,6 +22,7 @@ object WavesEnvironment {
 
 class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain, address: Coeval[ByteStr])
     extends Environment {
+
   override def height: Long = h()
 
   override def inputEntity: Environment.InputEntity = {
@@ -82,4 +86,21 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
 
   override def tthis: Address = Recipient.Address(address())
+
+  override def transactionParser(bytes: Array[Byte]): Option[Tx] =
+    TransactionParsers.parseBytes(bytes).toOption.map(RealTransactionWrapper(_))
+
+  override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader] =
+    ???
+
+  override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long = {
+    val posCalculator =
+      if (blockchain.activatedFeaturesAt(h()).contains(BlockchainFeatures.FairPoS.id))
+        FairPoSCalculator
+      else NxtPoSCalculator
+
+    posCalculator
+      .calculateDelay(BigInt(1, hit.arr), baseTarget, balance)
+  }
+
 }

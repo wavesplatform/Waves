@@ -269,6 +269,7 @@ lazy val lang =
           Dependencies.fp ++
           Dependencies.scalacheck ++
           Dependencies.scorex ++
+          Dependencies.scodec.value ++
           Dependencies.scalatest ++
           Dependencies.scalactic ++
           Dependencies.monix.value ++

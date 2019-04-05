@@ -179,14 +179,16 @@ object Bindings {
       case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled),
-          combine(Map(
-                    "dappAddress" -> mapRecipient(address)._2,
-                    "payment"     -> buildPayment(maybePayment),
-                    "feeAssetId"  -> feeAssetId,
-                    "function"    -> funcName,
-                    "args"        -> funcArgs
-                  ),
-                  provenTxPart(p, proofsEnabled))
+          combine(
+            Map(
+              "dappAddress" -> mapRecipient(address)._2,
+              "payment"     -> buildPayment(maybePayment),
+              "feeAssetId"  -> feeAssetId,
+              "function"    -> funcName,
+              "args"        -> funcArgs
+            ),
+            provenTxPart(p, proofsEnabled)
+          )
         )
 
       case Lease(p, amount, recipient) =>
@@ -266,4 +268,22 @@ object Bindings {
         )
     }
 
+  def blockHeaderObject(header: BlockHeader): CaseObj =
+    CaseObj(
+      blockHeader,
+      Map[String, EVALUATED](
+        "timestamp"                      -> header.timestamp,
+        "version"                        -> header.version,
+        "reference"                      -> header.reference,
+        "generator"                      -> header.generator,
+        "signature"                      -> header.signature,
+        "baseTarget"                     -> header.baseTarget,
+        "generationSignature"            -> header.generationSignature,
+        "transactionCount"               -> header.transactionCount,
+        "transactionTreeHash"            -> header.transactionTreeHash,
+        "minerWavesBalancesTreeHash"     -> header.minerWavesBalancesTreeHash,
+        "minerEffectiveBalancesTreeHash" -> header.minerEffectiveBalancesTreeHash,
+        "featureVotes"                   -> header.featureVotes.map(CONST_LONG)
+      )
+    )
 }

@@ -1,10 +1,13 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.nio.charset.StandardCharsets.UTF_8
 
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -14,11 +17,6 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 
 import scala.collection.mutable.ArrayBuffer
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.ByteBuffer
-
-import com.wavesplatform.lang.directives.values._
-
 import scala.util.{Success, Try}
 
 object PureContext {
@@ -86,10 +84,10 @@ object PureContext {
 
   lazy val extract: BaseFunction =
     UserFunction.deprecated("extract",
-                 13,
-                 TYPEPARAM('T'),
-                 "Extract value from option or fail",
-                 ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
+                            13,
+                            TYPEPARAM('T'),
+                            "Extract value from option or fail",
+                            ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
       IF(
         FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
         FUNCTION_CALL(throwWithMessage, List(CONST_STRING("extract() called on unit value"))),
@@ -99,10 +97,10 @@ object PureContext {
 
   lazy val value: BaseFunction =
     UserFunction("value",
-      13,
-      TYPEPARAM('T'),
-      "Extract value from option or fail",
-      ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
+                 13,
+                 TYPEPARAM('T'),
+                 "Extract value from option or fail",
+                 ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
       IF(
         FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
         FUNCTION_CALL(throwWithMessage, List(CONST_STRING("value() called on unit value"))),
@@ -318,44 +316,68 @@ object PureContext {
     }
 
   lazy val toLongOffset: BaseFunction =
-    NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offet", LONG, "bytes offset")) {
-      case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil => if( o >= 0 && o <= u.size - 8) {
+    NativeFunction("toInt",
+                   10,
+                   BININT_OFF,
+                   LONG,
+                   "Deserialize big endian 8-bytes value",
+                   ("bin", BYTESTR, "8-bytes BE binaries"),
+                   ("offet", LONG, "bytes offset")) {
+      case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil =>
+        if (o >= 0 && o <= u.size - 8) {
           Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map(_.toString)
-      } else {
-        Left("IndexOutOfBounds")
-      }
-      case xs                      => notImplemented("toInt(u: byte[], off: int)", xs)
+        } else {
+          Left("IndexOutOfBounds")
+        }
+      case xs => notImplemented("toInt(u: byte[], off: int)", xs)
     }
 
   lazy val indexOf: BaseFunction =
-    NativeFunction("indexOf", 20, INDEXOF, optionLong, "index of substring", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching")) {
-      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right({
-        val i = m.indexOf(sub)
-         if( i != -1 ) {
-           CONST_LONG(i.toLong)
-         } else {
-           unit
-         }
-      })
-      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+    NativeFunction("indexOf",
+                   20,
+                   INDEXOF,
+                   optionLong,
+                   "index of substring",
+                   ("str", STRING, "String for analize"),
+                   ("substr", STRING, "String for searching")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
+        Right({
+          val i = m.indexOf(sub)
+          if (i != -1) {
+            CONST_LONG(i.toLong)
+          } else {
+            unit
+          }
+        })
+      case xs => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
   lazy val indexOfN: BaseFunction =
-    NativeFunction("indexOf", 20, INDEXOFN, optionLong, "index of substring after offset", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
-      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right( if(off >= 0 && off <= m.length) {
-         val i = m.indexOf(sub, off.toInt)
-         if( i != -1 ) {
-           CONST_LONG(i.toLong)
-         } else {
-           unit
-         }
-      } else {
-        unit
-      } )
-      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+    NativeFunction(
+      "indexOf",
+      20,
+      INDEXOFN,
+      optionLong,
+      "index of substring after offset",
+      ("str", STRING, "String for analize"),
+      ("substr", STRING, "String for searching"),
+      ("offset", LONG, "offset")
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
+        Right(if (off >= 0 && off <= m.length) {
+          val i = m.indexOf(sub, off.toInt)
+          if (i != -1) {
+            CONST_LONG(i.toLong)
+          } else {
+            unit
+          }
+        } else {
+          unit
+        })
+      case xs => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
-  def split(m: String, sep: String, buffer: ArrayBuffer[CONST_STRING] =  ArrayBuffer[CONST_STRING](), start: Int = 0): IndexedSeq[CONST_STRING] = {
+  def split(m: String, sep: String, buffer: ArrayBuffer[CONST_STRING] = ArrayBuffer[CONST_STRING](), start: Int = 0): IndexedSeq[CONST_STRING] = {
     m.indexOf(sep, start) match {
       case -1 =>
         buffer += CONST_STRING(m.substring(start))
@@ -367,21 +389,27 @@ object PureContext {
   }
 
   lazy val splitStr: BaseFunction =
-    NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
-      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil => Right( ARR(split(m, sep)))
-      case xs                      => notImplemented("split(STRING, STRING)", xs)
+    NativeFunction("split",
+                   100,
+                   SPLIT,
+                   listString,
+                   "split string by separator",
+                   ("str", STRING, "String for splitting"),
+                   ("separator", STRING, "separator")) {
+      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil => Right(ARR(split(m, sep)))
+      case xs                                          => notImplemented("split(STRING, STRING)", xs)
     }
 
   lazy val parseInt: BaseFunction =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
       case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).orElse(Success(unit)).toEither.left.map(_.toString)
-      case xs                      => notImplemented("parseInt(STRING)", xs)
+      case xs                     => notImplemented("parseInt(STRING)", xs)
     }
 
   lazy val parseIntVal: BaseFunction =
     NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
       case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).toEither.left.map(_.toString)
-      case xs                      => notImplemented("parseInt(STRING)", xs)
+      case xs                     => notImplemented("parseInt(STRING)", xs)
     }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(

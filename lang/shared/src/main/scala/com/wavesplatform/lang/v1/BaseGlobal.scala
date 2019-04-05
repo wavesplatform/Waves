@@ -33,6 +33,8 @@ trait BaseGlobal {
 
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
+  def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
+
   def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
     val s = Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
     s ++ checksum(s)

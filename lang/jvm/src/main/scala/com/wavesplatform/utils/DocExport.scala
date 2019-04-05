@@ -1,5 +1,6 @@
 import cats.kernel.Monoid
 import com.github.mustachejava._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
@@ -8,7 +9,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.collection.JavaConverters._
@@ -31,6 +32,9 @@ object DocExport {
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
           override def tthis: Recipient.Address                                                                        = ???
+          override def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = ???
+          override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
+          override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = ???
         }
       )
 

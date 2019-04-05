@@ -2,7 +2,9 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
-import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
+import scorex.crypto.authds.{LeafData, Side}
+import scorex.crypto.authds.merkle.MerkleProof
+import scorex.crypto.hash._
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 object Global extends BaseGlobal {
@@ -28,4 +30,51 @@ object Global extends BaseGlobal {
   def keccak256(message: Array[Byte]): Array[Byte]  = Keccak256.hash(message)
   def blake2b256(message: Array[Byte]): Array[Byte] = Blake2b256.hash(message)
   def sha256(message: Array[Byte]): Array[Byte]     = Sha256.hash(message)
+
+  override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean = {
+    (for {
+      rootDigest  <- parseRoot(rootBytes)
+      merkleProof <- parseProof(proofBytes, valueBytes)
+    } yield merkleProof.valid(rootDigest)).getOrElse(false)
+  }
+
+  def parseRoot(bytes: Array[Byte]): Option[Digest32] = {
+    if (bytes.length == 32) Some(Digest32 @@ bytes)
+    else None
+  }
+
+  private def parseProof(proofBytes: Array[Byte], valueBytes: Array[Byte]): Option[MerkleProof[Digest32]] = {
+    val slicedBytes = proofBytes.sliding(32, 32).toList
+
+    parseHashesAndSides(slicedBytes, Nil) match {
+      case (Nil, Nil) => None
+      case (hashes, sides) =>
+        val data   = LeafData @@ valueBytes
+        val levels = sides zip hashes
+        val proof  = MerkleProof[Digest32](data, levels)(blakeCH)
+
+        Some(proof)
+    }
+  }
+
+  private def parseHashesAndSides(sd: List[Array[Byte]], hashAcc: List[Digest32]): (List[Side], List[Digest32]) = {
+    sd match {
+      case sideBytes :: Nil if sideBytes.length == hashAcc.length =>
+        val parsedSides: List[Side] = sideBytes.map {
+          case MerkleProof.LeftSide => MerkleProof.LeftSide
+          case _                    => MerkleProof.RightSide
+        }.toList
+
+        (parsedSides, hashAcc)
+      case hash :: rest if hash.length == 32 =>
+        parseHashesAndSides(rest, (Digest32 @@ hash) :: hashAcc)
+      case _ => (Nil, Nil)
+    }
+  }
+
+  private val blakeCH: CryptographicHash[Digest32] =
+    new CryptographicHash32 {
+      override def hash(input: Message): Digest32 = Digest32 @@ blake2b256(input)
+    }
+
 }

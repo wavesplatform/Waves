@@ -1,19 +1,19 @@
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -64,6 +64,9 @@ object JsAPI {
         override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
         override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
         override def tthis: Recipient.Address                                                                        = ???
+        override def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = ???
+        override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
+        override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = ???
       }
     )
 

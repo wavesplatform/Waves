@@ -37,6 +37,9 @@ object Global extends BaseGlobal {
 
   private def hash(message: Array[Byte])(f: ArrayBuffer => ArrayBuffer): Array[Byte] = toArray(f(toBuffer(message)))
 
+  override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
+    impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
+
   def toBuffer(xs: Array[Byte]): ArrayBuffer = {
     val r = new Int8Array(xs.length)
     r.set(xs.toJSArray)
