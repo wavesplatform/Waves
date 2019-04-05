@@ -444,12 +444,12 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     val defaultOrderRestrictionsSettings =
       OrderRestrictionsSettings(
-        stepSize = 0.001,
-        minAmount = 0.00000001,
-        maxAmount = 1000000000,
-        tickSize = 0.00000001,
-        minPrice = 0.00000001,
-        maxPrice = 1000000,
+        stepSize = OrderRestrictionsSettings.stepSizeDefault,
+        minAmount = OrderRestrictionsSettings.minAmountDefault,
+        maxAmount = OrderRestrictionsSettings.maxAmountDefault,
+        tickSize = OrderRestrictionsSettings.tickSizeDefault,
+        minPrice = OrderRestrictionsSettings.minPriceDefault,
+        maxPrice = OrderRestrictionsSettings.maxPriceDefault,
         mergeSmallPrices = false
       )
 
@@ -465,9 +465,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
             stepSize = 0.001,
             minAmount = 0.001,
             maxAmount = 1000000,
-            tickSize = 0.00000001,
-            minPrice = 0.00000001,
-            maxPrice = 1000000,
+            tickSize = OrderRestrictionsSettings.tickSizeDefault,
+            minPrice = OrderRestrictionsSettings.minPriceDefault,
+            maxPrice = OrderRestrictionsSettings.maxPriceDefault,
             mergeSmallPrices = false
           ),
         AssetPair.createAssetPair("ETH", "USD").get ->
@@ -475,9 +475,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
             stepSize = 0.01,
             minAmount = 0.05,
             maxAmount = 20000,
-            tickSize = 0.00000001,
-            minPrice = 0.00000001,
-            maxPrice = 1000000,
+            tickSize = OrderRestrictionsSettings.tickSizeDefault,
+            minPrice = OrderRestrictionsSettings.minPriceDefault,
+            maxPrice = OrderRestrictionsSettings.maxPriceDefault,
             mergeSmallPrices = true
           )
       )

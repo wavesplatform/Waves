@@ -9,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
@@ -17,7 +17,7 @@ import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, MatcherModel, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -85,17 +85,32 @@ class Matcher(actorSystem: ActorSystem,
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
-    matcherActor,
-    addressActors,
-    pair,
-    updateOrderBookCache(pair),
-    marketStatuses.put(pair, _),
-    tx => exchangeTxPool.execute(() => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx)),
-    matcherSettings,
-    transactionCreator.createTransaction,
-    time
-  )
+  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = {
+
+    val normalizedTickSize = matcherSettings.orderRestrictions.get(pair).withFilter(_.mergeSmallPrices).map { restrictions =>
+      def getDecimals(asset: Asset): Int =
+        asset.fold(8) { issuedAsset =>
+          blockchain
+            .assetDescription(issuedAsset)
+            .map(_.decimals)
+            .getOrElse(throw new Exception("Can not get asset decimals since asset not found!"))
+        }
+      MatcherModel.toNormalized(restrictions.tickSize, getDecimals(pair.priceAsset), getDecimals(pair.priceAsset)).max(1)
+    }
+
+    OrderBookActor.props(
+      matcherActor,
+      addressActors,
+      pair,
+      updateOrderBookCache(pair),
+      marketStatuses.put(pair, _),
+      tx => exchangeTxPool.execute(() => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx)),
+      matcherSettings,
+      transactionCreator.createTransaction,
+      time,
+      normalizedTickSize
+    )
+  }
 
   private val matcherQueue: MatcherQueue = settings.matcherSettings.eventsQueue.tpe match {
     case "local" =>

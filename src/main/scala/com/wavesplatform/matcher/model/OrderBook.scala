@@ -13,6 +13,9 @@ import scala.collection.mutable
 class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[OrderBook] val asks: OrderBook.Side) {
   import OrderBook._
 
+  private[model] def getBids: OrderBook.Side = bids
+  private[model] def getAsks: OrderBook.Side = asks
+
   def bestBid: Option[LevelAgg] = bids.aggregated.headOption
   def bestAsk: Option[LevelAgg] = asks.aggregated.headOption
 
@@ -37,10 +40,10 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[Or
     canceledOrders
   }
 
-  def add(o: Order, ts: Long): Seq[Event] =
+  def add(o: Order, ts: Long, normalizedTickSize: Option[Long] = None): Seq[Event] =
     (o.orderType match {
-      case OrderType.BUY  => doMatch(ts, buy, LimitOrder(o), Seq.empty, bids, asks)
-      case OrderType.SELL => doMatch(ts, sell, LimitOrder(o), Seq.empty, asks, bids)
+      case OrderType.BUY  => doMatch(ts, buy, LimitOrder(o), Seq.empty, bids, asks, normalizedTickSize)
+      case OrderType.SELL => doMatch(ts, sell, LimitOrder(o), Seq.empty, asks, bids, normalizedTickSize)
     }).reverse
 
   def snapshot: Snapshot                     = Snapshot(bids.toMap, asks.toMap)
@@ -101,6 +104,17 @@ object OrderBook {
     override val toString                                        = "submitted <= counter"
   }
 
+  private def correctPriceByTickSize(price: Price, orderType: OrderType, normalizedTickSize: Option[Long]): Price = {
+    normalizedTickSize.fold(price) { tickSize =>
+      val isPriceMultipleOfTickSize = BigDecimal(price).remainder(tickSize) == 0
+      (isPriceMultipleOfTickSize, orderType) match {
+        case (true, _)               => price
+        case (false, OrderType.BUY)  => price / tickSize * tickSize
+        case (false, OrderType.SELL) => (price / tickSize + 1) * tickSize
+      }
+    }
+  }
+
   /** @param canMatch (submittedPrice, counterPrice) => Boolean */
   @tailrec
   private def doMatch(
@@ -110,19 +124,21 @@ object OrderBook {
       prevEvents: Seq[Event],
       submittedSide: Side,
       counterSide: Side,
+      normalizedTickSize: Option[Long]
   ): Seq[Event] =
     if (!submitted.order.isValid(eventTs)) OrderCanceled(submitted, false) +: prevEvents
     else
       counterSide.best match {
         case counter if counter.forall(c => !canMatch(submitted.price, c.price)) =>
-          submittedSide += submitted.price -> (submittedSide.getOrElse(submitted.price, Vector.empty) :+ submitted)
+          val correctedKey = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
+          submittedSide += correctedKey -> (submittedSide.getOrElse(correctedKey, Vector.empty) :+ submitted)
           OrderAdded(submitted) +: prevEvents
         case Some(counter) =>
           if (!submitted.isValid(counter.price)) {
             OrderCanceled(submitted, true) +: prevEvents
           } else if (!counter.order.isValid(eventTs)) {
             counterSide.removeBest()
-            doMatch(eventTs, canMatch, submitted, OrderCanceled(counter, false) +: prevEvents, submittedSide, counterSide)
+            doMatch(eventTs, canMatch, submitted, OrderCanceled(counter, false) +: prevEvents, submittedSide, counterSide, normalizedTickSize)
           } else {
             val x         = OrderExecuted(submitted, counter, eventTs)
             val newEvents = x +: prevEvents
@@ -134,7 +150,7 @@ object OrderBook {
             } else {
               counterSide.removeBest()
               if (x.submittedRemaining.isValid) {
-                doMatch(eventTs, canMatch, x.submittedRemaining, newEvents, submittedSide, counterSide)
+                doMatch(eventTs, canMatch, x.submittedRemaining, newEvents, submittedSide, counterSide, normalizedTickSize)
               } else newEvents
             }
           }
