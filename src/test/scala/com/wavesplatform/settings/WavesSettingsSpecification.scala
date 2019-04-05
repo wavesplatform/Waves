@@ -15,7 +15,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
       .getString("waves.directory")
 
   private def config(configName: String) = {
-    WavesSettings.fromConfig(
+    WavesSettings.fromRootConfig(
       com.wavesplatform.settings.loadConfig(
         ConfigFactory.parseFile(new File(s"waves-$configName.conf"))
       )
@@ -50,10 +50,10 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
          |  ntp-server = "example.com"
          |}""".stripMargin))
 
-    val settings = WavesSettings.fromConfig(config.resolve())
+    val settings = WavesSettings.fromRootConfig(config.resolve())
 
     settings.directory should be("/xxx")
-    settings.dataDirectory should be("/xxx/data")
+    settings.dbSettings.directory should be("/xxx/data")
     settings.ntpServer should be("example.com")
     settings.networkSettings.file should be(Some(new File("/xxx/peers.dat")))
     settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))

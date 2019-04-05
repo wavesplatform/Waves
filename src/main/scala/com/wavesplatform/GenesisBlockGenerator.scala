@@ -148,10 +148,10 @@ object GenesisBlockGenerator extends App {
                       |  initial-balance: ${settings.initialBalance}
                       |  transactions = [
                       |    ${settings.transactions
-      .map { x =>
-        s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
-      }
-      .mkString(",\n    ")}
+                        .map { x =>
+                          s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
+                        }
+                        .mkString(",\n    ")}
                       |  ]
                       |}
                       |""".stripMargin

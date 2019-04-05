@@ -64,7 +64,7 @@ object MatcherSettings {
     )
   }
 
-  implicit val matcherSettingsValueReader: ValueReader[MatcherSettings] =
+  implicit val valueReader: ValueReader[MatcherSettings] =
     (cfg, path) => fromConfig(cfg.getConfig(path))
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
