@@ -6,12 +6,7 @@ import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
-import scala.concurrent.duration._
-
 case class WavesSettings(directory: String,
-                         maxCacheSize: Int,
-                         maxRollbackDepth: Int,
-                         rememberBlocks: FiniteDuration,
                          ntpServer: String,
                          dbSettings: DBSettings,
                          networkSettings: NetworkSettings,
@@ -30,9 +25,6 @@ object WavesSettings extends CustomValueReaders {
     val waves = rootConfig.getConfig("waves")
 
     val directory               = waves.as[String]("directory")
-    val maxCacheSize            = waves.as[Int]("max-cache-size")
-    val maxRollbackDepth        = waves.as[Int]("max-rollback-depth")
-    val rememberBlocks          = waves.as[FiniteDuration]("remember-blocks-interval-in-cache")
     val ntpServer               = waves.as[String]("ntp-server")
     val dbSettings              = waves.as[DBSettings]("db")
     val networkSettings         = waves.as[NetworkSettings]("network")
@@ -48,9 +40,6 @@ object WavesSettings extends CustomValueReaders {
 
     WavesSettings(
       directory,
-      maxCacheSize,
-      maxRollbackDepth,
-      rememberBlocks,
       ntpServer,
       dbSettings,
       networkSettings,
