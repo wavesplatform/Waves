@@ -862,7 +862,7 @@ class LevelDBWriter(writableDB: DB,
 
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readOnly { db =>
     db.get(Keys.heightOf(parentSignature)).map { parentHeight =>
-      (parentHeight + 1 until (parentHeight + howMany))
+      (parentHeight + 1 to (parentHeight + howMany))
         .map { h =>
           val height = Height(h)
           db.get(Keys.blockHeaderAndSizeAt(height))
