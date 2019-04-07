@@ -26,13 +26,13 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, Set.empty)
-        microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L))
+        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty)
+        microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L, 0L))
 
         ng.totalDiffOf(microBlocks.last.totalResBlockSig)
         microBlocks.foreach { m =>
           ng.totalDiffOf(m.totalResBlockSig).get match {
-            case (forged, _, _, _) => forged.signaturesValid() shouldBe 'right
+            case (forged, _, _, _, _) => forged.signaturesValid() shouldBe 'right
             case _                 => ???
           }
         }
@@ -45,12 +45,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, Set.empty)
-        microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L))
+        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty)
+        microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L, 0L))
 
         ng.bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, 0L, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+        new NgState(block, Diff.empty, 0L, 0L, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 
@@ -59,11 +59,11 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, Set.empty)
+        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty)
 
         microBlocks.foldLeft(1000) {
           case (thisTime, m) =>
-            ng.append(m, Diff.empty, 0L, thisTime)
+            ng.append(m, Diff.empty, 0L, 0L, thisTime)
             thisTime + 50
         }
 
@@ -72,7 +72,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
         ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, 0L, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+        new NgState(block, Diff.empty, 0L, 0L, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 
@@ -81,8 +81,8 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, Set.empty)
-        microBlocks.foreach(m => ng.append(m, Diff.empty, 1L, 0L))
+        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty)
+        microBlocks.foreach(m => ng.append(m, Diff.empty, 1L, 0L, 0L))
 
         ng.totalDiffOf(block.uniqueId).map(_._3) shouldBe Some(0L)
         microBlocks.zipWithIndex.foreach {

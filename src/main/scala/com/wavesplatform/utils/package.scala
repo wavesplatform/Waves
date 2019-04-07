@@ -13,6 +13,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -104,7 +105,7 @@ package object utils extends ScorexLogging {
       in = Coeval(???),
       h = Coeval(???),
       blockchain = EmptyBlockchain,
-      contractAdress = Coeval(???)
+      address = Coeval(???)
     )
     directives
       .filter(_.isRight)
@@ -131,7 +132,7 @@ package object utils extends ScorexLogging {
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
-      case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
+      case (typeName, CASETYPEREF(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>

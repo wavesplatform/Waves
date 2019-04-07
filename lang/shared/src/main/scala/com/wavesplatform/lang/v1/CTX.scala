@@ -11,7 +11,7 @@ import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
 
 @JSExportTopLevel("CTX")
-case class CTX(@(JSExport @field) types: Seq[DefinedType],
+case class CTX(@(JSExport @field) types: Seq[FINAL],
                @(JSExport @field) vars: Map[String, ((FINAL, String), LazyVal)],
                @(JSExport @field) functions: Array[BaseFunction]) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap

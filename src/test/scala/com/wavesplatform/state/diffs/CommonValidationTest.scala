@@ -48,9 +48,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
+          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
           f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
         }
@@ -71,9 +71,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
+          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
           f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
         }
@@ -189,9 +189,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
+          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
           f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
         }

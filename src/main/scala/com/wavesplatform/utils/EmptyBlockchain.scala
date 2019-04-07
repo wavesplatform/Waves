@@ -42,6 +42,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def parent(block: Block, back: Int): Option[Block] = None
 
+  override def totalFee(height: Int): Option[Long] = None
+
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = Map.empty
 
@@ -103,6 +105,6 @@ object EmptyBlockchain extends Blockchain {
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
-  override def append(diff: Diff, carryFee: Long, block: Block): Unit                                  = ()
+  override def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit                  = ()
   override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]]                          = Right(Seq.empty)
 }

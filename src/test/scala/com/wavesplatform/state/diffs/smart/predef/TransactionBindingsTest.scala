@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -266,24 +266,47 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("InvokeScriptTransaction binding") {
     forAll(invokeScriptGen) { t =>
+      val checkArgsScript = if (t.fc.args.nonEmpty) {
+        t.fc.args
+      .map {
+        case CONST_LONG(i)    => i.toString
+        case CONST_STRING(s)  => s""""$s""""
+        case CONST_BOOLEAN(b) => b.toString
+        case CONST_BYTESTR(b) => s"base64'${b.base64}'"
+      }
+      .zipWithIndex
+      .map { case (str, i) => s"t.args[$i] == $str" }
+      .mkString("let checkArgs = ", " && ", "\n")
+      } else {
+        "let checkArgs = true"
+      }
+
       val script =
         s"""
             |match tx {
             | case t : InvokeScriptTransaction  =>
             |   ${provenPart(t)}
             |   let dappAddress = t.dappAddress.bytes == base58'${t.dappAddress.bytes.base58}'
+            |
             |   let paymentAmount = if(${t.payment.nonEmpty})
             |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
             |     else isDefined(t.payment) == false
+            |
             |   let paymentAssetId = if(${t.payment.nonEmpty})
-            |     then if (${t.payment.headOption.map(_.assetId != Waves).getOrElse(false)})
+            |     then if (${t.payment.headOption.exists(_.assetId != Waves)})
             |             then extract(t.payment).assetId == base58'${t.payment.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
             |             else isDefined(extract(t.payment).assetId) == false
             |     else isDefined(t.payment) == false
+            |
             |   let feeAssetId = if (${t.feeAssetId != Waves})
             |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
             |      else isDefined(t.feeAssetId) == false
-            |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId
+            |
+            |   let checkFunc = t.function == "${t.fc.function.funcName}"
+            |   $checkArgsScript
+
+            |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId && checkFunc && checkArgs
+            |
             | case other => throw()
             | }
             |""".stripMargin

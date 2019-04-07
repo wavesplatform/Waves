@@ -1,7 +1,8 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
@@ -19,8 +20,8 @@ object ScriptRunner {
             in: TxOrd,
             blockchain: Blockchain,
             script: Script,
-            isTokenScript: Boolean,
-            dappAddress: Address): (Log, Either[ExecutionError, EVALUATED]) = {
+            isAssetScript: Boolean,
+            scriptContainerAddress: ByteStr): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
       case s: ExprScript =>
         val ctx = BlockchainContext.build(
@@ -29,24 +30,26 @@ object ScriptRunner {
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
           blockchain,
-          isTokenScript,
+          isAssetScript,
           false,
-          Coeval(dappAddress)
+          Coeval(scriptContainerAddress)
         )
         EvaluatorV1.applyWithLogging[EVALUATED](ctx, s.expr)
-      case ContractScript.ContractScriptImpl(_, DApp(_, _, Some(vf)), _) =>
+      case ContractScript.ContractScriptImpl(_, DApp(decls, _, Some(vf)), _) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
           blockchain,
-          isTokenScript,
+          isAssetScript,
           true,
-          Coeval(dappAddress)
+          Coeval(scriptContainerAddress)
         )
-        val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
-                                        _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))
+        val evalContract = in.eliminate(
+          t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.apply(t)),
+          _.eliminate(t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)), _ => ???)
+        )
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, None), _) =>

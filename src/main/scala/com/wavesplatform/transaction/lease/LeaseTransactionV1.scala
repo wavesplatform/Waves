@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -12,12 +12,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class LeaseTransactionV1 private (sender: PublicKey,
-                                       amount: Long,
-                                       fee: Long,
-                                       timestamp: Long,
-                                       recipient: AddressOrAlias,
-                                       signature: ByteStr)
+case class LeaseTransactionV1 private (sender: PublicKey, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias, signature: ByteStr)
     extends LeaseTransaction
     with SignedTransaction
     with FastHashId {
@@ -64,11 +59,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
     }
   }
 
-  def selfSigned(sender: KeyPair,
-                 amount: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: KeyPair, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(sender, amount, fee, timestamp, recipient, sender)
   }
 

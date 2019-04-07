@@ -19,7 +19,7 @@ trait WithState extends DBCacheSettings {
   protected def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)
-    try f(new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, maxCacheSize, 2000, 120 * 60 * 1000))
+    try f(new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, maxCacheSize, 2000, 120 * 60 * 1000, true))
     finally {
       db.close()
       TestHelpers.deleteRecursively(path)
@@ -32,7 +32,7 @@ trait WithState extends DBCacheSettings {
 trait WithDomain extends WithState with NTPTime {
   _: Suite =>
 
-  def withDomain[A](settings: WavesSettings = WavesSettings.fromConfig(loadConfig(ConfigFactory.load())))(test: Domain => A): A = {
+  def withDomain[A](settings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load())))(test: Domain => A): A = {
     try withState(settings.blockchainSettings.functionalitySettings) { blockchain =>
       val bcu = new BlockchainUpdaterImpl(blockchain, ignoreSpendableBalanceChanged, settings, ntpTime)
       try test(Domain(bcu))

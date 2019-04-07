@@ -43,7 +43,7 @@ object InvokeScriptTransactionDiff {
         Coeval(tx.asInstanceOf[In]),
         Coeval(height),
         blockchain,
-        Coeval(tx.dappAddress)
+        Coeval(tx.dappAddress.bytes)
       )
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
@@ -75,7 +75,7 @@ object InvokeScriptTransactionDiff {
           case Some(_) =>
             val (result, trace) = evalContract(contract)
             val diff = result
-                  .leftMap { case (error, log) => ScriptExecutionError(error, log, isTokenScript = false) }
+                  .leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
                   .flatMap {
                     case ScriptResult(ds, ps) =>
                       val pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {
@@ -250,11 +250,11 @@ object InvokeScriptTransactionDiff {
         CompositeBlockchain.composite(blockchain, totalDiff),
         script,
         true,
-        tx.dappAddress
+        tx.dappAddress.bytes
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, true))
         case (log, Right(FALSE)) =>
-          Left(TransactionNotAllowedByScript(log, isTokenScript = true))
+          Left(TransactionNotAllowedByScript(log, isAssetScript = true))
         case (_, Right(TRUE)) => Right(nextDiff)
         case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }

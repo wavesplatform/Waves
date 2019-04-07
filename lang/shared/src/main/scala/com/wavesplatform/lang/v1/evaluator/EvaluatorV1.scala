@@ -4,6 +4,7 @@ import cats.Monad
 import cats.implicits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
@@ -92,10 +93,10 @@ fields.get(field) match {
           header match {
             case FunctionHeader.User(typeName) =>
               types.get(ctx).get(typeName).collect {
-                case t @ CaseType(_, fields) =>
+                case t @ CASETYPEREF(_, fields) =>
                   args
                     .traverse[EvalM, EVALUATED](a => evalExpr(a))
-                    .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
+                    .map(argValues => CaseObj(t, fields.map(_._1).zip(argValues).toMap))
               }
             case _ => None
           }

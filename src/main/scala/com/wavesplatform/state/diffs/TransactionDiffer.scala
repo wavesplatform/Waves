@@ -59,7 +59,7 @@ object TransactionDiffer extends ScorexLogging {
       blockchain: Blockchain,
       tx: Transaction): Either[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
-      tx match {
+      val diff = tx match {
         case gtx: GenesisTransaction      => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction      => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
         case itx: IssueTransaction        => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
@@ -79,6 +79,8 @@ object TransactionDiffer extends ScorexLogging {
         case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci).diffE
         case _                           => Left(UnsupportedTransactionType)
       }
+
+      diff
     }
   }
 }

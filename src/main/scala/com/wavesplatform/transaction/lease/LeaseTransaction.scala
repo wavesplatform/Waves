@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{PublicKey, Address, AddressOrAlias}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval
@@ -24,8 +24,8 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
       "timestamp" -> timestamp
     ))
 
-  protected final val bytesBase = Coeval.evalOnce(
-    Bytes.concat(sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
+  protected final val bytesBase =
+    Coeval.evalOnce(Bytes.concat(sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
 }
 
 object LeaseTransaction {
