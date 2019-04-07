@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{ScriptTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import cats.implicits._
 
 object ContractEvaluator {
   case class Invocation(fc: FUNCTION_CALL, caller: Recipient.Address, callerPk: ByteStr, payment: Option[(Long, Option[ByteStr])], dappAddress: ByteStr)
@@ -64,6 +65,10 @@ object ContractEvaluator {
     EvaluatorV1.evalExpr(expr)
   }
 
-  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[ExecutionError, ScriptResult] =
-    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ScriptResult.fromObj)
+  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[(ExecutionError, Log), ScriptResult] = {
+    val (log, result) = EvaluatorV1.evalWithLogging(ctx, eval(c, i))
+    result
+      .flatMap(ScriptResult.fromObj)
+      .leftMap((_, log))
+  }
 }

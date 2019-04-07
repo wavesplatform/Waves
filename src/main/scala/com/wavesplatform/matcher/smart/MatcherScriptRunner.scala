@@ -17,7 +17,7 @@ object MatcherScriptRunner {
   def apply(script: Script, order: Order, isTokenScript: Boolean): (Log, Either[String, EVALUATED]) = script match {
     case s: ExprScript =>
       val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
-      EvaluatorV1.applywithLogging(ctx, s.expr)
+      EvaluatorV1.applyWithLogging(ctx, s.expr)
 
     case ContractScript.ContractScriptImpl(_, DApp(_, _, Some(vf)), _) =>
       val ctx = MatcherContext.build(

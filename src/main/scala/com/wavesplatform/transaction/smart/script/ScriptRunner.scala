@@ -33,7 +33,7 @@ object ScriptRunner {
           false,
           Coeval(dappAddress)
         )
-        EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
+        EvaluatorV1.applyWithLogging[EVALUATED](ctx, s.expr)
       case ContractScript.ContractScriptImpl(_, DApp(_, _, Some(vf)), _) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,

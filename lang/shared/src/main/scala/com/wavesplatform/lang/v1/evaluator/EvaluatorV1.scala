@@ -117,13 +117,13 @@ fields.get(field) match {
     case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
   }
 
-  def applywithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
+  def applyWithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
     val log = ListBuffer[LogItem]()
     val r   = ap(c, expr, (str: String) => (v: LetExecResult) => log.append((str, v)))
     (log.toList, r)
   }
 
-  def applywithLogging[A <: EVALUATED](
+  def applyWithLogging[A <: EVALUATED](
     c:    Either[ExecutionError, EvaluationContext],
     expr: EXPR
   ): (Log, Either[ExecutionError, A]) = {
