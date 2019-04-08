@@ -56,13 +56,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
-  private val db = openDB(settings.dataDirectory)
+  private val db = openDB(settings.dbSettings.directory)
 
   private val LocalScoreBroadcastDebounce = 1.second
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, settings.dbSettings.storeTransactionsByAddress)
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -382,7 +382,7 @@ object Application extends ScorexLogging {
       SystemInformationReporter.report(config)
     }
 
-    val settings = WavesSettings.fromConfig(config)
+    val settings = WavesSettings.fromRootConfig(config)
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme {

@@ -272,7 +272,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
       client.startContainer(containerId)
 
-      val node = new DockerNode(actualConfig, containerId, getNodeInfo(containerId, WavesSettings.fromConfig(actualConfig)))
+      val node = new DockerNode(actualConfig, containerId, getNodeInfo(containerId, WavesSettings.fromRootConfig(actualConfig)))
       nodes.add(node)
       log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}")
       node

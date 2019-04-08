@@ -79,7 +79,7 @@ object MatcherTool extends ScorexLogging {
 
     val userConfig   = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
     val actualConfig = loadConfig(userConfig)
-    val settings     = WavesSettings.fromConfig(actualConfig)
+    val settings     = WavesSettings.fromRootConfig(actualConfig)
     val db           = openDB(settings.matcherSettings.dataDir)
 
     AddressScheme.current = new AddressScheme {
