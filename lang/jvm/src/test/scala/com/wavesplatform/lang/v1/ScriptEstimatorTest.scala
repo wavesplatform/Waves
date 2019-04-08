@@ -27,13 +27,13 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   private val ctx = {
     val transactionType = Types.buildTransferTransactionType(true)
-    val tx              = CaseObj(transactionType.typeRef, Map("amount" -> CONST_LONG(100000000L)))
+    val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combine(
         PureContext.build(V1),
         CTX(
           Seq(transactionType),
-          Map(("tx", ((transactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
+          Map(("tx", ((transactionType, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
           Array.empty
         )
       )

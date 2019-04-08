@@ -9,12 +9,12 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, LazyVal, NativeFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{LazyVal, NativeFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 
 package object compiler {
 
-  val pointType   = CaseType("Point", List("x" -> LONG, "y" -> LONG))
+  val pointType   = CASETYPEREF("Point", List("x" -> LONG, "y" -> LONG))
   val listOfLongs = LIST
   val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "test id", ("p1", TYPEPARAM('T'), "p1")) {
     case a :: Nil => Right(a)
@@ -41,7 +41,7 @@ package object compiler {
         Map(
           ("p", ((Common.AorB, "Test variable"), null)),
           ("l", ((LIST(LONG), "Test list"), LazyVal(EitherT.pure(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))))),
-          ("lpa", ((LIST(Common.pointTypeA.typeRef), "Yet test list"), LazyVal(EitherT.pure(arr)))),
+          ("lpa", ((LIST(Common.pointTypeA), "Yet test list"), LazyVal(EitherT.pure(arr)))),
           ("lpabc", ((LIST(Common.AorBorC), "Yet another test list"), LazyVal(EitherT.pure(arr))))
         ),
         Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
