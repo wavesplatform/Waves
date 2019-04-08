@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.account._
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V3
@@ -20,6 +21,7 @@ import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.transfer._
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -244,10 +246,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
     } yield TransferTransactionV1.selfSigned(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).explicitGet()
 
-  def versionedTransferGeneratorP(sender: KeyPair,
-                                  recipient: AddressOrAlias,
-                                  assetId: Asset,
-                                  feeAssetId: Asset): Gen[TransferTransactionV2] =
+  def versionedTransferGeneratorP(sender: KeyPair, recipient: AddressOrAlias, assetId: Asset, feeAssetId: Asset): Gen[TransferTransactionV2] =
     for {
       (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
     } yield
@@ -267,11 +266,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       (_, _, _, _, _, _, feeAmount, attachment) <- transferParamGen
     } yield TransferTransactionV2.selfSigned(Waves, sender, recipient, amount, timestamp, Waves, feeAmount, attachment).explicitGet()
 
-  def transferGeneratorP(timestamp: Long,
-                         sender: KeyPair,
-                         recipient: AddressOrAlias,
-                         assetId: Asset,
-                         feeAssetId: Asset): Gen[TransferTransactionV1] =
+  def transferGeneratorP(timestamp: Long, sender: KeyPair, recipient: AddressOrAlias, assetId: Asset, feeAssetId: Asset): Gen[TransferTransactionV1] =
     for {
       (_, _, _, amount, _, _, feeAmount, attachment) <- transferParamGen
     } yield TransferTransactionV1.selfSigned(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).explicitGet()
@@ -478,8 +473,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  def sponsorFeeCancelSponsorFeeGen(
-      sender: KeyPair): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
+  def sponsorFeeCancelSponsorFeeGen(sender: KeyPair): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransactionV1
@@ -840,8 +834,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       lease = LeaseTransactionV2.selfSigned(master, ENOUGH_AMT / 2, fee, ts, recipient).explicitGet()
     } yield (genesis, setScript, lease, transfer)
 
-  def smartIssueTransactionGen(senderGen: Gen[KeyPair] = accountGen,
-                               sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[IssueTransactionV2] =
+  def smartIssueTransactionGen(senderGen: Gen[KeyPair] = accountGen, sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[IssueTransactionV2] =
     for {
       script                                                                      <- sGen
       (_, assetName, description, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
@@ -850,4 +843,19 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       IssueTransactionV2
         .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
         .explicitGet()
+
+  val blockGen = for {
+    baseTarget          <- arbitrary[Long]
+    reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
+    generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
+    assetBytes          <- byteArrayGen(AssetIdLength)
+    time                <- timestampGen
+    assetId = IssuedAsset(ByteStr(assetBytes))
+    sender                    <- accountGen
+    recipient                 <- accountGen
+    paymentTransaction        <- wavesTransferGeneratorP(time, sender, recipient)
+    transferTrancation        <- transferGeneratorP(1 + time, sender, recipient, assetId, Waves)
+    anotherPaymentTransaction <- wavesTransferGeneratorP(2 + time, sender, recipient)
+    transactionData = Seq(paymentTransaction, transferTrancation, anotherPaymentTransaction)
+  } yield (baseTarget, reference, ByteStr(generationSignature), recipient, transactionData)
 }

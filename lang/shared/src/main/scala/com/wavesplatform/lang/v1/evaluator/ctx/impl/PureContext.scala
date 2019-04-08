@@ -65,7 +65,7 @@ object PureContext {
 
   lazy val ne: BaseFunction =
     UserFunction(NE_OP.func,
-                 Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1),
+                 Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1, V4 -> 1),
                  BOOLEAN,
                  "Inequality",
                  ("@a", TYPEPARAM('T'), "value"),
@@ -78,7 +78,7 @@ object PureContext {
     case _                              => Left(defaultThrowMessage)
   }
 
-  lazy val throwNoMessage: BaseFunction = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1), NOTHING, "Fail script") {
+  lazy val throwNoMessage: BaseFunction = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1, V4 -> 1), NOTHING, "Fail script") {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage)))
   }
 
@@ -111,7 +111,7 @@ object PureContext {
   lazy val isDefined: BaseFunction =
     UserFunction(
       "isDefined",
-      Map[StdLibVersion, Long](V1 -> 35, V2 -> 35, V3 -> 1),
+      Map[StdLibVersion, Long](V1 -> 35, V2 -> 35, V3 -> 1, V4 -> 1),
       BOOLEAN,
       "Check the value is defined",
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")
@@ -458,12 +458,12 @@ object PureContext {
     }
 
   lazy val uMinus: BaseFunction =
-    UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1), LONG, "Change integer sign", ("@n", LONG, "value")) {
+    UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1, V4 -> 1), LONG, "Change integer sign", ("@n", LONG, "value")) {
       FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
     }
 
   lazy val uNot: BaseFunction =
-    UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1), BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
+    UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1, V4 -> 1), BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
       IF(REF("@p"), FALSE, TRUE)
     }
 
@@ -532,7 +532,7 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3 =>
+      case V3 | V4 =>
         Monoid.combine(
           ctx,
           CTX(

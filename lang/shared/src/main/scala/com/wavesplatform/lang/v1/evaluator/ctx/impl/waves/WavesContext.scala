@@ -306,7 +306,7 @@ object WavesContext {
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
       NativeFunction("transactionById",
-                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500),
+                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500, V4 -> 500),
                      GETTRANSACTIONBYID,
                      returnType,
                      "Lookup transaction",
@@ -389,6 +389,14 @@ object WavesContext {
         )
         val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
+      },
+      4 -> {
+        val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
+          ("Sell", ((sellType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+        )
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
+        (v3Part1 ++ v3Part2)
       }
     )
 
@@ -419,7 +427,7 @@ object WavesContext {
         "blockHeaderFromBytes",
         100,
         BLOCKHEADER_FROM_BYTES,
-        UNION.create(UNIT :: anyTransactionType.typeList),
+        UNION.create(UNIT :: blockHeader :: Nil),
         "parse block header from bytes",
         ("blockHeaderBytes", BYTESTR, "block header bytes")
       ) {
@@ -500,14 +508,10 @@ object WavesContext {
                 } else List.empty),
       commonVars ++ vars(version.id),
       functions ++
-        versioned(version, V3, v3Functions).map(withExtract) ++
-        versioned(version, V4, v4Functions)
+        (if (version == V3) v3Functions.map(withExtract) else List.empty) ++
+        (if (version == V4) v3Functions.map(withExtract) ++ v4Functions else List.empty)
     )
   }
-
-  def versioned[A](actual: StdLibVersion, expected: StdLibVersion, xs: => List[A]): List[A] =
-    if (expected == actual) xs
-    else List.empty[A]
 
   val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)), Some("VerifierInput"))
 }

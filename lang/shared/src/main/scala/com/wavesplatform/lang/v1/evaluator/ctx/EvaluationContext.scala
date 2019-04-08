@@ -12,7 +12,7 @@ case class LoggedEvaluationContext(l: LetLogCallback, ec: EvaluationContext)
 
 object LoggedEvaluationContext {
   object Lenses {
-    val types: Lens[LoggedEvaluationContext, Map[String, FINAL]]          = lens[LoggedEvaluationContext] >> 'ec >> 'typeDefs
+    val types: Lens[LoggedEvaluationContext, Map[String, FINAL]]                = lens[LoggedEvaluationContext] >> 'ec >> 'typeDefs
     val lets: Lens[LoggedEvaluationContext, Map[String, LazyVal]]               = lens[LoggedEvaluationContext] >> 'ec >> 'letDefs
     val funcs: Lens[LoggedEvaluationContext, Map[FunctionHeader, BaseFunction]] = lens[LoggedEvaluationContext] >> 'ec >> 'functions
   }

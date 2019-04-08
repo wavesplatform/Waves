@@ -80,7 +80,7 @@ object Merkle {
   private def balanceToBytes(in: (Address, Long)): Array[Byte] = {
     val (addr, balance) = in
     ByteBuffer
-      .allocate(30)
+      .allocate(Address.AddressLength + 8)
       .put(addr.bytes.arr)
       .putLong(balance)
       .array()

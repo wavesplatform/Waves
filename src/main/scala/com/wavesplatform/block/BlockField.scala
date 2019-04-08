@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
+import com.wavesplatform.serialization.{BytesSerializable, Deser, JsonSerializable}
 import com.wavesplatform.transaction.Transaction
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -33,7 +33,7 @@ case class ByteBlockField(override val name: String, override val value: Byte) e
 case class HashBlockField(override val name: String, override val value: Digest32) extends BlockField[Digest32] {
   override protected def j: JsObject = Json.obj(name -> Base58.encode(value))
 
-  override protected def b: Array[Byte] = value
+  override protected def b: Array[Byte] = Deser.serializeMerkleRootHash(value)
 }
 
 case class LongBlockField(override val name: String, override val value: Long) extends BlockField[Long] {

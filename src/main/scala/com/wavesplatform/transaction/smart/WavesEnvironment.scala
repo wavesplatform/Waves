@@ -91,7 +91,25 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     TransactionParsers.parseBytes(bytes).toOption.map(RealTransactionWrapper(_))
 
   override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader] =
-    ???
+    com.wavesplatform.block.BlockHeader
+      .parseWithoutTransactions(bytes)
+      .toOption
+      .map { header =>
+        BlockHeader(
+          header.timestamp,
+          header.version.toLong,
+          header.reference,
+          header.signerData.generator,
+          header.signerData.signature,
+          header.consensusData.baseTarget,
+          header.consensusData.generationSignature,
+          header.transactionCount,
+          header.transactionTreeHash,
+          header.minerWavesBalancesTreeHash,
+          header.minerEffectiveBalancesTreeHash,
+          header.featureVotes.map(_.toLong).toSeq
+        )
+      }
 
   override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long = {
     val posCalculator =

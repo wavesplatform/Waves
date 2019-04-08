@@ -1,13 +1,12 @@
 package com.wavesplatform.lagonaki.unit
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Merkle
@@ -16,24 +15,13 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import scorex.crypto.hash.Digest32
+
+import scala.util.{Random, Success}
 
 class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
 
   val time = System.currentTimeMillis() - 5000
-
-  val blockGen = for {
-    baseTarget          <- arbitrary[Long]
-    reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
-    generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
-    assetBytes          <- byteArrayGen(AssetIdLength)
-    assetId = IssuedAsset(ByteStr(assetBytes))
-    sender                    <- accountGen
-    recipient                 <- accountGen
-    paymentTransaction        <- wavesTransferGeneratorP(time, sender, recipient)
-    transferTrancation        <- transferGeneratorP(1 + time, sender, recipient, assetId, Waves)
-    anotherPaymentTransaction <- wavesTransferGeneratorP(2 + time, sender, recipient)
-    transactionData = Seq(paymentTransaction, transferTrancation, anotherPaymentTransaction)
-  } yield (baseTarget, reference, ByteStr(generationSignature), recipient, transactionData)
 
   def bigBlockGen(amt: Int): Gen[Block] =
     for {
@@ -106,6 +94,34 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             Set(1)
           ) should produce("could not contain feature votes")
       }
+    }
+  }
+
+  property("header roundtrip") {
+    forAll(blockGen) {
+      case (baseTarget, reference, generationSignature, recipient, transactionData) =>
+        val randomHash = Digest32 @@ new Array[Byte](32)
+
+        Random.nextBytes(randomHash)
+
+        val block = Block
+          .buildAndSign(
+            3,
+            time,
+            reference,
+            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            transactionData,
+            randomHash,
+            randomHash,
+            randomHash,
+            recipient,
+            Set.empty
+          )
+          .explicitGet()
+
+        val headerBytes = block.headerBytes()
+
+        BlockHeader.parseWithoutTransactions(headerBytes) shouldBe an[Success[_]]
     }
   }
 
@@ -186,9 +202,19 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) {
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
-          Instrumented.withTimeMillis(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs,Merkle.EMPTY_ROOT_HASH,
+          Instrumented.withTimeMillis(
+            Block
+              .buildAndSign(3,
+                            1,
+                            ByteStr(ref),
+                            NxtLikeConsensusBlockData(1, ByteStr(gs)),
+                            txs,
                             Merkle.EMPTY_ROOT_HASH,
-                            Merkle.EMPTY_ROOT_HASH, acc, Set.empty).explicitGet())
+                            Merkle.EMPTY_ROOT_HASH,
+                            Merkle.EMPTY_ROOT_HASH,
+                            acc,
+                            Set.empty)
+              .explicitGet())
         val (bytes, t1) = Instrumented.withTimeMillis(block.bytesWithoutSignature())
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
         val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))

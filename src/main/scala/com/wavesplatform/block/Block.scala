@@ -4,13 +4,14 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{KeyPair, PublicKey, Address}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.fields.FeaturesBlockField
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
+import com.wavesplatform.serialization.Deser
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -44,6 +45,22 @@ class BlockHeader(val timestamp: Long,
     HashBlockField("effectiveBalancesHash", minerEffectiveBalancesTreeHash)
   protected val supportedFeaturesField = FeaturesBlockField(version, featureVotes)
 
+  val headerBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    val cBytesSize = consensusField.bytes().length
+    val cBytes     = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusField.bytes()
+
+    versionField.bytes() ++
+      timestampField.bytes() ++
+      referenceField.bytes() ++
+      cBytes ++
+      Ints.toByteArray(transactionCount) ++
+      supportedFeaturesField.bytes() ++
+      signerField.bytes() ++
+      transactionTreeHashField.bytes() ++
+      balancesTreeHashField.bytes() ++
+      effectiveBalancesTreeHashField.bytes()
+  }
+
   val headerJson: Coeval[JsObject] = Coeval.evalOnce(
     versionField.json() ++
       timestampField.json() ++
@@ -54,6 +71,77 @@ class BlockHeader(val timestamp: Long,
 }
 
 object BlockHeader extends ScorexLogging {
+
+  def parseWithoutTransactions(bytes: Array[Byte]): Try[BlockHeader] = Try {
+    val version = bytes.head
+
+    var position = 1
+
+    val timestamp = Longs.fromByteArray(bytes.slice(position, position + 8))
+    position += 8
+
+    val reference = ByteStr(bytes.slice(position, position + SignatureLength))
+    position += SignatureLength
+
+    val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
+    position += 4
+    val cBytes = bytes.slice(position, position + cBytesLength)
+    val consData =
+      NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), ByteStr(cBytes.takeRight(Block.GeneratorSignatureLength)))
+    position += cBytesLength
+
+    val txCount = version match {
+      case 1 | 2 =>
+        val cnt = bytes(position)
+        position += 1
+        cnt
+      case 3 =>
+        val cnt = ByteBuffer.wrap(bytes.slice(position, position + 4), 0, 4).getInt()
+        position += 4
+        cnt
+    }
+
+    var supportedFeaturesIds = Set.empty[Short]
+
+    if (version > 2) {
+      val featuresCount = Ints.fromByteArray(bytes.slice(position, position + 4))
+      position += 4
+
+      val buffer = ByteBuffer.wrap(bytes.slice(position, position + featuresCount * 2)).asShortBuffer
+      val arr    = new Array[Short](featuresCount)
+      buffer.get(arr)
+      position += featuresCount * 2
+      supportedFeaturesIds = arr.toSet
+    }
+
+    val genPK = bytes.slice(position, position + KeyLength)
+    position += KeyLength
+
+    val signature = ByteStr(bytes.slice(position, position + SignatureLength))
+    position += SignatureLength
+
+    val (transactionsHash, maybeTxHashOffset) = Deser.parseMerkleRootHash(bytes, position)
+    position = maybeTxHashOffset
+    val (minerWavesBalanceHash, maybeMinerBalanceHashOffset) = Deser.parseMerkleRootHash(bytes, position)
+    position = maybeMinerBalanceHashOffset
+    val (minerEffectiveBalanceHash, maybeMinerEffBalanceHashOffset) = Deser.parseMerkleRootHash(bytes, position)
+    position = maybeMinerEffBalanceHashOffset
+
+    val blockHeader =
+      new BlockHeader(
+        timestamp,
+        version,
+        reference,
+        SignerData(PublicKey(genPK), signature),
+        consData,
+        txCount,
+        transactionsHash,
+        minerWavesBalanceHash,
+        minerEffectiveBalanceHash,
+        supportedFeaturesIds
+      )
+    blockHeader
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[(BlockHeader, Array[Byte])] =
     Try {
