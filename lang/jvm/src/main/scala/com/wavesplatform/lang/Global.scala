@@ -7,6 +7,8 @@ import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.hash._
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
+import scala.util.Try
+
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] =
     if (input.length > MaxBase58Bytes) Left(s"base58Encode input exceeds $MaxBase58Bytes")
@@ -43,34 +45,32 @@ object Global extends BaseGlobal {
     else None
   }
 
-  private def parseProof(proofBytes: Array[Byte], valueBytes: Array[Byte]): Option[MerkleProof[Digest32]] = {
-    val slicedBytes = proofBytes.sliding(32, 32).toList
+  private def parseProof(proofBytes: Array[Byte], valueBytes: Array[Byte]): Option[MerkleProof[Digest32]] =
+    Try {
+      MerkleProof[Digest32](
+        LeafData @@ valueBytes,
+        parseMerkleProofLevels(proofBytes)
+      )(blakeCH)
+    }.toOption
 
-    parseHashesAndSides(slicedBytes, Nil) match {
-      case (Nil, Nil) => None
-      case (sides, hashes) =>
-        val data   = LeafData @@ valueBytes
-        val levels = hashes zip sides
-
-        val proof = MerkleProof[Digest32](data, levels)(blakeCH)
-
-        Some(proof)
+  def parseMerkleProofLevels(arr: Array[Byte]): List[(Digest, Side)] = {
+    def parseHashAndSide(arr: Array[Byte]): (Side, Digest, Array[Byte]) = {
+      val side =
+        if (arr(0) == MerkleProof.LeftSide) MerkleProof.LeftSide
+        else MerkleProof.RightSide
+      val hashLen = arr(1).toInt
+      val hash    = Digest32 @@ arr.slice(2, 2 + hashLen)
+      (side, hash, arr.drop(2 + hashLen))
     }
-  }
 
-  private def parseHashesAndSides(sd: List[Array[Byte]], hashAcc: List[Digest32]): (List[Side], List[Digest32]) = {
-    sd match {
-      case sideBytes :: Nil if sideBytes.length == hashAcc.length =>
-        val parsedSides: List[Side] = sideBytes.map {
-          case MerkleProof.LeftSide => MerkleProof.LeftSide
-          case _                    => MerkleProof.RightSide
-        }.toList
-
-        (parsedSides, hashAcc.reverse)
-      case hash :: rest if hash.length == 32 =>
-        parseHashesAndSides(rest, (Digest32 @@ hash) :: hashAcc)
-      case _ => (Nil, Nil)
+    def parseLevels(arr: Array[Byte], acc: List[(Digest, Side)]): List[(Digest, Side)] = {
+      if (arr.nonEmpty) {
+        val (side, hash, rest) = parseHashAndSide(arr)
+        parseLevels(rest, (hash, side) :: acc)
+      } else acc.reverse
     }
+
+    parseLevels(arr, Nil)
   }
 
   private val blakeCH: CryptographicHash[Digest32] =

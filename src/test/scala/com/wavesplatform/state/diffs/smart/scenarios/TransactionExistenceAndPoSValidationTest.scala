@@ -249,13 +249,13 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
   }
 
   def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
-    def _proofBytes(lvls: List[(Digest, Side)], hashAcc: Array[Byte], sideAcc: Array[Byte]): Array[Byte] = {
+    def _proofBytes(lvls: List[(Digest, Side)], acc: Array[Byte]): Array[Byte] = {
       lvls match {
-        case (d, s) :: xs => _proofBytes(xs, hashAcc ++ d, sideAcc :+ s)
-        case Nil          => hashAcc ++ sideAcc
+        case (d, s) :: xs => _proofBytes(xs, Array.concat(acc, s +: d.length.toByte +: d))
+        case Nil          => acc
       }
     }
 
-    _proofBytes(mp.levels.toList, Array.emptyByteArray, Array.emptyByteArray)
+    _proofBytes(mp.levels.toList, Array.emptyByteArray)
   }
 }
