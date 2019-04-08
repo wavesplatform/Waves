@@ -349,7 +349,7 @@ case class DebugApiRoute(ws: WavesSettings,
         val t0 = System.nanoTime
         val diffEi = for {
           tx <- TransactionFactory.fromSignedRequest(jsv)
-          _  <- Verifier(blockchain, h)(tx)
+          _  <- Verifier(blockchain, h)(tx).result
           ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0

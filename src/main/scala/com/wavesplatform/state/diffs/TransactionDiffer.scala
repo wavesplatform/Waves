@@ -53,7 +53,7 @@ object TransactionDiffer extends ScorexLogging {
           BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
         }
     } yield positiveDiff
-  }.left.map(TransactionValidationError(_, tx))
+  }.result.left.map(TransactionValidationError(_, tx))
 
   def unverified(settings: FunctionalitySettings, currentBlockTimestamp: Long, currentBlockHeight: Int)(
       blockchain: Blockchain,
@@ -76,7 +76,7 @@ object TransactionDiffer extends ScorexLogging {
         case sstx: SetAssetScriptTransaction =>
           AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
         case stx: SponsorFeeTransaction  => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci).diffE
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci).result
         case _                           => Left(UnsupportedTransactionType)
       }
     }

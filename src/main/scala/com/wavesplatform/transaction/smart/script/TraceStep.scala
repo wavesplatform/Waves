@@ -10,7 +10,7 @@ sealed abstract class TraceStep
 
 case class AccountVerifierTrace(
     address: Address,
-    resultE: Either[ValidationError, Boolean]
+    resultE: Option[ValidationError]
 ) extends TraceStep
 
 case class AssetVerifierTrace(

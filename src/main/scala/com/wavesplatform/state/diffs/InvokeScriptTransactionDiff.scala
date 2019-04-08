@@ -34,7 +34,7 @@ import shapeless.Coproduct
 import scala.util.{Failure, Success, Try}
 
 object InvokeScriptTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedDiffResult = {
+  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[Diff] = {
     val sc = blockchain.accountScript(tx.dappAddress)
 
     def evalContract(contract: DApp): Either[ScriptExecutionError, ScriptResult] = {
@@ -134,7 +134,7 @@ object InvokeScriptTransactionDiff {
                     )
                   }
                   assetValidationTrace = foldScriptTransfers(blockchain, tx)(ps, dataAndPaymentDiff)
-                  _ <- assetValidationTrace.diffE
+                  _ <- assetValidationTrace.result
                 } yield {
                   val paymentReceiversMap: Map[Address, Portfolio] = Monoid
                     .combineAll(pmts)
@@ -147,8 +147,8 @@ object InvokeScriptTransactionDiff {
                   assetValidationTrace |+| dataAndPaymentDiff |+| Diff.stateOps(portfolios = transfers)
                 }
             } match {
-              case Right(TracedDiffResult(diffE, trace)) => TracedDiffResult(diffE, invokeScriptTrace ::: trace)
-              case Left(e)                               => TracedDiffResult(Left(e), invokeScriptTrace)
+              case Right(TracedResult(diffE, trace)) => TracedResult(diffE, invokeScriptTrace ::: trace)
+              case Left(e)                               => TracedResult(Left(e), invokeScriptTrace)
             }
         }
       case _ => Left(GenericError(s"No contract at address ${tx.dappAddress}"))
@@ -196,20 +196,19 @@ object InvokeScriptTransactionDiff {
   }
 
   private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
-                                                                                       dataDiff: Diff): TracedDiffResult = {
+                                                                                       dataDiff: Diff): TracedResult[Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount) {
-      val foldResult = ps.foldLeft(TracedDiffResult(Right(dataDiff))) { (tracedDiffAcc, payment) =>
+      val foldResult = ps.foldLeft(TracedResult(Right(dataDiff))) { (tracedDiffAcc, payment) =>
         val (addressRepr, amount, asset) = payment
         val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-        val tracedDiff = Asset.fromCompatId(asset) match {
+        val tracedDiff: TracedResult[Diff] = Asset.fromCompatId(asset) match {
           case Waves =>
-            val diffE = Diff.stateOps(
+            Diff.stateOps(
               portfolios = Map(
                 address -> Portfolio(amount, LeaseBalance.empty, Map.empty),
                 tx.dappAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
               )
             ).asRight[ValidationError]
-            TracedDiffResult.wrapE(diffE)
           case a@IssuedAsset(id) =>
             val nextDiff = Diff.stateOps(
               portfolios = Map(
@@ -218,13 +217,13 @@ object InvokeScriptTransactionDiff {
               ))
             blockchain.assetScript(a) match {
               case None =>
-                TracedDiffResult.wrapE(nextDiff.asRight[ValidationError])
+                nextDiff.asRight[ValidationError]
               case Some(script) =>
-                val assetValidationDiff = tracedDiffAcc.diffE.flatMap(
+                val assetValidationDiff = tracedDiffAcc.result.flatMap(
                   d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
-                TracedDiffResult(
+                TracedResult(
                   assetValidationDiff,
                   List(AssetVerifierTrace(id, errorOpt))
                 )
@@ -232,7 +231,7 @@ object InvokeScriptTransactionDiff {
         }
         tracedDiffAcc |+| tracedDiff
       }
-      TracedDiffResult(foldResult.diffE.map(_ => Diff.stateOps()), foldResult.trace)
+      TracedResult(foldResult.result.map(_ => Diff.stateOps()), foldResult.trace)
     } else {
       Left(GenericError(s"Too many ScriptTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
     }

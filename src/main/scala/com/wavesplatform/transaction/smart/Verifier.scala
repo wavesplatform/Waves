@@ -8,13 +8,15 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.TracedResult
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
+import com.wavesplatform.transaction.smart.script.{AccountVerifierTrace, AssetVerifierTrace, Script, ScriptRunner, TraceStep}
 import com.wavesplatform.utils.ScorexLogging
 import shapeless.Coproduct
+import TracedResult._
 
 import scala.util.{Failure, Success, Try}
 
@@ -26,8 +28,8 @@ object Verifier extends ScorexLogging {
 
   type ValidationResult[T] = Either[ValidationError, T]
 
-  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): ValidationResult[Transaction] =
-    (tx match {
+  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): TracedResult[Transaction] = {
+    val validatedTx: TracedResult[Transaction] = tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
@@ -45,41 +47,61 @@ object Verifier extends ScorexLogging {
             stats.signatureVerification
               .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
         }
-    }).flatMap { tx =>
+    }
+    validatedTx.flatMap { tx =>
       tx.checkedAssets()
         .flatMap {
           case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
-          case _                  => None
+          case _ => None
         }
-        .foldRight(Either.right[ValidationError, Transaction](tx)) { (assetInfo, txr) =>
-          txr.right.flatMap(tx =>
+        .foldRight(TracedResult(tx.asRight[ValidationError])) { (assetInfo, txr) =>
+          txr.flatMap(tx =>
             stats.assetScriptExecution
               .measureForType(tx.builder.typeId)(verifyTx(blockchain, assetInfo._1, currentBlockHeight, tx, Some(assetInfo._2.id))))
         }
     }
+  }
 
   def verifyTx(blockchain: Blockchain,
                script: Script,
                height: Int,
                transaction: Transaction,
-               assetIdOpt: Option[ByteStr]): ValidationResult[Transaction] =
-    Try {
-      val containerAddress = if (assetIdOpt.nonEmpty) assetIdOpt.get else transaction.asInstanceOf[Authorized].sender.toAddress.bytes
+               assetIdOpt: Option[ByteStr]): TracedResult[Transaction] = {
+
+    val isAsset       = assetIdOpt.nonEmpty
+    val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
+
+    val result = Try {
+      val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
       logged(
         s"transaction ${transaction.id()}",
-        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, assetIdOpt.nonEmpty, containerAddress)
+        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, isAsset, containerAddress)
       ) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, assetIdOpt.nonEmpty))
-        case (log, Right(FALSE)) =>
-          Left(TransactionNotAllowedByScript(log, assetIdOpt.nonEmpty))
-        case (_, Right(TRUE)) => Right(transaction)
-        case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
+        case (_,   Right(TRUE))     => Right(transaction)
+        case (_,   Right(x))        => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, assetIdOpt.nonEmpty))
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
       case Success(s) => s
     }
+    val error2Trace: Option[ValidationError] => List[TraceStep] =
+      e => {
+        val trace = assetIdOpt.fold[TraceStep](
+          AccountVerifierTrace(senderAddress, e)
+        )(
+          (id: ByteStr) => AssetVerifierTrace(id, e)
+        )
+        List(trace)
+      }
+
+    result match {
+      case r @ Right(_) => TracedResult(r, error2Trace(None))
+      case l @ Left(e)  => TracedResult(l, error2Trace(Some(e)))
+    }
+  }
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     Try {
@@ -100,26 +122,26 @@ object Verifier extends ScorexLogging {
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
-                     height: Int): ValidationResult[Transaction] = {
+                     height: Int): TracedResult[Transaction] = {
 
     val typeId    = et.builder.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
 
-    def matcherTxVerification =
+    def matcherTxVerification: TracedResult[Transaction] =
       matcherScriptOpt
         .map { script =>
           if (et.version != 1) {
             stats.accountScriptExecution
               .measureForType(typeId)(verifyTx(blockchain, script, height, et, None))
           } else {
-            Left(GenericError("Can't process transaction with signature from scripted account"))
+            TracedResult.wrapE(Left(GenericError("Can't process transaction with signature from scripted account")))
           }
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
 
-    def orderVerification(order: Order) = {
-      blockchain
+    def orderVerification(order: Order): TracedResult[Order] = {
+      val verificationResult = blockchain
         .accountScript(order.sender.toAddress)
         .map { script =>
           if (order.version != 1) {
@@ -129,12 +151,14 @@ object Verifier extends ScorexLogging {
           }
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)))
+
+      TracedResult.wrapE(verificationResult)
     }
 
-    def assetVerification(assetId: Asset) = assetId match {
+    def assetVerification(assetId: Asset): TracedResult[Transaction] = assetId match {
       case Waves => Right(et)
       case asset: IssuedAsset =>
-        blockchain.assetScript(asset).fold[ValidationResult[Transaction]](Right(et)) { script =>
+        blockchain.assetScript(asset).fold[TracedResult[Transaction]](Right(et)) { script =>
           verifyTx(blockchain, script, height, et, assetId.compatId) leftMap {
             case x: HasScriptType => x
             case GenericError(x)  => ScriptExecutionError(x, List.empty, isAssetScript = true)
@@ -143,13 +167,13 @@ object Verifier extends ScorexLogging {
         }
     }
 
-    lazy val txAssetsVerification: ValidationResult[Transaction] = {
+    lazy val txAssetsVerification: TracedResult[Transaction] = {
       Set(
         buyOrder.assetPair.amountAsset,
         buyOrder.assetPair.priceAsset,
         buyOrder.matcherFeeAssetId,
         sellOrder.matcherFeeAssetId
-      ).foldLeft[ValidationResult[Transaction]](Right(et)) {
+      ).foldLeft[TracedResult[Transaction]](Right(et)) {
         case (verificationResult, asset) => verificationResult flatMap (_ => assetVerification(asset))
       }
     }
