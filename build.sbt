@@ -109,6 +109,7 @@ inScope(Global)(
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",
+      "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
