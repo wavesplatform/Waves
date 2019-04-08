@@ -5,17 +5,18 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
@@ -113,7 +114,7 @@ object CommonValidation {
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
-        ValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
+        TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {

@@ -15,15 +15,16 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory, ValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet

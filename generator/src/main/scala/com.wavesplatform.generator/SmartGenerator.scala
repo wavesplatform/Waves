@@ -8,10 +8,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, OrderV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{Asset, Transaction}
 

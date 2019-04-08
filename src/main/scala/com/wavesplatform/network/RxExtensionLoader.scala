@@ -13,8 +13,8 @@ import monix.reactive.{Observable, Observer}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 import scala.concurrent.duration._
 

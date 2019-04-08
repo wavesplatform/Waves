@@ -8,9 +8,9 @@ import akka.http.scaladsl.server._
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {

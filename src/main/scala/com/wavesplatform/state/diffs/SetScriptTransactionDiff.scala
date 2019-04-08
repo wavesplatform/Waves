@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 import scala.util.Right

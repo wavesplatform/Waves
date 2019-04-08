@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import monix.reactive.Observable
 
 trait BlockchainUpdater {

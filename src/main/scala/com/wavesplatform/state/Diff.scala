@@ -2,15 +2,15 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{PublicKey, Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.Script
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)

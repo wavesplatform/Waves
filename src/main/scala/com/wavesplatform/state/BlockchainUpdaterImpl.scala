@@ -10,6 +10,8 @@ import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.WavesSettings
@@ -17,10 +19,9 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject

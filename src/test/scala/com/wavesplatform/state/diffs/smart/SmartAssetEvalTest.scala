@@ -5,15 +5,15 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{Expression, V3}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransactionV2, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}

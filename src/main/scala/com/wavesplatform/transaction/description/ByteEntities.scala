@@ -2,21 +2,22 @@ package com.wavesplatform.transaction.description
 
 import cats.{Functor, Semigroupal}
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.account.{PublicKey, Address, AddressOrAlias, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.Validation
+import com.wavesplatform.transaction.TxValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
 import scala.util.{Failure, Success, Try}

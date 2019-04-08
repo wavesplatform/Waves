@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.transaction.ValidationError.InvalidSignature
+import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler

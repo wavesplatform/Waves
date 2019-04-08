@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{DataTransaction, ValidationError}
+import com.wavesplatform.transaction.DataTransaction
 
 object DataTransactionDiff {
 

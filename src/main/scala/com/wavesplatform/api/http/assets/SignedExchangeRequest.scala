@@ -2,9 +2,9 @@ package com.wavesplatform.api.http.assets
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange._
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}

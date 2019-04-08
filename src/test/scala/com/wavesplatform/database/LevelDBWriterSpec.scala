@@ -14,7 +14,7 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time

@@ -6,10 +6,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.{BlockchainUpdaterImpl, _}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{TransactionGen, WithDB}

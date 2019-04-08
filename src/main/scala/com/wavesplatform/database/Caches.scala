@@ -7,10 +7,10 @@ import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer

@@ -9,6 +9,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented, _}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}

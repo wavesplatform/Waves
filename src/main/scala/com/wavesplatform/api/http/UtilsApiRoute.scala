@@ -7,9 +7,10 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path

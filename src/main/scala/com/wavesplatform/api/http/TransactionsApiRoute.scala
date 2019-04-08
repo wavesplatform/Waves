@@ -14,7 +14,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
@@ -238,7 +238,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
               case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
               case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
-              case _                         => Left(ValidationError.UnsupportedTransactionType)
+              case _                         => Left(TxValidationError.UnsupportedTransactionType)
             }
         }).fold(ApiError.fromValidationError, _.json())
     }

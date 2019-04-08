@@ -8,7 +8,7 @@ import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.http.ApiMarshallers
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}

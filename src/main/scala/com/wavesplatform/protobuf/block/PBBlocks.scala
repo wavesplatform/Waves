@@ -4,9 +4,9 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.SignerData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBBlocks {
   def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {

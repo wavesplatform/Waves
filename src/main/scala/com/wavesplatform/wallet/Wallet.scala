@@ -6,9 +6,9 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.MissingSenderPrivateKey
+import com.wavesplatform.transaction.TxValidationError.MissingSenderPrivateKey
 import com.wavesplatform.utils.{JsonFileStorage, randomBytes, _}
 import play.api.libs.json._
 

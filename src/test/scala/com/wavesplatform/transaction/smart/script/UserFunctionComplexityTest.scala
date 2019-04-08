@@ -3,17 +3,16 @@ package com.wavesplatform.transaction.smart.script
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.utils
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}

@@ -2,10 +2,11 @@ package com
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.NG
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.{BlockchainUpdater, ValidationError}
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.ScorexLogging
 
 package object wavesplatform extends ScorexLogging {

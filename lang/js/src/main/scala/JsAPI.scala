@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
+import com.wavesplatform.lang.script.Script
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -177,6 +178,19 @@ object JsAPI {
 
     compiled.fold(
       err => js.Dynamic.literal("error" -> err),
+      identity
+    )
+  }
+
+  @JSExportTopLevel("decompile")
+  def decompile(input: String): js.Dynamic = {
+    val decompiled = Script.fromBase64String(input, checkComplexity = false).right.map{
+      script =>
+        val (scriptText, _) = Script.decompile(script)
+        js.Dynamic.literal("result" -> scriptText)
+    }
+    decompiled.fold(
+      err => js.Dynamic.literal("error" -> err.m),
       identity
     )
   }

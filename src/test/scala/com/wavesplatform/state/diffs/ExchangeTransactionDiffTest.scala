@@ -6,13 +6,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.AccountBalanceError
+import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}

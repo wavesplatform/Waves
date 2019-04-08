@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{KeyPair, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -11,12 +11,13 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync.createSignedIssueRequest
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json.Json
 
 import scala.concurrent.duration.DurationInt
