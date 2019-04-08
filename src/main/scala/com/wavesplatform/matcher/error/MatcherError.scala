@@ -225,10 +225,10 @@ object MatcherError {
         order,
         amount,
         denied,
-        e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> MatcherModel
-          .fromNormalized(ord.amount, amountAssetDecimals, priceAssetDecimals)}) does not meet matcher requirements: max amount = ${'maxAmount -> BigDecimal
-          .valueOf(amtSettings.maxAmount)}, min amount = ${'minAmount -> BigDecimal
-          .valueOf(amtSettings.minAmount)}, step size = ${'stepSize   -> BigDecimal.valueOf(amtSettings.stepSize)}"
+        e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> OrderRestrictionsSettings.formatValue(MatcherModel
+          .fromNormalized(ord.amount, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max amount = ${'maxAmount -> OrderRestrictionsSettings
+          .formatValue(amtSettings.maxAmount)}, min amount = ${'minAmount -> OrderRestrictionsSettings
+          .formatValue(amtSettings.minAmount)}, step size = ${'stepSize   -> OrderRestrictionsSettings.formatValue(amtSettings.stepSize)}"
       )
 
   case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings, amountAssetDecimals: Int, priceAssetDecimals: Int)
@@ -236,11 +236,11 @@ object MatcherError {
         order,
         price,
         denied,
-        e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> MatcherModel
-          .fromNormalized(ord.price, amountAssetDecimals, priceAssetDecimals)}) does not meet matcher requirements: max price = ${'maxPrice -> BigDecimal
-          .valueOf(prcSettings.maxPrice)}, min price = ${'minPrice -> BigDecimal
-          .valueOf(prcSettings.minPrice)}, tick size = ${'tickSize                  -> BigDecimal
-          .valueOf(prcSettings.tickSize)}, merge small prices = ${'mergeSmallPrices -> prcSettings.mergeSmallPrices}"
+        e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> OrderRestrictionsSettings.formatValue(MatcherModel
+          .fromNormalized(ord.price, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max price = ${'maxPrice -> OrderRestrictionsSettings
+          .formatValue(prcSettings.maxPrice)}, min price = ${'minPrice -> OrderRestrictionsSettings
+          .formatValue(prcSettings.minPrice)}, tick size = ${'tickSize                  -> OrderRestrictionsSettings
+          .formatValue(prcSettings.tickSize)}, merge small prices = ${'mergeSmallPrices -> prcSettings.mergeSmallPrices}"
       )
 
   sealed abstract class Entity(val code: Int)

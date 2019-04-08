@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PublicKey, Address}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -70,7 +70,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   override lazy val route: Route = pathPrefix("matcher") {
     matcherStatusBarrier {
-      getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+      getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ orderRestrictionsInfo ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
@@ -111,8 +111,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
-        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey),
-                "Incorrect signature")
+        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey), "Incorrect signature")
         pass
     }
 
@@ -177,6 +176,23 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
+  @Path("/orderbook/{amountAsset}/{priceAsset}/info")
+  @ApiOperation(value = "Get order restrictions for the specified asset pair", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+    ))
+  def orderRestrictionsInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
+    withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
+      matcherSettings.orderRestrictions
+        .get(pair)
+        .fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { restrictions =>
+          complete(StatusCodes.OK -> restrictions.getJson.value)
+        }
+    }
+  }
+
   @Path("/orderbook")
   @ApiOperation(value = "Place order",
                 notes = "Place a new limit order (buy or sell)",
@@ -218,7 +234,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             "priceAsset"      -> m.pair.priceAssetStr,
             "priceAssetName"  -> m.priceAssetName,
             "priceAssetInfo"  -> m.priceAssetinfo,
-            "created"         -> m.created
+            "created"         -> m.created,
+            "restrictions"    -> matcherSettings.orderRestrictions.get(m.pair).map(_.getJson.value)
         )))
       )
     })

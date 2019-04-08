@@ -4,8 +4,10 @@ import cats.implicits._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
+import play.api.libs.json.{JsObject, Json}
 
 case class OrderRestrictionsSettings(stepSize: Double,
                                      minAmount: Double,
@@ -13,13 +15,30 @@ case class OrderRestrictionsSettings(stepSize: Double,
                                      tickSize: Double,
                                      minPrice: Double,
                                      maxPrice: Double,
-                                     mergeSmallPrices: Boolean)
+                                     mergeSmallPrices: Boolean) {
+
+  import OrderRestrictionsSettings._
+
+  def getJson: Coeval[JsObject] = Coeval.evalOnce {
+    Json.obj(
+      "stepSize"         -> formatValue(stepSize),
+      "minAmount"        -> formatValue(minAmount),
+      "maxAmount"        -> formatValue(maxAmount),
+      "tickSize"         -> formatValue(tickSize),
+      "minPrice"         -> formatValue(minPrice),
+      "maxPrice"         -> formatValue(maxPrice),
+      "mergeSmallPrices" -> mergeSmallPrices
+    )
+  }
+}
 
 object OrderRestrictionsSettings {
 
   val stepSizeDefault, tickSizeDefault, minAmountDefault, minPriceDefault = 0.00000001
   val maxAmountDefault                                                    = 1000000000
   val maxPriceDefault                                                     = 1000000
+
+  def formatValue(value: Double): String = new java.text.DecimalFormat("#.########").format(value)
 
   implicit val orderRestrictionsSettingsReader: ValueReader[(AssetPair, OrderRestrictionsSettings)] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)

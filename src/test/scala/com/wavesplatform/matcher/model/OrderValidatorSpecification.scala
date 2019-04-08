@@ -417,10 +417,10 @@ class OrderValidatorSpecification
             def getRestrictionsByOrder(order: Order, mergeSmallPrices: Boolean = false): OrderRestrictionsSettings = OrderRestrictionsSettings(
               stepSize = denormalizeAmount(normalizedStepSize),
               minAmount = denormalizeAmount(order.amount / 2),
-              maxAmount = denormalizeAmount((order.amount * 1.5).toLong),
+              maxAmount = denormalizeAmount(order.amount * 2),
               tickSize = denormalizePrice(normalizedTickSize),
               minPrice = denormalizePrice(order.price / 2),
-              maxPrice = denormalizePrice((order.price * 1.5).toLong),
+              maxPrice = denormalizePrice(order.price * 2),
               mergeSmallPrices = mergeSmallPrices
             )
 
@@ -450,7 +450,7 @@ class OrderValidatorSpecification
               Map(defaultOrder.assetPair -> defaultRestrictions.copy(minAmount = denormalizeAmount((defaultOrder.amount * 1.5).toLong)))
 
             val restrictionsMapWithSmallMaxAmount =
-              Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxAmount = denormalizeAmount(defaultOrder.amount / 2)))
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxAmount = denormalizeAmount((defaultOrder.amount / 1.5).toLong)))
 
             orderValidator(defaultRestrictionsMap)(orderWithNonMultipleAmount) should produce("OrderInvalidAmount")
             orderValidator(restrictionsMapWithBigMinAmount)(defaultOrder) should produce("OrderInvalidAmount")
@@ -463,7 +463,7 @@ class OrderValidatorSpecification
               Map(defaultOrder.assetPair -> defaultRestrictions.copy(minPrice = denormalizePrice((defaultOrder.price * 1.5).toLong)))
 
             val restrictionsMapWithSmallMaxPrice =
-              Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxPrice = denormalizePrice(defaultOrder.price / 2)))
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxPrice = denormalizePrice((defaultOrder.price / 1.5).toLong)))
 
             val defaultRestrictionsMergeSmallPrices =
               Map(defaultOrder.assetPair -> defaultRestrictions.copy(mergeSmallPrices = true))
