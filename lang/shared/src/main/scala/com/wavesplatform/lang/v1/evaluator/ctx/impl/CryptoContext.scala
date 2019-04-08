@@ -66,7 +66,7 @@ object CryptoContext {
         "Check validity of merkle tree proof",
         ("merkleRoot", BYTESTR, "root hash of merkle tree"),
         ("merkleProof", BYTESTR, "proof bytes"),
-        ("value bytes", BYTESTR, "bytes of value to be prooven")
+        ("valueBytes", BYTESTR, "bytes of value to be prooven")
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
           Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))

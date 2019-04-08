@@ -20,7 +20,7 @@ object ScriptReader {
       a <- {
         if (versionByte == 0)
           Right((DirectiveDictionary[ContentType].idMap(bytes(1)), DirectiveDictionary[StdLibVersion].idMap(bytes(2)), 3))
-        else if (versionByte == V1.id || versionByte == V2.id || versionByte == V3.id)
+        else if (versionByte == V1.id || versionByte == V2.id || versionByte == V3.id || versionByte == V4.id)
           Right((Expression, DirectiveDictionary[StdLibVersion].idMap(versionByte.toInt), 1))
         else Left(ScriptParseError(s"Can't parse script bytes starting with [${bytes(0).toInt},${bytes(1).toInt},${bytes(2).toInt}]"))
       }

@@ -2,8 +2,8 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
-import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.authds.merkle.MerkleProof
+import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.hash._
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
@@ -48,10 +48,11 @@ object Global extends BaseGlobal {
 
     parseHashesAndSides(slicedBytes, Nil) match {
       case (Nil, Nil) => None
-      case (hashes, sides) =>
+      case (sides, hashes) =>
         val data   = LeafData @@ valueBytes
-        val levels = sides zip hashes
-        val proof  = MerkleProof[Digest32](data, levels)(blakeCH)
+        val levels = hashes zip sides
+
+        val proof = MerkleProof[Digest32](data, levels)(blakeCH)
 
         Some(proof)
     }
@@ -65,7 +66,7 @@ object Global extends BaseGlobal {
           case _                    => MerkleProof.RightSide
         }.toList
 
-        (parsedSides, hashAcc)
+        (parsedSides, hashAcc.reverse)
       case hash :: rest if hash.length == 32 =>
         parseHashesAndSides(rest, (Digest32 @@ hash) :: hashAcc)
       case _ => (Nil, Nil)

@@ -1,39 +1,46 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.typesafe.config.ConfigFactory
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V4}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
-import com.wavesplatform.state.{BinaryDataEntry, BlockchainUpdaterImpl, NG}
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.BinaryDataEntry
+import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.{BlockchainUpdater, DataTransaction, GenesisTransaction}
-import com.wavesplatform.utils.Time
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.utils.Merkle
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.hash.Digest32
+import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
+import scorex.crypto.authds.{LeafData, Side}
+import scorex.crypto.hash.{Digest, Digest32}
 
 import scala.util.Random
 
-class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChecks with Matchers with WithDB with TransactionGen with NoShrink {
+class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   val AMT: Long = 1000000 * 100000000L
 
-  def gen(miner: KeyPair, gateway: KeyPair, script: Script)(time: Time): Gen[Seq[Block]] = {
-    val ts        = time.correctedTime()
+  val fs =
+    TestFunctionalitySettings.Stub
+      .copy(
+        preActivatedFeatures = BlockchainFeatures.implemented.map(_ -> 0).toMap
+      )
+
+  def gen(miner: KeyPair, gateway: KeyPair, script: Script): Gen[Seq[Block]] = {
+    val ts        = System.currentTimeMillis()
     val genesisTx = GenesisTransaction.create(miner, AMT, ts).explicitGet()
 
     for {
@@ -47,10 +54,9 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
         )
         .explicitGet()
       genesisBlock     = TestBlock.create(time = ts, txs = Seq(genesisTx), signer = miner)
-      transferBlock    = TestBlock.create(time = ts + 1000, txs = Seq(transferTx), signer = miner, ref = genesisBlock.uniqueId)
-      setScriptTxBlock = TestBlock.create(time = ts + 2000, txs = Seq(setScriptTx), signer = miner, ref = transferBlock.uniqueId)
-      emptyBlock       = TestBlock.create(time = ts + 3000, txs = Seq.empty, signer = miner, ref = setScriptTxBlock.uniqueId)
-    } yield Seq(genesisBlock, transferBlock, setScriptTxBlock, emptyBlock)
+      transferBlock    = TestBlock.create(time = ts + 1, txs = Seq(transferTx), signer = miner, ref = genesisBlock.signerData.signature)
+      setScriptTxBlock = TestBlock.create(time = ts + 2, txs = Seq(setScriptTx), signer = miner, ref = transferBlock.signerData.signature)
+    } yield Seq(genesisBlock, transferBlock, setScriptTxBlock)
   }
 
   property("can parse block header") {
@@ -102,61 +108,154 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
         val typedScript =
           ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
-        withEnv(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) {
-          case Env(bcu, _) =>
-            val lastBlock = bcu.lastBlock.get
+        forAll(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) { blocks =>
+          val dataTx =
+            DataTransaction
+              .selfSigned(
+                gateway,
+                List(
+                  BinaryDataEntry("header_bytes", ByteStr(blockHeader.headerBytes()))
+                ),
+                5 * 10000000,
+                System.currentTimeMillis()
+              )
+              .explicitGet()
 
-            val dataTx =
-              DataTransaction
-                .selfSigned(
-                  gateway,
-                  List(
-                    BinaryDataEntry("header_bytes", ByteStr(blockHeader.headerBytes()))
-                  ),
-                  5 * 10000000,
-                  lastBlock.timestamp
-                )
-                .explicitGet()
+          val blockWithData =
+            TestBlock
+              .create(
+                signer = miner,
+                txs = List(dataTx)
+              )
 
-            val blockWithData =
-              TestBlock
-                .create(
-                  time = lastBlock.timestamp + 1000,
-                  signer = miner,
-                  txs = List(dataTx),
-                  ref = lastBlock.uniqueId
-                )
-
-            bcu.processBlock(blockWithData) shouldBe an[Right[_, _]]
+          assertDiffEi(blocks, blockWithData, fs) { diffEi =>
+            diffEi shouldBe an[Right[_, _]]
+          }
         }
     }
   }
 
-  final case class Env(blockchain: BlockchainUpdater with NG, poSSelector: PoSSelector)
+  property("can parse transaction") {
+    forAll(accountGen, accountGen, randomTransactionGen) { (miner, gateway, tx) =>
+      val scriptSource =
+        s"""
+           |match tx {
+           |  case dt: DataTransaction =>
+           |    let txBytes = extract(getBinary(dt.data, "tx_bytes"))
+           |    let parsedTx = extract(transactionFromBytes(txBytes))
+           |
+           |    parsedTx.id == base58'${tx.id().base58}'
+           |
+           |  case _ => false
+           |}
+         """.stripMargin
 
-  def withEnv(gen: Time => Gen[(Seq[Block])])(f: Env => Unit): Unit = {
-    val fs =
-      TestFunctionalitySettings.Stub
-        .copy(
-          preActivatedFeatures = BlockchainFeatures.implemented.map(_ -> 0).toMap
-        )
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, 10000, 2000, 120 * 60 * 1000)
-    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
-    val pos           = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
-    try {
-      val blocks = gen(ntpTime).sample.get
+      val untypedScript = Parser.parseExpr(scriptSource).get.value
+      val typedScript =
+        ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
-      blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+      forAll(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) { blocks =>
+        val dataTx =
+          DataTransaction
+            .selfSigned(
+              gateway,
+              List(
+                BinaryDataEntry("tx_bytes", ByteStr(tx.bytes()))
+              ),
+              5 * 10000000,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
+
+        val blockWithData =
+          TestBlock
+            .create(
+              signer = miner,
+              txs = List(dataTx)
+            )
+
+        assertDiffEi(blocks, blockWithData, fs) { diffEi =>
+          diffEi shouldBe an[Right[_, _]]
+        }
       }
-
-      f(Env(bcu, pos))
-      bcu.shutdown()
-    } finally {
-      bcu.shutdown()
-      db.close()
     }
+  }
+
+  property("can check merkle proof") {
+    val scriptSource =
+      s"""
+         |match tx {
+         |  case dt: DataTransaction =>
+         |    let rootHash = extract(getBinary(dt.data, "root_hash"))
+         |    let leafData = extract(getBinary(dt.data, "value_bytes"))
+         |    let merkleProof = extract(getBinary(dt.data, "proof"))
+         |
+         |    checkMerkleProof(rootHash, merkleProof, leafData)
+         |
+         |  case _ => false
+         |}
+         """.stripMargin
+
+    val (tree, leafs) = {
+      val data: List[LeafData] =
+        List
+          .fill(100)(Random.nextInt(10000))
+          .map(Ints.toByteArray)
+          .map(LeafData @@ _)
+
+      val tree = MerkleTree[Digest32](data)(Merkle.FastHash)
+
+      (tree, data)
+    }
+
+    forAll(accountGen, accountGen, Gen.oneOf(leafs)) { (miner, gateway, leaf) =>
+      val untypedScript = Parser.parseExpr(scriptSource).get.value
+      val typedScript =
+        ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+
+      forAll(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) { blocks =>
+        val proof =
+          tree
+            .proofByElement(Leaf[Digest32](leaf)(Merkle.FastHash))
+            .get
+
+        val dataTx =
+          DataTransaction
+            .selfSigned(
+              gateway,
+              List(
+                BinaryDataEntry("root_hash", ByteStr(tree.rootHash)),
+                BinaryDataEntry("value_bytes", ByteStr(leaf)),
+                BinaryDataEntry("proof", ByteStr(proofBytes(proof)))
+              ),
+              5 * 10000000,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
+
+        val blockWithData =
+          TestBlock
+            .create(
+              signer = miner,
+              txs = List(dataTx)
+            )
+
+        assertDiffEi(blocks, blockWithData, fs) { diffEi =>
+          assert(proof.valid(tree.rootHash))
+          diffEi shouldBe an[Right[_, _]]
+        }
+      }
+    }
+  }
+
+  def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
+    def _proofBytes(lvls: List[(Digest, Side)], hashAcc: Array[Byte], sideAcc: Array[Byte]): Array[Byte] = {
+      lvls match {
+        case (d, s) :: xs => _proofBytes(xs, hashAcc ++ d, sideAcc :+ s)
+        case Nil          => hashAcc ++ sideAcc
+      }
+    }
+
+    _proofBytes(mp.levels.toList, Array.emptyByteArray, Array.emptyByteArray)
   }
 }
