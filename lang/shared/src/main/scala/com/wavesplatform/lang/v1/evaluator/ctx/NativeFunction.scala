@@ -1,8 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.StdLibVersion.StdLibVersion
-import com.wavesplatform.lang.{StdLibVersion, TrampolinedExecResult}
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -45,7 +46,7 @@ object NativeFunction {
       ev: PartialFunction[List[EVALUATED], Either[String, EVALUATED]]) =
     new NativeFunction(
       name = name,
-      costByLibVersion = StdLibVersion.SupportedVersions.map(_ -> cost).toMap,
+      costByLibVersion = DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
       ev = ev.orElse{ case _ => Left("Passed argument with wrong type").asInstanceOf[Either[String, EVALUATED]]},
       docString = docString,
@@ -82,10 +83,10 @@ case class UserFunction(@(JSExport @field) name: String,
 object UserFunction {
 
   def apply(name: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
-    UserFunction(name, name, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
+    UserFunction(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
 
   def deprecated(name: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
-    UserFunction.deprecated(name, name, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
+    UserFunction.deprecated(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
 
   def apply(name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
       ev: EXPR): UserFunction =
@@ -93,7 +94,7 @@ object UserFunction {
 
   def apply(name: String, internalName: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
       ev: EXPR): UserFunction =
-    UserFunction(name, internalName, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
+    UserFunction(name, internalName, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
 
   def apply(name: String,
             internalName: String,

@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
@@ -15,7 +15,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, ContentType, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.directives.DirectiveSet
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -26,7 +27,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+          DirectiveSet(V3, Account, DAppType).explicitGet(),
           Common.emptyBlockchainEnvironment()
         )
         .compilerContext
@@ -85,7 +86,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   private val cmpCtx: CompilerContext =
     WavesContext
       .build(
-        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+        DirectiveSet(V3, Account, DAppType).explicitGet(),
         Common.emptyBlockchainEnvironment()
       )
       .compilerContext
@@ -185,7 +186,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | func foo() = {
           |  true
           | }
-          | 
+          |
           | @Verifier(tx)
           | func bar() = {
           |  false
@@ -232,10 +233,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(StdLibVersion.V3),
+          PureContext.build(V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
+            DirectiveSet(V3, Account, DAppType).explicitGet(),
             Common.emptyBlockchainEnvironment()
           )
         ))
@@ -462,27 +463,27 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
     compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
   }
 
   property("expression matching case with non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
-    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
 
     val expr = {
       val script =
         s"""
-          |
+           |
           |  func local(tx: ${verifierTypes.mkString("|")}) = tx
-          |
+           |
           |  @Verifier(tx)
-          |  func test() =
-          |    match local(tx) {
-          |      case _: UndefinedType => true
-          |      case _                => false
-          |  }
-          |
+           |  func test() =
+           |    match local(tx) {
+           |      case _: UndefinedType => true
+           |      case _                => false
+           |  }
+           |
         """.stripMargin
       Parser.parseContract(script).get.value
     }
@@ -491,7 +492,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
   ignore("matching case with union type containing non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
-    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
 
     val expr = {
       val script =
@@ -508,5 +509,82 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
+
+  property("locally call @Callable func should produce informative error") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3#-}
+          | {-#CONTENT_TYPE DAPP#-}
+          |
+          | @Callable(i)
+          | func f1(a:ByteVector) = WriteSet([])
+          |
+          | @Callable(i)
+          | func f2(a:ByteVector) = f1(a)
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'f1'(ByteVector) or it is @Callable")
+  }
+
+  property("contract compiles if script uses InvokeScriptTransaction function and args field") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        s"""
+           |
+           | @Verifier(tx)
+           | func verify() = {
+           |   match tx {
+           |     case ist: InvokeScriptTransaction => isDefined(ist.function) && isDefined(ist.args)
+           |     case _ => false
+           |   }
+           | }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
+  property("compiler error if user function defined below usage") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+           |
+           | let a = foo()
+           | func foo() = (1)
+           |
+           | @Verifier(tx)
+           | func bar() = { a == 1 }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function")
+  }
+
+  property("compiler error if variable defined below usage") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | func foo() = (a)
+          | let a = 1
+          |
+          | @Verifier(tx)
+          | func bar() = { foo() == 1 }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("A definition of 'a' is not found")
   }
 }
