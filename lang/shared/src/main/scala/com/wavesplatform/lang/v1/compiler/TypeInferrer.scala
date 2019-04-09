@@ -2,12 +2,11 @@ package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {
 
   case class MatchResult(tpe: FINAL, name: TYPEPARAM)
-  def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
+  def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, FINAL] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
     val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
@@ -20,7 +19,7 @@ object TypeInferrer {
             commonType match {
               case NOTHING   => Right(NOTHING)
               case p: SINGLE => Right(p)
-              case u @ UNION(plainTypes) =>
+              case u @ UNION(plainTypes, _) =>
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => e >= p)
                 }
@@ -32,7 +31,7 @@ object TypeInferrer {
           case None =>
             Right(resolved.mapValues { t =>
               t.explicitGet() match {
-                case UNION(x :: Nil) => x
+                case UNION(x :: Nil, _) => x
                 case x               => x
               }
             })
@@ -40,7 +39,7 @@ object TypeInferrer {
     }
   }
 
-  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
+  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL]): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
@@ -55,13 +54,13 @@ object TypeInferrer {
         val parameterized = l
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])
-        if (conctretes >= UNION.create(argType.l)) Right(None)
+        if (conctretes >= UNION.create(argType.typeList)) Right(None)
         else
           parameterized match {
             case singlePlaceholder :: Nil =>
               val nonMatchedArgTypes = argType match {
                 case NOTHING         => ???
-                case UNION(argTypes) => UNION(argTypes.filterNot(conctretes.l.contains))
+                case UNION(argTypes, _) => UNION(argTypes.filterNot(conctretes.typeList.contains))
                 case s: SINGLE       => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
@@ -70,7 +69,7 @@ object TypeInferrer {
 
       case (LIST(tp), LIST(t)) => matchTypes(t, tp, knownTypes)
       case (placeholder: FINAL, _) =>
-        Either.cond(placeholder >= UNION.create(argType.l), None, err)
+        Either.cond(placeholder >= UNION.create(argType.typeList), None, err)
     }
   }
 
@@ -91,12 +90,12 @@ object TypeInferrer {
     case (r @ LIST(it1), a @ LIST(it2)) =>
       findCommonType(it1, it2) match {
         case NOTHING   => NOTHING
-        case UNION(_)  => UNION(List(r, a))
+        case UNION(_, _)  => UNION(List(r, a))
         case p: SINGLE => LIST(p)
       }
     case (p1: SINGLE, p2: SINGLE) => if (p1 == p2) p1 else UNION.create(List(p1, p2))
-    case (r: UNION, a: UNION)     => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
-    case (u: UNION, t: SINGLE)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
-    case (t: SINGLE, u: UNION)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+    case (r: UNION, a: UNION)     => UNION.create((r.typeList.toSet ++ a.typeList.toSet).toSeq)
+    case (u: UNION, t: SINGLE)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
+    case (t: SINGLE, u: UNION)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
   }
 }

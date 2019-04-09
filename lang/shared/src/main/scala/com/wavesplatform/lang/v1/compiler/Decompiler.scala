@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.implicits._
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
@@ -65,7 +65,7 @@ object Decompiler {
       case Terms.CONST_BOOLEAN(b)        => pureOut(b.toString.toLowerCase(), i)
       case Terms.CONST_LONG(t)           => pureOut(t.toLong.toString, i)
       case Terms.CONST_STRING(s)         => pureOut('"' + s + '"', i)
-      case Terms.CONST_BYTESTR(bs)       => pureOut("base58'" + bs.base58 + "'", i)
+      case Terms.CONST_BYTESTR(bs)       => pureOut(if(bs.size <= 128) { "base58'" ++ bs.toString ++ "'" } else { "base64'" ++ bs.base64Raw ++ "'" }, i)
       case Terms.REF(ref)                => pureOut(ref, i)
       case Terms.GETTER(getExpr, fld)    => expr(pure(getExpr), ctx, BracesWhenNeccessary, firstLinePolicy).map(a => a + "." + fld)
       case Terms.IF(cond, it, iff) =>
@@ -101,7 +101,7 @@ object Decompiler {
     }
   }
 
-  def apply(e: Contract, ctx: DecompilerContext): String = {
+  def apply(e: DApp, ctx: DecompilerContext): String = {
 
     def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence.map(v => v.mkString(NEWLINE + NEWLINE))
 

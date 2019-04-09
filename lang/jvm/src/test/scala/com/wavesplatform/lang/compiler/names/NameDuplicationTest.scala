@@ -1,15 +1,17 @@
 package com.wavesplatform.lang.compiler.names
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.compiler.compilerContext
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, ContentType, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Common
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -19,7 +21,10 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
     Monoid.combine(
       compilerContext,
       WavesContext
-        .build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+        .build(
+          DirectiveSet(V3, Account, DAppType).explicitGet(),
+          Common.emptyBlockchainEnvironment()
+        )
         .compilerContext
     )
 
@@ -202,7 +207,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
 
   }
 
-  def compileOf(script: String): Either[String, Contract] = {
+  def compileOf(script: String): Either[String, DApp] = {
     val expr = Parser.parseContract(script.stripMargin).get.value
     compiler.ContractCompiler(ctx, expr)
   }
