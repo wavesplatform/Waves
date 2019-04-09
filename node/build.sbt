@@ -1,8 +1,11 @@
+import WavesDockerKeys.exposedPorts
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
+import sbtdocker.DockerPlugin.autoImport.ImageName
+import sbtdocker._
 
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, sbtdocker.DockerPlugin)
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -169,3 +172,38 @@ inConfig(Debian)(
     serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
   ))
+
+inTask(docker) {
+  Seq(
+    imageNames := Seq(
+      ImageName(
+        namespace = Some("wavesplatform"),
+        repository = "node-dev",
+        tag = Some("latest")
+      )),
+    dockerfile := {
+      val yourKitArchive = "YourKit-JavaProfiler-2019.1-docker.zip"
+      val bin            = "/opt/waves/start-waves.sh"
+      new Dockerfile {
+        from("anapsix/alpine-java:8_server-jre")
+
+        env("WAVES_CONFIG_FILE", "/opt/waves/waves.conf")
+
+        runRaw(s"""mkdir -p /opt/waves && \\
+                  |apk update && \\
+                  |apk add --no-cache openssl ca-certificates && \\
+                  |wget --quiet "https://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar" -O /opt/waves/aspectjweaver.jar && \\
+                  |wget --quiet "https://www.yourkit.com/download/docker/$yourKitArchive" -P /tmp/ && \\
+                  |unzip /tmp/$yourKitArchive -d /usr/local && \\
+                  |rm -f /tmp/$yourKitArchive""".stripMargin)
+
+        add((Universal / stage).value, "/opt/waves")
+        add((Default / sourceDirectory).value / "container" / "start-waves.sh", "/opt/waves")
+        add((Default / sourceDirectory).value / "container" / "waves.conf", "/opt/waves")
+        runShell("chmod", "+x", bin)
+        entryPoint(bin)
+        expose(6864, 6869)
+      }
+    }
+  )
+}
