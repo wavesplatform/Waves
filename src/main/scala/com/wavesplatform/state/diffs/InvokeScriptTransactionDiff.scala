@@ -116,7 +116,7 @@ object InvokeScriptTransactionDiff {
                       (),
                       GenericError(s"Unissued assets are not allowed")
                     )
-                    _ <- {
+                    scriptsInvoked <- {
                       val totalScriptsInvoked =
                         tx.checkedAssets()
                           .collect { case asset @ IssuedAsset(_) => asset }
@@ -126,7 +126,7 @@ object InvokeScriptTransactionDiff {
                       val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
-                        (),
+                        totalScriptsInvoked,
                         GenericError(s"Fee in ${tx.assetFee._1
                           .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
                       )
@@ -139,7 +139,7 @@ object InvokeScriptTransactionDiff {
                       .mapValues(l => Monoid.combineAll(l))
                     val paymentFromContractMap = Map(tx.dappAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
                     val transfers              = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
-                    dataAndPaymentDiff.combine(Diff.stateOps(portfolios = transfers))
+                    dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1).combine(Diff.stateOps(portfolios = transfers))
                   }
               }
         }

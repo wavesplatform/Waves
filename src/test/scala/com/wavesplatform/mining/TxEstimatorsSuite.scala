@@ -7,27 +7,30 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.settings.TestFunctionalitySettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
 class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with TransactionGen {
+  def differ = TransactionDiffer(TestFunctionalitySettings.Enabled, None, System.currentTimeMillis(), 1, false) _
   "scriptRunNumber" - {
     "smart account" - {
       "should not count transactions going from a regular account" in {
         val blockchain = stub[Blockchain]
         (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).right.get) shouldBe 0
       }
 
       "should count transactions going from a smart account" in {
         val blockchain = stub[Blockchain]
         (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).right.get) shouldBe 1
       }
     }
 
@@ -37,7 +40,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
         (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => None).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).right.get) shouldBe 0
       }
 
       "should count transactions working with smart tokens" in {
@@ -45,7 +48,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
         (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => Some(assetDescription)).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).right.get) shouldBe 1
       }
     }
 
@@ -54,7 +57,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
       (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
       (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => Some(assetDescription)).anyNumberOfTimes()
 
-      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 2
+      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).right.get) shouldBe 2
     }
   }
 

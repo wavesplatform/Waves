@@ -179,7 +179,7 @@ class UtxPoolImpl(time: Time,
         .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
           case ((invalid, valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
             val updatedBlockchain = composite(blockchain, diff)
-            val updatedRest       = currRest.put(updatedBlockchain, tx)
+            val updatedRest       = currRest.put(updatedBlockchain, tx, diff)
             if (updatedRest.isOverfilled) {
               if (updatedRest != lastOverfilled)
                 log.trace(

@@ -133,7 +133,8 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 scripts: Map[Address, Option[Script]],
                 assetScripts: Map[IssuedAsset, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[IssuedAsset, Sponsorship])
+                sponsorship: Map[IssuedAsset, Sponsorship],
+                scriptsRun: Int)
 
 object Diff {
 
@@ -156,7 +157,8 @@ object Diff {
       scripts = scripts,
       assetScripts = assetScripts,
       accountData = accountData,
-      sponsorship = sponsorship
+      sponsorship = sponsorship,
+      scriptsRun = 0
     )
 
   def apply(height: Int,
@@ -169,7 +171,8 @@ object Diff {
             scripts: Map[Address, Option[Script]] = Map.empty,
             assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
             accountData: Map[Address, AccountDataInfo] = Map.empty,
-            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
+            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+            scriptsRun: Int = 0): Diff =
     Diff(
       transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
       portfolios = portfolios,
@@ -180,10 +183,11 @@ object Diff {
       scripts = scripts,
       assetScripts = assetScripts,
       accountData = accountData,
-      sponsorship = sponsorship
+      sponsorship = sponsorship,
+      scriptsRun = scriptsRun
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -199,7 +203,8 @@ object Diff {
         scripts = older.scripts ++ newer.scripts,
         assetScripts = older.assetScripts ++ newer.assetScripts,
         accountData = older.accountData.combine(newer.accountData),
-        sponsorship = older.sponsorship.combine(newer.sponsorship)
+        sponsorship = older.sponsorship.combine(newer.sponsorship),
+        scriptsRun = older.scriptsRun.combine(newer.scriptsRun)
       )
   }
 }
