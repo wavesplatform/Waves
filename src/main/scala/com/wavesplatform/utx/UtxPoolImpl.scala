@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
-import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.diffs.{TracedResult, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -46,7 +46,7 @@ class UtxPoolImpl(time: Time,
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
+  override def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, (Boolean, Diff)] = {
     def canReissue(blockchain: Blockchain, tx: Transaction) = tx match {
       case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
       case _                                                     => Right(())
@@ -107,23 +107,27 @@ class UtxPoolImpl(time: Time,
     }
 
     PoolMetrics.putRequestStats.increment()
-    val result = PoolMetrics.putTimeStats.measure {
+    val tracedResult = PoolMetrics.putTimeStats.measure {
       val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
 
-      for {
+      val checks = for {
         _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
         transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
           .map(_.bytes().length)
           .sum
         _ <- Either.cond(skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-                         (),
-                         GenericError("Transaction pool bytes size limit is reached"))
+          (),
+          GenericError("Transaction pool bytes size limit is reached"))
 
-        _    <- checkScripted(blockchain, tx, skipSizeCheck)
-        _    <- checkNotBlacklisted(tx)
-        _    <- checkAlias(blockchain, tx)
-        _    <- canReissue(blockchain, tx)
+        _ <- checkScripted(blockchain, tx, skipSizeCheck)
+        _ <- checkNotBlacklisted(tx)
+        _ <- checkAlias(blockchain, tx)
+        _ <- canReissue(blockchain, tx)
+      } yield ()
+
+      for {
+        _    <- TracedResult(checks)
         diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
@@ -133,12 +137,11 @@ class UtxPoolImpl(time: Time,
       }
     }
 
-    result.fold(
-      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
-      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
+    tracedResult.resultE.fold(
+      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}"),
+      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}, trace = ${tracedResult.trace}")
     )
-
-    result
+    tracedResult
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit =
@@ -189,7 +192,7 @@ class UtxPoolImpl(time: Time,
             } else if (TxCheck.isExpired(tx)) {
               (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
             } else {
-              differ(updatedBlockchain, tx) match {
+              differ(updatedBlockchain, tx).resultE match {
                 case Right(newDiff) =>
                   (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
                 case Left(_) =>
@@ -225,7 +228,7 @@ class UtxPoolImpl(time: Time,
                  height: Int = blockchain.height): Either[ValidationError, Diff] = {
       for {
         _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
-        diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction)
+        diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
       } yield diff
     }
 

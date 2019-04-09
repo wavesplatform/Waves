@@ -150,7 +150,7 @@ object BlockDiffer extends ScorexLogging {
               } else {
                 Result(updatedDiff, 0L, totalWavesFee, updatedConstraint)
               }
-            }
+            }.resultE
       }
       .map {
         case Result(diff, carry, totalFee, constraint) =>

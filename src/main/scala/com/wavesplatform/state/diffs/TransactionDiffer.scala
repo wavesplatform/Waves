@@ -24,7 +24,7 @@ object TransactionDiffer extends ScorexLogging {
             prevBlockTimestamp: Option[Long],
             currentBlockTimestamp: Long,
             currentBlockHeight: Int,
-            verify: Boolean = true)(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Diff] = {
+            verify: Boolean = true)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
     val func =
       if (verify) verified(settings, prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight) _
       else unverified(settings, currentBlockTimestamp, currentBlockHeight) _
@@ -33,10 +33,10 @@ object TransactionDiffer extends ScorexLogging {
 
   def verified(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(
       blockchain: Blockchain,
-      tx: Transaction): Either[ValidationError, Diff] = {
+      tx: Transaction): TracedResult[ValidationError, Diff] = {
     for {
       _ <- Verifier(blockchain, currentBlockHeight)(tx)
-      _ <- stats.commonValidation
+      _ <- TracedResult(stats.commonValidation
         .measureForType(tx.builder.typeId) {
           for {
             _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
@@ -46,18 +46,18 @@ object TransactionDiffer extends ScorexLogging {
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
             _ <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
           } yield ()
-        }
+        })
       diff <- unverified(settings, currentBlockTimestamp, currentBlockHeight)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
         .measureForType(tx.builder.typeId) {
           BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
         }
     } yield positiveDiff
-  }.result.left.map(TransactionValidationError(_, tx))
+  }.leftMap(TransactionValidationError(_, tx))
 
   def unverified(settings: FunctionalitySettings, currentBlockTimestamp: Long, currentBlockHeight: Int)(
       blockchain: Blockchain,
-      tx: Transaction): Either[ValidationError, Diff] = {
+      tx: Transaction): TracedResult[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx match {
         case gtx: GenesisTransaction      => GenesisTransactionDiff(currentBlockHeight)(gtx)
@@ -76,7 +76,7 @@ object TransactionDiffer extends ScorexLogging {
         case sstx: SetAssetScriptTransaction =>
           AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
         case stx: SponsorFeeTransaction  => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci).result
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
         case _                           => Left(UnsupportedTransactionType)
       }
     }

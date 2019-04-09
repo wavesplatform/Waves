@@ -34,7 +34,7 @@ import shapeless.Coproduct
 import scala.util.{Failure, Success, Try}
 
 object InvokeScriptTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[Diff] = {
+  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.dappAddress)
 
     def evalContract(contract: DApp): Either[ScriptExecutionError, ScriptResult] = {
@@ -134,7 +134,7 @@ object InvokeScriptTransactionDiff {
                     )
                   }
                   assetValidationTrace = foldScriptTransfers(blockchain, tx)(ps, dataAndPaymentDiff)
-                  _ <- assetValidationTrace.result
+                  _ <- assetValidationTrace.resultE
                 } yield {
                   val paymentReceiversMap: Map[Address, Portfolio] = Monoid
                     .combineAll(pmts)
@@ -148,7 +148,7 @@ object InvokeScriptTransactionDiff {
                 }
             } match {
               case Right(TracedResult(diffE, trace)) => TracedResult(diffE, invokeScriptTrace ::: trace)
-              case Left(e)                               => TracedResult(Left(e), invokeScriptTrace)
+              case Left(e)                           => TracedResult(Left(e), invokeScriptTrace)
             }
         }
       case _ => Left(GenericError(s"No contract at address ${tx.dappAddress}"))
@@ -196,12 +196,12 @@ object InvokeScriptTransactionDiff {
   }
 
   private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
-                                                                                       dataDiff: Diff): TracedResult[Diff] = {
+                                                                                       dataDiff: Diff): TracedResult[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount) {
-      val foldResult = ps.foldLeft(TracedResult(Right(dataDiff))) { (tracedDiffAcc, payment) =>
+      val foldResult = ps.foldLeft(TracedResult(dataDiff.asRight[ValidationError])) { (tracedDiffAcc, payment) =>
         val (addressRepr, amount, asset) = payment
         val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-        val tracedDiff: TracedResult[Diff] = Asset.fromCompatId(asset) match {
+        val tracedDiff: TracedResult[ValidationError, Diff] = Asset.fromCompatId(asset) match {
           case Waves =>
             Diff.stateOps(
               portfolios = Map(
@@ -219,7 +219,7 @@ object InvokeScriptTransactionDiff {
               case None =>
                 nextDiff.asRight[ValidationError]
               case Some(script) =>
-                val assetValidationDiff = tracedDiffAcc.result.flatMap(
+                val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
                   d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
@@ -231,7 +231,7 @@ object InvokeScriptTransactionDiff {
         }
         tracedDiffAcc |+| tracedDiff
       }
-      TracedResult(foldResult.result.map(_ => Diff.stateOps()), foldResult.trace)
+      TracedResult(foldResult.resultE.map(_ => Diff.stateOps()), foldResult.trace)
     } else {
       Left(GenericError(s"Too many ScriptTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
     }

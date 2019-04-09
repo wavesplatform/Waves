@@ -13,7 +13,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.{CommonValidation, TracedResult}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -259,7 +259,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route =
     (pathPrefix("broadcast") & post) {
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
-        val futureResult: Either[ApiError, Transaction] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
+        val futureResult: TracedResult[ApiError, Transaction] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
         complete(futureResult)
       }
     }
