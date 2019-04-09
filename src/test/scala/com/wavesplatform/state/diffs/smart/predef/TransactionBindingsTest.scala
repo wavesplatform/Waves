@@ -268,15 +268,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(invokeScriptGen) { t =>
       val checkArgsScript = if (t.fc.args.nonEmpty) {
         t.fc.args
-      .map {
-        case CONST_LONG(i)    => i.toString
-        case CONST_STRING(s)  => s""""$s""""
-        case CONST_BOOLEAN(b) => b.toString
-        case CONST_BYTESTR(b) => s"base64'${b.base64}'"
-      }
-      .zipWithIndex
-      .map { case (str, i) => s"t.args[$i] == $str" }
-      .mkString("let checkArgs = ", " && ", "\n")
+          .map {
+            case CONST_LONG(i)    => i.toString
+            case CONST_STRING(s)  => s""""$s""""
+            case CONST_BOOLEAN(b) => b.toString
+            case CONST_BYTESTR(b) => s"base64'${b.base64}'"
+            case _                => ""
+          }
+          .zipWithIndex
+          .map { case (str, i) => s"t.args[$i] == $str" }
+          .mkString("let checkArgs = ", " && ", "\n")
       } else {
         "let checkArgs = true"
       }

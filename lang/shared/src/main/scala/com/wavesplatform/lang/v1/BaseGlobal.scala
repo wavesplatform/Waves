@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1
 
+import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 
@@ -62,5 +64,13 @@ trait BaseGlobal {
         val ser = serializeContract(ast, stdLibVersion)
         (ser, ast)
       }
+  }
+
+  def decompile(compiledCode: String): Either[ScriptParseError, String] = {
+    Script.fromBase64String(compiledCode, checkComplexity = false).right.map{
+      script =>
+        val (scriptText, _) = Script.decompile(script)
+        scriptText
+    }
   }
 }
