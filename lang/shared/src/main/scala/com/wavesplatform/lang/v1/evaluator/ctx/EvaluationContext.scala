@@ -2,16 +2,17 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats._
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.LetLogCallback
 import shapeless.{Lens, lens}
 
-case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
+case class EvaluationContext(typeDefs: Map[String, FINAL], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
 
 case class LoggedEvaluationContext(l: LetLogCallback, ec: EvaluationContext)
 
 object LoggedEvaluationContext {
   object Lenses {
-    val types: Lens[LoggedEvaluationContext, Map[String, DefinedType]]          = lens[LoggedEvaluationContext] >> 'ec >> 'typeDefs
+    val types: Lens[LoggedEvaluationContext, Map[String, FINAL]]          = lens[LoggedEvaluationContext] >> 'ec >> 'typeDefs
     val lets: Lens[LoggedEvaluationContext, Map[String, LazyVal]]               = lens[LoggedEvaluationContext] >> 'ec >> 'letDefs
     val funcs: Lens[LoggedEvaluationContext, Map[FunctionHeader, BaseFunction]] = lens[LoggedEvaluationContext] >> 'ec >> 'functions
   }
@@ -28,7 +29,7 @@ object EvaluationContext {
       EvaluationContext(typeDefs = x.typeDefs ++ y.typeDefs, letDefs = x.letDefs ++ y.letDefs, functions = x.functions ++ y.functions)
   }
 
-  def build(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Seq[BaseFunction]): EvaluationContext = {
+  def build(typeDefs: Map[String, FINAL], letDefs: Map[String, LazyVal], functions: Seq[BaseFunction]): EvaluationContext = {
     if (functions.distinct.size != functions.size) {
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")

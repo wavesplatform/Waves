@@ -4,40 +4,43 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 
 import scala.util.Try
 
-case class ByteStr(arr: Array[Byte]) {
-  lazy val base58: String = Base58.encode(arr)
+final case class ByteStr(arr: Array[Byte]) {
+  lazy val base58: String    = Base58.encode(arr)
+  lazy val base64Raw: String = Base64.encode(arr)
+  lazy val base64: String    = "base64:" + base64Raw
+  lazy val trim: String = (if (arr.length < 1024) {
+                             base58.toString.take(7)
+                           } else {
+                             base64Raw
+                           }) + "..."
+  override lazy val toString: String = if (arr.length < 1024) {
+    base58
+  } else {
+    base64
+  }
 
-  lazy val base64: String = "base64:" + Base64.encode(arr)
+  def isEmpty: Boolean =
+    arr.length == 0
 
-  lazy val trim: String = base58.toString.take(7) + "..."
+  def size: Int = arr.length
 
-  override lazy val toString: String = base58
-
-  def isEmpty: Boolean = arr.length == 0
-
-  def ++(other: ByteStr): ByteStr = if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
+  def ++(other: ByteStr): ByteStr =
+    if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
 
   def take(n: Long): ByteStr = {
-
     val n1 = n min arr.length max 0
 
     if (n1 == arr.length) this
     else if (n1 == 0) ByteStr.empty
-    else {
-      ByteStr(arr.take(n1.toInt))
-    }
-
+    else ByteStr(arr.take(n1.toInt))
   }
 
   def drop(n: Long): ByteStr = {
-
     val n1 = n min arr.length max 0
 
     if (n1 == arr.length) ByteStr.empty
     else if (n1 == 0) this
-    else {
-      ByteStr(arr.drop(n1.toInt))
-    }
+    else ByteStr(arr.drop(n1.toInt))
   }
 
   def takeRight(n: Long): ByteStr = drop(arr.length.toLong - n)
@@ -45,7 +48,7 @@ case class ByteStr(arr: Array[Byte]) {
   def dropRight(n: Long): ByteStr = take(arr.length.toLong - n.max(0))
 
   override def equals(a: Any): Boolean = a match {
-    case other: ByteStr => arr.sameElements(other.arr)
+    case other: ByteStr => java.util.Arrays.equals(arr, other.arr)
     case _              => false
   }
 
@@ -67,10 +70,9 @@ object ByteStr {
     ByteStr(bytes.toArray)
   }
 
-  def fromLong(l: Long): ByteStr = {
-
+  def fromLong(longValue: Long): ByteStr = {
     val buf = new Array[Byte](8)
-    var b   = l
+    var b   = longValue
 
     for (i <- (buf.length - 1) to 0 by -1) {
       buf(i) = b.toByte
@@ -89,7 +91,7 @@ object ByteStr {
   implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => compare(x.arr, y.arr)
 
   // scorex.utils.ByteArray.compare
-  private def compare(buffer1: Array[Byte], buffer2: Array[Byte]): Int =
+  private[this] def compare(buffer1: Array[Byte], buffer2: Array[Byte]): Int =
     if (buffer1 sameElements buffer2) {
       0
     } else {
