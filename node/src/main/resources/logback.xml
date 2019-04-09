@@ -53,4 +53,7 @@
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
     </root>
+
+    <include optional="true" file="/etc/waves/logback.xml"/>
+    <include optional="true" file="waves_logback.xml"/>
 </configuration>
