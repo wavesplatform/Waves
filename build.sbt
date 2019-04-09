@@ -109,12 +109,15 @@ inScope(Global)(
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",
+      "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
+      "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-Ywarn-unused-import",
-      "-Ypartial-unification"
+      "-Ypartial-unification",
+      "-opt:l:inline",
+      "-opt-inline-from:**"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -179,8 +182,8 @@ checkPRRaw := {
 }
 
 def checkPR: Command = Command.command("checkPR") { state =>
-  // Now warnings aren't treated as errors
-  val updatedState = state // Project.extract(state).appendWithoutSession(Seq(Global / scalacOptions += "-Xfatal-warnings"), state)
+  val updatedState = Project.extract(state)
+    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }
