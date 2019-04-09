@@ -31,7 +31,7 @@ class OrderBookActor(owner: ActorRef,
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[${assetPair.key}]"))
+  protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
   private var savingSnapshot: Option[QueueEventWithMeta.Offset]  = None
   private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = -1L
@@ -82,8 +82,8 @@ class OrderBookActor(owner: ActorRef,
       }
   }
 
-  private def processEvents(events: Seq[Event]): Unit = {
-    for (e <- events) {
+  private def processEvents(events: Iterable[Event]): Unit = {
+    events.foreach { e =>
       e match {
         case Events.OrderAdded(order) =>
           log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
@@ -110,16 +110,16 @@ class OrderBookActor(owner: ActorRef,
     updateSnapshot(orderBook.aggregatedSnapshot)
   }
 
-  private def onCancelOrder(request: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
+  private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
     cancelTimer.measure(orderBook.cancel(orderIdToCancel) match {
       case Some(cancelEvent) =>
-        processEvents(Seq(cancelEvent))
+        processEvents(List(cancelEvent))
       case None =>
-        log.warn(s"Error cancelling $orderIdToCancel: order not found")
+        log.warn(s"Error applying $event: order not found")
     })
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
-    log.trace(s"Order accepted [${eventWithMeta.offset}]: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
+    log.trace(s"Applied $eventWithMeta, trying to match ...")
     processEvents(orderBook.add(order, eventWithMeta.timestamp))
   }
 
@@ -127,17 +127,17 @@ class OrderBookActor(owner: ActorRef,
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
+      processEvents(orderBook.allOrders.map(OrderAdded))
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
       log.debug(s"Recovery completed: $orderBook")
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
-      log.debug(s"Recovering $persistenceId from $snapshot")
+      log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
       orderBook = OrderBook(snapshot.orderBook)
       lastProcessedOffset = snapshot.eventNr
       lastSavedSnapshotOffset = lastProcessedOffset
-      processEvents(orderBook.allOrders.map(OrderAdded).toSeq)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
