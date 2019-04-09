@@ -6,7 +6,9 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Time
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
 import monix.reactive.Observable
 
 trait Context {
@@ -14,6 +16,8 @@ trait Context {
   def blockchain: Blockchain
   def time: Time
   def wallet: Wallet
+  def utx: UtxPool
+  def channels: ChannelGroup
   def spendableBalanceChanged: Observable[(Address, Asset)]
   def spendableBalance(address: Address, assetId: Asset): Long
   def addToUtx(tx: Transaction): Unit

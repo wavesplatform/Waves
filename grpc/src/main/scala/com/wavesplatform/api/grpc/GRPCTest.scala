@@ -1,4 +1,5 @@
 package com.wavesplatform.api.grpc
+
 import com.wavesplatform.account.Address
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import io.grpc.ManagedChannelBuilder

@@ -5,7 +5,6 @@ import java.security.Security
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
 
-import _root_.io.grpc.{Server, ServerBuilder}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -14,7 +13,6 @@ import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.api.grpc.{BlocksApiGrpc, BlocksApiGrpcImpl, TransactionsApiGrpc, TransactionsApiGrpcImpl}
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
@@ -38,7 +36,7 @@ import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, T
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
-import io.netty.channel.group.DefaultChannelGroup
+import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
@@ -212,6 +210,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def blockchain: Blockchain                                   = app.blockchainUpdater
       override def time: Time                                               = app.time
       override def wallet: Wallet                                           = app.wallet
+      override def utx: UtxPool                                             = utxStorage
+      override def channels: ChannelGroup                                   = allChannels
       override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
       override def spendableBalance(address: Address, assetId: Asset): Long = utxStorage.spendableBalance(address, assetId)
       override def addToUtx(tx: Transaction): Unit                          = utxStorage.putIfNew(tx)
@@ -222,21 +222,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
       val ctor           = extensionClass.getConstructor(classOf[Context])
       ctor.newInstance(extensionContext)
-    }
-
-    if (settings.grpcSettings.enable) {
-      this.grpcServer = ServerBuilder
-        .forPort(settings.grpcSettings.port)
-        .addService(TransactionsApiGrpc.bindService(
-          new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels)(
-            apiScheduler),
-          apiScheduler
-        ))
-        .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(blockchainUpdater)(apiScheduler), apiScheduler))
-        .build()
-        .start()
-
-      log.info(s"gRPC API was bound to ${settings.grpcSettings.port}")
     }
 
     if (settings.restAPISettings.enable) {
@@ -324,7 +309,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _
-  @volatile var grpcServer: Server           = _
 
   def shutdown(utx: UtxPool, network: NS): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
@@ -343,12 +327,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       if (settings.restAPISettings.enable)
         Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
-
-      log.info("Closing gRPC API")
-      if (settings.grpcSettings.enable) Try {
-        grpcServer.shutdown()
-        grpcServer.awaitTermination(2, TimeUnit.MINUTES)
-      }
 
       log.debug("Closing peer database")
       peerDatabase.close()

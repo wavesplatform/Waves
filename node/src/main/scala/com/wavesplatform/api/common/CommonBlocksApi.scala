@@ -17,13 +17,11 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
       .collect { case (Some(block), height) => (block, height) }
   }
 
-  def childBlock(blockId: BlockId): Option[VanillaBlock] = {
-    val childBlock = for {
+  def childBlock(blockId: BlockId): Option[(VanillaBlock, Int)] = {
+    for {
       height     <- blockchain.heightOf(blockId)
       childBlock <- blockchain.blockAt(height + 1)
-    } yield childBlock
-
-    childBlock
+    } yield (childBlock, height + 1)
   }
 
   def calcBlocksDelay(blockId: BlockId, blockNum: Int): Either[ApiError, Long] = {

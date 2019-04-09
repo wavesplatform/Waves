@@ -1,4 +1,5 @@
 package com.wavesplatform.api
+
 import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError

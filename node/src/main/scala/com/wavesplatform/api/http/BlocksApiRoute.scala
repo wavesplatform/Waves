@@ -57,10 +57,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
-      val childJson = for {
-        height <- commonApi.heightOf(block.uniqueId)
-        child <- commonApi.childBlock(block.uniqueId)
-      } yield child.json().addBlockFields(height + 1)
+      val childJson = for ((child, height) <- commonApi.childBlock(block.uniqueId))
+        yield child.json().addBlockFields(height)
 
       complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
     }
