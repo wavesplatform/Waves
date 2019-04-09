@@ -12,7 +12,7 @@ env:
 script:
   - unset _JAVA_OPTIONS
   - unset SBT_OPTS
-  - sbt -J-Xms128m -J-Xmx1948m -J-XX:+UseConcMarkSweepGC -J-XX:+CMSClassUnloadingEnabled ";coverage;checkPR;coverageReport"
+  - travis_wait 30 sbt -J-Xms3G -J-Xmx3G -J-XX:+UseConcMarkSweepGC -J-XX:+CMSClassUnloadingEnabled ";coverage;checkPR;coverageReport"
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 # These directories are cached to S3 at the end of the build
