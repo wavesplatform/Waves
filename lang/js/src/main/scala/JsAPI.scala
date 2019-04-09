@@ -67,6 +67,7 @@ object JsAPI {
         override def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = ???
         override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
         override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = ???
+        override def accountScriptHash(address: Recipient): Option[Array[Byte]]                                      = ???
       }
     )
 

@@ -20,5 +20,6 @@ object WavesContext {
     override def transactionParser(bytes: Array[Byte]): Option[Tx]                      = impl.Environment.transactionParser(bytes)
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]             = impl.Environment.blockHeaderParser(bytes)
     override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long = impl.Environment.calculatePoSDelay(hit, baseTarget, balance)
+    override def accountScriptHash(address: Recipient): Option[Array[Byte]] = impl.Environment.accountScriptHash(address)
   }
 }

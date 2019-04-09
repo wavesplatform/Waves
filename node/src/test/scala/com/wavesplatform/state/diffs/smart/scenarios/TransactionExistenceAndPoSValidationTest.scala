@@ -10,6 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V4}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.BinaryDataEntry
@@ -17,7 +18,7 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils.Merkle
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -246,6 +247,83 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
         }
       }
     }
+  }
+
+  property("can compute account script") {
+    forAll(accountGen, accountGen, aliasGen) { (miner, gateway, alias) =>
+      val minerScript = compile("""
+          |true
+        """.stripMargin)
+
+      val minerScriptHash = Base58.encode(com.wavesplatform.crypto.fastHash(ExprScript(V4, minerScript).explicitGet().bytes()))
+
+      val gatewayScript = compile(s"""
+           | let alias = Alias("${alias.name}")
+           | let address = Address(base58'${miner.toAddress.bytes.base58}')
+           |
+           | let byAlias = extract(accountScriptHash(alias))
+           | let byAddress = extract(accountScriptHash(address))
+           |
+           | let expectedHash = base58'$minerScriptHash'
+           |
+           | byAlias == expectedHash &&
+           |   byAddress == expectedHash
+         """.stripMargin)
+
+
+      forAll(gen(miner, gateway, ExprScript(V4, gatewayScript).explicitGet())) { blocks =>
+        val minerScriptTx =
+          SetScriptTransaction
+            .selfSigned(
+              miner,
+              Some(ExprScript(V4, minerScript).explicitGet()),
+              1000000000,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
+
+        val minerAliasTx =
+          CreateAliasTransactionV1.selfSigned(
+            miner,
+            alias,
+            5 * 10000000,
+            System.currentTimeMillis()
+          ).explicitGet()
+
+        val dataTx =
+          DataTransaction
+            .selfSigned(
+              gateway,
+              List(),
+              5 * 10000000,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
+
+        val blockWithAliasAndScript =
+          TestBlock
+            .create(
+              signer = miner,
+              txs = List(minerAliasTx, minerScriptTx)
+            )
+
+        val blockWithData =
+          TestBlock
+            .create(
+              signer = miner,
+              txs = List(dataTx)
+            )
+
+        assertDiffEi(blocks :+ blockWithAliasAndScript, blockWithData, fs) { diffEi =>
+          diffEi shouldBe an[Right[_, _]]
+        }
+      }
+    }
+  }
+
+  def compile(src: String): EXPR = {
+    val untypedScript = Parser.parseExpr(src).get.value
+    ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
   }
 
   def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {

@@ -76,6 +76,6 @@ object FunctionIds {
   val TRANSACTION_FROM_BYTES: Short = 1062
   val CALCULATE_POS_DELAY: Short = 1063
   val CHECK_MERKLE_PROOF: Short = 1064
-
+  val ACCOUNT_SCRIPT_HASH: Short = 1065
 
 }

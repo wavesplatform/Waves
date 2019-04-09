@@ -87,6 +87,7 @@ object EnvironmentFunctionsBenchmark {
     override def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = ???
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = ???
+    override def accountScriptHash(addressOrAlias: Recipient): Option[Array[Byte]]                               = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

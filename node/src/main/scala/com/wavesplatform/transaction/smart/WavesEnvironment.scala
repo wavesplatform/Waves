@@ -3,9 +3,7 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
@@ -112,13 +110,20 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
       }
 
   override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long = {
-    val posCalculator =
-      if (blockchain.activatedFeaturesAt(h()).contains(BlockchainFeatures.FairPoS.id))
-        FairPoSCalculator
-      else NxtPoSCalculator
-
-    posCalculator
+    FairPoSCalculator
       .calculateDelay(BigInt(1, hit.arr), baseTarget, balance)
   }
 
+  override def accountScriptHash(addressOrAlias: Recipient): Option[Array[Byte]] = {
+    (for {
+      aoa <- addressOrAlias match {
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
+      }
+      address <- blockchain.resolveAlias(aoa)
+      maybeScript = blockchain.accountScript(address).map { script =>
+        com.wavesplatform.crypto.fastHash(script.bytes().arr)
+      }
+    } yield maybeScript).toOption.flatten
+  }
 }

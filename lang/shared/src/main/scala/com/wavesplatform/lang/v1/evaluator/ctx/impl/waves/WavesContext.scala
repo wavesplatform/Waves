@@ -305,12 +305,14 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
-      NativeFunction("transactionById",
-                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500, V4 -> 500),
-                     GETTRANSACTIONBYID,
-                     returnType,
-                     "Lookup transaction",
-                     ("id", BYTESTR, "transaction Id")) {
+      NativeFunction(
+        "transactionById",
+        Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500, V4 -> 500),
+        GETTRANSACTIONBYID,
+        returnType,
+        "Lookup transaction",
+        ("id", BYTESTR, "transaction Id")
+      ) {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled))
           Right(fromOptionCO(maybeDomainTx))
@@ -478,6 +480,25 @@ object WavesContext {
       }
     }
 
+    val accountScriptHashF: BaseFunction = {
+      NativeFunction(
+        "accountScriptHash",
+        100,
+        ACCOUNT_SCRIPT_HASH,
+        UNION.create(Seq(UNIT, BYTESTR)),
+        "Get hash of account script",
+        ("addressOrAlias", addressOrAliasType, "miner effective balance")
+      ) {
+        case (c @ CaseObj(typ, _)) :: Nil if typ == addressType || typ == aliasType =>
+          val maybeScriptHash = env
+            .accountScriptHash(caseObjToRecipient(c))
+            .map(ByteStr(_))
+
+          fromOptionBV(maybeScriptHash).asRight[String]
+        case _ => ???
+      }
+    }
+
     val v3Functions = List(
       getIntegerFromStateF,
       getBooleanFromStateF,
@@ -497,7 +518,8 @@ object WavesContext {
     val v4Functions = List(
       blockHeaderFromBytesF,
       transactionFromBytesF,
-      calculatePosDelayF
+      calculatePosDelayF,
+      accountScriptHashF
     )
 
     val types = buildWavesTypes(proofsEnabled, version)

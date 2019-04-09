@@ -27,4 +27,5 @@ object Environment extends scalajs.js.Object {
   def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = platform.native
   def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = platform.native
   def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = platform.native
+  def accountScriptHash(addressOrAlias: Recipient): Option[Array[Byte]]                               = platform.native
 }

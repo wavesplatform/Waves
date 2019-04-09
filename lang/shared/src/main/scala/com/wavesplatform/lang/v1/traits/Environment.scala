@@ -21,5 +21,6 @@ trait Environment {
   def resolveAlias(name: String): Either[String, Recipient.Address]
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long]
   def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]
+  def accountScriptHash(addressOrAlias: Recipient): Option[Array[Byte]]
   def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long
 }
