@@ -104,7 +104,7 @@ object DocExport {
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
       case class FieldTypes(name: String, types: java.util.List[TransactionField])
       val transactionsType       = fullContext.types.filter(v => v.name == "Transaction")
-      val transactionsTypesNames = transactionsType.flatMap({ case UNION(union, _) => union.map(_.name) }).toSet
+      val transactionsTypesNames = transactionsType.collect({ case UNION(union, _) => union.map(_.name) }).flatten.toSet
       def transactionDocs(types: Seq[FINAL], fieldsFlt: String => Boolean = (_ => true)) = {
         val transactionsTypes =
           types.flatMap({
