@@ -7,7 +7,6 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
@@ -47,7 +46,7 @@ package object utils {
             Seq(
               PureContext.build(ds.stdLibVersion),
               CryptoContext.build(Global),
-              WavesContext.build(ds, environment)
+              com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext.build(ds, environment)
             )
           )
         )
