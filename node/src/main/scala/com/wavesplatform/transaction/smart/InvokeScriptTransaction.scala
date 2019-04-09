@@ -65,7 +65,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
         )
     )
 
-  override def checkedAssets(): Seq[Asset] = payment.toSeq.map(_.assetId)
+  override def checkedAssets(): Seq[IssuedAsset] = payment.toSeq collect { case Payment(_, assetId: IssuedAsset) => assetId }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 

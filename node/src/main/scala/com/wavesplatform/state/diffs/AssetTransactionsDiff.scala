@@ -13,7 +13,9 @@ import com.wavesplatform.transaction.{ProvenTransaction, ValidationError}
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
-  def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
+  def scripts(blockchain: Blockchain, tx: ProvenTransaction) = tx.checkedAssets().count(blockchain.hasAssetScript) + (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 })
+
+  def issue(blockchain: Blockchain, height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
     Right(
@@ -22,7 +24,8 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
-        assetScripts = if (tx.script.isEmpty) { Map() } else { Map(asset -> tx.script) }
+        assetScripts = if (tx.script.isEmpty) { Map() } else { Map(asset -> tx.script) },
+        scriptsRun = scripts(blockchain, tx)
       ))
   }
 
@@ -35,7 +38,8 @@ object AssetTransactionsDiff {
             height = height,
             tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-            assetScripts = Map(tx.asset          -> tx.script)
+            assetScripts = Map(tx.asset          -> tx.script),
+            scriptsRun = scripts(blockchain, tx)
           ))
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
@@ -66,7 +70,8 @@ object AssetTransactionsDiff {
               height = height,
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))),
-              assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable))
+              assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable)),
+              scriptsRun = scripts(blockchain, tx)
             ))
         }
       } else {
@@ -82,7 +87,8 @@ object AssetTransactionsDiff {
         height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))),
-        assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity))
+        assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity)),
+        scriptsRun = scripts(blockchain, tx)
       )
     }
   }
@@ -96,7 +102,8 @@ object AssetTransactionsDiff {
           height = height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0)))
+          sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
+          scriptsRun = scripts(blockchain, tx)
         ),
         GenericError("Sponsorship smart assets is disabled.")
       )
