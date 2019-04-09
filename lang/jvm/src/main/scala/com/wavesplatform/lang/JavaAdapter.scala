@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.kernel.Monoid
-import com.wavesplatform.lang.StdLibVersion.V2
+import com.wavesplatform.lang.directives.values.V2
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext

@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -27,13 +27,13 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   private val ctx = {
     val transactionType = Types.buildTransferTransactionType(true)
-    val tx              = CaseObj(transactionType.typeRef, Map("amount" -> CONST_LONG(100000000L)))
+    val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combine(
         PureContext.build(V1),
         CTX(
           Seq(transactionType),
-          Map(("tx", ((transactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
+          Map(("tx", ((transactionType, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
           Array.empty
         )
       )
