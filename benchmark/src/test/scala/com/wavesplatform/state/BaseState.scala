@@ -31,7 +31,7 @@ trait BaseState {
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-  val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, 100000, 2000, 120 * 60 * 1000)
+  val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, 100000, 2000, 120 * 60 * 1000, false)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -73,8 +73,8 @@ trait BaseState {
   )
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next, MiningConstraint.Unlimited).explicitGet()._1
-    state.append(preconditionDiff, 0, next)
+    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next, MiningConstraint.Unlimited).explicitGet().diff
+    state.append(preconditionDiff, 0, 0, next)
   }
 
   def applyBlock(b: Block): Unit = {

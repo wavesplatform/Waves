@@ -44,7 +44,7 @@ object ScriptResult {
           val l: Vector[E[(Address, Long, Option[ByteStr])]] = xs.map {
             case CaseObj(t, scriptTransferFields) if t.name == FieldNames.ScriptTransfer =>
               (scriptTransferFields(FieldNames.Recipient), scriptTransferFields(FieldNames.Amount), scriptTransferFields(FieldNames.Asset)) match {
-                case (CaseObj(at, fields2), CONST_LONG(b), maybeToken) if at.name == Types.addressType.typeRef.name =>
+                case (CaseObj(at, fields2), CONST_LONG(b), maybeToken) if at.name == Types.addressType.name =>
                   for {
                     token <- maybeToken match {
                       case CONST_BYTESTR(tokenId)     => Right(Some(tokenId))
