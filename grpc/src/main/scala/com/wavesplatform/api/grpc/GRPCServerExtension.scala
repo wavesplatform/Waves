@@ -18,7 +18,7 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
   @volatile
   var server: Server = _
 
-  override def start(): Unit            = {
+  override def start(): Unit = {
     val settings = ConfigFactory.load().as[GRPCSettings]("waves.grpc")
     this.server = startServer(settings)
   }
