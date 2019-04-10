@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.{ApiKeyNotValid, PaymentApiRoute}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state.Diff
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Time
@@ -27,6 +28,12 @@ class PaymentRouteSpec
   private val allChannels = stub[ChannelGroup]
 
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
+
+  (utx.putIfNewTraced _)
+    .when(*)
+    .onCall((t: Transaction) => TracedResult(Right((true, Diff.empty))))
+    .anyNumberOfTimes()
+
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 
   "accepts payments" in {

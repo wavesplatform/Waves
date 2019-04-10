@@ -1,12 +1,12 @@
 package com.wavesplatform.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import play.api.libs.json._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.{Transaction, ValidationError}
+import play.api.libs.json._
 
 case class ApiErrorResponse(error: Int, message: String)
 
@@ -23,7 +23,7 @@ trait ApiError {
 }
 
 object ApiError {
-  def fromValidationError(e: ValidationError): ApiError =
+  implicit def fromValidationError(e: ValidationError): ApiError =
     e match {
       case ValidationError.InvalidAddress(_)        => InvalidAddress
       case ValidationError.NegativeAmount(x, of)    => NegativeAmount(s"$x of $of")
@@ -77,6 +77,10 @@ object ApiError {
             "value"  -> lv.toString
           )
       })()
+  }
+
+  implicit class ApiErrorException(val error: ApiError) extends IllegalArgumentException(error.message) {
+    def toException = this
   }
 }
 

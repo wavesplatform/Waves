@@ -7,6 +7,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen.posNum
@@ -26,6 +27,11 @@ class LeaseBroadcastRouteSpec
   private val allChannels = stub[ChannelGroup]
 
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
+
+  (utx.putIfNewTraced _)
+    .when(*)
+    .onCall((t: Transaction) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
+    .anyNumberOfTimes()
 
   "returns StateCheckFailed" - {
     val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route

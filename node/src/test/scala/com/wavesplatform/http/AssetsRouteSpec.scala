@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, Tra
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -28,6 +29,12 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
   (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
+
+  (utx.putIfNewTraced _)
+    .when(*)
+    .onCall((_: Transaction) => TracedResult(Right((true, Diff.empty))))
+    .anyNumberOfTimes()
+
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 
   "/transfer" - {

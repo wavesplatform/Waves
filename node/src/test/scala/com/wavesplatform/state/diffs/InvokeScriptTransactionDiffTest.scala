@@ -15,15 +15,16 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.TransactionNotAllowedByScript
+import com.wavesplatform.transaction.ValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ContractScript
@@ -62,6 +63,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   ).explicitGet()
 
   val assetBanned = ExprScript(FALSE).explicitGet()
+
+  val throwingAsset = ExprScript(FUNCTION_CALL(Native(THROW), Nil)).explicitGet()
 
   def dataContract(senderBinding: String, argName: String, funcName: String, bigData: Boolean) = {
     val datas =
@@ -326,6 +329,53 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
+  property("successfully invoked contract trace should contain both attached and transferring asset script info") {
+    forAll(for {
+      invoker <- accountGen
+      quantity = 1000000000
+      am      <- smallFeeGen
+      master  <- accountGen
+      ts      <- timestampGen
+
+      transferringAsset = IssueTransactionV2
+        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .explicitGet()
+
+      attachedAsset = IssueTransactionV2
+        .selfSigned(chainId, invoker, "Asset#2".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .explicitGet()
+
+      contractGen = paymentContractGen(master, am, List(IssuedAsset(transferringAsset.id()))) _
+
+      r <- preconditionsAndSetContract(
+        contractGen,
+        masterGen  = Gen.oneOf(Seq(master)),
+        invokerGen = Gen.oneOf(Seq(invoker)),
+        payment    = Some(Payment(1, IssuedAsset(attachedAsset.id()))),
+        feeGen     = ciFee(2)
+      )
+    } yield (invoker, am, r._1, r._2, r._3, transferringAsset, attachedAsset, master)) {
+      case (acc, amount, genesis, setScript, ci, transferringAsset, attachedAsset, master) =>
+        assertDiffEiTraced(
+          Seq(TestBlock.create(genesis ++ Seq(transferringAsset, attachedAsset, setScript))),
+          TestBlock.create(Seq(ci)),
+          fs
+        ) { blockDiffEi =>
+          blockDiffEi.resultE shouldBe 'right
+          inside(blockDiffEi.trace) {
+            case List(
+              AssetVerifierTrace(attachedAssetId, None),
+              InvokeScriptTrace(_, _, Right(ScriptResult(_, transactions))),
+              AssetVerifierTrace(transferringAssetId, None)
+            ) =>
+              attachedAssetId          shouldBe attachedAsset.id.value
+              transferringAssetId      shouldBe transferringAsset.id.value
+              transactions.head._3.get shouldBe transferringAsset.id.value
+          }
+        }
+    }
+  }
+
   property("asset script ban invoking contract with payment and produce trace") {
     forAll(for {
       a  <- accountGen
@@ -427,6 +477,47 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               bannedAssetId  shouldBe asset2.id.value
 
               transactions.flatMap(_._3.toList) shouldBe List(allowedAssetId, bannedAssetId)
+          }
+        }
+    }
+  }
+
+  property("trace contains attached asset script invocation result when transferring asset script produce error") {
+    forAll(for {
+      a       <- accountGen
+      am      <- smallFeeGen
+      invoker <- accountGen
+      ts      <- timestampGen
+
+      attachedAsset = IssueTransactionV2
+        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
+        .explicitGet()
+
+      transferringAsset = IssueTransactionV2
+        .selfSigned(chainId, invoker, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, Some(throwingAsset), enoughFee, ts)
+        .explicitGet()
+
+      r <- preconditionsAndSetContract(
+        paymentContractGen(a, am, List(IssuedAsset(transferringAsset.id()))),
+        invokerGen = Gen.oneOf(Seq(invoker)),
+        payment = Some(Payment(1, IssuedAsset(attachedAsset.id()))),
+        feeGen = ciFee(1)
+      )
+    } yield (a, am, r._1, r._2, r._3, transferringAsset, attachedAsset, invoker)) {
+      case (acc, amount, genesis, setScript, ci, transferringAsset, attachedAsset, invoker) =>
+        assertDiffEiTraced(
+          Seq(TestBlock.create(genesis ++ Seq(transferringAsset, attachedAsset, setScript))),
+          TestBlock.create(Seq(ci)),
+          fs
+        ) { blockDiffEi =>
+          blockDiffEi.resultE should produce("TransactionValidationError")
+          inside(blockDiffEi.trace) {
+            case List(
+              AssetVerifierTrace(attachedAssetId, None),
+              InvokeScriptTrace(_, _, Right(ScriptResult(_, transactions)))
+            ) =>
+              attachedAssetId          shouldBe attachedAsset.id.value
+              transactions.head._3.get shouldBe transferringAsset.id.value
           }
         }
     }
