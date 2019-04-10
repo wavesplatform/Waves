@@ -213,8 +213,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                             = utxStorage
       override def channels: ChannelGroup                                   = allChannels
       override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
-      override def spendableBalance(address: Address, assetId: Asset): Long = utxStorage.spendableBalance(address, assetId)
-      override def addToUtx(tx: Transaction): Unit                          = utxStorage.putIfNew(tx)
       override def actorSystem: ActorSystem                                 = app.actorSystem
     }
 

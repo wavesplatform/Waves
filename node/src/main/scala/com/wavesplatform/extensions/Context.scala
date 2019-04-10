@@ -19,7 +19,5 @@ trait Context {
   def utx: UtxPool
   def channels: ChannelGroup
   def spendableBalanceChanged: Observable[(Address, Asset)]
-  def spendableBalance(address: Address, assetId: Asset): Long
-  def addToUtx(tx: Transaction): Unit
   def actorSystem: ActorSystem
 }
