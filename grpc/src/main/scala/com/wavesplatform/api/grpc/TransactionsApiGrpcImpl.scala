@@ -3,7 +3,7 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.TransactionNotExists
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ValidationError
@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
-import io.netty.channel.group.ChannelGroup
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
@@ -22,10 +21,10 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
                               wallet: Wallet,
                               blockchain: Blockchain,
                               utx: UtxPool,
-                              allChannels: ChannelGroup)(implicit sc: Scheduler)
+                              broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels)
+  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, broadcast)
 
   override def getTransactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
     val stream = commonApi

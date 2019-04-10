@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
@@ -36,7 +36,7 @@ import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, T
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
-import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
+import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
@@ -206,14 +206,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     val extensionContext = new Context {
-      override def settings: WavesSettings                                  = app.settings
-      override def blockchain: Blockchain                                   = app.blockchainUpdater
-      override def time: Time                                               = app.time
-      override def wallet: Wallet                                           = app.wallet
-      override def utx: UtxPool                                             = utxStorage
-      override def channels: ChannelGroup                                   = allChannels
-      override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                 = app.actorSystem
+      override def settings: WavesSettings                               = app.settings
+      override def blockchain: Blockchain                                = app.blockchainUpdater
+      override def time: Time                                            = app.time
+      override def wallet: Wallet                                        = app.wallet
+      override def utx: UtxPool                                          = utxStorage
+      override def broadcastTx(tx: Transaction): Unit                    = allChannels.broadcastTx(tx, None)
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
     }
 
     extensions = settings.extensions.map { extensionClassName =>

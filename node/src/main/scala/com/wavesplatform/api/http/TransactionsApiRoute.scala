@@ -47,7 +47,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     with CommonApiFunctions
     with WithSettings {
 
-  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels)
+  import com.wavesplatform.network._
+  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels.broadcastTx(_, None))
 
   override lazy val route =
     pathPrefix("transactions") {

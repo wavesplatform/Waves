@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc
 
 import java.net.InetSocketAddress
 
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.utils.ScorexLogging
@@ -44,7 +43,7 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
                                     context.wallet,
                                     context.blockchain,
                                     context.utx,
-                                    context.channels),
+                                    context.broadcastTx),
         apiScheduler
       ))
       .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(context.blockchain), apiScheduler))
