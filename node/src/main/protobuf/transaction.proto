@@ -166,14 +166,12 @@ message ExchangeTransactionData {
         repeated bytes proofs = 12;
     };
 
-    oneof orders {
-        BuySellOrders buy_sell_orders = 1;
-        MakerTakerOrders maker_taker_orders = 2;
-    }
-    int64 amount = 3;
-    int64 price = 4;
-    int64 buy_matcher_fee = 5;
-    int64 sell_matcher_fee = 6;
+    int64 amount = 1;
+    int64 price = 2;
+    int64 buy_matcher_fee = 3;
+    int64 sell_matcher_fee = 4;
+    repeated Order orders = 5;
+    int32 taker = 6;
 };
 
 message SponsorFeeTransactionData {

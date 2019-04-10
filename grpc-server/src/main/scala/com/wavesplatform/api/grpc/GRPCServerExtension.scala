@@ -1,13 +1,15 @@
 package com.wavesplatform.api.grpc
 
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.extensions.{Context => ExtensionContext, Extension}
+import java.net.InetSocketAddress
+
+import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.utils.ScorexLogging
+import io.grpc.Server
+import io.grpc.netty.NettyServerBuilder
+import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import io.grpc.{Server, ServerBuilder}
-import monix.execution.Scheduler
 
 import scala.concurrent.Future
 
@@ -15,8 +17,8 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
   @volatile
   var server: Server = _
 
-  override def start(): Unit            = {
-    val settings = ConfigFactory.load().as[GRPCSettings]("waves.grpc")
+  override def start(): Unit = {
+    val settings = context.settings.config.as[GRPCSettings]("waves.grpc")
     this.server = startServer(settings)
   }
 
@@ -33,21 +35,22 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
   private[this] def startServer(settings: GRPCSettings): Server = {
     implicit val apiScheduler = Scheduler(context.actorSystem.dispatcher)
 
-    val server: Server = ServerBuilder
-      .forPort(settings.port)
+    val bindAddress = new InetSocketAddress(settings.host, settings.port)
+    val server: Server = NettyServerBuilder
+      .forAddress(bindAddress)
       .addService(TransactionsApiGrpc.bindService(
         new TransactionsApiGrpcImpl(context.settings.blockchainSettings.functionalitySettings,
                                     context.wallet,
                                     context.blockchain,
                                     context.utx,
-                                    context.channels),
+                                    context.broadcastTx),
         apiScheduler
       ))
       .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(context.blockchain), apiScheduler))
       .build()
       .start()
 
-    log.info(s"gRPC API was bound to ${settings.port}")
+    log.info(s"gRPC API was bound to $bindAddress")
     server
   }
 }
