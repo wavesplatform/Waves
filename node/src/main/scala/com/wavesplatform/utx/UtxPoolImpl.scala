@@ -179,19 +179,20 @@ class UtxPoolImpl(time: Time,
         .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
           case ((invalid, valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
             val updatedBlockchain = composite(blockchain, diff)
-            val updatedRest       = currRest.put(updatedBlockchain, tx, diff)
-            if (updatedRest.isOverfilled) {
-              if (updatedRest != lastOverfilled)
-                log.trace(
-                  s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
-
-              (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
-            } else if (TxCheck.isExpired(tx)) {
+            if (TxCheck.isExpired(tx)) {
               (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
             } else {
               differ(updatedBlockchain, tx) match {
                 case Right(newDiff) =>
+                 val updatedRest       = currRest.put(updatedBlockchain, tx, newDiff)
+                 if (updatedRest.isOverfilled) {
+                   if (updatedRest != lastOverfilled) {
+                     log.trace(s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+                   }
+                   (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
+                 } else {
                   (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                 }
                 case Left(_) =>
                   (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
               }

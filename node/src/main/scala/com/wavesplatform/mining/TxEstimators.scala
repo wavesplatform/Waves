@@ -1,12 +1,14 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.state.{Blockchain, Diff}
+//
 //import com.wavesplatform.transaction.Asset.IssuedAsset
 //import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 //import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
 //import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 //import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 //import com.wavesplatform.transaction.{Authorized, Transaction}
+//
 import com.wavesplatform.transaction.Transaction
 
 object TxEstimators {
@@ -32,6 +34,8 @@ object TxEstimators {
 
   object scriptRunNumber extends Fn {
     override def apply(blockchain: Blockchain, x: Transaction, diff: Diff): Long = {
+
+//  for tests
 //      val smartAccountRun = x match {
 //        case x: Transaction with Authorized if blockchain.hasScript(x.sender) => 1
 //        case _                                                                => 0
@@ -57,7 +61,14 @@ object TxEstimators {
 //        case _                           => 0
 //      }
 //
-//      smartAccountRun + smartTokenRuns + invokeScriptRun
+//      val oldScriptsRun = smartAccountRun + smartTokenRuns + invokeScriptRun
+//
+//      println(s"${diff.scriptsRun} $oldScriptsRun")
+//      if(diff.scriptsRun != oldScriptsRun) {
+//        println(s"$smartAccountRun + $smartTokenRuns + $invokeScriptRun")
+//        println(x)
+//      }
+//
       diff.scriptsRun
     }
 
