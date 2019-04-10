@@ -5,12 +5,12 @@ import java.util.concurrent.ExecutionException
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server._
+import com.wavesplatform.api.http.ApiError.ApiErrorException
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.ValidationError.{GenericError, ValidationErrorException}
 import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
@@ -30,7 +30,8 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
-    case e: ValidationError                                             => complete(ApiError.fromValidationError(e))
+    case e: ApiErrorException                                           => complete(e.error)
+    case e: ValidationErrorException                                    => complete(ApiError.fromValidationError(e.error))
     case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
     case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
     case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)

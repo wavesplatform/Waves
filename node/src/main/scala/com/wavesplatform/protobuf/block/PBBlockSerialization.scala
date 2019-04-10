@@ -8,6 +8,6 @@ private[block] object PBBlockSerialization {
   }
 
   def unsignedBytes(block: PBBlock): Array[Byte] = {
-    PBUtils.encodeDeterministic(block.withHeader(block.getHeader.withSignature(ByteString.EMPTY)))
+    PBUtils.encodeDeterministic(block.withSignature(ByteString.EMPTY))
   }
 }
