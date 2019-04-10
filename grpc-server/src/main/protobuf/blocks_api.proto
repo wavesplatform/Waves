@@ -6,8 +6,8 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 service BlocksApi {
-    rpc GetBlock (BlockRequest) returns (BlockAndHeight);
-    rpc GetBlocksRange (BlocksRangeRequest) returns (stream BlockAndHeight);
+    rpc GetBlock (BlockRequest) returns (BlockWithHeight);
+    rpc GetBlockRange (BlockRangeRequest) returns (stream BlockWithHeight);
     rpc GetCurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
 }
 
@@ -21,7 +21,7 @@ message BlockRequest {
     bool include_transactions = 100;
 }
 
-message BlocksRangeRequest {
+message BlockRangeRequest {
     uint32 from_height = 1;
     uint32 to_height = 2;
     oneof filter {
@@ -31,7 +31,7 @@ message BlocksRangeRequest {
     bool include_transactions = 100;
 }
 
-message BlockAndHeight {
+message BlockWithHeight {
     Block block = 1;
     uint32 height = 2;
 }

@@ -5,13 +5,18 @@ import "transaction.proto";
 import "google/protobuf/empty.proto";
 
 service TransactionsApi {
-    rpc GetTransactionsByAddress (TransactionsByAddressRequest) returns (stream SignedTransaction);
-    rpc GetTransactionById (TransactionByIdRequest) returns (SignedTransaction);
+    rpc GetTransactionsByAddress (TransactionsByAddressRequest) returns (stream TransactionWithHeight);
+    rpc GetTransactionById (TransactionByIdRequest) returns (TransactionWithHeight);
     rpc GetUnconfirmedTransactions (google.protobuf.Empty) returns (stream SignedTransaction);
     rpc GetUnconfirmedTransactionById (TransactionByIdRequest) returns (SignedTransaction);
     rpc CalculateFee (Transaction) returns (CalculateFeeResponse);
     rpc SignTransaction (SignRequest) returns (SignedTransaction);
     rpc BroadcastTransaction (SignedTransaction) returns (SignedTransaction);
+}
+
+message TransactionWithHeight {
+    SignedTransaction transaction = 1;
+    int64 height = 2;
 }
 
 message TransactionsByAddressRequest {

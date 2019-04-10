@@ -16,6 +16,6 @@ object GRPCTest extends App {
   result.take(100).foreach(println)
 
   val blocksService = BlocksApiGrpc.blockingStub(channel)
-  val result1       = blocksService.getBlocksRange(BlocksRangeRequest(100, 200))
+  val result1       = blocksService.getBlockRange(BlockRangeRequest(100, 200))
   result1.foreach(println)
 }

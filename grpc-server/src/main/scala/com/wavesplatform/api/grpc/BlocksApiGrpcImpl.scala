@@ -20,23 +20,23 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     Future.successful(UInt32Value(commonApi.currentHeight()))
   }
 
-  override def getBlocksRange(request: BlocksRangeRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
+  override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = {
     val stream = if (request.includeTransactions) {
       commonApi
         .blocksRange(request.fromHeight, request.toHeight)
-        .map { case (block, height) => BlockAndHeight(Some(block.toPB), height) }
+        .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
     } else {
       commonApi
         .blockHeadersRange(request.fromHeight, request.toHeight)
-        .map { case (header, _, height) => BlockAndHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
+        .map { case (header, _, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
     }
 
     val filteredStream = stream.filter {
-      case BlockAndHeight(Some(PBBlock(Some(header), _, _)), _) =>
+      case BlockWithHeight(Some(PBBlock(Some(header), _, _)), _) =>
         request.filter match {
-          case BlocksRangeRequest.Filter.Generator(generator) =>
+          case BlockRangeRequest.Filter.Generator(generator) =>
             header.generator == generator || PublicKey(header.generator.toByteArray).toAddress.bytes == generator.toByteStr
-          case BlocksRangeRequest.Filter.Empty => true
+          case BlockRangeRequest.Filter.Empty => true
         }
 
       case _ => true
@@ -45,27 +45,27 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     responseObserver.completeWith(filteredStream)
   }
 
-  override def getBlock(request: BlockRequest): Future[BlockAndHeight] = {
+  override def getBlock(request: BlockRequest): Future[BlockWithHeight] = {
     val result = request.request match {
       case Request.BlockId(blockId) =>
         commonApi
           .blockBySignature(blockId)
-          .map(block => BlockAndHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
+          .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
 
       case Request.Height(height) =>
         commonApi
           .blockAtHeight(if (height > 0) height else blockchain.height + height)
           .toRight(BlockDoesNotExist)
-          .map(block => BlockAndHeight(Some(block.toPB), height))
+          .map(block => BlockWithHeight(Some(block.toPB), height))
 
       case Request.ParentId(parentId) =>
         commonApi
           .childBlock(parentId)
           .toRight(BlockDoesNotExist)
-          .map { case (block, height) => BlockAndHeight(Some(block.toPB), height) }
+          .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
 
       case Request.Empty =>
-        Right(BlockAndHeight.defaultInstance)
+        Right(BlockWithHeight.defaultInstance)
     }
 
     if (request.includeTransactions) {
