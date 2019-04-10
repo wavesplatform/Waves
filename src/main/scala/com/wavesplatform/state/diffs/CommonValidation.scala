@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction._
@@ -276,7 +276,7 @@ object CommonValidation {
           minFee <= tx.assetFee._2,
           (),
           GenericError(
-            s"Fee for ${tx.getClass.getSimpleName} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.base58)})" ++
+            s"Fee for ${Constants.TransactionNames(tx.builder.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.base58)})" ++
               " does not exceed minimal value of " ++
               s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.base58}")}"
           )

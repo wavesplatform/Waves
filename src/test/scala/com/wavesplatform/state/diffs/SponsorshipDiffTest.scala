@@ -125,8 +125,12 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
               CommonValidation.FeeConstants(insufficientFee.builder.typeId) * CommonValidation.FeeUnit,
               sponsor.minSponsoredAssetFee.get
             )
-          
-          blockDiffEi should produce(s"does not exceed minimal value of 100000 WAVES or $minFee ${issue.assetId().base58}")
+
+          val expectedError =
+            s"Fee for TransferTransaction (${insufficientFee.fee} in ${issue.assetId().base58})" ++
+              s" does not exceed minimal value of 100000 WAVES or $minFee ${issue.assetId().base58}"
+
+          blockDiffEi should produce(expectedError)
         }
         assertDiffEi(setupBlocks, block(Seq(wavesOverspend)), s) { blockDiffEi =>
           if (wavesOverspend.fee > issue.quantity)
