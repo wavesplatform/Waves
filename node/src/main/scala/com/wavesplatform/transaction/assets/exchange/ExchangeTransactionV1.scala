@@ -102,8 +102,8 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     (
       IntBytes(tailIndex(1), "Buy order object length (BN)"),
       IntBytes(tailIndex(2), "Sell order object length (SN)"),
-      OrderV1Bytes(tailIndex(3), "Buy order object", "BN"),
-      OrderV1Bytes(tailIndex(4), "Sell order object", "SN"),
+      OrderV1Bytes(tailIndex(3), "Buy order object", "BN, see OrderV1 structure"),
+      OrderV1Bytes(tailIndex(4), "Sell order object", "SN, see OrderV1 structure"),
       LongBytes(tailIndex(5), "Price"),
       LongBytes(tailIndex(6), "Amount"),
       LongBytes(tailIndex(7), "Buy matcher fee"),

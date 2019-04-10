@@ -95,7 +95,7 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       LongBytes(tailIndex(7), "Amount"),
       LongBytes(tailIndex(8), "Fee"),
       AddressOrAliasBytes(tailIndex(9), "Recipient"),
-      BytesArrayUndefinedLength(tailIndex(10), "Attachment")
+      BytesArrayUndefinedLength(tailIndex(10), "Attachment", TransferTransaction.MaxAttachmentSize)
     ) mapN {
       case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
         require(txId == typeId, s"Signed tx id is not match")

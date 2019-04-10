@@ -2,13 +2,13 @@ package com.wavesplatform.transaction.description
 
 import cats.{Functor, Semigroupal}
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.account.{PublicKey, Address, AddressOrAlias, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -42,8 +42,9 @@ sealed trait ByteEntity[T] { self =>
   private[description] val AddressType        = "Address"
   private[description] val AliasType          = "Alias"
   private[description] val AddressOrAliasType = "Address or Alias"
-  private[description] val OrderV1Type        = "OrderV1"
   private[description] val OrderType          = "Order"
+  private[description] val OrderV1Type        = "OrderV1"
+  private[description] val ProofsType         = "Proofs"
   private[description] val UnimportantType    = ""
 
   /** Index of the byte entity. In case of composition of byte entities returns index of the last one */
@@ -144,12 +145,12 @@ case class BytesArrayDefinedLength(index: Int, name: String, length: Int) extend
   }
 }
 
-case class BytesArrayUndefinedLength(index: Int, name: String) extends ByteEntity[Array[Byte]] {
+case class BytesArrayUndefinedLength(index: Int, name: String, maxLength: Int, minLength: Int = 0) extends ByteEntity[Array[Byte]] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, s"$name length (N)", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, name, ByteArrayType, "N", subIndex = 2)
+      ByteEntityDescription(index, name, ByteArrayType, s"${if (minLength == 0) "" else s"$minLength <= "}N <= $maxLength", subIndex = 2)
     )
   }
 
@@ -225,7 +226,7 @@ case class AliasBytes(index: Int, name: String) extends ByteEntity[Alias] {
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, s"$name length (A)", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, s"$name", AliasType, "A", subIndex = 2)
+      ByteEntityDescription(index, s"$name", AliasType, s"${Alias.MinLength} <= A <= ${Alias.MaxLength}", subIndex = 2)
     )
   }
 
@@ -241,24 +242,26 @@ case class AliasBytes(index: Int, name: String) extends ByteEntity[Alias] {
 case class AddressOrAliasBytes(index: Int, name: String) extends ByteEntity[AddressOrAlias] {
 
   def generateDoc: Seq[ByteEntityDescription] =
-    Seq(ByteEntityDescription(index, name, AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"))
+    Seq(ByteEntityDescription(index, name, AddressOrAliasType, "Depends on the first byte (1 - Address, 2 - Alias)"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(AddressOrAlias, Int)] = {
     Try { AddressOrAlias.fromBytes(buf, offset).explicitGet() }
   }
 }
 
-case class ProofsBytes(index: Int) extends ByteEntity[Proofs] {
+case class ProofsBytes(index: Int, concise: Boolean = true) extends ByteEntity[Proofs] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(
-      ByteEntityDescription(index, s"Proofs version (${Proofs.Version})", UnimportantType, "1", subIndex = 1),
-      ByteEntityDescription(index, "Proofs count", UnimportantType, "2", subIndex = 2),
-      ByteEntityDescription(index, "Proof 1 length (P1)", UnimportantType, "2", subIndex = 3),
-      ByteEntityDescription(index, "Proof 1", ByteStrType, "P1", subIndex = 4),
-      ByteEntityDescription(index, "Proof 2 length (P2)", UnimportantType, "2", subIndex = 5),
-      ByteEntityDescription(index, "Proof 2 ", ByteStrType, "P2", subIndex = 6, additionalInfo = "\n...")
-    )
+    if (concise) Seq(ByteEntityDescription(index, s"Proofs", ProofsType, "See Proofs structure"))
+    else
+      Seq(
+        ByteEntityDescription(index, s"Proofs version (${Proofs.Version})", UnimportantType, "1", subIndex = 1),
+        ByteEntityDescription(index, "Proofs count", UnimportantType, "2", subIndex = 2),
+        ByteEntityDescription(index, "Proof 1 length (P1)", UnimportantType, "2", subIndex = 3),
+        ByteEntityDescription(index, "Proof 1", ByteStrType, "P1", subIndex = 4),
+        ByteEntityDescription(index, "Proof 2 length (P2)", UnimportantType, "2", subIndex = 5),
+        ByteEntityDescription(index, "Proof 2 ", ByteStrType, "P2", subIndex = 6, additionalInfo = "\n...")
+      )
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Proofs, Int)] = {
@@ -282,9 +285,9 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, "Number of transfers", UnimportantType, "2", 1),
-      ByteEntityDescription(index, "Address or alias for transfer 1", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)", 2),
+      ByteEntityDescription(index, "Address or alias for transfer 1", AddressOrAliasType, "Depends on the first byte (1 - Address, 2 - Alias)", 2),
       ByteEntityDescription(index, "Amount for transfer 1", LongType, "8", 3),
-      ByteEntityDescription(index, "Address or alias for transfer 2", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)", 4),
+      ByteEntityDescription(index, "Address or alias for transfer 2", AddressOrAliasType, "Depends on the first byte (1 - Address, 2 - Alias)", 4),
       ByteEntityDescription(index, "Amount for transfer 2", LongType, "8", 5, additionalInfo = "\n...")
     )
   }
@@ -312,7 +315,7 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
     Seq(
       ByteEntityDescription(index, s"$name size (N)", UnimportantType, "4", subIndex = 1),
       ByteEntityDescription(index, s"$name version mark", UnimportantType, "1 (version 1) / 0 (version 2)", subIndex = 2),
-      ByteEntityDescription(index, name, OrderType, "N", subIndex = 3)
+      ByteEntityDescription(index, name, OrderType, "N, see the appropriate Order version structure", subIndex = 3)
     )
   }
 
@@ -333,7 +336,7 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
 
 case class OrderV1Bytes(index: Int, name: String, length: String) extends ByteEntity[OrderV1] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, OrderV1Type, s"$length"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, OrderV1Type, length))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(OrderV1, Int)] = {
     OrderV1.parseBytes(buf.drop(offset)).map { order =>
@@ -348,9 +351,18 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
     Seq(
       ByteEntityDescription(index, "Data entries count", UnimportantType, "2", subIndex = 1),
       ByteEntityDescription(index, "Key 1 length (K1)", UnimportantType, "2", subIndex = 2),
-      ByteEntityDescription(index, "Key 1 bytes", "UTF-8 encoded", "K1", subIndex = 3),
+      ByteEntityDescription(index,
+                            "Key 1 bytes",
+                            "UTF-8 encoded",
+                            s"K1 <= ${DataEntry.MaxKeySize} * 4 (max bytes count per char) = ${DataEntry.MaxKeySize * 4}",
+                            subIndex = 3),
       ByteEntityDescription(index, "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", UnimportantType, "1", subIndex = 4),
-      ByteEntityDescription(index, "Value 1 bytes", "Value 1 type", "depends on value type", subIndex = 5, additionalInfo = "\n...")
+      ByteEntityDescription(index,
+                            "Value 1 bytes",
+                            "Value 1 type",
+                            s"Depends on the value type, max ${DataEntry.MaxValueSize}",
+                            subIndex = 5,
+                            additionalInfo = "\n...")
     )
   }
 
@@ -403,7 +415,7 @@ case class ScriptBytes(index: Int, name: String) extends ByteEntity[Script] {
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, s"$name length (S)", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, name, "Script", "S", subIndex = 2)
+      ByteEntityDescription(index, name, "Script", s"0 <= S <= ${ContractLimits.MaxContractSizeInBytes}", subIndex = 2)
     )
   }
 
@@ -420,7 +432,7 @@ case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, s"$name length (P)", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, name, "Payment (Long, Option[AssetId])", "P", subIndex = 2)
+      ByteEntityDescription(index, name, "Payment (Long, Option[AssetId])", s"P <= ${8 + AssetIdLength}", subIndex = 2)
     )
   }
 
@@ -451,7 +463,7 @@ class OptionBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[
     ByteEntityDescription(index, s"$name $firstByteInterpretation", UnimportantType, "1", subIndex = 1) +:
       nestedByteEntity.generateDoc.map { desc =>
       desc.copy(
-        length = desc.length + s"/0 (depends on byte in $index.1)",
+        length = desc.length + s" or 0 (depends on the byte in $index.1)",
         subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
       )
     }
@@ -477,7 +489,7 @@ class SeqBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U])
     ByteEntityDescription(index, s"$name", UnimportantType, "1", subIndex = 1) +:
       nestedByteEntity.generateDoc.map { desc =>
       desc.copy(
-        length = desc.length + s"/0 (depends on short in $index.1)",
+        length = desc.length + s" or 0 (depends on the short in $index.1)",
         subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
       )
     }
