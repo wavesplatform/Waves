@@ -190,4 +190,48 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       invokeScript
     ) shouldBe Testing.evaluated(true)
   }
+
+  property("User function should return correct lists for sets") {
+    parseCompileAndEvaluate(
+      """
+        | {-#STDLIB_VERSION 3#-}
+        | {-#SCRIPT_TYPE ACCOUNT#-}
+        | {-#CONTENT_TYPE DAPP#-}
+        |
+        | func wSet() = {
+        |     [
+        |       DataEntry("a", 1),
+        |       DataEntry("b", true),
+        |       DataEntry("c", "str"),
+        |       DataEntry("d",  toBytes(256))
+        |     ]
+        | }
+        |
+        | func tSet(caller: Address) = {
+        |     [
+        |       ScriptTransfer(caller, 1, unit),
+        |       ScriptTransfer(caller, 2, unit)
+        |     ]
+        | }
+        |
+        | @Callable(i)
+        | func test() = {
+        |     ScriptResult(WriteSet(wSet()), TransferSet(tSet(i.caller)))
+        | }
+        |
+        """.stripMargin,
+      "test"
+    ).explicitGet() shouldBe ScriptResult(
+      List(
+        DataItem.Lng("a", 1),
+        DataItem.Bool("b", true),
+        DataItem.Str("c", "str"),
+        DataItem.Bin("d", ByteStr.fromLong(256L))
+      ),
+      List(
+        (Recipient.Address(callerAddress), 1L, None),
+        (Recipient.Address(callerAddress), 2L, None)
+      )
+    )
+  }
 }
