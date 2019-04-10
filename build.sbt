@@ -46,7 +46,7 @@ lazy val node = project
     langJVM   % "compile;test->test"
   )
 
-lazy val grpc = project
+lazy val `grpc-server` = project
   .dependsOn(node % "compile;test->test;runtime->provided")
 
 lazy val `node-it` = project.dependsOn(node)
