@@ -137,7 +137,7 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava") % Test
-    ) ++ test
+    ) ++ protobuf.value ++ test
   )
 
   lazy val matcher = Seq(
