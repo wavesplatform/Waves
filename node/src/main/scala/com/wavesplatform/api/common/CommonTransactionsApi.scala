@@ -9,7 +9,6 @@ import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.{Asset, ValidationError}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.reactive.Observable
 
@@ -17,7 +16,7 @@ private[api] class CommonTransactionsApi(functionalitySettings: FunctionalitySet
                                          wallet: Wallet,
                                          blockchain: Blockchain,
                                          utx: UtxPool,
-                                         allChannels: ChannelGroup) {
+                                         broadcast: VanillaTransaction => Unit) {
 
   private[this] val TransactionsBatchLimit = 100
 
@@ -56,11 +55,9 @@ private[api] class CommonTransactionsApi(functionalitySettings: FunctionalitySet
   }
 
   def broadcastTransaction(tx: VanillaTransaction): Either[ValidationError, VanillaTransaction] = {
-    import com.wavesplatform.network._
-
     val result = for {
       r <- utx.putIfNew(tx)
-      _ = if (r._1) allChannels.broadcastTx(tx, None) else ()
+      _ = if (r._1) broadcast(tx) else ()
     } yield tx
 
     result
