@@ -26,15 +26,15 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
 
   private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, broadcast)
 
-  override def getTransactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[TransactionWithHeight]): Unit = {
+  override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionWithHeight]): Unit = {
     val stream = commonApi
-      .transactionsByAddress(request.getAddress.toAddress, Option(request.fromId.toByteStr).filterNot(_.isEmpty))
+      .transactionsByAddress(request.getRecipient.toAddress, Option(request.fromId.toByteStr).filterNot(_.isEmpty))
       .map { case (height, transaction) => TransactionWithHeight(Some(transaction.toPB), height) }
 
     responseObserver.completeWith(stream)
   }
 
-  override def getTransactionById(request: TransactionByIdRequest): Future[TransactionWithHeight] = {
+  override def getTransaction(request: TransactionRequest): Future[TransactionWithHeight] = {
     commonApi
       .transactionById(request.transactionId)
       .map { case (height, transaction) => TransactionWithHeight(Some(transaction.toPB), height) }
@@ -46,7 +46,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     responseObserver.completeWith(stream)
   }
 
-  override def getUnconfirmedTransactionById(request: TransactionByIdRequest): Future[PBSignedTransaction] = {
+  override def getUnconfirmedTransaction(request: TransactionRequest): Future[PBSignedTransaction] = {
     commonApi
       .unconfirmedTransactionById(request.transactionId)
       .map(_.toPB)
