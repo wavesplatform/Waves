@@ -46,13 +46,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("fails with right error position") {
     val script =
-      """
-        | {-# STDLIB_VERSION 3 #-}
-        | {-# STDLIB_VERSION 3 #-}
-        | let a = 1000
-        | a > b
-      """.stripMargin
-    ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 76-77")
+      """{-# STDLIB_VERSION 3 #-}
+        |{-# STDLIB_VERSION 3 #-}
+        |let a = 1000
+        |a > b""".stripMargin
+    ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 72-73")
   }
 
   property("fails with contract for asset") {
