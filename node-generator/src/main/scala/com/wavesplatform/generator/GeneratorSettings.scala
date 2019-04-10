@@ -10,6 +10,7 @@ import com.wavesplatform.common.utils.EitherExt2
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],
                              sendTo: Seq[InetSocketAddress],
+                             restUrls: Seq[String],
                              worker: Worker.Settings,
                              mode: Mode.Value,
                              narrow: NarrowTransactionGenerator.Settings,

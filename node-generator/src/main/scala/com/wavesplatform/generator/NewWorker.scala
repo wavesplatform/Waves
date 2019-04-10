@@ -1,32 +1,64 @@
 package com.wavesplatform.generator
 
+import java.net.{InetSocketAddress, URL}
+
+import com.wavesplatform.generator.Worker.Settings
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
-import io.netty.channel.Channel
-import io.netty.util.concurrent.{Future => NFuture}
+import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
+import monix.execution.Scheduler
+import org.asynchttpclient.AsyncHttpClient
 
-import scala.concurrent.Promise
+import scala.compat.java8.FutureConverters
+import scala.concurrent.{ExecutionContext, Future}
 
-class NewWorker(transactionSource: Iterable[Transaction], channel: Channel, canContinue: => Boolean) {
-  def utxSpace: Task[Int] = Task(0)
-  def writeTransactions(txs: Iterable[Transaction]): Task[Unit] = Task.fromFuture {
-    val p = Promise[Unit]()
-    // txCount will only be decremented from one thread, so there's no need
-    @volatile var txCount = 0
-    txs.foreach { tx =>
-      txCount += 1
-      channel.write(RawBytes.from(tx)).addListener { _: NFuture[_] =>
-        txCount -= 1
-        if (txCount == 0) p.success(())
-      }
-    }
-    p.future
+class NewWorker(settings: Settings,
+                transactionSource: Iterator[Transaction],
+                networkSender: NetworkSender,
+                node: InetSocketAddress,
+                nodeRestAddress: URL,
+                canContinue: () => Boolean)(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
+    extends ScorexLogging {
+
+  def run(): Future[Unit] =
+    pullAndWriteTask.runAsyncLogErr(Scheduler(ec))
+
+  private[this] def utxSpace: Task[Int] = Task.defer {
+    import org.asynchttpclient.Dsl._
+    val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
+    Task
+      .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+      .map(_.getResponseBody.toInt)
   }
 
-  val tt: Task[Unit] = if (!canContinue) Task(()) else for {
-    txCount <- utxSpace
-    _ <- writeTransactions(transactionSource.take(txCount))
-    _ <- tt
-  } yield ()
+  private[this] def writeTransactions(txs: Iterator[Transaction]): Task[Unit] = Task.fromFuture {
+    networkSender.connect(node).flatMap(networkSender.send(_, txs.map(RawBytes.from).toSeq: _*))
+  }
+
+  private[this] def pullAndWriteTask: Task[Unit] =
+    if (!canContinue()) Task(())
+    else {
+      val baseTask = for {
+        txCount <- utxSpace
+        _       <- writeTransactions(transactionSource.take(txCount))
+      } yield ()
+
+      val withReconnect = baseTask.onErrorRecoverWith {
+        case e =>
+          if (settings.autoReconnect) {
+            log.error("Stopping because autoReconnect is disabled", e)
+            Task.raiseError(e)
+          } else {
+            log.error(s"[$node] An error during sending transations, reconnect", e)
+            for {
+              _ <- Task.sleep(settings.reconnectDelay)
+              _ <- pullAndWriteTask
+            } yield ()
+          }
+      }
+
+      withReconnect.flatMap(_ => pullAndWriteTask)
+    }
 }
