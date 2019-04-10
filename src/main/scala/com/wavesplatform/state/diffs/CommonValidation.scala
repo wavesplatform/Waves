@@ -278,7 +278,7 @@ object CommonValidation {
           GenericError(
             s"Fee for ${tx.getClass.getSimpleName} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.base58)})" ++
               " does not exceed minimal value of " ++
-              s"$minWaves WAVES${feeAssetId.fold("")(id => s"or $minFee ${id.base58}")}"
+              s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.base58}")}"
           )
         )
       } yield ()
