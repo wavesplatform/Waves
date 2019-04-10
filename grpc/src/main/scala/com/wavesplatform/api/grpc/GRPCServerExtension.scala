@@ -1,9 +1,12 @@
 package com.wavesplatform.api.grpc
 
+import java.net.InetSocketAddress
+
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.extensions.{Context => ExtensionContext, Extension}
+import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.utils.ScorexLogging
+import io.grpc.netty.NettyServerBuilder
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import io.grpc.{Server, ServerBuilder}
@@ -33,8 +36,9 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
   private[this] def startServer(settings: GRPCSettings): Server = {
     implicit val apiScheduler = Scheduler(context.actorSystem.dispatcher)
 
-    val server: Server = ServerBuilder
-      .forPort(settings.port)
+    val bindAddress = new InetSocketAddress(settings.host, settings.port)
+    val server: Server = NettyServerBuilder
+      .forAddress(bindAddress)
       .addService(TransactionsApiGrpc.bindService(
         new TransactionsApiGrpcImpl(context.settings.blockchainSettings.functionalitySettings,
                                     context.wallet,
@@ -47,7 +51,7 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
       .build()
       .start()
 
-    log.info(s"gRPC API was bound to ${settings.port}")
+    log.info(s"gRPC API was bound to $bindAddress")
     server
   }
 }
