@@ -85,7 +85,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     pair,
     updateOrderBookCache(pair),
     marketStatuses.put(pair, _),
-    tx => exchangeTxPool.execute(() => context.addToUtx(tx)),
+    tx => exchangeTxPool.execute(() => context.utx.putIfNew(tx).map(r => if (r._1) context.broadcastTx(tx))),
     settings,
     transactionCreator.createTransaction,
     context.time
@@ -189,7 +189,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           address =>
             Props(new AddressActor(
               address,
-              context.spendableBalance(address, _),
+              context.utx.spendableBalance(address, _),
               5.seconds,
               context.time,
               orderDb,
