@@ -208,7 +208,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           blockDiffEi should produce("Asset was issued by other address")
         }
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("does not exceed minimal value of 100000000 WAVES: 99999999")
+          blockDiffEi should produce("(99999999 in WAVES) does not exceed minimal value of 100000000 WAVES")
         }
     }
   }
@@ -241,7 +241,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           blockDiffEi should produce("Asset was issued by other address")
         }
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("does not exceed minimal value of 100000000 WAVES: 99999999")
+          blockDiffEi should produce("(99999999 in WAVES) does not exceed minimal value of 100000000 WAVES")
         }
     }
   }
