@@ -10,6 +10,7 @@ import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
+import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
@@ -22,7 +23,6 @@ import scopt.OptionParser
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.io.StdIn
 import scala.util.{Failure, Random, Success}
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
@@ -30,7 +30,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   // IDEA bugs
   implicit val inetSocketAddressReader        = com.wavesplatform.settings.inetSocketAddressReader
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  implicit val httpClient = asyncHttpClient()
+  implicit val httpClient                     = asyncHttpClient()
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
@@ -187,10 +187,24 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       @volatile
       var canContinue = true
 
-      val workers = finalConfig.sendTo.zip(finalConfig.restUrls).map { case (node, nodeRestUrl) =>
-        log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
-        // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
-        new NewWorker(finalConfig.worker, Iterator.continually(generator.next()).flatten, sender, node, new URL(nodeRestUrl), () => canContinue)
+      sys.addShutdownHook {
+        log.error("Stopping generator")
+        canContinue = false
+      }
+
+      val workers = finalConfig.sendTo.zip(finalConfig.restUrls).map {
+        case (node, nodeRestUrl) =>
+          log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
+          // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
+          new NewWorker(
+            finalConfig.worker,
+            Iterator.continually(generator.next()).flatten,
+            sender,
+            node,
+            new URL(nodeRestUrl),
+            () => canContinue,
+            initialTransactions.map(RawBytes.from)
+          )
       }
 
       def close(status: Int): Unit = {
@@ -211,9 +225,6 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             log.error("Failed", e)
             close(1)
         }
-
-      StdIn.readLine("Press ENTER to stop generator")
-      canContinue = false
   }
 
 }

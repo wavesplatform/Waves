@@ -23,6 +23,8 @@ class NetworkSender(chainId: Char, name: String, nonce: Long) extends ScorexLogg
   }
 
   def send(channel: Channel, messages: RawBytes*): Future[Unit] = {
+    if (messages.isEmpty) return Future.successful(())
+
     if (channel.isOpen) {
       val p       = Promise[Unit]
       val counter = new AtomicLong(messages.size)

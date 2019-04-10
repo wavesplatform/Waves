@@ -3,7 +3,7 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{KeyPair, Alias}
+import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
@@ -27,7 +27,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
   private def r = ThreadLocalRandom.current
 
   private val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
-  private val typeGen = new DistributedRandomGenerator(settings.probabilities)
+  private val typeGen = DistributedRandomGenerator(settings.probabilities)
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
