@@ -9,6 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import org.scalatest.Matchers
 
@@ -21,6 +22,18 @@ package object diffs extends WithState with Matchers {
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) = differ(state, precondition).explicitGet()
+      state.append(preconditionDiff, preconditionFees, totalFee, precondition)
+    }
+    val totalDiff1 = differ(state, block)
+    assertion(totalDiff1.map(_.diff))
+  }
+
+  def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
+      assertion: TracedResult[ValidationError, Diff] => Unit): Unit = withStateAndHistory(fs) { state =>
+    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(fs, blockchain, None, b, MiningConstraint.Unlimited)
+
+    preconditions.foreach { precondition =>
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) = differ(state, precondition).resultE.explicitGet()
       state.append(preconditionDiff, preconditionFees, totalFee, precondition)
     }
     val totalDiff1 = differ(state, block)
