@@ -57,7 +57,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     commonApi.calculateFee(request.toVanilla).map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId.protoId, assetAmount) }.toFuture
   }
 
-  override def signTransaction(request: TransactionSignRequest): Future[PBSignedTransaction] = {
+  override def signTransaction(request: SignRequest): Future[PBSignedTransaction] = {
     def signTransactionWith(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBSignedTransaction] =
       for {
         sender <- wallet.findPrivateKey(tx.sender.toString)
@@ -65,7 +65,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
         tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
       } yield tx
 
-    val signerAddress: PublicKey = if (request.signer.isEmpty) request.getTransaction.sender else request.signer.toPublicKeyAccount
+    val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKeyAccount
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString).toFuture
   }
 

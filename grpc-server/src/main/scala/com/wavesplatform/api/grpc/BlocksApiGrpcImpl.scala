@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
-import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
+import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
@@ -15,13 +15,6 @@ import scala.concurrent.Future
 
 class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
   private[this] val commonApi = new CommonBlocksApi(blockchain)
-
-  override def calcBlocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
-    commonApi
-      .calcBlocksDelay(request.blockId, request.blockNum)
-      .map(UInt64Value(_))
-      .toFuture
-  }
 
   override def getCurrentHeight(request: Empty): Future[UInt32Value] = {
     Future.successful(UInt32Value(commonApi.currentHeight()))

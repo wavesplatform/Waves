@@ -8,7 +8,6 @@ import "google/protobuf/wrappers.proto";
 service BlocksApi {
     rpc GetBlock (BlockRequest) returns (BlockAndHeight);
     rpc GetBlocksRange (BlocksRangeRequest) returns (stream BlockAndHeight);
-    rpc CalcBlocksDelay (BlocksDelayRequest) returns (google.protobuf.UInt64Value);
     rpc GetCurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
 }
 
@@ -30,11 +29,6 @@ message BlocksRangeRequest {
     }
 
     bool include_transactions = 100;
-}
-
-message BlocksDelayRequest {
-    bytes block_id = 1;
-    uint32 block_num = 2;
 }
 
 message BlockAndHeight {

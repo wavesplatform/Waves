@@ -10,7 +10,7 @@ service TransactionsApi {
     rpc GetUnconfirmedTransactions (google.protobuf.Empty) returns (stream SignedTransaction);
     rpc GetUnconfirmedTransactionById (TransactionByIdRequest) returns (SignedTransaction);
     rpc CalculateFee (Transaction) returns (CalculateFeeResponse);
-    rpc SignTransaction (TransactionSignRequest) returns (SignedTransaction);
+    rpc SignTransaction (SignRequest) returns (SignedTransaction);
     rpc BroadcastTransaction (SignedTransaction) returns (SignedTransaction);
 }
 
@@ -28,7 +28,7 @@ message CalculateFeeResponse {
     uint64 amount = 2;
 }
 
-message TransactionSignRequest {
+message SignRequest {
     Transaction transaction = 1;
-    bytes signer = 2;
+    bytes signer_public_key = 2;
 }
