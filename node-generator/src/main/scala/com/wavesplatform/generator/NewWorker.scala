@@ -39,9 +39,8 @@ class NewWorker(settings: Settings,
   private[this] def writeTransactions(channel: Channel, txs: Seq[Transaction]): Task[Unit] = Task.fromFuture {
     for {
       _ <- networkSender.send(channel, initial: _*)
-      _ <- networkSender.send(channel, txs.map { tx =>
-        log.info(s"Sending tx: $tx"); RawBytes.from(tx)
-      }: _*)
+      _ = log.info(s"Sending ${txs.length} to $channel")
+      _ <- networkSender.send(channel, txs.map(RawBytes.from): _*)
     } yield ()
   }
 
@@ -53,7 +52,7 @@ class NewWorker(settings: Settings,
         else Task.fromFuture(networkSender.connect(node))
 
         txCount <- utxSpace
-        _       <- writeTransactions(validChannel, transactionSource.take(txCount).toVector)
+        _       <- writeTransactions(validChannel, transactionSource.take(settings.utxLimit - txCount).toVector)
       } yield validChannel
 
       val withReconnect: Task[Channel] = baseTask.onErrorRecoverWith {
@@ -61,7 +60,7 @@ class NewWorker(settings: Settings,
           if (settings.autoReconnect) {
             log.error(s"[$node] An error during sending transations, reconnect", e)
             for {
-              _ <- Task.sleep(settings.reconnectDelay)
+              _       <- Task.sleep(settings.reconnectDelay)
               channel <- pullAndWriteTask()
             } yield channel
           } else {

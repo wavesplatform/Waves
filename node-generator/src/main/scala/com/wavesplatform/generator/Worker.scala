@@ -107,7 +107,7 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
 }
 
 object Worker {
-  case class Settings(autoReconnect: Boolean, iterations: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
+  case class Settings(autoReconnect: Boolean, iterations: Int, utxLimit: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
