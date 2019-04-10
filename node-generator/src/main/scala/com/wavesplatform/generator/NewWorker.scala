@@ -57,6 +57,8 @@ class NewWorker(settings: Settings,
 
       val withReconnect: Task[Channel] = baseTask.onErrorRecoverWith {
         case e =>
+          channel.close()
+
           if (settings.autoReconnect) {
             log.error(s"[$node] An error during sending transations, reconnect", e)
             for {
@@ -69,6 +71,6 @@ class NewWorker(settings: Settings,
           }
       }
 
-      withReconnect.flatMap(channel => pullAndWriteTask(channel))
+      withReconnect.flatMap(channel => Task.sleep(settings.delay).flatMap(_ => pullAndWriteTask(channel)))
     }
 }
