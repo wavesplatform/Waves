@@ -15,7 +15,7 @@ import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val baseBlockTotalFee: Long, val approvedFeatures: Set[Short])
     extends ScorexLogging {
-  private[this] final case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
+  private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
   private[this] val MaxTotalDiffs = 15
 
   private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty

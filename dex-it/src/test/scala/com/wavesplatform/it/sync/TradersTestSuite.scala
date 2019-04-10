@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -15,7 +16,9 @@ import scala.util.Random
 
 class TradersTestSuite extends MatcherSuiteBase {
 
-  private def orderVersion = (Random.nextInt(2) + 1).toByte // TODO OrderV3 support
+  override protected def nodeConfigs: Seq[Config] = super.nodeConfigs.map(TradersTestSuite.matcherSettingsOrderV3Allowed.withFallback)
+
+  private def orderVersion = (Random.nextInt(3) + 1).toByte
 
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
@@ -213,4 +216,8 @@ class TradersTestSuite extends MatcherSuiteBase {
     order.message.id
   }
 
+}
+
+object TradersTestSuite {
+  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.matcher { allow-order-v3 = yes }")
 }
