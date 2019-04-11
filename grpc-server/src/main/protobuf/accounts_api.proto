@@ -12,6 +12,8 @@ service AccountsApi {
     rpc GetPortfolio (AccountRequest) returns (stream Amount);
     rpc GetScript (AccountRequest) returns (AccountScriptResponse);
     rpc GetActiveLeases (AccountRequest) returns (stream TransactionWithHeight);
+    rpc GetData (DataRequest) returns (DataTransactionData.DataEntry);
+    rpc GetDataStream (DataRequest) returns (stream DataTransactionData.DataEntry);
 }
 
 message AccountRequest {

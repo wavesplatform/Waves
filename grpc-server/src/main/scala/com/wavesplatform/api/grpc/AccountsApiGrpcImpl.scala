@@ -1,10 +1,11 @@
 package com.wavesplatform.api.grpc
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount}
+import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount, DataTransactionData, PBTransactions}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.ValidationError.GenericError
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -53,11 +54,27 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
 
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionWithHeight]): Unit = {
     val transactions = Observable.defer(commonApi.activeLeases(request.address.toAddress) match {
-      case Right(transactions) => Observable.fromIterable(transactions)
-      case Left(error)  => Observable.raiseError(new IllegalArgumentException(error))
+      case Right(txs)  => Observable.fromIterable(txs)
+      case Left(error) => Observable.raiseError(new IllegalArgumentException(error))
     })
 
     val result = transactions.map { case (height, transaction) => TransactionWithHeight(Some(transaction.toPB), height) }
     responseObserver.completeWith(result)
+  }
+
+  override def getData(request: DataRequest): Future[DataTransactionData.DataEntry] = Future {
+    val entry = commonApi
+      .data(request.address.toAddress, request.key)
+      .getOrElse(throw GenericError("Data key not found"))
+
+    PBTransactions.toPBDataEntry(entry)
+  }
+
+  override def getDataStream(request: DataRequest, responseObserver: StreamObserver[DataTransactionData.DataEntry]): Unit = {
+    val stream = commonApi
+      .dataStream(request.address.toAddress, key => request.key.isEmpty || key.matches(request.key))
+      .map(PBTransactions.toPBDataEntry)
+
+    responseObserver.completeWith(stream)
   }
 }
