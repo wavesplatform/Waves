@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.{ContractScript, ScriptReader}
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce

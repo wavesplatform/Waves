@@ -6,12 +6,13 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
 import play.api.libs.json.Json
 
@@ -53,7 +54,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
         .cond(tx.chainId == chainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
-        .flatMap(_ => Either.cond(tx.fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: ${tx.fee}")))
+        .flatMap(_ => Either.cond(tx.fee > 0, (), InsufficientFee(s"insufficient fee: ${tx.fee}")))
         .map(_ => tx)
         .foldToTry
     }
@@ -61,7 +62,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
 
   def create(sender: PublicKey, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
+      _ <- Either.cond(fee > 0, (), InsufficientFee(s"insufficient fee: $fee"))
     } yield new SetScriptTransaction(chainId, sender, script, fee, timestamp, proofs)
   }
 

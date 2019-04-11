@@ -24,7 +24,7 @@ object Decompiler {
 
   private def pureOut(in: String, ident: Int): Coeval[String] = pure(out(in, ident))
 
-  private val NEWLINE = scala.util.Properties.lineSeparator
+  private val NEWLINE = "\n"
 
   private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[String] =
     e flatMap {

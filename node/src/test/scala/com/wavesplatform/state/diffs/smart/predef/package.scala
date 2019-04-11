@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -11,7 +12,7 @@ import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
-import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
+import com.wavesplatform.utils.EmptyBlockchain
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import shapeless.Coproduct

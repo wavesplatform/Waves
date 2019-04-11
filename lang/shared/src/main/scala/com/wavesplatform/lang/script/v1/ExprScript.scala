@@ -1,16 +1,18 @@
-package com.wavesplatform.transaction.smart.script.v1
+package com.wavesplatform.lang.script.v1
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ContractLimits._
-import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.utils.{functionCosts, varNames}
+import com.wavesplatform.lang.v1.{BaseGlobal, ScriptEstimator}
 import monix.eval.Coeval
 
 object ExprScript {
+
+  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
+
   val checksumLength = 4
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =

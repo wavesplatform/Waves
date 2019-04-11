@@ -2,14 +2,14 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{PublicKey, Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 

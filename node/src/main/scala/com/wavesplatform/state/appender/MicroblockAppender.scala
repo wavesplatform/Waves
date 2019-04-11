@@ -2,12 +2,13 @@ package com.wavesplatform.state.appender
 
 import cats.data.EitherT
 import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, _}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.network._
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.ValidationError.InvalidSignature
-import com.wavesplatform.transaction.{BlockchainUpdater, ValidationError}
+import com.wavesplatform.transaction.TxValidationError.InvalidSignature
+import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
