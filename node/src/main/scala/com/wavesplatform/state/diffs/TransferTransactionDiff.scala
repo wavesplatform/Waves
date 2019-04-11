@@ -3,13 +3,14 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.features.FeatureProvider._
 
 import scala.util.{Right, Try}
 
@@ -74,7 +75,7 @@ object TransferTransactionDiff {
     } else {
       Try(Math.addExact(tx.fee, tx.amount))
         .fold(
-          _ => ValidationError.OverflowError.asLeft[Unit],
+          _ => TxValidationError.OverflowError.asLeft[Unit],
           _ => ().asRight[ValidationError]
         )
     }

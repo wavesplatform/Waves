@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.NonPositiveAmount
+import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import org.scalatest._

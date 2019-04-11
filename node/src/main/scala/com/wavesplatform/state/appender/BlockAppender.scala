@@ -3,13 +3,14 @@ package com.wavesplatform.state.appender
 import cats.data.EitherT
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.ValidationError.{BlockAppendError, InvalidSignature}
-import com.wavesplatform.transaction.{BlockchainUpdater, ValidationError}
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
+import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel

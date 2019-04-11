@@ -3,11 +3,11 @@ package com.wavesplatform.matcher.smart
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV1, Log}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval

@@ -1,20 +1,20 @@
-package com.wavesplatform.transaction.smart.script
-
-import com.wavesplatform.crypto
+package com.wavesplatform.lang.script
+import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.transaction.ValidationError.ScriptParseError
-import com.wavesplatform.transaction.smart.script.v1._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.{BaseGlobal, Serde}
 
 object ScriptReader {
+
+  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
   val checksumLength = 4
 
   def fromBytes(bytes: Array[Byte], checkComplexity: Boolean = true): Either[ScriptParseError, Script] = {
     val checkSum          = bytes.takeRight(checksumLength)
-    val computedCheckSum  = crypto.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
+    val computedCheckSum  = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
     val versionByte: Byte = bytes.head
     (for {
       a <- {

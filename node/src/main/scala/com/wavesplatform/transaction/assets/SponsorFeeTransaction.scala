@@ -6,7 +6,9 @@ import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -65,9 +67,9 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       (
         if (tx.minSponsoredAssetFee.exists(_ < 0)) {
-          Left(ValidationError.NegativeMinFee(tx.minSponsoredAssetFee.get, "asset"))
+          Left(NegativeMinFee(tx.minSponsoredAssetFee.get, "asset"))
         } else if (tx.fee <= 0) {
-          Left(ValidationError.InsufficientFee())
+          Left(InsufficientFee())
         } else {
           Right(tx)
         }
@@ -82,9 +84,9 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     if (minSponsoredAssetFee.exists(_ < 0)) {
-      Left(ValidationError.NegativeMinFee(minSponsoredAssetFee.get, "asset"))
+      Left(NegativeMinFee(minSponsoredAssetFee.get, "asset"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(InsufficientFee())
     } else {
       Right(SponsorFeeTransaction(sender, asset, minSponsoredAssetFee.filter(_ != 0), fee, timestamp, proofs))
     }

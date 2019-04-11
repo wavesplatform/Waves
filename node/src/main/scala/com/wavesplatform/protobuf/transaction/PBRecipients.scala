@@ -2,8 +2,8 @@ package com.wavesplatform.protobuf.transaction
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
   def create(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {

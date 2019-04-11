@@ -3,11 +3,11 @@ package com.wavesplatform.state.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease._
 
 import scala.util.{Left, Right}

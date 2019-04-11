@@ -7,14 +7,16 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.transaction.ValidationError.ActivationError
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.transaction.TxValidationError.ActivationError
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.TxValidationError._
 
 object BlockDiffer extends ScorexLogging {
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
@@ -137,7 +139,7 @@ object BlockDiffer extends ScorexLogging {
           txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
             if (updatedConstraint.isOverfilled)
-              Left(ValidationError.GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint"))
+              Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint"))
             else {
               val updatedDiff = currDiff.combine(newDiff)
 

@@ -1,11 +1,12 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{PublicKey, Address}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -13,14 +14,12 @@ import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
-import com.wavesplatform.lang.Global
 import com.wavesplatform.state.diffs.smart.predef.scriptWithAllFunctions
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
-import com.wavesplatform.utils
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}

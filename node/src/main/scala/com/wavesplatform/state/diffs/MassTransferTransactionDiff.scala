@@ -2,10 +2,10 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.{GenericError, Validation}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, Validation}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 

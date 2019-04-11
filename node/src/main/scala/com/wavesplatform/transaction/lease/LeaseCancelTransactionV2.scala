@@ -2,11 +2,12 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval

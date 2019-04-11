@@ -4,7 +4,7 @@ import com.google.common.collect.Interners
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
-import com.wavesplatform.transaction.ValidationError.InvalidAddress
+import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{Format, Writes}
 import supertagged._
