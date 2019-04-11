@@ -81,6 +81,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
+  override def accountDataKeys(acc: Address): Seq[String] = Seq.empty
+
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None

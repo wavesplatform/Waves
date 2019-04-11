@@ -244,7 +244,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                         utxStorage,
                         allChannels,
                         time,
-                        settings.blockchainSettings.functionalitySettings),
+                        settings.blockchainSettings.functionalitySettings)(apiScheduler),
         DebugApiRoute(
           settings,
           time,
