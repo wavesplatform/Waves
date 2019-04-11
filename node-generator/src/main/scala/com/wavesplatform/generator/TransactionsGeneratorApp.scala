@@ -202,7 +202,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             Iterator.continually(generator.next()).flatten,
             sender,
             node,
-            new URL(nodeRestUrl),
+            nodeRestUrl,
             () => canContinue,
             initialTransactions.map(RawBytes.from)
           )
