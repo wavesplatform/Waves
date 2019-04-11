@@ -1,7 +1,6 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.common.CommonAssetsApi
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -23,10 +22,10 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       info.description.decimals,
       info.description.reissuable,
       info.description.totalVolume.longValue(),
-      Some(ScriptData(
-        info.description.script.fold(ByteStr.empty)(_.bytes()).toPBByteString,
-        info.description.script.fold("")(_.expr.toString),
-        info.description.script.fold(0L)(_.complexity)
+      info.description.script.map(script => ScriptData(
+        script.bytes().toPBByteString,
+        script.expr.toString,
+        script.complexity
       )),
       info.description.sponsorship,
       Some(info.issueTransaction.toPB),
