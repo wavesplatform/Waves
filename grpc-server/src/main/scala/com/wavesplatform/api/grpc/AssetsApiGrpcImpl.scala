@@ -23,7 +23,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       info.description.decimals,
       info.description.reissuable,
       info.description.totalVolume.longValue(),
-      Some(AssetInfoResponse.ScriptInfo(
+      Some(ScriptData(
         info.description.script.fold(ByteStr.empty)(_.bytes()).toPBByteString,
         info.description.script.fold("")(_.expr.toString),
         info.description.script.fold(0L)(_.complexity)

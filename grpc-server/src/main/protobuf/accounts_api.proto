@@ -6,7 +6,7 @@ import "transaction.proto";
 
 service AccountsApi {
     rpc GetPortfolio (PortfolioRequest) returns (PortfolioResponse);
-    rpc GetScript (AccountRequest) returns (AccountScriptResponse);
+    rpc GetScript (AccountRequest) returns (ScriptData);
     rpc GetActiveLeases (AccountRequest) returns (stream TransactionWithHeight);
     rpc GetData (DataRequest) returns (DataTransactionData.DataEntry);
     rpc GetDataStream (DataRequest) returns (stream DataTransactionData.DataEntry);
@@ -40,9 +40,8 @@ message PortfolioResponse {
     repeated AssetAmount assets = 2;
 }
 
-message AccountScriptResponse {
-    bytes script = 1;
+message ScriptData {
+    bytes script_bytes = 1;
     string script_text = 2;
     int64 complexity = 3;
-    int64 extra_fee = 4;
 }
