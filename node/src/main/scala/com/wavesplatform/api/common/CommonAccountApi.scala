@@ -1,6 +1,5 @@
 package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.settings.FunctionalitySettings
@@ -19,7 +18,7 @@ class CommonAccountApi(blockchain: Blockchain, functionalitySettings: Functional
     blockchain.balance(address, blockchain.height, confirmations)
   }
 
-  def effectiveBalance(address: Address, confirmations: Int = 0, blockId: BlockId = ByteStr.empty): Long = {
+  def effectiveBalance(address: Address, confirmations: Int = 0): Long = {
     blockchain.effectiveBalance(address, confirmations)
   }
 
@@ -47,7 +46,7 @@ class CommonAccountApi(blockchain: Blockchain, functionalitySettings: Functional
       .accountScript(address)
 
     AddressScriptInfo(
-      script = script.map(_.bytes().base64),
+      script = script.map(_.bytes()),
       scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
@@ -78,5 +77,5 @@ class CommonAccountApi(blockchain: Blockchain, functionalitySettings: Functional
 
 object CommonAccountApi {
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long)
-  final case class AddressScriptInfo(script: Option[String], scriptText: Option[String], complexity: Long, extraFee: Long)
+  final case class AddressScriptInfo(script: Option[ByteStr], scriptText: Option[String], complexity: Long, extraFee: Long)
 }

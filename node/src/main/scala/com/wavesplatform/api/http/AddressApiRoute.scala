@@ -362,7 +362,7 @@ case class AddressApiRoute(settings: RestAPISettings,
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
     val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountApi.script(account)
-    AddressScriptInfo(account.address, script, scriptText, complexity, extraFee)
+    AddressScriptInfo(account.address, script.map(_.base64), scriptText, complexity, extraFee)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
