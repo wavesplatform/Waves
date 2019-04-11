@@ -44,8 +44,9 @@ class NewWorker(settings: Settings,
     } yield ()
   }
 
-  private[this] def pullAndWriteTask(channel: Option[Channel] = None): Task[Channel] =
-    if (!canContinue()) Task.now(null)
+  private[this] def pullAndWriteTask(channel: Option[Channel] = None): Task[Option[Channel]] =
+    if (!canContinue())
+      Task.now(None)
     else {
       val baseTask = for {
         validChannel <- if (channel.exists(_.isOpen)) Task.now(channel.get)
@@ -55,22 +56,22 @@ class NewWorker(settings: Settings,
         _       <- writeTransactions(validChannel, transactionSource.take(settings.utxLimit - txCount).toVector)
       } yield validChannel
 
-      val withReconnect: Task[Channel] = baseTask.onErrorRecoverWith {
-        case e =>
+      val withReconnect = baseTask.onErrorRecoverWith[Option[Channel]] {
+        case error =>
           channel.foreach(_.close())
 
           if (settings.autoReconnect) {
-            log.error(s"[$node] An error during sending transations, reconnect", e)
+            log.error(s"[$node] An error during sending transations, reconnect", error)
             for {
               _       <- Task.sleep(settings.reconnectDelay)
               channel <- pullAndWriteTask()
             } yield channel
           } else {
-            log.error("Stopping because autoReconnect is disabled", e)
-            Task.raiseError(e)
+            log.error("Stopping because autoReconnect is disabled", error)
+            Task.raiseError(error)
           }
       }
 
-      withReconnect.flatMap(channel => Task.sleep(settings.delay).flatMap(_ => pullAndWriteTask(Option(channel))))
+      withReconnect.flatMap(channel => Task.sleep(settings.delay).flatMap(_ => pullAndWriteTask(channel)))
     }
 }
