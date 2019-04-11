@@ -76,7 +76,7 @@ sealed trait ByteEntity[T] { self =>
             .replace(")", "\\)")
             .replace("*", "\\*")
       }
-      .foldLeft("""| \# | Field name | Type | Length |""" + "\n| --- | --- | --- | --- |\n")(_ + _)
+      .foldLeft("""| \# | Field name | Type | Length in Bytes |""" + "\n| --- | --- | --- | --- |\n")(_ + _)
   }
 }
 
@@ -432,7 +432,7 @@ case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, s"$name length (P)", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, name, "Payment (Long, Option[AssetId])", s"P <= ${8 + AssetIdLength}", subIndex = 2)
+      ByteEntityDescription(index, name, s"$name (Long, Option[AssetId])", s"P <= ${8 + AssetIdLength}", subIndex = 2)
     )
   }
 
@@ -486,13 +486,16 @@ object OptionBytes {
 class SeqBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U]) extends ByteEntity[Seq[U]] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    ByteEntityDescription(index, s"$name", UnimportantType, "1", subIndex = 1) +:
-      nestedByteEntity.generateDoc.map { desc =>
-      desc.copy(
-        length = desc.length + s" or 0 (depends on the short in $index.1)",
-        subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
-      )
-    }
+    val seq =
+      ByteEntityDescription(index, s"$name size", UnimportantType, "2", subIndex = 1) +:
+        nestedByteEntity.generateDoc.map { desc =>
+        desc.copy(
+          length = desc.length + s" or 0 (depends on the short in $index.1)",
+          subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
+        )
+      }
+
+    seq.init :+ seq.last.copy(additionalInfo = "\n...")
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Seq[U], Int)] = {

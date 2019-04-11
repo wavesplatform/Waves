@@ -195,7 +195,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
       FunctionCallBytes(tailIndex(4), "Function call"),
-      SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),
+      SeqBytes(tailIndex(5), "Payments", PaymentBytes(tailIndex(5), "Payment")),
       LongBytes(tailIndex(6), "Fee"),
       OptionBytes(tailIndex(7), "Fee's asset ID", AssetIdBytes(tailIndex(7), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)")
         .map(_.getOrElse(Waves)),
