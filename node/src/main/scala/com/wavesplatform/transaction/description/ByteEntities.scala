@@ -258,9 +258,9 @@ case class ProofsBytes(index: Int, concise: Boolean = true) extends ByteEntity[P
         ByteEntityDescription(index, s"Proofs version (${Proofs.Version})", UnimportantType, "1", subIndex = 1),
         ByteEntityDescription(index, "Proofs count", UnimportantType, "2", subIndex = 2),
         ByteEntityDescription(index, "Proof 1 length (P1)", UnimportantType, "2", subIndex = 3),
-        ByteEntityDescription(index, "Proof 1", ByteStrType, "P1", subIndex = 4),
+        ByteEntityDescription(index, "Proof 1", ByteStrType, s"P1 <= ${Proofs.MaxProofSize}", subIndex = 4),
         ByteEntityDescription(index, "Proof 2 length (P2)", UnimportantType, "2", subIndex = 5),
-        ByteEntityDescription(index, "Proof 2 ", ByteStrType, "P2", subIndex = 6, additionalInfo = "\n...")
+        ByteEntityDescription(index, "Proof 2 ", ByteStrType, s"P2 <= ${Proofs.MaxProofSize}", subIndex = 6, additionalInfo = "\n...")
       )
   }
 
