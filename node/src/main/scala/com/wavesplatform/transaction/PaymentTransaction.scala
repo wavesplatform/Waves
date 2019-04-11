@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TransactionParsers._
 import com.wavesplatform.transaction.description._
@@ -62,11 +63,11 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] = {
     if (amount <= 0) {
-      Left(ValidationError.NonPositiveAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
+      Left(TxValidationError.NonPositiveAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
+      Left(TxValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(TxValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
       Right(PaymentTransaction(sender, recipient, amount, fee, timestamp, signature))
     }
@@ -80,11 +81,11 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
       byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
         (
           if (tx.amount <= 0) {
-            Left(ValidationError.NonPositiveAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
+            Left(TxValidationError.NonPositiveAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
           } else if (tx.fee <= 0) {
-            Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
+            Left(TxValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
           } else if (Try(Math.addExact(tx.amount, tx.fee)).isFailure) {
-            Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+            Left(TxValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
           } else {
             Right(tx)
           }

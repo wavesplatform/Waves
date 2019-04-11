@@ -6,12 +6,13 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -77,10 +78,10 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
     for {
       _ <- Either.cond(script.fold(true)(_.isInstanceOf[ExprScript]),
                        (),
-                       ValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
+                       TxValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
       _ <- Either.cond(chainId == currentChainId,
                        (),
-                       ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
+                       TxValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
     } yield SetAssetScriptTransaction(chainId, sender, assetId, script, fee, timestamp, proofs)
 
   }
@@ -99,7 +100,9 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
-        .cond(tx.chainId == currentChainId, (), ValidationError.GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
+        .cond(tx.chainId == currentChainId,
+              (),
+              TxValidationError.GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
         .map(_ => tx)
         .foldToTry
     }

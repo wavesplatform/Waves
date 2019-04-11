@@ -11,12 +11,13 @@ import com.wavesplatform.api.http.{DataRequest, InvokeScriptRequest, SignedDataR
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
@@ -714,11 +715,15 @@ object TransactionFactory {
   }
 
   def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKey): Either[ValidationError, ExchangeTransactionV2] = {
-    val decodedProofs = request.proofs.map(ByteStr.decodeBase58(_))
+    import cats.instances.either._
+    import cats.instances.list._
+    import cats.syntax.traverse._
+
     for {
-      proofs <- Either.cond(decodedProofs.forall(_.isSuccess),
-                            Proofs(decodedProofs.map(_.get)),
-                            GenericError(s"Invalid proof: ${decodedProofs.find(_.isFailure).get}"))
+      proofs <- request.proofs
+        .map(str => ByteStr.decodeBase58(str).toEither.left.map(e => GenericError(s"Invalid proof: $str ($e)")))
+        .sequence
+
       tx <- ExchangeTransactionV2.create(
         request.order1,
         request.order2,

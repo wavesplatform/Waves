@@ -7,7 +7,7 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool

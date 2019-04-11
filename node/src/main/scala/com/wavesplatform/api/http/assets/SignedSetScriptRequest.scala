@@ -3,9 +3,10 @@ package com.wavesplatform.api.http.assets
 import cats.implicits._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Proofs, ValidationError}
+import com.wavesplatform.transaction.Proofs
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

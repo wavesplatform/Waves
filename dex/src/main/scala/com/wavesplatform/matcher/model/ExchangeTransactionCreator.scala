@@ -1,18 +1,20 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
 import com.wavesplatform.settings.AssetType
 import com.wavesplatform.settings.AssetType.AssetType
 import com.wavesplatform.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.{Asset, ValidationError}
 
 class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyPair, matcherOrderFeeSettings: OrderFeeSettings) {
   private def calculateMatcherFee(buy: Order, sell: Order, executedAmount: Long, executedPrice: Long): (Long, Long) = {
@@ -65,7 +67,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
 
   private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
     case x: OrderV1 => Right(x)
-    case _          => Left(ValidationError.ActivationError("Smart Account Trading feature has not been activated yet"))
+    case _          => Left(ActivationError("Smart Account Trading feature has not been activated yet"))
   }
 }
 

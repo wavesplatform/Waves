@@ -4,11 +4,12 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderV3}
-import com.wavesplatform.transaction.{Asset, ValidationError}
+import com.wavesplatform.transaction.Asset
 
 import scala.util.Right
 

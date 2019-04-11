@@ -3,8 +3,8 @@ package com.wavesplatform.api.http.assets
 import com.google.common.base.Charsets
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
-import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}

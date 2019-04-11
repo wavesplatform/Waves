@@ -2,8 +2,9 @@ package com.wavesplatform.api.http
 
 import cats.implicits._
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.DataEntry
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ValidationError}
+import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 
