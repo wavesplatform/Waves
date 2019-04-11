@@ -120,7 +120,11 @@ class AddressActor(
       val batchCancelFutures = for {
         lo <- activeOrders.values
         if maybePair.forall(_ == lo.order.assetPair)
-      } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
+      } yield {
+        val id = lo.order.id()
+        val f  = pendingCancellation.get(id).fold(storeCanceled(lo.order.assetPair, id))(_.future)
+        f.map(id -> _)
+      }
 
       Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
 
@@ -186,19 +190,21 @@ class AddressActor(
       updateTimestamp(submitted.order.timestamp)
       release(submitted.order.id())
       handleOrderAdded(submitted)
+
     case e @ OrderExecuted(submitted, counter, _) =>
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
 
     case OrderCanceled(lo, unmatchable) =>
+      val id = lo.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       confirmPlacement(lo.order)
-      pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCanceled(lo.order.id())))
-      val isActive = activeOrders.contains(lo.order.id())
-      log.trace(s"OrderCanceled(${lo.order.id()}, system=$unmatchable, isActive=$isActive)")
+      pendingCancellation.remove(id).foreach(_.success(api.OrderCanceled(id)))
+      val isActive = activeOrders.contains(id)
+      log.trace(s"OrderCanceled($id, system=$unmatchable, isActive=$isActive)")
       if (isActive) {
-        release(lo.order.id())
+        release(id)
         handleOrderTerminated(lo, OrderStatus.finalStatus(lo, unmatchable))
       }
   }

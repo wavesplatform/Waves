@@ -142,11 +142,11 @@ object OrderBook {
 
   private def formatSide(side: Side) =
     side
-      .map { case (price, level) => s""""$price":${level.map(formatLo).mkString("[", ",", "]").mkString("[", ",", "]")}}""" }
+      .map { case (price, level) => s""""$price":${level.map(formatLo).mkString("[", ",", "]")}""" }
       .mkString("{", ",", "}")
 
   // Showing owner for old orders. Should be deleted in Order.MaxLiveTime
-  private def formatLo(lo: LimitOrder): String = s"""{"id":"${lo.order.id()}", "owner":"${lo.order.senderPublicKey.toAddress.stringRepr}"}"""
+  private def formatLo(lo: LimitOrder): String = s"""{"id":"${lo.order.id()}","owner":"${lo.order.senderPublicKey.toAddress.stringRepr}"}"""
 
   val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
   val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
