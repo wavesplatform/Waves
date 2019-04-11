@@ -72,6 +72,10 @@ class NewWorker(settings: Settings,
           }
       }
 
-      withReconnect.flatMap(channel => Task.sleep(settings.delay).flatMap(_ => pullAndWriteTask(channel)))
+      for {
+        channel <- withReconnect
+        _ <- Task.sleep(settings.delay)
+        newChannel <- pullAndWriteTask(channel)
+      } yield newChannel
     }
 }
