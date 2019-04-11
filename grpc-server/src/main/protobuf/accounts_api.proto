@@ -39,14 +39,14 @@ message BalanceResponse {
 
 message BalanceDetailsResponse {
     int64 balance = 1;
-    int64 generatingBalance = 2;
-    int64 availableBalance = 3;
-    int64 effectiveBalance = 4;
+    int64 generating_balance = 2;
+    int64 available_balance = 3;
+    int64 effective_balance = 4;
 }
 
 message AccountScriptResponse {
     bytes script = 1;
-    string scriptText = 2;
+    string script_text = 2;
     int64 complexity = 3;
-    int64 extraFee = 4;
+    int64 extra_fee = 4;
 }

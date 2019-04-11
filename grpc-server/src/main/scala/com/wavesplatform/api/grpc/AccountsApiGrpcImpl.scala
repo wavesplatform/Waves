@@ -48,7 +48,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
 
   override def getScript(request: AccountRequest): Future[AccountScriptResponse] = Future {
     val desc = commonApi.script(request.address.toAddress)
-    AccountScriptResponse(desc.script.getOrElse(ByteStr.empty), desc.scriptText.getOrElse(""), desc.complexity, desc.extraFee)
+    AccountScriptResponse(desc.script.getOrElse(ByteStr.empty).toPBByteString, desc.scriptText.getOrElse(""), desc.complexity, desc.extraFee)
   }
 
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionWithHeight]): Unit = {

@@ -1,0 +1,30 @@
+syntax = "proto3";
+package com.wavesplatform.api.grpc;
+
+import "transaction.proto";
+
+service AssetsApi {
+    rpc GetFullInfo (AssetRequest) returns (AssetInfoResponse);
+    rpc GetScript (AssetRequest) returns (AssetScriptResponse);
+}
+
+message AssetRequest {
+    bytes asset_id = 1;
+}
+
+message AssetInfoResponse {
+    bytes issuer = 1;
+    bytes name = 2;
+    bytes description = 3;
+    int32 decimals = 4;
+    bool reissuable = 5;
+    int64 total_volume = 6;
+    bytes script = 7;
+    int64 sponsorship = 8;
+    SignedTransaction issue_transaction = 11;
+    int64 sponsor_balance = 10;
+}
+
+message AssetScriptResponse {
+    bytes script = 1;
+}
