@@ -54,9 +54,9 @@ class NewWorker(settings: Settings,
 
         txCount <- utxSpace
         _       <- writeTransactions(validChannel, transactionSource.take(settings.utxLimit - txCount).toVector)
-      } yield validChannel
+      } yield Option(validChannel)
 
-      val withReconnect = baseTask.onErrorRecoverWith[Option[Channel]] {
+      val withReconnect = baseTask.onErrorRecoverWith {
         case error =>
           channel.foreach(_.close())
 
