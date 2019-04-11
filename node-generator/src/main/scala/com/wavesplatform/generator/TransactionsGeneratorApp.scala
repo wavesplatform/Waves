@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
@@ -192,8 +193,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         canContinue = false
       }
 
-      val workers = finalConfig.sendTo.zip(finalConfig.restUrls).map {
-        case (node, nodeRestUrl) =>
+      val workers = finalConfig.sendTo.map {
+        case NodeAddress(node, nodeRestUrl) =>
           log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
           // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
           new NewWorker(

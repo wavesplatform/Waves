@@ -1,16 +1,16 @@
 package com.wavesplatform.generator
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URL}
 
 import cats.Show
 import cats.implicits.showInterpolator
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],
-                             sendTo: Seq[InetSocketAddress],
-                             restUrls: Seq[String],
+                             sendTo: Seq[NodeAddress],
                              worker: Worker.Settings,
                              mode: Mode.Value,
                              narrow: NarrowTransactionGenerator.Settings,
@@ -24,6 +24,8 @@ case class GeneratorSettings(chainId: String,
 }
 
 object GeneratorSettings {
+  case class NodeAddress(networkAddress: InetSocketAddress, apiAddress: URL)
+
   implicit val toPrintable: Show[GeneratorSettings] = { x =>
     import x._
 

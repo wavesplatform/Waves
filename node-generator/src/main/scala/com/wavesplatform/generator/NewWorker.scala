@@ -44,11 +44,11 @@ class NewWorker(settings: Settings,
     } yield ()
   }
 
-  private[this] def pullAndWriteTask(channel: Channel = null): Task[Channel] =
+  private[this] def pullAndWriteTask(channel: Option[Channel] = None): Task[Channel] =
     if (!canContinue()) Task.now(null)
     else {
       val baseTask = for {
-        validChannel <- if (channel != null && channel.isOpen) Task.now(channel)
+        validChannel <- if (channel.exists(_.isOpen)) Task.now(channel.get)
         else Task.fromFuture(networkSender.connect(node))
 
         txCount <- utxSpace
@@ -57,7 +57,7 @@ class NewWorker(settings: Settings,
 
       val withReconnect: Task[Channel] = baseTask.onErrorRecoverWith {
         case e =>
-          channel.close()
+          channel.foreach(_.close())
 
           if (settings.autoReconnect) {
             log.error(s"[$node] An error during sending transations, reconnect", e)
@@ -71,6 +71,6 @@ class NewWorker(settings: Settings,
           }
       }
 
-      withReconnect.flatMap(channel => Task.sleep(settings.delay).flatMap(_ => pullAndWriteTask(channel)))
+      withReconnect.flatMap(channel => Task.sleep(settings.delay).flatMap(_ => pullAndWriteTask(Option(channel))))
     }
 }
