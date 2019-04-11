@@ -6,6 +6,7 @@ import com.wavesplatform.account.{Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
@@ -31,14 +32,14 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
   override protected def parseTail(bytes: Array[Byte]): Try[CreateAliasTransactionV2] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
-        .cond(tx.fee > 0, tx, ValidationError.InsufficientFee)
+        .cond(tx.fee > 0, tx, TxValidationError.InsufficientFee)
         .foldToTry
     }
   }
 
   def create(sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, CreateAliasTransactionV2] = {
     if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(TxValidationError.InsufficientFee())
     } else {
       Right(CreateAliasTransactionV2(sender, alias, fee, timestamp, proofs))
     }

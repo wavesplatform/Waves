@@ -4,16 +4,16 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{PublicKey, Address}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TransactionFactory
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet

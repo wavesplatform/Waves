@@ -6,9 +6,10 @@ import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 

@@ -3,8 +3,10 @@ package com.wavesplatform.transaction.lease
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -36,8 +38,8 @@ object LeaseCancelTransaction {
 
   def validateLeaseCancelParams(leaseId: ByteStr, fee: Long): Either[ValidationError, Unit] =
     if (leaseId.arr.length != crypto.DigestSize) {
-      Left(ValidationError.GenericError("Lease transaction id is invalid"))
+      Left(GenericError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(InsufficientFee())
     } else Right(())
 }

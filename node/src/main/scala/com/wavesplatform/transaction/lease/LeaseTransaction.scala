@@ -2,8 +2,9 @@ package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxValidationError, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -43,12 +44,12 @@ object LeaseTransaction {
 
   def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKey): Either[ValidationError, Unit] =
     if (amount <= 0) {
-      Left(ValidationError.NonPositiveAmount(amount, "waves"))
+      Left(TxValidationError.NonPositiveAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError)
+      Left(TxValidationError.OverflowError)
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(TxValidationError.InsufficientFee())
     } else if (recipient.isInstanceOf[Address] && sender.stringRepr == recipient.stringRepr) {
-      Left(ValidationError.ToSelf)
+      Left(TxValidationError.ToSelf)
     } else Right(())
 }

@@ -6,7 +6,8 @@ import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Transaction
 import play.api.libs.json._
 
 import scala.util.control.Exception.nonFatalCatch

@@ -3,9 +3,10 @@ package com.wavesplatform.api.http.assets
 import cats.implicits._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, Proofs}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 

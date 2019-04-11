@@ -6,6 +6,7 @@ import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
