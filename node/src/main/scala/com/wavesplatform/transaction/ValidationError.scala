@@ -59,4 +59,7 @@ object ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
   }
 
+  implicit class ValidationErrorException(val error: ValidationError) extends IllegalArgumentException(error.toString) {
+    def toException = this
+  }
 }

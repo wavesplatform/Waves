@@ -2,7 +2,6 @@ package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.ExchangeTransactionData.{BuySellOrders, Orders}
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
@@ -238,12 +237,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Exchange(
-          ExchangeTransactionData(amount,
-                                  price,
-                                  buyMatcherFee,
-                                  sellMatcherFee,
-                                  Orders.BuySellOrders(BuySellOrders(Some(buyOrder), Some(sellOrder))))) =>
+      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), _)) =>
         version match {
           case 1 =>
             vt.assets.exchange.ExchangeTransactionV1.create(
@@ -467,12 +461,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Exchange(
-          ExchangeTransactionData(amount,
-                                  price,
-                                  buyMatcherFee,
-                                  sellMatcherFee,
-                                  Orders.BuySellOrders(BuySellOrders(Some(buyOrder), Some(sellOrder))))) =>
+      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), _)) =>
         version match {
           case 1 =>
             vt.assets.exchange.ExchangeTransactionV1(
@@ -571,7 +560,7 @@ object PBTransactions {
           price,
           buyMatcherFee,
           sellMatcherFee,
-          Orders.BuySellOrders(BuySellOrders(Some(PBOrders.protobuf(buyOrder)), Some(PBOrders.protobuf(sellOrder))))
+          Seq(PBOrders.protobuf(buyOrder), PBOrders.protobuf(sellOrder))
         )
         PBTransactions.create(tx.sender, NoChainId, fee, tx.assetFee._1, timestamp, 1, Seq(signature), Data.Exchange(data))
 
@@ -581,7 +570,7 @@ object PBTransactions {
           price,
           buyMatcherFee,
           sellMatcherFee,
-          Orders.BuySellOrders(BuySellOrders(Some(PBOrders.protobuf(buyOrder)), Some(PBOrders.protobuf(sellOrder))))
+          Seq(PBOrders.protobuf(buyOrder), PBOrders.protobuf(sellOrder))
         )
         PBTransactions.create(tx.sender, 0: Byte, fee, tx.assetFee._1, timestamp, 2, proofs, Data.Exchange(data))
 
