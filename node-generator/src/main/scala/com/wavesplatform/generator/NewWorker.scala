@@ -74,6 +74,7 @@ class NewWorker(settings: Settings,
 
       for {
         channel <- withReconnect
+        _ <- Task(log.info(s"Sleeping for ${settings.delay}"))
         _ <- Task.sleep(settings.delay)
         newChannel <- pullAndWriteTask(channel)
       } yield newChannel
