@@ -15,7 +15,6 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
