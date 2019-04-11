@@ -354,7 +354,7 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
       ByteEntityDescription(index,
                             "Key 1 bytes",
                             "UTF-8 encoded",
-                            s"K1 <= ${DataEntry.MaxKeySize} * 4 (max bytes count per char) = ${DataEntry.MaxKeySize * 4}",
+                            s"K1 <= ${DataEntry.MaxKeySize} * 4 (max number of bytes per char) = ${DataEntry.MaxKeySize * 4}",
                             subIndex = 3),
       ByteEntityDescription(index, "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", UnimportantType, "1", subIndex = 4),
       ByteEntityDescription(index,
@@ -415,7 +415,7 @@ case class ScriptBytes(index: Int, name: String) extends ByteEntity[Script] {
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(index, s"$name length (S)", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, name, "Script", s"0 <= S <= ${ContractLimits.MaxContractSizeInBytes}", subIndex = 2)
+      ByteEntityDescription(index, name, "Script", s"S <= ${ContractLimits.MaxContractSizeInBytes}", subIndex = 2)
     )
   }
 
