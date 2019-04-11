@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
+import monix.execution.Scheduler
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
@@ -45,7 +46,7 @@ class AddressRouteSpec
     mock[ChannelGroup],
     new TestTime,
     TestFunctionalitySettings.Stub
-  ).route
+  )(Scheduler.global).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
