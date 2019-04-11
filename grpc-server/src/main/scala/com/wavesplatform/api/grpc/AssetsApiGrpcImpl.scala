@@ -4,7 +4,7 @@ import com.wavesplatform.api.common.CommonAssetsApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
@@ -12,7 +12,7 @@ import scala.concurrent.Future
 class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends AssetsApiGrpc.AssetsApi {
   private[this] val commonApi = new CommonAssetsApi(blockchain)
 
-  override def getFullInfo(request: AssetRequest): Future[AssetInfoResponse] = Future {
+  override def getInfo(request: AssetRequest): Future[AssetInfoResponse] = Future {
     val info = commonApi.fullInfo(IssuedAsset(request.assetId))
       .getOrElse(throw GenericError("Asset not found"))
 
@@ -23,17 +23,14 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       info.description.decimals,
       info.description.reissuable,
       info.description.totalVolume.longValue(),
-      info.description.script.map(_.bytes()).getOrElse(ByteStr.empty).toPBByteString,
+      Some(AssetInfoResponse.ScriptInfo(
+        info.description.script.fold(ByteStr.empty)(_.bytes()).toPBByteString,
+        info.description.script.fold("")(_.expr.toString),
+        info.description.script.fold(0L)(_.complexity)
+      )),
       info.description.sponsorship,
       Some(info.issueTransaction.toPB),
       info.sponsorBalance.getOrElse(0)
     )
-  }
-
-  override def getScript(request: AssetRequest): Future[AssetScriptResponse] = Future {
-    val info = commonApi.description(IssuedAsset(request.assetId))
-      .getOrElse(throw GenericError("Asset not found"))
-
-    AssetScriptResponse(info.script.map(_.bytes()).getOrElse(ByteStr.empty).toPBByteString)
   }
 }

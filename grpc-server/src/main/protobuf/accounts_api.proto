@@ -5,11 +5,7 @@ import "transactions_api.proto";
 import "transaction.proto";
 
 service AccountsApi {
-    rpc GetBalance (BalanceRequest) returns (BalanceResponse);
-    rpc GetEffectiveBalance (BalanceRequest) returns (BalanceResponse);
-    rpc GetBalanceDetails (BalanceRequest) returns (BalanceDetailsResponse);
-    rpc GetAssetBalance (AssetBalanceRequest) returns (BalanceResponse);
-    rpc GetPortfolio (AccountRequest) returns (stream Amount);
+    rpc GetPortfolio (PortfolioRequest) returns (PortfolioResponse);
     rpc GetScript (AccountRequest) returns (AccountScriptResponse);
     rpc GetActiveLeases (AccountRequest) returns (stream TransactionWithHeight);
     rpc GetData (DataRequest) returns (DataTransactionData.DataEntry);
@@ -20,14 +16,11 @@ message AccountRequest {
     bytes address = 1;
 }
 
-message BalanceRequest {
+message PortfolioRequest {
     bytes address = 1;
     int32 confirmations = 2;
-}
-
-message AssetBalanceRequest {
-    bytes address = 1;
-    bytes asset_id = 2;
+    bool include_waves = 3;
+    repeated bytes assets = 4;
 }
 
 message DataRequest {
@@ -35,15 +28,16 @@ message DataRequest {
     string key = 2;
 }
 
-message BalanceResponse {
-    int64 balance = 1;
-}
+message PortfolioResponse {
+    message WavesBalances {
+        int64 balance = 1;
+        int64 generating_balance = 2;
+        int64 available_balance = 3;
+        int64 effective_balance = 4;
+    }
 
-message BalanceDetailsResponse {
-    int64 balance = 1;
-    int64 generating_balance = 2;
-    int64 available_balance = 3;
-    int64 effective_balance = 4;
+    WavesBalances waves = 1;
+    repeated AssetAmount assets = 2;
 }
 
 message AccountScriptResponse {

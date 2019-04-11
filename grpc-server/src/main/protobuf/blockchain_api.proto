@@ -6,6 +6,7 @@ import "google/protobuf/empty.proto";
 service BlockchainApi {
     rpc GetActivationStatus (ActivationStatusRequest) returns (ActivationStatusResponse);
     rpc GetBaseTarget (google.protobuf.Empty) returns (BaseTargetResponse);
+    rpc GetCumulativeScore (google.protobuf.Empty) returns (ScoreResponse);
 }
 
 message ActivationStatusRequest {
@@ -43,5 +44,8 @@ message FeatureActivationStatus {
 
 message BaseTargetResponse {
     int64 base_target = 1;
-    bytes score = 2;
+}
+
+message ScoreResponse {
+    bytes score = 1; // BigInt
 }

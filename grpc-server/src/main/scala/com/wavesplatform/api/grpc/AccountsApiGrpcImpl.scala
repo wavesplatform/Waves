@@ -1,11 +1,11 @@
 package com.wavesplatform.api.grpc
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount, DataTransactionData, PBTransactions}
+import com.wavesplatform.protobuf.transaction.{AssetAmount, DataTransactionData, PBTransactions}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -16,35 +16,28 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
     extends AccountsApiGrpc.AccountsApi {
   private[this] val commonApi = new CommonAccountApi(blockchain, functionalitySettings)
 
-  override def getBalance(request: BalanceRequest): Future[BalanceResponse] = Future {
-    BalanceResponse(commonApi.balance(request.address.toAddress, request.confirmations))
-  }
+  override def getPortfolio(request: PortfolioRequest): Future[PortfolioResponse] = Future {
+    val wavesOption = if (request.includeWaves) {
+      val details = commonApi.balanceDetails(request.address.toAddress)
+      Some(PortfolioResponse.WavesBalances(details.regular, details.generating, details.available, details.effective))
+    } else {
+      None
+    }
 
-  override def getEffectiveBalance(request: BalanceRequest): Future[BalanceResponse] = Future {
-    BalanceResponse(commonApi.effectiveBalance(request.address.toAddress, request.confirmations))
-  }
+    val assetIdSet = request.assets.map(_.toByteStr).toSet
+    val assets =
+      if (assetIdSet.isEmpty)
+        Seq.empty
+      else
+        commonApi
+          .portfolio(request.address.toAddress)
+          .toSeq
+          .collect {
+            case (IssuedAsset(assetId), balance) if assetIdSet.contains(assetId) =>
+              AssetAmount(assetId, balance)
+          }
 
-  override def getBalanceDetails(request: BalanceRequest): Future[BalanceDetailsResponse] = Future {
-    val details = commonApi.balanceDetails(request.address.toAddress)
-    BalanceDetailsResponse(details.regular, details.generating, details.available, details.effective)
-  }
-
-  override def getAssetBalance(request: AssetBalanceRequest): Future[BalanceResponse] = Future {
-    BalanceResponse(commonApi.assetBalance(request.address.toAddress, IssuedAsset(request.assetId.toByteStr)))
-  }
-
-  override def getPortfolio(request: AccountRequest, responseObserver: StreamObserver[Amount]): Unit = {
-    val result = Observable
-      .defer(Observable.fromIterable(commonApi.portfolio(request.address.toAddress)))
-      .map {
-        case (IssuedAsset(assetId), balance) =>
-          Amount().withAssetAmount(AssetAmount(assetId, balance))
-
-        case (Waves, balance) =>
-          Amount().withWavesAmount(balance)
-      }
-
-    responseObserver.completeWith(result)
+    PortfolioResponse(wavesOption, assets)
   }
 
   override def getScript(request: AccountRequest): Future[AccountScriptResponse] = Future {
