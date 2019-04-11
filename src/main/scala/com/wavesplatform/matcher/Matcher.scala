@@ -1,8 +1,8 @@
 package com.wavesplatform.matcher
 
 import java.io.File
+import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ConcurrentHashMap, Executors, TimeoutException}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
@@ -19,6 +19,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
+import com.wavesplatform.matcher.util.TrackedBroadcastTransactions
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, VolumeAndFee}
@@ -67,6 +68,34 @@ class Matcher(actorSystem: ActorSystem,
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
 
+  private val trackedBroadcastTxs = new TrackedBroadcastTransactions()
+  private def checkPendingTransaction(): Unit = {
+    val nowMs              = time.getTimestamp()
+    val readyMs            = nowMs - settings.matcherSettings.broadcastUntilConfirmed.interval.toMillis
+    val expireMs           = nowMs - settings.matcherSettings.broadcastUntilConfirmed.maxPendingTime.toMillis
+    val (expired, watched) = trackedBroadcastTxs.ready(readyMs).toVector.span(_._2.timestamp <= expireMs)
+
+    val failedToSend = expired.collect { case (_, tx) if !blockchain.containsTransaction(tx) => tx.id() }
+    expired.foreach(Function.tupled(trackedBroadcastTxs.remove))
+
+    val toSend = watched.filter { case (_, tx) => !blockchain.containsTransaction(tx) }
+    toSend.foreach {
+      case (lastSendMs, tx) =>
+        allChannels.broadcastTx(tx)
+        trackedBroadcastTxs.refresh(lastSendMs, nowMs, tx)
+    }
+
+    if (failedToSend.nonEmpty) log.error(s"Failed to send to the network: ${failedToSend.mkString(", ")}")
+    log.info(
+      s"Pending transactions stats: ${toSend.size} to send, ${watched.size} total watched, ${failedToSend.size} failed to send, ${expired.size} total expired"
+    )
+  }
+
+  private def checkPendingTransactionLoop(): Unit = {
+    checkPendingTransaction()
+    actorSystem.scheduler.scheduleOnce(settings.matcherSettings.broadcastUntilConfirmed.interval)(checkPendingTransactionLoop())
+  }
+
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.AggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
@@ -78,7 +107,13 @@ class Matcher(actorSystem: ActorSystem,
     pair,
     updateOrderBookCache(pair),
     marketStatuses.put(pair, _),
-    tx => exchangeTxPool.execute(() => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx)),
+    tx =>
+      exchangeTxPool.execute(() => {
+        if (utx.putIfNew(tx).isRight) {
+          allChannels.broadcastTx(tx)
+          if (matcherSettings.broadcastUntilConfirmed.enable) trackedBroadcastTxs.add(time.getTimestamp(), tx)
+        }
+      }),
     matcherSettings,
     transactionCreator.createTransaction,
     time
@@ -238,7 +273,7 @@ class Matcher(actorSystem: ActorSystem,
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress, matcherSettings.port), 5.seconds)
 
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
-
+    if (matcherSettings.broadcastUntilConfirmed.enable) checkPendingTransactionLoop()
     actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings), MatcherTransactionWriter.name)
 
     val startGuard = for {
