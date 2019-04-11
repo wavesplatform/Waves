@@ -1,9 +1,10 @@
 package com.wavesplatform.api.http.alias
 
-import com.wavesplatform.account.{PublicKey, Alias}
+import com.wavesplatform.account.{Alias, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
-import com.wavesplatform.transaction.{CreateAliasTransactionV1, ValidationError}
+import com.wavesplatform.transaction.CreateAliasTransactionV1
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 

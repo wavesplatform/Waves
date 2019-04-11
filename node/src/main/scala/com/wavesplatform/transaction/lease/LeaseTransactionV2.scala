@@ -6,8 +6,10 @@ import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -40,7 +42,7 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       val (assetIdOpt, _) = Deser.parseByteArrayOption(bytes, 0, AssetIdLength)
       Either
-        .cond(assetIdOpt.isEmpty, (), ValidationError.GenericError("Leasing assets is not supported yet"))
+        .cond(assetIdOpt.isEmpty, (), GenericError("Leasing assets is not supported yet"))
         .flatMap(_ => LeaseTransaction.validateLeaseParams(tx))
         .map(_ => tx)
         .foldToTry

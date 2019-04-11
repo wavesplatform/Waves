@@ -1,16 +1,14 @@
 package com.wavesplatform.transaction
-
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
 
-trait ValidationError extends Product with Serializable
-
-object ValidationError {
+object TxValidationError {
   type Validation[T] = Either[ValidationError, T]
 
   case class InvalidAddress(reason: String)                    extends ValidationError
@@ -26,7 +24,6 @@ object ValidationError {
   case object UnsupportedTransactionType                       extends ValidationError
   case object InvalidRequestSignature                          extends ValidationError
   case class BlockFromFuture(ts: Long)                         extends ValidationError
-  case class ScriptParseError(m: String)                       extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int)   extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String])   extends ValidationError
   case class AliasDoesNotExist(a: Alias)                       extends ValidationError

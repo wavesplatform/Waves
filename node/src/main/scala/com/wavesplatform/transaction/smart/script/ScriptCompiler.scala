@@ -1,13 +1,15 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.lang.directives.Directive.extractValue
+import com.wavesplatform.lang.directives.DirectiveKey._
 import com.wavesplatform.lang.directives._
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveKey._
+import com.wavesplatform.lang.script.ContractScript._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
-import com.wavesplatform.transaction.smart.script.ContractScript._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {
