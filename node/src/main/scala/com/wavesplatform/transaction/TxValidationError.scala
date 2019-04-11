@@ -55,4 +55,8 @@ object TxValidationError {
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
   }
+
+  implicit class ValidationErrorException(val error: ValidationError) extends IllegalArgumentException(error.toString) {
+    def toException = this
+  }
 }

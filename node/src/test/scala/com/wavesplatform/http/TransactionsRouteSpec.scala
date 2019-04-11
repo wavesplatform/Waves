@@ -19,6 +19,7 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import io.netty.channel.group.ChannelGroup
+import monix.execution.Scheduler
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -35,6 +36,8 @@ class TransactionsRouteSpec
     with BlockGen
     with PropertyChecks
     with NoShrink {
+
+  implicit def scheduler = Scheduler.global
 
   private val wallet      = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain  = mock[Blockchain]

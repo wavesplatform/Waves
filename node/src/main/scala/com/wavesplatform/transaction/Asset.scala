@@ -49,7 +49,7 @@ object Asset {
   }
 
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
-    maybeBStr.map(IssuedAsset).getOrElse(Waves)
+    maybeBStr.fold[Asset](Waves)(IssuedAsset)
   }
 
   def fromProtoId(byteStr: ByteString): Asset = {
@@ -57,7 +57,7 @@ object Asset {
     else IssuedAsset(byteStr.toByteArray)
   }
 
-  implicit class AssetIdOps(val ai: Asset) extends AnyVal {
+  implicit class AssetIdOps(private val ai: Asset) extends AnyVal {
     def byteRepr: Array[Byte] = ai match {
       case Waves           => Array(0: Byte)
       case IssuedAsset(id) => (1: Byte) +: id.arr
