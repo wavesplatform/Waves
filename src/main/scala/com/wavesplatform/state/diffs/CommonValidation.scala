@@ -5,18 +5,17 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.ContractScript
-import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{smart, _}
 
 import scala.util.{Left, Right}
 
@@ -277,7 +276,10 @@ object CommonValidation {
           minFee <= tx.assetFee._2,
           (),
           GenericError(
-            s"Fee in ${feeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+            s"Fee for ${Constants.TransactionNames(tx.builder.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.base58)})" ++
+              " does not exceed minimal value of " ++
+              s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.base58}")}"
+          )
         )
       } yield ()
     } else {

@@ -257,7 +257,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
           sponsor
             .transfer(sponsor.address, alice.address, 10 * Token, fee = SmallFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
             .id,
-          s"Fee in $sponsorAssetId .* does not exceed minimal value"
+          "does not exceed minimal value"
         )
       }
 
