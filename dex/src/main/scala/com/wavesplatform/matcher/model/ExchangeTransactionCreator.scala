@@ -6,9 +6,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
-import com.wavesplatform.settings.AssetType
-import com.wavesplatform.settings.AssetType.AssetType
-import com.wavesplatform.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
+import com.wavesplatform.matcher.settings.AssetType.AssetType
+import com.wavesplatform.matcher.settings.OrderFeeSettings.PercentSettings
+import com.wavesplatform.matcher.settings.{AssetType, MatcherSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset
@@ -16,8 +16,9 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.exchange._
 
-class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyPair, matcherOrderFeeSettings: OrderFeeSettings) {
+class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyPair, matcherSettings: MatcherSettings) {
   private def calculateMatcherFee(buy: Order, sell: Order, executedAmount: Long, executedPrice: Long): (Long, Long) = {
+
     def calcFee(o: Order, txAmount: Long, totalAmount: Long): Long = {
       val p = BigInt(txAmount) * o.matcherFee / totalAmount
       p.toLong
@@ -34,7 +35,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
       buyAmt.explicitGet() -> sellAmt.explicitGet()
     }
 
-    matcherOrderFeeSettings match {
+    matcherSettings.orderFee match {
       case PercentSettings(assetType, _) =>
         val (buyAmountFromTx, sellAmountFromTx) = getBuySellAmountTxOrTotal(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
         val (buyAmountTotal, sellAmountTotal)   = getBuySellAmountTxOrTotal(assetType, buy.amount, buy.price, sell.amount, sell.price)
@@ -54,7 +55,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount, price)
 
-    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair, OrderValidator.exchangeTransactionCreationFee)
+    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair, matcherSettings.exchangeTxBaseFee)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else

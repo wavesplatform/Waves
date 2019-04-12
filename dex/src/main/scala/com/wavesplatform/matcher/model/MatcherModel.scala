@@ -14,6 +14,14 @@ import scala.math.BigDecimal.RoundingMode
 
 object MatcherModel {
   type Price = Long
+
+  def toNormalized(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long = {
+    (BigDecimal.valueOf(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
+  }
+
+  def fromNormalized(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double = {
+    (BigDecimal.valueOf(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+  }
 }
 
 case class LevelAgg(amount: Long, price: Long)

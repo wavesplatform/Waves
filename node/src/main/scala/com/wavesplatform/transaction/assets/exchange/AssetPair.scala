@@ -76,8 +76,8 @@ object AssetPair {
     val sourceArr = source.split("-")
     val res = sourceArr match {
       case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-      case _                               => throw new Exception(s"Incorrect assets count (expected 2, but got ${sourceArr.size}): $source")
+      case _                               => throw new Exception(s"$source (incorrect assets count, expected 2 but got ${sourceArr.size})")
     }
-    res fold (ex => throw new Exception(ex.getMessage), identity)
+    res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
   }
 }

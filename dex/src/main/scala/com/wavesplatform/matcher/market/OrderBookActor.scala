@@ -25,7 +25,8 @@ class OrderBookActor(owner: ActorRef,
                      updateMarketStatus: MarketStatus => Unit,
                      broadcastTx: ExchangeTransaction => Unit,
                      createTransaction: CreateTransaction,
-                     time: Time)
+                     time: Time,
+                     normalizedTickSize: Option[Long] = None)
     extends PersistentActor
     with ScorexLogging {
 
@@ -120,7 +121,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Order accepted [${eventWithMeta.offset}]: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, normalizedTickSize))
   }
 
   override def receiveCommand: Receive = fullCommands
@@ -160,8 +161,18 @@ object OrderBookActor {
             broadcastTx: ExchangeTransaction => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
-            time: Time): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, broadcastTx, createTransaction, time))
+            time: Time,
+            normalizedTickSize: Option[Long] = None): Props =
+    Props(
+      new OrderBookActor(parent,
+                         addressActor,
+                         assetPair,
+                         updateSnapshot,
+                         updateMarketStatus,
+                         broadcastTx,
+                         createTransaction,
+                         time,
+                         normalizedTickSize))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
