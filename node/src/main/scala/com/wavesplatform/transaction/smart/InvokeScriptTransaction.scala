@@ -6,12 +6,13 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.ValidationError.{GenericError, NonPositiveAmount}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -104,11 +105,10 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
         .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
-        .flatMap(_ => Either.cond(tx.fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: ${tx.fee}")))
+        .flatMap(_ => Either.cond(tx.fee > 0, (), InsufficientFee(s"insufficient fee: ${tx.fee}")))
         .flatMap(_ =>
-          Either.cond(tx.payment.forall(_.amount > 0),
-                      (),
-                      ValidationError.NonPositiveAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
+          Either
+            .cond(tx.payment.forall(_.amount > 0), (), NonPositiveAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
         .flatMap(_ =>
           Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                       (),
@@ -127,11 +127,11 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
+      _ <- Either.cond(fee > 0, (), InsufficientFee(s"insufficient fee: $fee"))
       _ <- Either.cond(
         fc.args.size <= ContractLimits.MaxInvokeScriptArgs,
         (),
-        ValidationError.GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
+        GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
       )
       _ <- Either.cond(
         fc.function match {
@@ -139,18 +139,18 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
           case _                         => true
         },
         (),
-        ValidationError.GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes} bytes")
+        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes} bytes")
       )
       _ <- checkAmounts(p)
-      _ <- Either.cond(p.length <= 1, (), ValidationError.GenericError("Multiple payment isn't allowed now"))
-      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), ValidationError.GenericError("duplicate payments"))
+      _ <- Either.cond(p.length <= 1, (), GenericError("Multiple payment isn't allowed now"))
+      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), GenericError("duplicate payments"))
 
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of invokeScript must be EVALUATED"))
       tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
-      _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), ValidationError.TooBigArray)
+      _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
     } yield tx
   }
 
@@ -159,12 +159,10 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       .find(_.amount <= 0)
       .fold(().asRight[NonPositiveAmount])(
         p =>
-          ValidationError
-            .NonPositiveAmount(
-              p.amount,
-              p.assetId.fold("Waves")(_.toString)
-            )
-            .asLeft[Unit])
+          NonPositiveAmount(
+            p.amount,
+            p.assetId.fold("Waves")(_.toString)
+          ).asLeft[Unit])
 
   def signed(sender: PublicKey,
              dappAddress: Address,

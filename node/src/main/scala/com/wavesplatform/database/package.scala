@@ -13,8 +13,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import org.iq80.leveldb.{DB, ReadOptions}
 

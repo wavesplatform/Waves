@@ -3,11 +3,10 @@ package com.wavesplatform.http
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
-import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory

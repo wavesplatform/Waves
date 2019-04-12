@@ -2,12 +2,13 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, ValidationError}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task

@@ -2,9 +2,10 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, _}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 

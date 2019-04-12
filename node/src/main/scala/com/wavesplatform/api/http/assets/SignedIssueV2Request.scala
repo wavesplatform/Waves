@@ -2,11 +2,12 @@ package com.wavesplatform.api.http.assets
 
 import cats.implicits._
 import com.google.common.base.Charsets
-import com.wavesplatform.account.{PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Proofs, ValidationError}
+import com.wavesplatform.transaction.Proofs
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

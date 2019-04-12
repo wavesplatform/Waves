@@ -1,7 +1,7 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import supertagged._
 
 object PrivateKey extends TaggedType[ByteStr] {

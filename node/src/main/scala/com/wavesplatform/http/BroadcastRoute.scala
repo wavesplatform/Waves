@@ -1,9 +1,10 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 

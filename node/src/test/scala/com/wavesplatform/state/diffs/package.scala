@@ -6,11 +6,12 @@ import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.transaction.Transaction
 import org.scalatest.Matchers
 
 package object diffs extends WithState with Matchers {

@@ -12,9 +12,9 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils._
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}

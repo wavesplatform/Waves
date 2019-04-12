@@ -7,7 +7,8 @@ import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromE
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Transaction
 import play.api.libs.json._
 
 import scala.util.control.Exception.nonFatalCatch

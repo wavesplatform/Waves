@@ -6,11 +6,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -22,19 +24,16 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB, utils}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}

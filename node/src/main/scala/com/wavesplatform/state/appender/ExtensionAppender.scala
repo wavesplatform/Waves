@@ -3,12 +3,13 @@ package com.wavesplatform.state.appender
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
@@ -52,7 +53,7 @@ object ExtensionAppender extends ScorexLogging {
                   .fold[Either[ValidationError, Unit]](Right(())) {
                     case (i, declinedBlock, e) =>
                       e match {
-                        case _: ValidationError.BlockFromFuture =>
+                        case _: TxValidationError.BlockFromFuture =>
                         case _                                  => invalidBlocks.add(declinedBlock.uniqueId, e)
                       }
 

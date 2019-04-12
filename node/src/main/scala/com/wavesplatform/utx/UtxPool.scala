@@ -2,6 +2,7 @@ package com.wavesplatform.utx
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction._

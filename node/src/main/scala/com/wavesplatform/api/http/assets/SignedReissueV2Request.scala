@@ -1,10 +1,11 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import com.wavesplatform.account.{PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.ReissueTransactionV2
-import com.wavesplatform.transaction.{Proofs, ValidationError}
+import com.wavesplatform.transaction.Proofs
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads}

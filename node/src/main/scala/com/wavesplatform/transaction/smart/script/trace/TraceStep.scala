@@ -3,9 +3,9 @@ package com.wavesplatform.transaction.smart.script.trace
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ScriptResult
-import com.wavesplatform.transaction.ValidationError
 import play.api.libs.json.{JsObject, Json}
 
 sealed abstract class TraceStep {

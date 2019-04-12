@@ -5,10 +5,11 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval

@@ -3,11 +3,13 @@ package com.wavesplatform.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 
@@ -51,7 +53,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
               _.toTx,
               _.eliminate(
                 _.toTx,
-                _ => Left(ValidationError.UnsupportedTransactionType)
+                _ => Left(UnsupportedTransactionType)
               )
             )
           }
@@ -65,9 +67,9 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
             .map {
               case TracedResult(result, log) =>
                 val mapped = result match {
-                  case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, tx)) => Right(tx -> false)
-                  case Left(e)                                                                    => Left(ApiError.fromValidationError(e))
-                  case Right(x)                                                                   => Right(x)
+                  case Left(TransactionValidationError(_: AlreadyInTheState, tx)) => Right(tx -> false)
+                  case Left(e)                                                    => Left(ApiError.fromValidationError(e))
+                  case Right(x)                                                   => Right(x)
                 }
                 (mapped, log)
             }
@@ -95,7 +97,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
           _.toTx,
           _.eliminate(
             _.toTx,
-            _ => Left(ValidationError.UnsupportedTransactionType)
+            _ => Left(UnsupportedTransactionType)
           )
         )
       )

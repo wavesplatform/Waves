@@ -25,8 +25,8 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
         withStateAndHistory(Enabled) { blockchain: Blockchain =>
-          TransactionDiffer(Enabled, Some(prevBlockTs), blockTs, height)(blockchain, transfer1).resultE should
-            produce("in the past relative to previous block timestamp")
+          val result = TransactionDiffer(Enabled, Some(prevBlockTs), blockTs, height)(blockchain, transfer1).resultE
+          result should produce("in the past relative to previous block timestamp")
         }
     }
   }

@@ -6,7 +6,12 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -14,21 +19,17 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptRe
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
-import com.wavesplatform.lang._
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
-import com.wavesplatform.transaction.{Asset, ValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -107,7 +108,7 @@ object InvokeScriptTransactionDiff {
               })
               wavesFee = feeInfo._1
               dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, ds, feeInfo._2))
-              _ <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, "")))
+              _ <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
               _ <- TracedResult(validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
               _ <- TracedResult(Either.cond(
                 pmts

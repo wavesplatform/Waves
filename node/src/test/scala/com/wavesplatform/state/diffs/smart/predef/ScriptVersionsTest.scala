@@ -1,8 +1,10 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.parser.Parser
@@ -10,8 +12,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
+import com.wavesplatform.utils.EmptyBlockchain
 import fastparse.core.Parsed.Success
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}

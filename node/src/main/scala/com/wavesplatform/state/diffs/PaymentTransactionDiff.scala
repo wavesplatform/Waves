@@ -2,10 +2,11 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.{PaymentTransaction, ValidationError}
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.PaymentTransaction
 
 import scala.util.{Left, Right}
 

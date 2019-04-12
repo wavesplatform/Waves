@@ -1,15 +1,16 @@
-package com.wavesplatform.transaction.smart.script
+package com.wavesplatform.lang.script
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.v1.ContractLimits.{MaxContractComplexity, MaxContractSizeInBytes}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
-import com.wavesplatform.utils.{functionCosts, varNames}
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader, ScriptEstimator}
 import monix.eval.Coeval
 
 object ContractScript {
+
+  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= MaxContractSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $MaxContractSizeInBytes bytes")
