@@ -139,7 +139,7 @@ object ContractCompiler {
           for {
             anns <- annSeq.toList.traverse[CompileM, String](handlePart)
             args <- argSeq.toList.traverse[CompileM, String](handlePart)
-          } yield anns.forall(a => args.contains(a))
+          } yield anns.exists(a => args.contains(a))
       }
       _ <- annotationVars
         .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
