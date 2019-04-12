@@ -21,7 +21,7 @@ object DistributedRandomGenerator {
     val filteredProbabilities = probabilities.filter { case (_, p) => p > 0 }
     filteredProbabilities.size match {
       case 0 => throw new IllegalArgumentException("empty probability list")
-      case 1 => new SingleOutcome[T](probabilities.head._1)
+      case 1 => new SingleOutcome[T](filteredProbabilities.head._1)
       case _ =>
         val (treeMap, total) = filteredProbabilities.foldLeft((TreeMap.empty[Double, T], 0d)) {
           case ((tm, acc), (v, p)) => (tm + ((acc + p) -> v), acc + p)
