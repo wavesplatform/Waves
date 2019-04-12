@@ -156,7 +156,7 @@ class Matcher(actorSystem: ActorSystem,
           matcherQueue.startConsume(
             oldestSnapshotOffset + 1,
             eventWithMeta => {
-              log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
+              log.debug(s"Consumed $eventWithMeta")
 
               self ! eventWithMeta
               currentOffset = eventWithMeta.offset

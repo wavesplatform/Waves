@@ -52,7 +52,7 @@ class AddressActor(
     for ((id, b) <- limitOrder.requiredBalance if b != 0) {
       val prevBalance = openVolume(id)
       val newBalance  = prevBalance + b
-      log.trace(s"${limitOrder.order.id()}, ${assetIdStr(id)}: $prevBalance + $b = $newBalance")
+      log.trace(s"id=${limitOrder.order.id()}: $prevBalance + $b = $newBalance of ${assetIdStr(id)}")
       openVolume += id -> newBalance
     }
   }
@@ -61,7 +61,7 @@ class AddressActor(
     for (limitOrder <- activeOrders.get(orderId); (id, b) <- limitOrder.requiredBalance if b != 0) {
       val prevBalance = openVolume(id)
       val newBalance  = prevBalance - b
-      log.trace(s"${limitOrder.order.id()}, ${assetIdStr(id)}: $prevBalance - $b = $newBalance")
+      log.trace(s"id=${limitOrder.order.id()}: $prevBalance - $b = $newBalance of ${assetIdStr(id)}")
       openVolume += id -> newBalance
     }
 
@@ -120,7 +120,11 @@ class AddressActor(
       val batchCancelFutures = for {
         lo <- activeOrders.values
         if maybePair.forall(_ == lo.order.assetPair)
-      } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
+      } yield {
+        val id = lo.order.id()
+        val f  = pendingCancellation.get(id).fold(storeCanceled(lo.order.assetPair, id))(_.future)
+        f.map(id -> _)
+      }
 
       Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
 
@@ -143,7 +147,9 @@ class AddressActor(
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
         Future.successful(error)
-      case Success(_) => promisedResponse.future
+      case Success(x) =>
+        log.info(s"Stored $x")
+        promisedResponse.future
     }
   }
 
@@ -184,18 +190,21 @@ class AddressActor(
       updateTimestamp(submitted.order.timestamp)
       release(submitted.order.id())
       handleOrderAdded(submitted)
+
     case e @ OrderExecuted(submitted, counter, _) =>
-      log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount = ${e.executedAmount}")
+      log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
 
     case OrderCanceled(lo, unmatchable) =>
+      val id = lo.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       confirmPlacement(lo.order)
-      pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCanceled(lo.order.id())))
-      if (activeOrders.contains(lo.order.id())) {
-        log.trace(s"OrderCanceled(${lo.order.id()}, system=$unmatchable)")
-        release(lo.order.id())
+      pendingCancellation.remove(id).foreach(_.success(api.OrderCanceled(id)))
+      val isActive = activeOrders.contains(id)
+      log.trace(s"OrderCanceled($id, system=$unmatchable, isActive=$isActive)")
+      if (isActive) {
+        release(id)
         handleOrderTerminated(lo, OrderStatus.finalStatus(lo, unmatchable))
       }
   }
