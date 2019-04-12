@@ -7,7 +7,6 @@ import cats.Show
 import cats.data._
 import cats.implicits._
 import com.wavesplatform.generator.Worker.Settings
-import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
@@ -16,7 +15,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.control.NonFatal
 
-class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator, initial: List[RawBytes])(
+class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator, initial: List[NetworkSender.Serializable])(
     implicit ec: ExecutionContext)
     extends ScorexLogging {
 
@@ -64,7 +63,7 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
       }
   }
 
-  private def trySend(channel: Channel, messages: Seq[RawBytes]): EitherT[Future, Throwable, Unit] = EitherT {
+  private def trySend(channel: Channel, messages: Seq[NetworkSender.Serializable]): EitherT[Future, Throwable, Unit] = EitherT {
     sender
       .send(channel, messages: _*)
       .map { _ =>
@@ -80,10 +79,8 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
       log.info(s"[$node] Iteration $step")
       val txs = generator.next().toList
       txs.foreach(println)
-      val messages: Seq[RawBytes] = txs.map(RawBytes.from).toSeq
-
       def next: Result[Unit] = {
-        log.info(s"[$node] ${messages.size} transactions had been sent")
+        log.info(s"[$node] ${txs.length} transactions had been sent")
         if (step < settings.iterations) {
           log.info(s"[$node] Sleeping for ${settings.delay}")
           blocking {
@@ -96,7 +93,7 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
         }
       }
 
-      trySend(channel, messages)
+      trySend(channel, txs.map(NetworkSender.Serializable.TX))
         .leftMap(e => step -> e)
         .flatMap(_ => next)
     }

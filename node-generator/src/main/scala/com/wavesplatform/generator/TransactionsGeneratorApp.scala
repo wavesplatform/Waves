@@ -1,6 +1,5 @@
 package com.wavesplatform.generator
 
-import java.net.URL
 import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
@@ -11,7 +10,6 @@ import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
-import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
@@ -193,6 +191,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         canContinue = false
       }
 
+      log.info(s"Preconditions: $initialTransactions")
+
       val workers = finalConfig.sendTo.map {
         case NodeAddress(node, nodeRestUrl) =>
           log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
@@ -204,7 +204,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             node,
             nodeRestUrl,
             () => canContinue,
-            initialTransactions.map(RawBytes.from)
+            initialTransactions.map(NetworkSender.Serializable.TX)
           )
       }
 

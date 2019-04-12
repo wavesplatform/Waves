@@ -3,7 +3,6 @@ package com.wavesplatform.generator
 import java.net.{InetSocketAddress, URL}
 
 import com.wavesplatform.generator.Worker.Settings
-import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
@@ -22,7 +21,7 @@ class NewWorker(settings: Settings,
                 node: InetSocketAddress,
                 nodeRestAddress: URL,
                 canContinue: () => Boolean,
-                initial: Seq[RawBytes])(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
+                initial: Seq[NetworkSender.Serializable])(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
     extends ScorexLogging {
 
   def run(): Future[Unit] =
@@ -40,7 +39,7 @@ class NewWorker(settings: Settings,
     for {
       _ <- networkSender.send(channel, initial: _*)
       _ = log.info(s"Sending ${txs.length} to $channel")
-      _ <- networkSender.send(channel, txs.map(RawBytes.from): _*)
+      _ <- networkSender.send(channel, txs.map(NetworkSender.Serializable.TX): _*)
     } yield ()
   }
 

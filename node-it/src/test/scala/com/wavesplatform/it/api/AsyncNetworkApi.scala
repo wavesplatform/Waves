@@ -17,7 +17,7 @@ object AsyncNetworkApi {
     def sendByNetwork(message: RawBytes*): Future[Unit] = {
       val sender = new NetworkSender(n.settings.blockchainSettings.addressSchemeCharacter, s"it-client-to-${n.name}", nonce)
       sender.connect(n.networkAddress).map { ch =>
-        if (ch.isActive) sender.send(ch, message: _*).map(_ => sender.close()) else sender.close()
+        if (ch.isActive) sender.send(ch, message.map(NetworkSender.Serializable.Raw): _*).map(_ => sender.close()) else sender.close()
       }
     }
   }
