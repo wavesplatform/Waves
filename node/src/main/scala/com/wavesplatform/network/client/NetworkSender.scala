@@ -43,7 +43,7 @@ class NetworkSender(chainId: Char, name: String, nonce: Long)(implicit ec: Execu
       def write(messages: Seq[NetworkSender.Serializable]): Future[Unit] = messages match {
         case msg +: rest =>
           val result = Promise[Unit]()
-          channel.write(msg).addListener { (f: io.netty.util.concurrent.Future[Void]) =>
+          channel.write(msg.bytes).addListener { (f: io.netty.util.concurrent.Future[Void]) =>
             if (!f.isSuccess) {
               val cause = Option(f.cause()).getOrElse(new IOException("Can't send a message to the channel"))
               log.error(s"Can't send a message to the channel: $msg", cause)
