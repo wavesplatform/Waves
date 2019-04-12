@@ -49,20 +49,20 @@ class AddressActor(
 
   private def reserve(limitOrder: LimitOrder): Unit = {
     activeOrders += limitOrder.order.id() -> limitOrder
-    for ((id, b) <- limitOrder.requiredBalance if b != 0) {
-      val prevBalance = openVolume(id)
-      val newBalance  = prevBalance + b
-      log.trace(s"id=${limitOrder.order.id()}: $prevBalance + $b = $newBalance of ${assetIdStr(id)}")
-      openVolume += id -> newBalance
+    for ((assetId, b) <- limitOrder.requiredBalance if b != 0) {
+      val prevReserved    = openVolume(assetId)
+      val updatedReserved = prevReserved + b
+      log.trace(s"id=${limitOrder.order.id()}: $prevReserved + $b = $updatedReserved of ${assetIdStr(assetId)}")
+      openVolume += assetId -> updatedReserved
     }
   }
 
   private def release(orderId: ByteStr): Unit =
-    for (limitOrder <- activeOrders.get(orderId); (id, b) <- limitOrder.requiredBalance if b != 0) {
-      val prevBalance = openVolume(id)
-      val newBalance  = prevBalance - b
-      log.trace(s"id=${limitOrder.order.id()}: $prevBalance - $b = $newBalance of ${assetIdStr(id)}")
-      openVolume += id -> newBalance
+    for (limitOrder <- activeOrders.get(orderId); (assetId, b) <- limitOrder.requiredBalance if b != 0) {
+      val prevReserved    = openVolume(assetId)
+      val updatedReserved = prevReserved - b
+      log.trace(s"id=${limitOrder.order.id()}: $prevReserved - $b = $updatedReserved of ${assetIdStr(assetId)}")
+      openVolume += assetId -> updatedReserved
     }
 
   private def updateTimestamp(newTimestamp: Long): Unit = if (newTimestamp > latestOrderTs) {
