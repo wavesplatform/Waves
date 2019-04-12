@@ -38,14 +38,17 @@ object Address extends ScorexLogging {
   }
 
   def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
-    val version = addressBytes.head
-    val network = addressBytes.tail.head
     (for {
+      _ <- Either.cond(addressBytes.length == Address.AddressLength,
+        (),
+        s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
+
+      version = addressBytes.head
+      network = addressBytes.tail.head
+
       _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
       _ <- Either.cond(network == chainId, (), s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
-      _ <- Either.cond(addressBytes.length == Address.AddressLength,
-                       (),
-                       s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
+
       checkSum          = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
       _ <- Either.cond(checkSum.sameElements(checkSumGenerated), (), s"Bad address checksum")
