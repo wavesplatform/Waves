@@ -3,11 +3,13 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{Alias, KeyPair}
+import com.wavesplatform.account.{Address, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,6 +17,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.LoggerFacade
@@ -223,6 +226,37 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               val sender = accounts.find(_.address == assetTx.sender.address).get
               logOption(SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100000000L, ts))
             })
+
+          case InvokeScriptTransaction =>
+            val script   = randomFrom(settings.scripts).get
+            val function = randomFrom(script.functions).get
+            val sender   = randomFrom(accounts).get
+            val data = for {
+              argType <- function.argTypes
+            } yield
+              argType.toLowerCase match {
+                case "integer" => Terms.CONST_LONG(r.nextLong)
+                case "string"  => Terms.CONST_STRING(r.nextLong.toString)
+                case "boolean" => Terms.CONST_BOOLEAN(r.nextBoolean())
+                case "binary" =>
+                  val size = r.nextInt(MaxValueSize + 1)
+                  val b    = new Array[Byte](size)
+                  r.nextBytes(b)
+                  Terms.CONST_BYTESTR(ByteStr(b))
+              }
+
+            val fc    = Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList)
+            val asset = randomFrom(validIssueTxs).fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
+            logOption(
+              InvokeScriptTransaction.selfSigned(
+                sender,
+                Address.fromString(script.address).explicitGet(),
+                fc,
+                (0 to r.nextInt(5)).map(_ => InvokeScriptTransaction.Payment(r.nextInt(500000), asset)),
+                100000000L + r.nextInt(100000000),
+                Waves,
+                ts
+              ))
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
@@ -247,8 +281,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 }
 
 object NarrowTransactionGenerator {
-
-  case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double])
+  case class ScriptFunction(name: String, argTypes: Seq[String])
+  case class ScriptSettings(address: String, functions: Seq[ScriptFunction])
+  case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30
