@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Pmt, ScriptTransfer}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import cats.implicits._
 
 object ContractEvaluator {
   case class Invocation(fc: FUNCTION_CALL,
@@ -58,6 +59,10 @@ object ContractEvaluator {
   def verify(decls: List[DECLARATION], v: VerifierFunction, ct: ScriptTransfer): EvalM[EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.scriptTransfer(ct)))
 
-  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[ExecutionError, ScriptResult] =
-    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ScriptResult.fromObj)
+  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[(ExecutionError, Log), ScriptResult] = {
+    val (log, result) = EvaluatorV1.evalWithLogging(ctx, eval(c, i))
+    result
+      .flatMap(ScriptResult.fromObj)
+      .leftMap((_, log))
+  }
 }
