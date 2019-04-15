@@ -14,7 +14,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.matcher.AddressActor.GetOrderStatus
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
@@ -35,7 +35,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
-import scala.util.Failure
+import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -83,8 +83,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(Left(_)) => complete(OrderBookUnavailable)
-    case _             => pass
+    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable)
+    case None    => forceCheckOrderBook(p)
+  }
+
+  private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
+    case Success(_) => pass
+    case _          => complete(OrderBookUnavailable)
   }
 
   private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
@@ -236,7 +241,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>
-      handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+      assetPair.fold(pass)(unavailableOrderBookBarrier).apply {
+        handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+      }
     }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
@@ -260,8 +267,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
-    withAssetPair(p) { pair =>
-      handleCancelRequest(Some(pair))
+    unavailableOrderBookBarrier(p) {
+      withAssetPair(p) { pair =>
+        handleCancelRequest(Some(pair))
+      }
     }
   }
 

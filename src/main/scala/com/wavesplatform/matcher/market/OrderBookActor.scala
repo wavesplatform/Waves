@@ -5,7 +5,7 @@ import akka.persistence._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api._
-import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
+import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
@@ -60,6 +60,8 @@ class OrderBookActor(owner: ActorRef,
             context.stop(self)
         }
       }
+    case ForceStartOrderBook(p) if p == assetPair =>
+      sender() ! OrderBookCreated(assetPair)
   }
 
   private def snapshotsCommands: Receive = {
