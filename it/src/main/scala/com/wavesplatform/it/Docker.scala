@@ -311,7 +311,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     }
   }
 
-  def stopContainer(node: DockerNode): Unit = {
+  def stopContainer(node: DockerNode): String = {
     val id = node.containerId
     log.info(s"Stopping container with id: $id")
     client.stopContainer(node.containerId, 10)
@@ -323,6 +323,14 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
                  |Error: ${containerInfo.state().error()}
                  |Status: ${containerInfo.state().status()}
                  |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+    id
+  }
+
+  def startContainer(id: String): Unit = {
+    client.startContainer(id)
+    nodes.asScala.find(_.containerId == id).foreach { node =>
+      node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    }
   }
 
   def killAndStartContainer(node: DockerNode): DockerNode = {

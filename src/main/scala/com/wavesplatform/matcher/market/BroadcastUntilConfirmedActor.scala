@@ -36,7 +36,8 @@ class BroadcastUntilConfirmedActor(settings: BroadcastUntilConfirmedSettings,
       val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
       broadcast(ready)
-      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} to send, ${expired.size} failed to send")
+      log.debug(
+        s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${expired.size} failed to send: ${expired.map(_.id().base58).mkString(", ")}")
 
       scheduleSend()
       context.become(state(next, ready))
