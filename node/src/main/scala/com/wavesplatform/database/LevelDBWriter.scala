@@ -214,6 +214,7 @@ class LevelDBWriter(writableDB: DB,
     c2.drop(1).map(kf(_).keyBytes)
   }
 
+  //noinspection ScalaStyle
   override protected def doAppend(block: Block,
                                   carry: Long,
                                   newAddresses: Map[Address, BigInt],
@@ -229,7 +230,8 @@ class LevelDBWriter(writableDB: DB,
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
                                   sponsorship: Map[IssuedAsset, Sponsorship],
-                                  totalFee: Long): Unit = readWrite { rw =>
+                                  totalFee: Long,
+                                  scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -413,6 +415,12 @@ class LevelDBWriter(writableDB: DB,
     expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
     rw.put(Keys.blockTransactionsFee(height), totalFee)
+
+    // TODO: Make option to disable storage of this
+    scriptResults.foreach {
+      case (txId, result) =>
+        rw.put(Keys.invokeScriptResult(txId), result)
+    }
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
@@ -992,6 +1000,10 @@ class LevelDBWriter(writableDB: DB,
       createMap(),
       GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
     )
+  }
+
+  override def invokeScriptResult(txId: BlockId): Option[InvokeScriptResult] = readOnly { db =>
+    Try(db.get(Keys.invokeScriptResult(txId))).toOption
   }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>

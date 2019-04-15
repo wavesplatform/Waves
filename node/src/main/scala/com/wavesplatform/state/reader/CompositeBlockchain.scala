@@ -123,6 +123,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
+  override def invokeScriptResult(txId: BlockId): Option[InvokeScriptResult] = {
+    diff.scriptResults
+      .get(txId)
+      .orElse(inner.invokeScriptResult(txId))
+  }
+
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
