@@ -9,8 +9,18 @@ object ConfigOps {
 
     val cfgValidator = ConfigSettingsValidator(config)
 
-    def getFailSlowSetOf[T: ValueReader](path: String): Set[T] = {
-      cfgValidator.validateList[T](path).map(_.toSet).valueOr(e => throw new Exception(e.mkString(", ")))
+    private def throwErrors(list: List[String]) = throw new Exception(list.mkString(", "))
+
+    def getValidatedSet[T: ValueReader](path: String): Set[T] = {
+      cfgValidator.validateList[T](path).map(_.toSet) valueOr throwErrors
+    }
+
+    def getValidatedMap[T, U](path: String)(implicit tupleReader: ValueReader[(T, U)]): Map[T, U] = {
+      cfgValidator.validateList[(T, U)](path).map(_.toMap) valueOr throwErrors
+    }
+
+    def getValidatedByPredicate[T: ValueReader](path: String)(predicate: T => Boolean, errorMsg: String): T = {
+      cfgValidator.validateByPredicate(path)(predicate, errorMsg) valueOr throwErrors
     }
   }
 }

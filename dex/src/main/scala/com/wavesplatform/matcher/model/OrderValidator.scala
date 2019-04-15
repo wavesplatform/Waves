@@ -11,11 +11,10 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.error._
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.matcher.settings.OrderFeeSettings._
+import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.OrderFeeSettings._
-import com.wavesplatform.settings.{AssetType, DeviationsSettings, OrderAmountSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -83,7 +82,7 @@ object OrderValidator {
       blockchain.assetDescription(aid).map(_.decimals).toRight(MatcherError.AssetNotFound(aid))
     }
 
-  private def validateDecimals(blockchain: Blockchain, o: Order): Result[Int] =
+  private def validateDecimals(blockchain: Blockchain, o: Order): Result[(Int, Int)] =
     for {
       pd <- decimals(blockchain, o.assetPair.priceAsset)
       ad <- decimals(blockchain, o.assetPair.amountAsset)
@@ -93,36 +92,38 @@ object OrderValidator {
         (),
         MatcherError.PriceLastDecimalsMustBeZero(insignificantDecimals)
       )
-    } yield ad
+    } yield ad -> pd
 
-  private def validateOrderAmount(order: Order,
-                                  amountAssetDecimals: Int,
-                                  orderAmountRestrictions: Map[AssetPair, OrderAmountSettings]): Result[Order] = {
-    if (!(orderAmountRestrictions contains order.assetPair)) lift(order)
+  private def validateAmountAndPrice(order: Order,
+                                     decimalsPair: (Int, Int),
+                                     orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]): Result[Order] = {
+    if (!(orderRestrictions contains order.assetPair)) lift(order)
     else {
 
-      val amountSettings = orderAmountRestrictions(order.assetPair)
+      val (amountAssetDecimals, priceAssetDecimals) = decimalsPair
+      val restrictions                              = orderRestrictions(order.assetPair)
 
-      def normalizeByAmountAssetDecimals(value: Double): Long = {
-        (BigDecimal.valueOf(value) * BigDecimal(10).pow(amountAssetDecimals).toLongExact).toLong
-      }
+      def normalizeAmount(amt: Double): Long = MatcherModel.toNormalized(amt, -amountAssetDecimals, -8)
+      def normalizePrice(prc: Double): Long  = MatcherModel.toNormalized(prc, amountAssetDecimals, priceAssetDecimals)
 
-      lift(order).ensure(MatcherError.OrderInvalidAmount(order, amountSettings)) { o =>
-        o.amount >= normalizeByAmountAssetDecimals(amountSettings.minAmount) &&
-        o.amount <= normalizeByAmountAssetDecimals(amountSettings.maxAmount) &&
-        BigDecimal.valueOf(o.amount).remainder(normalizeByAmountAssetDecimals(amountSettings.stepSize)) == 0
-      }
+      lift(order)
+        .ensure(MatcherError.OrderInvalidAmount(order, restrictions, amountAssetDecimals, priceAssetDecimals)) { o =>
+          normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
+          BigDecimal(o.amount).remainder(normalizeAmount(restrictions.stepSize).max(1)) == 0
+        }
+        .ensure(MatcherError.OrderInvalidPrice(order, restrictions, amountAssetDecimals, priceAssetDecimals)) { o =>
+          normalizePrice(restrictions.minPrice) <= o.price && o.price <= normalizePrice(restrictions.maxPrice) &&
+          (restrictions.mergeSmallPrices || BigDecimal(o.price).remainder(normalizePrice(restrictions.tickSize).max(1)) == 0)
+        }
     }
   }
 
-  def blockchainAware(
-      blockchain: Blockchain,
-      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
-      matcherAddress: Address,
-      time: Time,
-      orderFeeSettings: OrderFeeSettings,
-      orderAmountRestrictions: Map[AssetPair, OrderAmountSettings]
-  )(order: Order): Result[Order] = timer.measure {
+  def blockchainAware(blockchain: Blockchain,
+                      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
+                      matcherAddress: Address,
+                      time: Time,
+                      orderFeeSettings: OrderFeeSettings,
+                      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings])(order: Order): Result[Order] = timer.measure {
     lazy val exchangeTx: Result[ExchangeTransaction] = {
       val fakeOrder: Order = order.updateType(order.orderType.opposite)
       transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map { x =>
@@ -153,12 +154,12 @@ object OrderValidator {
           Either.cond(order.matcherFee >= mof, order, MatcherError.FeeNotEnough(mof, order.matcherFee, Waves))
         case _ => lift(order)
       }
-      amountAssetDecimals <- validateDecimals(blockchain, order)
-      _                   <- validateOrderAmount(order, amountAssetDecimals, orderAmountRestrictions)
-      _                   <- verifyOrderByAccountScript(blockchain, order.sender, order)
-      _                   <- verifyAssetScript(order.assetPair.amountAsset)
-      _                   <- verifyAssetScript(order.assetPair.priceAsset)
-      _                   <- verifyMatcherFeeAssetScript(order.matcherFeeAssetId)
+      decimalsPair <- validateDecimals(blockchain, order)
+      _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
+      _            <- verifyOrderByAccountScript(blockchain, order.sender, order)
+      _            <- verifyAssetScript(order.assetPair.amountAsset)
+      _            <- verifyAssetScript(order.assetPair.priceAsset)
+      _            <- verifyMatcherFeeAssetScript(order.matcherFeeAssetId)
     } yield order
   }
 

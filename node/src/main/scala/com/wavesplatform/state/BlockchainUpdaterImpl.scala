@@ -571,6 +571,14 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
+  override def accountDataKeys(address: Address): Seq[String] = {
+    ngState.fold(blockchain.accountDataKeys(address)) { ng =>
+      val fromInner = blockchain.accountDataKeys(address)
+      val fromDiff  = ng.bestLiquidDiff.accountData.get(address).toVector.flatMap(_.data.keys)
+      fromInner ++ fromDiff
+    }
+  }
+
   override def accountData(acc: Address): AccountDataInfo = readLock {
     ngState.fold(blockchain.accountData(acc)) { ng =>
       val fromInner = blockchain.accountData(acc)
