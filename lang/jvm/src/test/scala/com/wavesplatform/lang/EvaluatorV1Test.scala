@@ -65,7 +65,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = EvaluatorV1.applywithLogging[EVALUATED](
+      val (log, Left(err)) = EvaluatorV1.applyWithLogging[EVALUATED](
         pureEvalContext,
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -732,7 +732,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
    """.stripMargin
 
     val r = EvaluatorV1
-      .applywithLogging[EVALUATED](context.evaluationContext,
+      .applyWithLogging[EVALUATED](context.evaluationContext,
                                    ExpressionCompiler
                                      .compile(script, context.compilerContext)
                                      .explicitGet())
