@@ -102,15 +102,15 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = {
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keys
       .map { id =>
         diff.transactions(id)._2
       }
-      .collect { case lt: LeaseTransaction => lt }
+      .collect { case lt: LeaseTransaction if predicate(lt) => lt }
       .toSet
-    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+    val fromInner = inner.allActiveLeases(predicate).filterNot(ltx => canceled.keySet.contains(ltx.id()))
     fromDiff ++ fromInner
   }
 

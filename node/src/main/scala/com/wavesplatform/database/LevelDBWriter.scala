@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Paged, ScorexLogging}
-import monix.reactive.Observer
+import monix.reactive.{Observable, Observer}
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
@@ -83,6 +83,8 @@ class LevelDBWriter(writableDB: DB,
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
   import LevelDBWriter._
+
+  private def readStream[A](f: ReadOnlyDB => Observable[A]): Observable[A] = writableDB.readOnlyStream(f)
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
@@ -727,7 +729,7 @@ class LevelDBWriter(writableDB: DB,
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readOnly { db =>
     val txs = new ListBuffer[LeaseTransaction]()
 
     db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
@@ -739,12 +741,11 @@ class LevelDBWriter(writableDB: DB,
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
         val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        val tx = db
+        val txOption = db
           .get(Keys.transactionAt(height, txNum))
-          .collect { case lt: LeaseTransaction => lt }
-          .get
+          .collect { case lt: LeaseTransaction if predicate(lt) => lt }
 
-        txs.append(tx)
+        txs ++= txOption
       }
     }
 

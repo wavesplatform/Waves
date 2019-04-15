@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -14,7 +15,6 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
@@ -279,7 +279,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
           bcu.processBlock(block).explicitGet()
         }
 
-        bcu.allActiveLeases shouldBe leases.toSet
+        bcu.allActiveLeases() shouldBe leases.toSet
 
         val emptyBlock = TestBlock
           .create(
@@ -291,7 +291,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         // some leases in liquid state, we should add one block over to store them in db
         bcu.processBlock(emptyBlock)
 
-        defaultWriter.allActiveLeases shouldBe leases.toSet
+        defaultWriter.allActiveLeases() shouldBe leases.toSet
 
         val l = leases(Random.nextInt(leases.length - 1))
 
@@ -321,8 +321,8 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         bcu.processBlock(b)
         bcu.processBlock(b2)
 
-        bcu.allActiveLeases shouldBe (leases.toSet - l)
-        defaultWriter.allActiveLeases shouldBe (leases.toSet - l)
+        bcu.allActiveLeases() shouldBe (leases.toSet - l)
+        defaultWriter.allActiveLeases() shouldBe (leases.toSet - l)
 
         bcu.shutdown()
       } finally {

@@ -85,7 +85,7 @@ trait Blockchain {
   def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
 
   // the following methods are used exclusively by patches
-  def allActiveLeases: Set[LeaseTransaction]
+  def allActiveLeases(predicate: LeaseTransaction => Boolean = _ => true): Set[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
