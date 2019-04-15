@@ -27,58 +27,51 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair]) extends TransactionGenerator {
+  private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
+  private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
 
-  private def r = ThreadLocalRandom.current
-
-  private val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
-  private val typeGen = DistributedRandomGenerator(settings.probabilities)
-
-  private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
-
-  private def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
-    txE match {
-      case Left(e) =>
-        log.warn(s"${m.runtimeClass.getName}: ${e.toString}")
-        None
-      case Right(tx) => Some(tx)
-    }
-  }
-
-  override def next(): Iterator[Transaction] = generate(settings.transactions).toIterator
+  override def next(): Iterator[Transaction] =
+    generate(settings.transactions).toIterator
 
   def generate(n: Int): Seq[Transaction] = {
-    val issueTransactionSender = randomFrom(accounts).get
+    //noinspection ScalaStyle,TypeAnnotation
+    object preconditions {
+      val issueTransactionSender = randomFrom(accounts).get
+
+      val tradeAssetIssue = IssueTransactionV1
+        .selfSigned(
+          issueTransactionSender,
+          "TRADE".getBytes,
+          "Waves DEX is the best exchange ever".getBytes,
+          100000000,
+          2,
+          reissuable = false,
+          100000000L + random.nextInt(100000000),
+          System.currentTimeMillis()
+        )
+        .right
+        .get
+
+      val tradeAssetDistribution = {
+        tradeAssetIssue +: accounts.map(acc => {
+          TransferTransactionV1
+            .selfSigned(
+              IssuedAsset(tradeAssetIssue.id()),
+              issueTransactionSender,
+              acc,
+              5,
+              System.currentTimeMillis(),
+              Waves,
+              100000,
+              Array.fill(random.nextInt(100))(random.nextInt().toByte)
+            )
+            .right
+            .get
+        })
+      }
+    }
 
     val now = System.currentTimeMillis()
-    val tradeAssetIssue = IssueTransactionV1
-      .selfSigned(
-        issueTransactionSender,
-        "TRADE".getBytes,
-        "Waves DEX is the best exchange ever".getBytes,
-        100000000,
-        2,
-        reissuable = false,
-        100000000L + r.nextInt(100000000),
-        now
-      )
-      .right
-      .get
-
-    val tradeAssetDistribution = {
-      tradeAssetIssue +: accounts.map(acc => {
-        TransferTransactionV1
-          .selfSigned(IssuedAsset(tradeAssetIssue.id()),
-                      issueTransactionSender,
-                      acc,
-                      5,
-                      System.currentTimeMillis(),
-                      Waves,
-                      100000,
-                      Array.fill(r.nextInt(100))(r.nextInt().toByte))
-          .right
-          .get
-      })
-    }
 
     val generated = (0 until (n * 1.2).toInt).foldLeft(
       (
@@ -89,7 +82,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         Seq.empty[CreateAliasTransaction]
       )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), i) =>
-        def moreThatStandartFee = 100000L + r.nextInt(100000)
+        def moreThatStandartFee = 100000L + random.nextInt(100000)
 
         val ts = now + i
 
@@ -98,17 +91,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             val sender      = randomFrom(accounts).get
             val name        = new Array[Byte](10)
             val description = new Array[Byte](10)
-            r.nextBytes(name)
-            r.nextBytes(description)
-            val reissuable = r.nextBoolean()
+            random.nextBytes(name)
+            random.nextBytes(description)
+            val reissuable = random.nextBoolean()
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
               IssueTransactionV1
-                .selfSigned(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
+                .selfSigned(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + random.nextInt(100000000), ts))
           case TransferTransactionV1 =>
-            val useAlias  = r.nextBoolean()
+            val useAlias  = random.nextBoolean()
             val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
-            val sendAsset = r.nextBoolean()
+            val sendAsset = random.nextBoolean()
             val senderAndAssetOpt = if (sendAsset) {
               val asset = randomFrom(validIssueTxs)
               asset.map(issue => {
@@ -120,17 +113,19 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               case (sender, asset) =>
                 logOption(
                   TransferTransactionV1
-                    .selfSigned(Asset.fromCompatId(asset),
-                                sender,
-                                recipient,
-                                r.nextInt(500000),
-                                ts,
-                                Waves,
-                                moreThatStandartFee,
-                                Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+                    .selfSigned(
+                      Asset.fromCompatId(asset),
+                      sender,
+                      recipient,
+                      random.nextInt(500000),
+                      ts,
+                      Waves,
+                      moreThatStandartFee,
+                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
+                    ))
             }
           case ReissueTransactionV1 =>
-            val reissuable = r.nextBoolean()
+            val reissuable = random.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
               logOption(ReissueTransactionV1.selfSigned(sender, IssuedAsset(assetTx.id()), Random.nextInt(Int.MaxValue), reissuable, 100000000L, ts))
@@ -143,7 +138,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
           case ExchangeTransactionV1 =>
             val matcher   = randomFrom(accounts).get
             val seller    = randomFrom(accounts).get
-            val pair      = AssetPair(Waves, IssuedAsset(tradeAssetIssue.id()))
+            val pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
             val sellOrder = OrderV1.sell(seller, matcher, pair, 1, 100000000, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
             val buyOrder  = OrderV1.buy(buyer, matcher, pair, 1, 100000000, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
@@ -151,7 +146,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
           case ExchangeTransactionV2 =>
             val matcher = randomFrom(accounts).get
             val seller  = randomFrom(accounts).get
-            val pair    = AssetPair(Waves, IssuedAsset(tradeAssetIssue.id()))
+            val pair    = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
             // XXX generate order version
             val sellOrder = OrderV1.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
@@ -159,7 +154,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             logOption(ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
           case LeaseTransactionV1 =>
             val sender   = randomFrom(accounts).get
-            val useAlias = r.nextBoolean()
+            val useAlias = random.nextBoolean()
             val recipientOpt =
               if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
@@ -174,14 +169,14 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             val aliasString = NarrowTransactionGenerator.generateAlias()
             logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.create(aliasString).explicitGet(), 100000, ts))
           case MassTransferTransaction =>
-            val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
+            val transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {
-              val useAlias  = r.nextBoolean()
+              val useAlias  = random.nextBoolean()
               val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
-              val amount    = r.nextLong(500000)
+              val amount    = random.nextLong(500000)
               ParsedTransfer(recipient, amount)
             }
-            val sendAsset = r.nextBoolean()
+            val sendAsset = random.nextBoolean()
             val senderAndAssetOpt = if (sendAsset) {
               val asset = randomFrom(validIssueTxs)
               asset.map(issue => {
@@ -198,24 +193,24 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                                 transfers.toList,
                                 ts,
                                 200000 + 50000 * transferCount,
-                                Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+                                Array.fill(random.nextInt(100))(random.nextInt().toByte)))
             }
           case DataTransaction =>
             val sender = randomFrom(accounts).get
-            val count  = r.nextInt(10)
+            val count  = random.nextInt(10)
 
             val data = for {
               _ <- 0 until count
-              etype = r.nextInt(Type.maxId)
+              etype = random.nextInt(Type.maxId)
             } yield
               etype match {
-                case t if t == Type.Integer.id => IntegerDataEntry(Random.nextString(10), r.nextLong)
-                case t if t == Type.Boolean.id => BooleanDataEntry(Random.nextString(10), r.nextBoolean)
-                case t if t == Type.String.id  => StringDataEntry(Random.nextString(10), r.nextLong.toString)
+                case t if t == Type.Integer.id => IntegerDataEntry(Random.nextString(10), random.nextLong)
+                case t if t == Type.Boolean.id => BooleanDataEntry(Random.nextString(10), random.nextBoolean)
+                case t if t == Type.String.id  => StringDataEntry(Random.nextString(10), random.nextLong.toString)
                 case t if t == Type.Binary.id =>
-                  val size = r.nextInt(MaxValueSize + 1)
+                  val size = random.nextInt(MaxValueSize + 1)
                   val b    = new Array[Byte](size)
-                  r.nextBytes(b)
+                  random.nextBytes(b)
                   BinaryDataEntry(Random.nextString(10), ByteStr(b))
               }
             val size = 128 + data.map(_.toBytes.length).sum
@@ -235,13 +230,13 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               argType <- function.argTypes
             } yield
               argType.toLowerCase match {
-                case "integer" => Terms.CONST_LONG(r.nextLong)
-                case "string"  => Terms.CONST_STRING(r.nextLong.toString)
-                case "boolean" => Terms.CONST_BOOLEAN(r.nextBoolean())
+                case "integer" => Terms.CONST_LONG(random.nextLong)
+                case "string"  => Terms.CONST_STRING(random.nextLong.toString)
+                case "boolean" => Terms.CONST_BOOLEAN(random.nextBoolean())
                 case "binary" =>
-                  val size = r.nextInt(MaxValueSize + 1)
+                  val size = random.nextInt(MaxValueSize + 1)
                   val b    = new Array[Byte](size)
-                  r.nextBytes(b)
+                  random.nextBytes(b)
                   Terms.CONST_BYTESTR(ByteStr(b))
               }
 
@@ -252,8 +247,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                 sender,
                 Address.fromString(script.address).explicitGet(),
                 fc,
-                (0 to r.nextInt(5)).map(_ => InvokeScriptTransaction.Payment(r.nextInt(500000), asset)),
-                100000000L + r.nextInt(100000000),
+                (0 to random.nextInt(5)).map(_ => InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
+                100000000L + random.nextInt(100000000),
                 Waves,
                 ts
               ))
@@ -264,11 +259,11 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
           case _                            => validIssueTxs
         }, tx match {
           case Some(tx: IssueTransactionV1) if tx.reissuable  => reissuableIssueTxs :+ tx
-          case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id != tx.id)
+          case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id() != tx.id())
           case _                                              => reissuableIssueTxs
         }, tx match {
           case Some(tx: LeaseTransactionV1)     => activeLeaseTransactions :+ tx
-          case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)
+          case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id() != tx.leaseId)
           case _                                => activeLeaseTransactions
         }, tx match {
           case Some(tx: CreateAliasTransaction) => aliases :+ tx
@@ -276,7 +271,20 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         })
     }
 
-    tradeAssetDistribution ++ generated._1.take(n - tradeAssetDistribution.size)
+    generated._1
+  }
+
+  private[this] def random = ThreadLocalRandom.current
+
+  private[this] def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(random.nextInt(c.size))) else None
+
+  private[this] def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
+    txE match {
+      case Left(e) =>
+        log.warn(s"${m.runtimeClass.getName}: ${e.toString}")
+        None
+      case Right(tx) => Some(tx)
+    }
   }
 }
 
