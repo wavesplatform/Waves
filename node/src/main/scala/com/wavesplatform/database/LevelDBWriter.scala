@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Paged, ScorexLogging}
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
@@ -83,8 +83,6 @@ class LevelDBWriter(writableDB: DB,
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
   import LevelDBWriter._
-
-  private def readStream[A](f: ReadOnlyDB => Observable[A]): Observable[A] = writableDB.readOnlyStream(f)
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
