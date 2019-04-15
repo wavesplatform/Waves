@@ -13,6 +13,7 @@ import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
+import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -189,6 +190,15 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       sys.addShutdownHook {
         log.error("Stopping generator")
         canContinue = false
+      }
+
+      if (finalConfig.worker.workingTime > Duration.Zero) {
+        log.info(s"Generator will be stopped after ${finalConfig.worker.workingTime}")
+
+        Scheduler.global.scheduleOnce(finalConfig.worker.workingTime) {
+          log.warn(s"Stopping generator after: ${finalConfig.worker.workingTime}")
+          canContinue = false
+        }
       }
 
       log.info(s"Preconditions: $initialTransactions")
