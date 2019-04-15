@@ -266,19 +266,9 @@ object PBTransactions {
         }
 
       case Data.DataTransaction(DataTransactionData(data)) =>
-        import DataTransactionData.DataEntry.Value._
-        val entries = data.toList.map { de =>
-          de.value match {
-            case IntValue(num)      => IntegerDataEntry(de.key, num)
-            case BoolValue(bool)    => BooleanDataEntry(de.key, bool)
-            case BinaryValue(bytes) => BinaryDataEntry(de.key, bytes.toByteArray)
-            case StringValue(str)   => StringDataEntry(de.key, str)
-            case Empty              => throw new IllegalArgumentException(s"Empty entries not supported: $data")
-          }
-        }
         vt.DataTransaction.create(
           sender,
-          entries,
+          data.toList.map(toVanillaDataEntry),
           feeAmount,
           timestamp,
           proofs
@@ -490,19 +480,10 @@ object PBTransactions {
         }
 
       case Data.DataTransaction(DataTransactionData(data)) =>
-        import DataTransactionData.DataEntry.Value._
-        val entries = data.toList.map { de =>
-          de.value match {
-            case IntValue(num)      => IntegerDataEntry(de.key, num)
-            case BoolValue(bool)    => BooleanDataEntry(de.key, bool)
-            case BinaryValue(bytes) => BinaryDataEntry(de.key, bytes.toByteArray)
-            case StringValue(str)   => StringDataEntry(de.key, str)
-            case Empty              => throw new IllegalArgumentException(s"Empty entries not supported: $data")
-          }
-        }
+
         vt.DataTransaction(
           sender,
-          entries,
+          data.toList.map(toVanillaDataEntry),
           feeAmount,
           timestamp,
           proofs
@@ -632,17 +613,7 @@ object PBTransactions {
         PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.MassTransfer(data))
 
       case tx @ vt.DataTransaction(sender, data, fee, timestamp, proofs) =>
-        val txData = DataTransactionData(
-          data.map(de =>
-            DataTransactionData.DataEntry(
-              de.key,
-              de match {
-                case IntegerDataEntry(_, value) => DataTransactionData.DataEntry.Value.IntValue(value)
-                case BooleanDataEntry(_, value) => DataTransactionData.DataEntry.Value.BoolValue(value)
-                case BinaryDataEntry(_, value)  => DataTransactionData.DataEntry.Value.BinaryValue(value)
-                case StringDataEntry(_, value)  => DataTransactionData.DataEntry.Value.StringValue(value)
-              }
-          )))
+        val txData = DataTransactionData(data.map(toPBDataEntry))
         PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.DataTransaction(txData))
 
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
@@ -652,5 +623,29 @@ object PBTransactions {
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }
+  }
+
+  def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[_] = {
+    import DataTransactionData.DataEntry.Value._
+
+    de.value match {
+      case IntValue(num)      => IntegerDataEntry(de.key, num)
+      case BoolValue(bool)    => BooleanDataEntry(de.key, bool)
+      case BinaryValue(bytes) => BinaryDataEntry(de.key, bytes.toByteArray)
+      case StringValue(str)   => StringDataEntry(de.key, str)
+      case Empty              => throw new IllegalArgumentException(s"Empty entries not supported: $de")
+    }
+  }
+
+  def toPBDataEntry(de: com.wavesplatform.state.DataEntry[_]): DataTransactionData.DataEntry = {
+    DataTransactionData.DataEntry(
+      de.key,
+      de match {
+        case IntegerDataEntry(_, value) => DataTransactionData.DataEntry.Value.IntValue(value)
+        case BooleanDataEntry(_, value) => DataTransactionData.DataEntry.Value.BoolValue(value)
+        case BinaryDataEntry(_, value)  => DataTransactionData.DataEntry.Value.BinaryValue(value)
+        case StringDataEntry(_, value)  => DataTransactionData.DataEntry.Value.StringValue(value)
+      }
+    )
   }
 }

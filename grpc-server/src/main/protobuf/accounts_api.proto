@@ -1,0 +1,47 @@
+syntax = "proto3";
+package com.wavesplatform.api.grpc;
+
+import "transactions_api.proto";
+import "transaction.proto";
+
+service AccountsApi {
+    rpc GetPortfolio (PortfolioRequest) returns (PortfolioResponse);
+    rpc GetScript (AccountRequest) returns (ScriptData);
+    rpc GetActiveLeases (AccountRequest) returns (stream TransactionWithHeight);
+    rpc GetData (DataRequest) returns (DataTransactionData.DataEntry);
+    rpc GetDataStream (DataRequest) returns (stream DataTransactionData.DataEntry);
+}
+
+message AccountRequest {
+    bytes address = 1;
+}
+
+message PortfolioRequest {
+    bytes address = 1;
+    int32 confirmations = 2;
+    bool include_waves = 3;
+    repeated bytes assets = 4;
+}
+
+message DataRequest {
+    bytes address = 1;
+    string key = 2;
+}
+
+message PortfolioResponse {
+    message WavesBalances {
+        int64 balance = 1;
+        int64 generating_balance = 2;
+        int64 available_balance = 3;
+        int64 effective_balance = 4;
+    }
+
+    WavesBalances waves = 1;
+    repeated AssetAmount assets = 2;
+}
+
+message ScriptData {
+    bytes script_bytes = 1;
+    string script_text = 2;
+    int64 complexity = 3;
+}

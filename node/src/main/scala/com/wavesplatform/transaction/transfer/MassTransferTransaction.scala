@@ -179,7 +179,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
       TransfersBytes(tailIndex(3)),
       LongBytes(tailIndex(4), "Timestamp"),
       LongBytes(tailIndex(5), "Fee"),
-      BytesArrayUndefinedLength(tailIndex(6), "Attachments"),
+      BytesArrayUndefinedLength(tailIndex(6), "Attachments", TransferTransaction.MaxAttachmentSize),
       ProofsBytes(tailIndex(7))
     ) mapN {
       case (sender, assetId, transfer, timestamp, fee, attachment, proofs) =>

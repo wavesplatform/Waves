@@ -96,7 +96,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
       LongBytes(tailIndex(5), "Amount"),
       LongBytes(tailIndex(6), "Fee"),
       AddressOrAliasBytes(tailIndex(7), "Recipient"),
-      BytesArrayUndefinedLength(tailIndex(8), "Attachment"),
+      BytesArrayUndefinedLength(tailIndex(8), "Attachment", TransferTransaction.MaxAttachmentSize),
       ProofsBytes(tailIndex(9))
     ) mapN {
       case (senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments, proofs) =>
