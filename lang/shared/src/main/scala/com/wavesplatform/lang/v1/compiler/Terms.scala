@@ -11,10 +11,10 @@ object Terms {
 
   case class LET(name: String, value: EXPR)                     extends DECLARATION
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION
-  case class CONST_LONG(t: Long)                                extends EXPR with EVALUATED
+  case class CONST_LONG(t: Long)                                extends EXPR with EVALUATED { override def toString: String = t.toString }
   case class GETTER(expr: EXPR, field: String)                  extends EXPR
-  case class CONST_BYTESTR(bs: ByteStr)                         extends EXPR with EVALUATED
-  case class CONST_STRING(s: String)                            extends EXPR with EVALUATED
+  case class CONST_BYTESTR(bs: ByteStr)                         extends EXPR with EVALUATED { override def toString: String = bs.toString }
+  case class CONST_STRING(s: String)                            extends EXPR with EVALUATED { override def toString: String = s }
   @Deprecated
   case class LET_BLOCK(let: LET, body: EXPR)             extends EXPR
   case class BLOCK(dec: DECLARATION, body: EXPR)         extends EXPR
@@ -30,15 +30,29 @@ object Terms {
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR
 
   case class CaseObj(caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
-    override def toString: String = {
-      s"""
-       |${caseType.name} {
-       |  ${fields.map({ case (k, v) => s"$k -> $v" }).mkString(", ")}
-       |}
-     """.stripMargin
-    }
+    override def toString: String = prettyString()
+
+    def prettyString(depth: Int = 0): String =
+      if (fields.isEmpty) caseType.name
+      else {
+        val parenthesisIndent = "\t" * depth
+        val fieldsIndent      = "\t" * (depth + 1)
+
+        def text(v: EVALUATED) = {
+          v match {
+            case co: CaseObj => co.prettyString(depth + 1)
+            case a           => a.toString
+          }
+        }
+        val fieldsText = fields
+          .map { case (name, value) => s"$fieldsIndent$name = ${text(value)}" }
+          .mkString("(\n", "\n", s"\n$parenthesisIndent)")
+
+        caseType.name + fieldsText
+      }
   }
 
-  case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED
-
+  case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED {
+    override def toString: String = xs.mkString("[", ", ", "]")
+  }
 }
