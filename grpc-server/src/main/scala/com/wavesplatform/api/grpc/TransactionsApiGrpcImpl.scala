@@ -73,6 +73,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     commonApi
       .broadcastTransaction(tx.toVanilla)
       .map(_.toPB)
+      .resultE
       .toFuture
   }
 }

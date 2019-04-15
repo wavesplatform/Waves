@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
@@ -47,7 +48,7 @@ class UtxPoolImpl(time: Time,
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
+  override def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, (Boolean, Diff)] = {
     def canReissue(blockchain: Blockchain, tx: Transaction): Either[GenericError, Unit] =
       PoolMetrics.checkCanReissue.measure(tx match {
         case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
@@ -65,13 +66,13 @@ class UtxPoolImpl(time: Time,
         case scripted if TxCheck.isScripted(scripted) =>
           for {
             _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts,
-                             (),
-                             GenericError("transactions from scripted accounts are denied from UTX pool"))
+              (),
+              GenericError("transactions from scripted accounts are denied from UTX pool"))
 
             scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
             _ <- Either.cond(skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
-                             (),
-                             GenericError("Transaction pool scripted txs size limit is reached"))
+              (),
+              GenericError("Transaction pool scripted txs size limit is reached"))
           } yield tx
 
         case _ =>
@@ -111,23 +112,27 @@ class UtxPoolImpl(time: Time,
     }
 
     PoolMetrics.putRequestStats.increment()
-    val result = PoolMetrics.putTimeStats.measure {
+    val tracedResult = PoolMetrics.putTimeStats.measure {
       val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
 
-      for {
+      val checks = for {
         _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
         transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
           .map(_.bytes().length)
           .sum
         _ <- Either.cond(skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-                         (),
-                         GenericError("Transaction pool bytes size limit is reached"))
+          (),
+          GenericError("Transaction pool bytes size limit is reached"))
 
-        _    <- checkScripted(blockchain, tx, skipSizeCheck)
-        _    <- checkNotBlacklisted(tx)
-        _    <- checkAlias(blockchain, tx)
-        _    <- canReissue(blockchain, tx)
+        _ <- checkScripted(blockchain, tx, skipSizeCheck)
+        _ <- checkNotBlacklisted(tx)
+        _ <- checkAlias(blockchain, tx)
+        _ <- canReissue(blockchain, tx)
+      } yield ()
+
+      for {
+        _    <- TracedResult(checks)
         diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
@@ -137,12 +142,11 @@ class UtxPoolImpl(time: Time,
       }
     }
 
-    result.fold(
-      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
-      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
+    tracedResult.resultE.fold(
+      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}"),
+      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}, trace = ${tracedResult.trace}")
     )
-
-    result
+    tracedResult
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit =
@@ -193,7 +197,7 @@ class UtxPoolImpl(time: Time,
             } else if (TxCheck.isExpired(tx)) {
               (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
             } else {
-              differ(updatedBlockchain, tx) match {
+              differ(updatedBlockchain, tx).resultE match {
                 case Right(newDiff) =>
                   (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
                 case Left(_) =>
@@ -229,7 +233,7 @@ class UtxPoolImpl(time: Time,
                  height: Int = blockchain.height): Either[ValidationError, Diff] = {
       for {
         _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
-        diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction)
+        diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
       } yield diff
     }
 

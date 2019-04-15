@@ -44,7 +44,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       (bc.height _).when().returns(0)
 
-      Verifier(bc, 0)(tx) shouldBe 'right
+      Verifier(bc, 0)(tx).resultE shouldBe 'right
     }
   }
 
@@ -101,6 +101,6 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     (blockchain.height _).when().returns(0)
 
-    Verifier(blockchain, 0)(tx)
+    Verifier(blockchain, 0)(tx).resultE
   }
 }

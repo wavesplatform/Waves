@@ -25,6 +25,7 @@ import com.wavesplatform.state.{Blockchain, LeaseBalance, NG}
 import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.Verifier
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -349,14 +350,21 @@ case class DebugApiRoute(ws: WavesSettings,
         import ws.blockchainSettings.{functionalitySettings => fs}
         val h  = blockchain.height
         val t0 = System.nanoTime
-        val diffEi = for {
-          tx <- TransactionFactory.fromSignedRequest(jsv)
+        val tracedDiff = for {
+          tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
           _  <- Verifier(blockchain, h)(tx)
           ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
-        val response  = Json.obj("valid" -> diffEi.isRight, "validationTime" -> timeSpent)
-        diffEi.fold(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)), _ => response)
+        val response  = Json.obj(
+          "valid"          -> tracedDiff.resultE.isRight,
+          "validationTime" -> timeSpent,
+          "trace"          -> tracedDiff.trace.map(_.toString)
+        )
+        tracedDiff.resultE.fold(
+          err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
+            _ => response
+        )
       }
     }
   }
