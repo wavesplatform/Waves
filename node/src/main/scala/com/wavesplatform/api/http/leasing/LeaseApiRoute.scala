@@ -2,13 +2,13 @@ package com.wavesplatform.api.http.leasing
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -19,10 +19,12 @@ import play.api.libs.json.JsNumber
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
+
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain, fs)
 
   override val route = pathPrefix("leasing") {
     lease ~ cancel ~ active
@@ -43,13 +45,10 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
       complete(Address.fromString(address) match {
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
-          blockchain
-            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-            .explicitGet()
-            .collect {
-              case (h, lt: LeaseTransaction) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>
-                lt.json() + ("height" -> JsNumber(h))
-            }
+          commonAccountApi.activeLeases(a).map(_.collect {
+            case (height, leaseTransaction: LeaseTransaction) =>
+              leaseTransaction.json() + ("height" -> JsNumber(height))
+          })
       })
     }
   }
