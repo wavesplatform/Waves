@@ -282,9 +282,6 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 
-      case invokeScript: InvokeScriptTransaction =>
-        invokeScript.json() ++ Json.obj("invokeScriptResult" -> blockchain.invokeScriptResult(invokeScript.id()).fold(_ => JsNull, Json.toJson(_)))
-
       case t => t.json()
     }
   }
