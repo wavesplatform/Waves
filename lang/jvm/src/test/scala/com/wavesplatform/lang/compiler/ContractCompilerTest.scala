@@ -7,7 +7,7 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler
+import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
@@ -586,5 +586,41 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) should produce("A definition of 'a' is not found")
+  }
+
+  property("contract compilation fails if function name length is longer than 255 bytes") {
+    val longName = "a" * (ContractLimits.MaxCallableFunctionNameInBytes + 1)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        s"""
+          |
+          |@Callable(i)
+          |func $longName() = {
+          |   WriteSet([])
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("must be less than")
+  }
+
+  property("contract compiles if function name length is equal to 255 bytes") {
+    val longName = "a" * ContractLimits.MaxCallableFunctionNameInBytes
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        s"""
+           |
+          |@Callable(i)
+           |func $longName() = {
+           |   WriteSet([])
+           |}
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 }
