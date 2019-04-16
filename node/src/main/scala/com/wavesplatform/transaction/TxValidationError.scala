@@ -3,6 +3,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.assets.exchange.Order
 
@@ -50,7 +51,20 @@ object TxValidationError {
 
   case class ScriptExecutionError(error: String, log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType
 
-  case class TransactionNotAllowedByScript(log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType
+  case class TransactionNotAllowedByScript(log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType {
+    override def toString: String = {
+      val logText = log
+        .map {
+          case (name, Right(v : CaseObj)) => s"$name = ${v.prettyString(1)}"
+          case (name, Right(v))           => s"$name = $v"
+          case (name, l@Left(_))          => s"$name = $l"
+        }
+        .map("\t" + _)
+        .mkString("\n", "\n", "\n")
+
+      s"TransactionNotAllowedByScript($logText)"
+    }
+  }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"

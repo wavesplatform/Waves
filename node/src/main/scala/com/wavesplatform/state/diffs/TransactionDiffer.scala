@@ -19,7 +19,9 @@ object TransactionDiffer extends ScorexLogging {
 
   import stats.TxTimerExt
 
-  case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError
+  case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError {
+    override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = $tx)"
+  }
 
   def apply(settings: FunctionalitySettings,
             prevBlockTimestamp: Option[Long],
