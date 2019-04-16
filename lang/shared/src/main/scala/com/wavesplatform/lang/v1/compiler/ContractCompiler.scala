@@ -137,7 +137,7 @@ object ContractCompiler {
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {
       ctx <- get[CompilerContext, CompilationError]
-      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
+      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, PART.VALID[String]](handleValid)
       annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
         (af.anns.flatMap(_.args), af.f.args.map(_._1)))
       annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Option[PART.VALID[String]]] {
@@ -147,9 +147,9 @@ object ContractCompiler {
             args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
           } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
       }
-      _ <- annotationVars
-        .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
-          aVs.forall(!ctx.varDefs.contains(_)))
+      _ <- annotationVars.flatMap(a => a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
+        raiseError[CompilerContext, CompilationError, Unit](Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
+      })
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
           case None => ().pure[CompileM]
