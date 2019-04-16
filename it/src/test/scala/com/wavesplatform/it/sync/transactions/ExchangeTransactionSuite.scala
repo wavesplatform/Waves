@@ -217,4 +217,68 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       }
     }
   }
+
+  test("negative - matcher can't send exchange transaction without having enough WAVES for fee") {
+    val matcher = pkByAddress(sender.createAddress())
+    val buyer = acc0
+    val seller = acc1
+    sender.transfer(buyer.address, matcher.address,0.001.waves,minFee, waitForTx = true)
+    val assetId: ByteStr = ByteStr.decodeBase58(
+      sender.issue(
+        sourceAddress = buyer.address,
+        name = "SomeAsset",
+        description = "description",
+        quantity = someAssetAmount,
+        decimals = 8,
+        reissuable = true,
+        script = None,
+        fee = issueFee,
+        waitForTx = true)
+        .id)
+      .get
+
+    val smartAssetId: ByteStr = ByteStr.decodeBase58(
+      sender.issue(
+        sourceAddress = seller.address,
+        name = "ScriptedAsset",
+        description = "asset with script = \"true\"",
+        quantity = someAssetAmount,
+        decimals = 8,
+        reissuable = true,
+        script = Some(scriptBase64),
+        fee = issueFee,
+        waitForTx = true)
+        .id)
+      .get
+
+    val ts = ntpTime.correctedTime()
+    val expirationTimestamp = ts + Order.MaxLiveTime
+    val buyPrice = 500000
+    val sellPrice = 500000
+    val buyAmount = 40000000
+    val sellAmount = 40000000
+    val assetPair = AssetPair.createAssetPair("WAVES", assetId.base58).get
+    val buy = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, 3, IssuedAsset(assetId))
+    val sell = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, 3, IssuedAsset(smartAssetId))
+    val amount = 40000000
+
+    val tx =
+      ExchangeTransactionV2
+        .create(
+          matcher = matcher,
+          buyOrder = buy,
+          sellOrder = sell,
+          amount = amount,
+          price = sellPrice,
+          buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
+          sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+          fee = matcherFee,
+          timestamp = ntpTime.correctedTime()
+        )
+        .explicitGet()
+        .json()
+    val matcherAddress = matcher.address
+    assertBadRequestAndResponse(sender.signedBroadcast(tx, waitForTx = true),f"State check failed. Reason: negative waves balance: $matcherAddress")
+
+  }
 }
