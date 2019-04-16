@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.compiler
 import cats.Show
 import cats.implicits._
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract._
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
@@ -42,9 +42,9 @@ object ContractCompiler {
             .cond(
               tpe match {
                 case _
-                    if tpe <= UNION(WavesContext.writeSetType.typeRef,
-                                    WavesContext.contractTransferSetType.typeRef,
-                                    WavesContext.contractResultType.typeRef) =>
+                    if tpe <= UNION(WavesContext.writeSetType,
+                                    WavesContext.scriptTransferSetType,
+                                    WavesContext.scriptResultType) =>
                   true
                 case _ => false
               },
@@ -88,7 +88,7 @@ object ContractCompiler {
     }
   }
 
-  private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
+  private def compileContract(contract: Expressions.DAPP): CompileM[DApp] = {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       _  <- validateDuplicateVarsInContract(contract)
@@ -125,10 +125,10 @@ object ContractCompiler {
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
       fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
-    } yield Contract(ds, fs, v)
+    } yield DApp(ds, fs, v)
   }
 
-  private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
+  private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {
       ctx <- get[CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
@@ -151,13 +151,13 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.CONTRACT): Either[String, Contract] =
+  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] =
     compileContract(contract)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
 
-  def compile(input: String, ctx: CompilerContext): Either[String, Contract] = {
+  def compile(input: String, ctx: CompilerContext): Either[String, DApp] = {
     Parser.parseContract(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
         ContractCompiler(ctx, xs) match {

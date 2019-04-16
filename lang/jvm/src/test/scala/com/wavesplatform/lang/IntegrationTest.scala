@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -393,9 +393,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
-        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("foo"), "value" -> CONST_LONG(1))),
-        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
-        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
+        CaseObj(dataEntryType, Map("key" -> CONST_STRING("foo"), "value" -> CONST_LONG(1))),
+        CaseObj(dataEntryType, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
+        CaseObj(dataEntryType, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
       )))
   }
 
@@ -541,5 +541,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ "x42".parseIntValue() """
     eval[EVALUATED](src) shouldBe 'left
+  }
+
+  property("matching case with non-existing type") {
+    val sampleScript =
+      """|
+         | let a = if (true) then 1 else "str"
+         | match a {
+         |   case _: UndefinedType => 0
+         |   case _                => 1
+         | }
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, None) should produce("all possible types are List(Int, String)")
   }
 }

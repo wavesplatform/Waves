@@ -3,14 +3,14 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.diffs.ProduceError
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
@@ -21,7 +21,7 @@ object Common {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
-  val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+  val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
   val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 
   def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
@@ -40,26 +40,26 @@ object Common {
       case _                                                   => ??? // suppress pattern match warning
     }
 
-  val pointTypeA = CaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
-  val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
-  val pointTypeC = CaseType("PointC", List("YB" -> LONG))
-  val pointTypeD = CaseType("PointD", List("YB" -> UNION(LONG, UNIT)))
+  val pointTypeA = CASETYPEREF("PointA", List("X"  -> LONG, "YA" -> LONG))
+  val pointTypeB = CASETYPEREF("PointB", List("X"  -> LONG, "YB" -> LONG))
+  val pointTypeC = CASETYPEREF("PointC", List("YB" -> LONG))
+  val pointTypeD = CASETYPEREF("PointD", List("YB" -> UNION(LONG, UNIT)))
 
-  val AorB    = UNION(pointTypeA.typeRef, pointTypeB.typeRef)
-  val AorBorC = UNION(pointTypeA.typeRef, pointTypeB.typeRef, pointTypeC.typeRef)
-  val BorC    = UNION(pointTypeB.typeRef, pointTypeC.typeRef)
-  val CorD    = UNION(pointTypeC.typeRef, pointTypeD.typeRef)
+  val AorB    = UNION(pointTypeA, pointTypeB)
+  val AorBorC = UNION(pointTypeA, pointTypeB, pointTypeC)
+  val BorC    = UNION(pointTypeB, pointTypeC)
+  val CorD    = UNION(pointTypeC, pointTypeD)
 
-  val pointAInstance  = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
-  val pointBInstance  = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
-  val pointCInstance  = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
-  val pointDInstance1 = CaseObj(pointTypeD.typeRef, Map("YB" -> 43L))
+  val pointAInstance  = CaseObj(pointTypeA, Map("X"  -> 3L, "YA" -> 40L))
+  val pointBInstance  = CaseObj(pointTypeB, Map("X"  -> 3L, "YB" -> 41L))
+  val pointCInstance  = CaseObj(pointTypeC, Map("YB" -> 42L))
+  val pointDInstance1 = CaseObj(pointTypeD, Map("YB" -> 43L))
 
-  val pointDInstance2 = CaseObj(pointTypeD.typeRef, Map("YB" -> unit))
+  val pointDInstance2 = CaseObj(pointTypeD, Map("YB" -> unit))
 
-  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UnionType("PointAB", AorB.l),
-                                                                               UnionType("PointBC", BorC.l),
-                                                                               UnionType("PointCD", CorD.l))
+  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UNION.create(AorB.typeList, Some("PointAB")),
+                                                                               UNION.create(BorC.typeList, Some("PointBC")),
+                                                                               UNION.create(CorD.typeList, Some("PointCD")))
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
@@ -71,6 +71,7 @@ object Common {
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+    override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???

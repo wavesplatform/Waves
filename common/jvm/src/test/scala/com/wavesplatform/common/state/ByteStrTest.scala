@@ -52,5 +52,9 @@ class ByteStrTest extends Matchers with WordSpecLike {
       ByteStr(getSeqBytesArr(3)).dropRight(-100) shouldBe ByteStr(getSeqBytesArr(3))
       ByteStr(getSeqBytesArr(3)).dropRight(100) shouldBe ByteStr.empty
     }
+
+    "serialize to base64 if huge" in {
+      ByteStr(new Array(1024)).toString.startsWith("base64:") shouldBe true
+    }
   }
 }

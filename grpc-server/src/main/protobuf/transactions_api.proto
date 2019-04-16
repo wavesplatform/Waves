@@ -1,0 +1,39 @@
+syntax = "proto3";
+package com.wavesplatform.api.grpc;
+import "recipient.proto";
+import "transaction.proto";
+import "google/protobuf/empty.proto";
+
+service TransactionsApi {
+    rpc GetTransactions (TransactionsRequest) returns (stream TransactionWithHeight);
+    rpc GetTransaction (TransactionRequest) returns (TransactionWithHeight);
+    rpc GetUnconfirmedTransactions (google.protobuf.Empty) returns (stream SignedTransaction);
+    rpc GetUnconfirmedTransaction (TransactionRequest) returns (SignedTransaction);
+    rpc CalculateFee (Transaction) returns (CalculateFeeResponse);
+    rpc SignTransaction (SignRequest) returns (SignedTransaction);
+    rpc BroadcastTransaction (SignedTransaction) returns (SignedTransaction);
+}
+
+message TransactionWithHeight {
+    SignedTransaction transaction = 1;
+    int64 height = 2;
+}
+
+message TransactionsRequest {
+    Recipient recipient = 1;
+    bytes from_id = 2;
+}
+
+message TransactionRequest {
+    bytes transaction_id = 1;
+}
+
+message CalculateFeeResponse {
+    bytes asset_id = 1;
+    uint64 amount = 2;
+}
+
+message SignRequest {
+    Transaction transaction = 1;
+    bytes signer_public_key = 2;
+}
