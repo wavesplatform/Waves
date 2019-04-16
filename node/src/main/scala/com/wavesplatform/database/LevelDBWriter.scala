@@ -413,7 +413,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
       case (txId, result) =>
         val (txHeight, txNum) = transactions
-          .collectFirst { case (`txId`, (_, txNum)) => (height, txNum) }
+            .get(TransactionId(txId))
+          .map { case (_, txNum) => (height, txNum) }
           .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
@@ -532,9 +533,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
                 case _: DataTransaction => // see changed data keys removal
 
-                case tx: InvokeScriptTransaction =>
-                  rw.get(Keys.transactionHNById(TransactionId(tx.id())))
-                    .foreach { case (height, txNum) => rw.delete(Keys.invokeScriptResult(height.ensuring(_ == currentHeight), txNum)) }
+                case _: InvokeScriptTransaction =>
+                  rw.delete(Keys.invokeScriptResult(h, num))
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
