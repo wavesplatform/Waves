@@ -5,7 +5,7 @@ import java.io.File
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.MatcherSettings.{BroadcastUntilConfirmedSettings, EventsQueueSettings}
+import com.wavesplatform.matcher.MatcherSettings.{ExchangeTransactionBroadcastSettings, EventsQueueSettings}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -41,7 +41,7 @@ case class MatcherSettings(enable: Boolean,
                            eventsQueue: EventsQueueSettings,
                            disableExtraFeeForScript: Boolean,
                            allowedAssetPairs: Set[AssetPair],
-                           broadcastUntilConfirmed: BroadcastUntilConfirmedSettings)
+                           exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings)
 
 object MatcherSettings {
   implicit val addressReader: ValueReader[Address] = (cfg, path) => Address.fromString(cfg.getString(path)).explicitGet()
@@ -101,7 +101,7 @@ object MatcherSettings {
 
     val allowedAssetPairs        = config.as[Set[String]]("allowed-asset-pairs").map(getAssetPairFromString)
     val disableExtraFeeForScript = config.as[Boolean]("disable-extra-fee-for-script")
-    val broadcastUntilConfirmed  = config.as[BroadcastUntilConfirmedSettings]("broadcast-until-confirmed")
+    val broadcastUntilConfirmed  = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
     MatcherSettings(
       enabled,
@@ -132,5 +132,5 @@ object MatcherSettings {
     )
   }
 
-  case class BroadcastUntilConfirmedSettings(enable: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
+  case class ExchangeTransactionBroadcastSettings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
 }

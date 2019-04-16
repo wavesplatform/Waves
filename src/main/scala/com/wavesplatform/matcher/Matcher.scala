@@ -16,7 +16,7 @@ import com.wavesplatform.db._
 import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market.{BroadcastUntilConfirmedActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
+import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
@@ -31,7 +31,7 @@ import io.netty.channel.group.ChannelGroup
 import monix.reactive.Observable
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -78,7 +78,6 @@ class Matcher(actorSystem: ActorSystem,
     pair,
     updateOrderBookCache(pair),
     marketStatuses.put(pair, _),
-    tx => exchangeTxPool.execute(() => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx)),
     matcherSettings,
     transactionCreator.createTransaction,
     time
@@ -138,8 +137,6 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcherApiTypes: Set[Class[_]] = Set(
     classOf[MatcherApiRoute]
   )
-
-  private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
   private val snapshotsRestore = Promise[Unit]()
 
@@ -238,10 +235,17 @@ class Matcher(actorSystem: ActorSystem,
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress, matcherSettings.port), 5.seconds)
 
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
-    if (matcherSettings.broadcastUntilConfirmed.enable)
-      actorSystem.actorOf(
-        BroadcastUntilConfirmedActor
-          .props(matcherSettings.broadcastUntilConfirmed, time, blockchain.containsTransaction(_), allChannels.broadcastTx(_)))
+    actorSystem.actorOf(
+      ExchangeTransactionBroadcastActor
+        .props(
+          matcherSettings.exchangeTransactionBroadcast,
+          time,
+          tx => utx.putIfNew(tx).isRight,
+          blockchain.containsTransaction(_),
+          allChannels.broadcastTx(_)
+        ),
+      "exchange-transaction-broadcast"
+    )
 
     actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings), MatcherTransactionWriter.name)
 

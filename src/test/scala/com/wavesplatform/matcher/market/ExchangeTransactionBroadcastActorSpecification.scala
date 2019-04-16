@@ -6,7 +6,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.MatcherSettings.BroadcastUntilConfirmedSettings
+import com.wavesplatform.matcher.MatcherSettings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.settings.loadConfig
@@ -19,8 +19,8 @@ import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class BroadcastUntilConfirmedActorSpecification
-    extends MatcherSpec("BroadcastUntilConfirmedActor")
+class ExchangeTransactionBroadcastActorSpecification
+    extends MatcherSpec("ExchangeTransactionBroadcastActor")
     with MatcherTestData
     with BeforeAndAfterEach
     with PathMockFactory
@@ -34,7 +34,7 @@ class BroadcastUntilConfirmedActorSpecification
 
   private val pair = AssetPair(Some(ByteStr(Array.emptyByteArray)), None)
 
-  "BroadcastUntilConfirmedActor" should {
+  "ExchangeTransactionBroadcastActor" should {
     "broadcast a transaction when receives it" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
       defaultActor(ntpTime, isConfirmed = _ => false, broadcast = broadcasted = _)
@@ -58,8 +58,8 @@ class BroadcastUntilConfirmedActorSpecification
       broadcasted = Seq.empty
 
       // Will be re-sent on second call
-      actor ! BroadcastUntilConfirmedActor.Send
-      actor ! BroadcastUntilConfirmedActor.Send
+      actor ! ExchangeTransactionBroadcastActor.Send
+      actor ! ExchangeTransactionBroadcastActor.Send
       eventually {
         broadcasted shouldBe Seq(event.tx)
       }
@@ -75,8 +75,7 @@ class BroadcastUntilConfirmedActorSpecification
         broadcasted should not be empty
       }
 
-      actor ! BroadcastUntilConfirmedActor.Send
-      actor ! BroadcastUntilConfirmedActor.Send
+      actor ! ExchangeTransactionBroadcastActor.Send
       eventually {
         broadcasted shouldBe empty
       }
@@ -92,8 +91,7 @@ class BroadcastUntilConfirmedActorSpecification
         broadcasted should not be empty
       }
 
-      actor ! BroadcastUntilConfirmedActor.Send
-      actor ! BroadcastUntilConfirmedActor.Send
+      actor ! ExchangeTransactionBroadcastActor.Send
       eventually {
         broadcasted shouldBe empty
       }
@@ -102,14 +100,15 @@ class BroadcastUntilConfirmedActorSpecification
 
   private def defaultActor(time: Time,
                            isConfirmed: ExchangeTransaction => Boolean,
-                           broadcast: Seq[ExchangeTransaction] => Unit): TestActorRef[BroadcastUntilConfirmedActor] = TestActorRef(
-    new BroadcastUntilConfirmedActor(
-      settings = BroadcastUntilConfirmedSettings(
-        enable = true,
+                           broadcast: Seq[ExchangeTransaction] => Unit): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
+    new ExchangeTransactionBroadcastActor(
+      settings = ExchangeTransactionBroadcastSettings(
+        broadcastUntilConfirmed = true,
         interval = 1.minute,
         maxPendingTime = 5.minute
       ),
       time = time,
+      _ => true,
       isConfirmed = isConfirmed,
       broadcast = broadcast
     )

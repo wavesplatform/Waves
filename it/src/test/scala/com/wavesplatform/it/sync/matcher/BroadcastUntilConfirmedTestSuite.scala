@@ -16,8 +16,8 @@ import scala.util.Random
 class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
   private def broadcastConfig =
     ConfigFactory
-      .parseString(s"""waves.matcher.broadcast-until-confirmed {
-                                                           |  enable = yes
+      .parseString(s"""waves.matcher.exchange-transaction-broadcast {
+                                                           |  broadcast-until-confirmed = yes
                                                            |  interval = 20s
                                                            |}""".stripMargin)
       .withFallback(matcherConfig)
