@@ -534,8 +534,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
                 case tx: InvokeScriptTransaction =>
                   rw.get(Keys.transactionHNById(TransactionId(tx.id())))
-                    .map(_._2)
-                    .foreach(txNum => rw.delete(Keys.invokeScriptResult(currentHeight, txNum)))
+                    .foreach { case (height, txNum) => rw.delete(Keys.invokeScriptResult(height.ensuring(_ == currentHeight), txNum)) }
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
