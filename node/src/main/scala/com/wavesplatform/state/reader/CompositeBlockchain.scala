@@ -123,7 +123,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
-  override def invokeScriptResult(txId: BlockId): Either[ValidationError, InvokeScriptResult] = {
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = {
     diff.scriptResults
       .get(txId)
       .toRight(GenericError("InvokeScript result not found"))

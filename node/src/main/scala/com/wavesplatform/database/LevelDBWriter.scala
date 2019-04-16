@@ -412,7 +412,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
       case (txId, result) =>
-        rw.put(Keys.invokeScriptResult(txId), result)
+        val (txHeight, txNum) = transactions
+          .collectFirst { case (`txId`, (_, txNum)) => (height, txNum) }
+          .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
+          .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
+
+        rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
     }
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
@@ -528,7 +533,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                 case _: DataTransaction => // see changed data keys removal
 
                 case tx: InvokeScriptTransaction =>
-                  rw.delete(Keys.invokeScriptResult(tx.id()))
+                  rw.get(Keys.transactionHNById(TransactionId(tx.id())))
+                    .map(_._2)
+                    .foreach(txNum => rw.delete(Keys.invokeScriptResult(currentHeight, txNum)))
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
@@ -998,10 +1005,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     )
   }
 
-  override def invokeScriptResult(txId: BlockId): Either[ValidationError, InvokeScriptResult] =
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =
     for {
-      _      <- Either.cond(dbSettings.storeInvokeScriptResults, (), GenericError("InvokeScript results are disabled"))
-      result <- Try(readOnly(_.get(Keys.invokeScriptResult(txId)))).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
+      _ <- Either.cond(dbSettings.storeInvokeScriptResults, (), GenericError("InvokeScript results are disabled"))
+      result <- Try(readOnly { db =>
+        val (height, txNum) = db.get(Keys.transactionHNById(txId)).getOrElse(throw new IllegalArgumentException("No such transaction"))
+        db.get(Keys.invokeScriptResult(height, txNum))
+      }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>

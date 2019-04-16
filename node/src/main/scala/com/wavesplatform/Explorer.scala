@@ -83,6 +83,7 @@ object Explorer extends ScorexLogging {
     "address-transaction-seq-nr",
     "address-transaction-height-type-and-nums",
     "transaction-height-and-nums-by-id",
+    "invoke-script-result"
   )
 
   def main(args: Array[String]): Unit = {

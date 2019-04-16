@@ -109,5 +109,5 @@ object EmptyBlockchain extends Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
-  override def invokeScriptResult(txId: ByteStr): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 }

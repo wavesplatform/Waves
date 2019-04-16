@@ -21,7 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -383,7 +383,7 @@ case class DebugApiRoute(ws: WavesSettings,
 
     txEither match {
       case Right(tx: InvokeScriptTransaction) =>
-        val result = blockchain.invokeScriptResult(tx.id())
+        val result = blockchain.invokeScriptResult(TransactionId(tx.id()))
         complete(result)
 
       case Left(error) =>
