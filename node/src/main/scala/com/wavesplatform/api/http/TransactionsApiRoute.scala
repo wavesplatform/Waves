@@ -278,8 +278,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case lease: LeaseTransaction =>
         import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
+      case invokeScript: InvokeScriptTransaction =>
+        invokeScript.json() ++ Json.obj("invokeScriptResult" -> blockchain.invokeScriptResult(invokeScript.id()).fold(_ => JsNull, Json.toJson(_)))
+
       case t => t.json()
     }
   }
