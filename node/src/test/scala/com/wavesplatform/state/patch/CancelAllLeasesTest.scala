@@ -45,7 +45,7 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
           settings
         ) {
           case (_, newState) =>
-            newState.allActiveLeases shouldBe empty
+            newState.allActiveLeases() shouldBe empty
 //          newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
         }
     }

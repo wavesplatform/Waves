@@ -733,7 +733,7 @@ class LevelDBWriter(writableDB: DB,
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readOnly { db =>
     val txs = new ListBuffer[LeaseTransaction]()
 
     db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
@@ -745,12 +745,11 @@ class LevelDBWriter(writableDB: DB,
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
         val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        val tx = db
+        val txOption = db
           .get(Keys.transactionAt(height, txNum))
-          .collect { case lt: LeaseTransaction => lt }
-          .get
+          .collect { case lt: LeaseTransaction if predicate(lt) => lt }
 
-        txs.append(tx)
+        txs ++= txOption
       }
     }
 
