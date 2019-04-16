@@ -413,7 +413,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
       case (txId, result) =>
         val (txHeight, txNum) = transactions
-            .get(TransactionId(txId))
+          .get(TransactionId(txId))
           .map { case (_, txNum) => (height, txNum) }
           .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
