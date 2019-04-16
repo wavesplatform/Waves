@@ -656,10 +656,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def invokeScriptResult(txId: BlockId): Option[InvokeScriptResult] = readLock {
+  override def invokeScriptResult(txId: BlockId): Either[ValidationError, InvokeScriptResult] = readLock {
     ngState.fold(blockchain.invokeScriptResult(txId)) { ng =>
       ng.bestLiquidDiff.scriptResults
         .get(txId)
+        .toRight(GenericError("InvokeScript result not found"))
         .orElse(blockchain.invokeScriptResult(txId))
     }
   }
