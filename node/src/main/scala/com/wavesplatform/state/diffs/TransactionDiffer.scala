@@ -20,7 +20,7 @@ object TransactionDiffer extends ScorexLogging {
   import stats.TxTimerExt
 
   case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError {
-    override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = $tx)"
+    override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${tx.toPrettyString})"
   }
 
   def apply(settings: FunctionalitySettings,

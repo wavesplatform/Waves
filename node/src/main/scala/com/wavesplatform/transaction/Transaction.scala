@@ -14,7 +14,9 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   def assetFee: (Asset, Long)
   def timestamp: Long
 
-  override def toString: String = json.map(Json.prettyPrint).value
+  override def toString: String = json().toString
+
+  def toPrettyString: String = json.map(Json.prettyPrint).value
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()

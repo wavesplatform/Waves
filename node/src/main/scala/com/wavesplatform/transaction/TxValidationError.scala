@@ -53,16 +53,21 @@ object TxValidationError {
 
   case class TransactionNotAllowedByScript(log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
-      val logText = log
-        .map {
-          case (name, Right(v : CaseObj)) => s"$name = ${v.prettyString(1)}"
-          case (name, Right(v))           => s"$name = $v"
-          case (name, l@Left(_))          => s"$name = $l"
-        }
-        .map("\t" + _)
-        .mkString("\n", "\n", "\n")
+      val logText = if (log.isEmpty) ""
+      else {
+        val text = log
+          .map {
+            case (name, Right(v: CaseObj)) => s"$name = ${v.prettyString(1)}"
+            case (name, Right(v))          => s"$name = $v"
+            case (name, l@Left(_))         => s"$name = $l"
+          }
+          .map("\t" + _)
+          .mkString("\n", "\n", "\n")
 
-      s"TransactionNotAllowedByScript($logText)"
+        s", log = $text"
+      }
+      val target = if (isAssetScript) "Asset" else "Account"
+      s"TransactionNotAllowedByScript(type = $target$logText)"
     }
   }
 

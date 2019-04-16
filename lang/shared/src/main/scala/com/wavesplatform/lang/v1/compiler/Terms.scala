@@ -1,14 +1,10 @@
 package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 
 object Terms {
-  val decompilerContext = PureContext.build(V3).decompilerContext
-
   sealed abstract class DECLARATION
   case class LET(name: String, value: EXPR)                     extends DECLARATION
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION
