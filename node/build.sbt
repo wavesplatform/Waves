@@ -177,7 +177,7 @@ inTask(docker) {
   Seq(
     imageNames := Seq(
       ImageName(
-        namespace = Some("wavesplatform"),
+        namespace = Some("waves-node"),
         repository = "node-dev",
         tag = Some("latest")
       )),
