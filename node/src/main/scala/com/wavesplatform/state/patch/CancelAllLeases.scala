@@ -8,7 +8,7 @@ object CancelAllLeases extends ScorexLogging {
 
   def apply(s: Blockchain): Diff = {
     log.info("Collecting all active leases")
-    val leasesToCancel = s.allActiveLeases.map(_.id() -> false).toMap
+    val leasesToCancel = s.allActiveLeases().map(_.id() -> false).toMap
     leasesToCancel.foreach(id => log.info(s"Cancelling lease $id"))
     val portfolios = s.collectLposPortfolios { case (_, p) if p.lease != LeaseBalance.empty => invertLeaseInfo(p) }
     portfolios.keys.foreach(addr => log.info(s"Resetting lease balance for $addr"))

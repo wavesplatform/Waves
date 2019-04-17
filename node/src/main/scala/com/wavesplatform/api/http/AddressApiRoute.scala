@@ -5,14 +5,12 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
@@ -20,6 +18,7 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import monix.execution.Scheduler
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
@@ -32,14 +31,15 @@ case class AddressApiRoute(settings: RestAPISettings,
                            utx: UtxPool,
                            allChannels: ChannelGroup,
                            time: Time,
-                           functionalitySettings: FunctionalitySettings)
+                           functionalitySettings: FunctionalitySettings)(implicit ec: Scheduler)
     extends ApiRoute
     with WithSettings
     with BroadcastRoute {
 
   import AddressApiRoute._
 
-  val MaxAddressesPerRequest = 1000
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain, functionalitySettings)
+  val MaxAddressesPerRequest         = 1000
 
   override lazy val route =
     pathPrefix("addresses") {
@@ -335,7 +335,7 @@ case class AddressApiRoute(settings: RestAPISettings,
             Balance(
               acc.address,
               confirmations,
-              blockchain.balance(acc, blockchain.height, confirmations)
+              commonAccountApi.balance(acc, confirmations)
             )))
       .getOrElse(InvalidAddress)
   }
@@ -350,40 +350,26 @@ case class AddressApiRoute(settings: RestAPISettings,
             Balance(
               acc.address,
               0,
-              blockchain.balance(acc)
+              commonAccountApi.balance(acc, 0)
             )))
       .getOrElse(InvalidAddress)
   }
 
   private def balancesDetailsJson(account: Address): BalanceDetails = {
-    val portfolio = blockchain.wavesPortfolio(account)
-    BalanceDetails(
-      account.address,
-      portfolio.balance,
-      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, account),
-      portfolio.balance - portfolio.lease.out,
-      portfolio.effectiveBalance
-    )
+    val CommonAccountApi.BalanceDetails(regular, generating, available, effective) = commonAccountApi.balanceDetails(account)
+    BalanceDetails(account.address, regular, generating, available, effective)
   }
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val script: Option[Script] = blockchain
-      .accountScript(account)
-
-    AddressScriptInfo(
-      address = account.address,
-      script = script.map(_.bytes().base64),
-      scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
-      complexity = script.map(_.complexity).getOrElse(0),
-      extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
-    )
+    val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountApi.script(account)
+    AddressScriptInfo(account.address, script.map(_.base64), scriptText, complexity, extraFee)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, blockchain.effectiveBalance(acc, confirmations))))
+      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, commonAccountApi.effectiveBalance(acc, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
@@ -391,7 +377,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     Address
       .fromString(address)
       .map { acc =>
-        ToResponseMarshallable(blockchain.accountData(acc).data.values.toSeq.sortBy(_.key))
+        ToResponseMarshallable(commonAccountApi.dataStream(acc).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
       }
       .getOrElse(InvalidAddress)
   }
@@ -399,7 +385,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   private def accountData(address: String, key: String): ToResponseMarshallable = {
     val result = for {
       addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
-      value <- blockchain.accountData(addr, key).toRight(DataKeyNotExists)
+      value <- commonAccountApi.data(addr, key).toRight(DataKeyNotExists)
     } yield value
     ToResponseMarshallable(result)
   }

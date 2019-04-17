@@ -66,7 +66,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, settings.dbSettings.storeTransactionsByAddress)
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -244,7 +244,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                         utxStorage,
                         allChannels,
                         time,
-                        settings.blockchainSettings.functionalitySettings),
+                        settings.blockchainSettings.functionalitySettings)(apiScheduler),
         DebugApiRoute(
           settings,
           time,
@@ -264,10 +264,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot
         ),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, blockchainUpdater, time),
+        AssetsApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, utxStorage, allChannels, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, blockchainUpdater),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
+        LeaseApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
         AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, blockchainUpdater),
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)

@@ -70,8 +70,9 @@ trait Blockchain {
   def assetScript(id: IssuedAsset): Option[Script]
   def hasAssetScript(id: IssuedAsset): Boolean
 
-  def accountData(acc: Address): AccountDataInfo
+  def accountDataKeys(address: Address): Seq[String]
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
+  def accountData(acc: Address): AccountDataInfo
 
   def leaseBalance(address: Address): LeaseBalance
 
@@ -85,10 +86,12 @@ trait Blockchain {
   def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
 
   // the following methods are used exclusively by patches
-  def allActiveLeases: Set[LeaseTransaction]
+  def allActiveLeases(predicate: LeaseTransaction => Boolean = _ => true): Set[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
+
+  def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
 }

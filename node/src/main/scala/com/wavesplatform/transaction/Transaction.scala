@@ -5,6 +5,7 @@ import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.eval.Coeval
+import play.api.libs.json.Json
 
 trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
@@ -13,7 +14,9 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   def assetFee: (Asset, Long)
   def timestamp: Long
 
-  override def toString: String = json().toString()
+  override def toString: String = json().toString
+
+  def toPrettyString: String = json.map(Json.prettyPrint).value
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()

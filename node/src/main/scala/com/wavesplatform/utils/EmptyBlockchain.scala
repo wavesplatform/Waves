@@ -82,6 +82,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
+  override def accountDataKeys(acc: Address): Seq[String] = Seq.empty
+
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
@@ -94,7 +96,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
-  override def allActiveLeases: Set[LeaseTransaction] = Set.empty
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = Set.empty
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,
                                          height: Int,
@@ -106,4 +108,6 @@ object EmptyBlockchain extends Blockchain {
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 }

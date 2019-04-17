@@ -51,13 +51,13 @@ package object predef {
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 
-  def scriptWithAllFunctions(tx: DataTransaction, t: TransferTransaction): String =
-    s"""${dropLastLine(scriptWithPureFunctions(tx, t))}
-       |${dropLastLine(scriptWithWavesFunctions(tx, t))}
+  def scriptWithAllV1Functions(tx: DataTransaction, t: TransferTransaction): String =
+    s"""${dropLastLine(scriptWithV1PureFunctions(tx, t))}
+       |${dropLastLine(scriptWithV1WavesFunctions(tx, t))}
        |${dropLastLine(scriptWithCryptoFunctions)}
        |if rnd then pure && waves else crypto""".stripMargin
 
-  def scriptWithPureFunctions(tx: DataTransaction, t: TransferTransaction): String =
+  def scriptWithV1PureFunctions(tx: DataTransaction, t: TransferTransaction): String =
     s"""
        | # Pure context
        | # 1) basic(+ eq) -> mulLong, divLong, modLong, sumLong, subLong, sumString, sumByteVector
@@ -79,9 +79,9 @@ package object predef {
        |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.bytes.base58}')
        |   case _ => false
        | }
-       |   
+       |
        | let basic = longAll && sumString && sumByteVector && eqUnion
-       | 
+       |
        | # 2) ne
        | let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha" && tx.bodyBytes != base64'hahaha'
        | let neDataEntryAndGetElement = match tx {
@@ -125,7 +125,7 @@ package object predef {
        | let pure = basic && ne && gteLong && getListSize && unary && frAction && bytesOps && strOps
        | pure""".stripMargin
 
-  def scriptWithWavesFunctions(tx: DataTransaction, t: TransferTransaction): String =
+  def scriptWithV1WavesFunctions(tx: DataTransaction, t: TransferTransaction): String =
     s""" # Waves context
        | let txById = match tx {
        |     case _: DataTransaction => true

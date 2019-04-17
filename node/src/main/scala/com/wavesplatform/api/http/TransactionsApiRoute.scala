@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
@@ -262,11 +263,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route =
     (pathPrefix("broadcast") & post) {
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
-        val result: Either[ApiError, VanillaTransaction] = TransactionFactory
-          .fromSignedRequest(transactionJson)
-          .flatMap(commonApi.broadcastTransaction)
-          .left
-          .map(ApiError.fromValidationError)
+        val result: TracedResult[ApiError, VanillaTransaction] =
+          TracedResult(TransactionFactory.fromSignedRequest(transactionJson))
+            .flatMap(commonApi.broadcastTransaction)
+            .leftMap(ApiError.fromValidationError)
 
         complete(result)
       }
@@ -278,8 +278,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case lease: LeaseTransaction =>
         import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
       case t => t.json()
     }
   }

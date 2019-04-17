@@ -27,7 +27,7 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
     codeOf(msg).filterNot(settings.ignoreTxMessages).foreach { code =>
-      log.trace(s"${id(ctx)} <-- transmitted($code): $msg")
+      log.trace(s"${id(ctx)} <-- transmitted($code): ${stringify(msg)}")
     }
 
     super.write(ctx, msg, promise)
@@ -41,6 +41,11 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
     super.channelRead(ctx, msg)
   }
 
+  private def stringify(msg: Any) = msg match {
+    case tx: Transaction => tx.id().toString
+    case b: Block        => b.uniqueId.toString
+    case other           => other.toString
+  }
 }
 
 object TrafficLogger {
