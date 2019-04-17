@@ -302,8 +302,7 @@ class MatcherActorSpecification
           matcherSettings,
           doNothingOnRecovery,
           ob,
-          (assetPair, matcher) =>
-            OrderBookActor.props(matcher, TestProbe().ref, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
+          (assetPair, matcher) => OrderBookActor.props(matcher, TestProbe().ref, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
           blockchain.assetDescription
         )
       ))

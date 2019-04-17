@@ -40,8 +40,8 @@ object Address extends ScorexLogging {
   def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
     (for {
       _ <- Either.cond(addressBytes.length == Address.AddressLength,
-        (),
-        s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
+                       (),
+                       s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
 
       version = addressBytes.head
       network = addressBytes.tail.head

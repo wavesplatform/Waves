@@ -23,7 +23,6 @@ class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
-                     broadcastTx: ExchangeTransaction => Unit,
                      createTransaction: CreateTransaction,
                      time: Time)
     extends PersistentActor
@@ -91,9 +90,7 @@ class OrderBookActor(owner: ActorRef,
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
           lastTrade = Some(LastTrade(counter.price, x.executedAmount, x.submitted.order.orderType))
           createTransaction(submitted, counter, timestamp) match {
-            case Right(tx) =>
-              broadcastTx(tx)
-              context.system.eventStream.publish(ExchangeTransactionCreated(tx))
+            case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
                           |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
@@ -157,11 +154,10 @@ object OrderBookActor {
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
-            broadcastTx: ExchangeTransaction => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, broadcastTx, createTransaction, time))
+    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

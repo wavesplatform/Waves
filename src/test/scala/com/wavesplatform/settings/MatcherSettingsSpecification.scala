@@ -2,7 +2,7 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
+import com.wavesplatform.matcher.MatcherSettings.{ExchangeTransactionBroadcastSettings, EventsQueueSettings}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import org.scalatest.{FlatSpec, Matchers}
@@ -61,6 +61,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |        producer.buffer-size = 200
         |      }
         |    }
+        |    exchange-transaction-broadcast {
+        |      broadcast-until-confirmed = yes
+        |      interval = 1 day
+        |      max-pending-time = 30 days
+        |    }
         |  }
         |}""".stripMargin))
 
@@ -95,6 +100,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
         KafkaMatcherQueue.ProducerSettings(200)
       )
+    )
+    settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
+      broadcastUntilConfirmed = true,
+      interval = 1.day,
+      maxPendingTime = 30.days
     )
   }
 }
