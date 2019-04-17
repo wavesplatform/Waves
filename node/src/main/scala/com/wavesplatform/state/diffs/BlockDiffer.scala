@@ -125,8 +125,8 @@ object BlockDiffer extends ScorexLogging {
                                                     txs: Seq[Transaction],
                                                     currentBlockHeight: Int,
                                                     verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
-    def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction): Constraint =
-      constraint.put(blockchain, tx).asInstanceOf[Constraint]
+    def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
+      constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
 
     val txDiffer       = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
@@ -158,23 +158,26 @@ object BlockDiffer extends ScorexLogging {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint)), _), tx) =>
           val updatedBlockchain = composite(blockchain, currDiff)
-          val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
-          if (updatedConstraint.isOverfilled)
-            TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
-          else
-            txDiffer(updatedBlockchain, tx).map { newDiff =>
+          txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
+            val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
+            if (updatedConstraint.isOverfilled)
+              TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
+            else {
               val updatedDiff = currDiff.combine(newDiff)
 
               val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
               val totalWavesFee                = currTotalFee + curBlockFees.balance + nextBlockFee
 
-              if (hasNg) {
-                val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
-                Result(diff, carryFee + nextBlockFee, totalWavesFee, updatedConstraint)
-              } else {
-                Result(updatedDiff, 0L, totalWavesFee, updatedConstraint)
-              }
+              Right(
+                if (hasNg) {
+                  val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
+                  Result(diff, carryFee + nextBlockFee, totalWavesFee, updatedConstraint)
+                } else {
+                  Result(updatedDiff, 0L, totalWavesFee, updatedConstraint)
+                }
+              )
             }
+          }
       }
       .map {
         case Result(diff, carry, totalFee, constraint) =>
