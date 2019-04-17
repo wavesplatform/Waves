@@ -26,14 +26,14 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Paged, ScorexLogging}
+import com.wavesplatform.utils.{CloseableIterator, Paged, ScorexLogging}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
-import scala.util.Try
+import scala.util.{Success, Try}
 
 object LevelDBWriter {
 
@@ -77,6 +77,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
+
+  private def readStream[A](f: ReadOnlyDB => Iterator[A]): CloseableIterator[A] = writableDB.readOnlyStream(f)
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
@@ -1011,6 +1013,27 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         db.get(Keys.invokeScriptResult(height, txNum))
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
+
+  override def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[Transaction] = readStream { db =>
+    db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix)
+      .transform(_.flatMap { kv =>
+        val heightNumBytes = kv.getValue
+
+        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+
+        db.get(Keys.transactionBytesAt(height, txNum))
+          .flatMap { txBytes =>
+            if (ofTypes.isEmpty)
+              TransactionParsers.parseBytes(txBytes).toOption
+            else {
+              ofTypes.iterator
+                .map(_.parseBytes(txBytes))
+                .collectFirst { case Success(tx) => tx }
+            }
+          }
+      })
+  }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

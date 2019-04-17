@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
@@ -663,6 +663,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
         .toRight(GenericError("InvokeScript result not found"))
         .orElse(blockchain.invokeScriptResult(txId))
     }
+  }
+
+  override def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[Transaction] = {
+    blockchain.transactionsIterator(ofTypes)
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {

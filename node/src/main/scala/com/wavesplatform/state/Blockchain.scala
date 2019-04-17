@@ -9,7 +9,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.utils.CloseableIterator
+import monix.reactive.Observable
 
 trait Blockchain {
   def height: Int
@@ -94,4 +96,9 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
+
+  def transactionsIterator(ofTypes: Seq[TransactionParser] = Nil): CloseableIterator[Transaction]
+
+  def transactionsIterator(ofTypes1: TransactionParser, ofTypes2: TransactionParser*): CloseableIterator[Transaction] =
+    this.transactionsIterator(Vector(ofTypes1) ++ ofTypes2)
 }

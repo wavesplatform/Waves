@@ -14,7 +14,8 @@ import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.utils.CloseableIterator
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
 
@@ -128,6 +129,10 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       .get(txId)
       .toRight(GenericError("InvokeScript result not found"))
       .orElse(inner.invokeScriptResult(txId))
+  }
+
+  override def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[Transaction] = {
+    inner.transactionsIterator(ofTypes)
   }
 
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
