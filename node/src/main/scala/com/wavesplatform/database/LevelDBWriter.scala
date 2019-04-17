@@ -1018,7 +1018,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
-  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean, idPredicate: TransactionId => Boolean): CloseableIterator[(Height, Transaction)] = readStream { db =>
+  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = readStream { db =>
     val baseIterator: CloseableIterator[(Height, TxNum)] =
       if (reverse) {
         for {
