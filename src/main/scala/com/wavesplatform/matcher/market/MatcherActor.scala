@@ -80,24 +80,13 @@ class MatcherActor(settings: MatcherSettings,
   /**
     * @param f (sender, orderBook)
     */
-  private def runFor(eventWithMeta: QueueEventWithMeta, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
-    import eventWithMeta.event.assetPair
-    import eventWithMeta.offset
-
+  private def runFor(assetPair: AssetPair, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
     val s = sender()
     if (shutdownStatus.initiated) s ! DuringShutdown
     else
       orderBook(assetPair) match {
-        case Some(Right(ob)) =>
-          f(s, ob)
-          snapshotsState.requiredSnapshot(offset).foreach {
-            case (assetPair, updatedSnapshotState) =>
-              log.info(
-                s"OrderBook $assetPair should do snapshot, the current offset is $offset. Next snapshot: ${updatedSnapshotState.nearestSnapshotOffset}")
-              orderBooks.get.get(assetPair).flatMap(_.toOption).foreach(_ ! SaveSnapshot(offset))
-              snapshotsState = updatedSnapshotState
-          }
-        case Some(Left(_)) => s ! OrderBookUnavailable
+        case Some(Right(ob)) => f(s, ob)
+        case Some(Left(_))   => s ! OrderBookUnavailable
         case None =>
           if (autoCreate) {
             val ob = createOrderBook(assetPair)
@@ -110,6 +99,25 @@ class MatcherActor(settings: MatcherSettings,
       }
   }
 
+  private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit = {
+    snapshotsState.requiredSnapshot(offset).foreach {
+      case (assetPair, updatedSnapshotState) =>
+        orderBooks.get.get(assetPair) match {
+          case Some(Right(actorRef)) =>
+            log.info(
+              s"The $assetPair order book should do a snapshot, the current offset is $offset. The next snapshot: ${updatedSnapshotState.nearestSnapshotOffset}")
+            actorRef ! SaveSnapshot(offset)
+
+          case Some(Left(_)) =>
+            log.warn(s"Can't create a snapshot for $assetPair: the order book is down, ignoring it in the snapshot's rotation.")
+
+          case None =>
+            log.warn(s"Can't create a snapshot for $assetPair: the order book has't yet started or was removed.")
+        }
+        snapshotsState = updatedSnapshotState
+    }
+  }
+
   private def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
@@ -119,7 +127,7 @@ class MatcherActor(settings: MatcherSettings,
       request.event match {
         case QueueEvent.OrderBookDeleted(assetPair) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
-          runFor(request, autoCreate = false) { (sender, ref) =>
+          runFor(request.event.assetPair, autoCreate = false) { (sender, ref) =>
             ref.tell(request, sender)
             orderBooks.getAndUpdate(_.filterNot { x =>
               x._2.right.exists(_ == ref)
@@ -128,9 +136,13 @@ class MatcherActor(settings: MatcherSettings,
             tradedPairs -= assetPair
           }
 
-        case _ => runFor(request)((sender, orderBook) => orderBook.tell(request, sender))
+        case _ => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
+      createSnapshotFor(lastProcessedNr)
+
+    case request: ForceStartOrderBook =>
+      runFor(request.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
 
     case Shutdown =>
       shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = () => context.stop(self))
@@ -312,7 +324,8 @@ object MatcherActor {
 
   case class Snapshot(tradedPairsSet: Set[AssetPair])
 
-  case class OrderBookCreated(pair: AssetPair)
+  case class ForceStartOrderBook(assetPair: AssetPair)
+  case class OrderBookCreated(assetPair: AssetPair)
 
   case object GetMarkets
 

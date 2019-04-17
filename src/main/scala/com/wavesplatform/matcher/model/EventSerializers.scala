@@ -62,7 +62,7 @@ object EventSerializers {
   private def parse[A: Reads](bytes: Array[Byte]): A = Json.parse(bytes).as[A]
 
   private def mkOrderBookCreated(a1: String, a2: String) = OrderBookCreated(AssetPair.createAssetPair(a1, a2).get)
-  private def orderBookToPair(obc: OrderBookCreated)     = (obc.pair.amountAssetStr, obc.pair.priceAssetStr)
+  private def orderBookToPair(obc: OrderBookCreated)     = (obc.assetPair.amountAssetStr, obc.assetPair.priceAssetStr)
 
   implicit val orderBookCreatedFormat: Format[OrderBookCreated] = ((__ \ "a1").format[String] and
     (__ \ "a2").format[String])(mkOrderBookCreated, orderBookToPair)

@@ -11,7 +11,7 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData, SaveSnapshot}
+import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
 import com.wavesplatform.matcher.market.OrderBookActor.OrderBookSnapshotUpdated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator
@@ -240,6 +240,27 @@ class MatcherActorSpecification
         probe.expectNoMessage(200.millis)
       }
     }
+
+    "creates an order book by force request" in {
+      val pair    = AssetPair(randomAssetId, randomAssetId)
+      val ob      = emptyOrderBookRefs
+      var stopped = false
+
+      provideSnapshot(pair)
+      val actor = system.actorOf(
+        Props(
+          new MatcherActor(
+            matcherSettings,
+            startResult => stopped = startResult.isLeft,
+            ob,
+            (assetPair, matcherActorRef) => Props(new RecoveringActor(matcherActorRef, assetPair)),
+            blockchain.assetDescription
+          )
+        )
+      )
+      actor ! MatcherActor.ForceStartOrderBook(pair)
+      expectMsg(MatcherActor.OrderBookCreated(pair))
+    }
   }
 
   private def sendBuyOrders(actor: ActorRef, assetPair: AssetPair, indexes: Range): Unit = {
@@ -331,8 +352,12 @@ class MatcherActorSpecification
 
 object MatcherActorSpecification {
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
-  private class RecoveringActor(owner: ActorRef, assetPair: AssetPair) extends NothingDoActor {
+  private class RecoveringActor(owner: ActorRef, assetPair: AssetPair) extends Actor {
     owner ! OrderBookSnapshotUpdated(assetPair, 0)
+    override def receive: Receive = {
+      case ForceStartOrderBook(p) if p == assetPair => sender() ! MatcherActor.OrderBookCreated(assetPair)
+      case _                                        =>
+    }
   }
   private class FailAtStartActor extends Actor {
     throw new RuntimeException("I don't want to work today")
