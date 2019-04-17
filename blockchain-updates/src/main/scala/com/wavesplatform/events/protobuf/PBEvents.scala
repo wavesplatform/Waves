@@ -1,20 +1,21 @@
-package com.wavesplatform.protobuf.events
+package com.wavesplatform.events.protobuf
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
-import com.wavesplatform.protobuf.events.StateUpdated.{BalanceUpdated => PBBalanceUpdated, LeasingUpdated => PBLeasingUpdated}
+import com.wavesplatform.events.protobuf.StateUpdated.ReasonType.{BLOCK, MICROBLOCK, TRANSACTION}
+import com.wavesplatform.events.protobuf.StateUpdated.{BalanceUpdated => PBBalanceUpdated, LeasingUpdated => PBLeasingUpdated}
 import com.wavesplatform.state.{BlockAdded, MicroBlockAdded, RollbackCompleted}
 
 object PBEvents {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   // @todo deserialization to vanilla
 
   private def protobufStateUpdated(reason: (Short, ByteStr), su: VanillaStateUpdated): PBStateUpdated = {
     val reasonType = reason._1 match {
-      case 0 => PBStateUpdated.ReasonType.BLOCK
-      case 1 => PBStateUpdated.ReasonType.TRANSACTION
-      case 2 => PBStateUpdated.ReasonType.MICROBLOCK
+      case 0 => BLOCK
+      case 1 => TRANSACTION
+      case 2 => MICROBLOCK
     }
     PBStateUpdated(
       reasonType = reasonType,

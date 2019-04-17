@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   def vanilla(order: PBOrder, version: Int = 0): VanillaOrder = {
     VanillaOrder(

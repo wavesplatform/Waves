@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   private[this] val NoChainId: Byte = 0: Byte
 

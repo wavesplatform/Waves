@@ -7,7 +7,7 @@ import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Asset
 
-private[protobuf] object PBInternalImplicits {
+object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
   import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias}
 

@@ -1,6 +1,6 @@
 // State update notifications
 syntax = "proto3";
-option java_package = "com.wavesplatform.protobuf.events";
+package com.wavesplatform.events.protobuf;
 
 import "block.proto";
 import "transaction.proto";
