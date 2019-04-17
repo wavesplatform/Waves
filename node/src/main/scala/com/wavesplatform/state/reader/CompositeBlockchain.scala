@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -121,6 +121,13 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     }
 
     inner.collectLposPortfolios(pf) ++ b.result()
+  }
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = {
+    diff.scriptResults
+      .get(txId)
+      .toRight(GenericError("InvokeScript result not found"))
+      .orElse(inner.invokeScriptResult(txId))
   }
 
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)

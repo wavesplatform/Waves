@@ -102,7 +102,7 @@ case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, 
         case Right(asset) =>
           Task
             .eval(blockchain.assetDistribution(asset))
-            .map(dst => Json.toJson(dst): ToResponseMarshallable)
+            .map(dst => Json.toJson(dst)(com.wavesplatform.state.dstWrites): ToResponseMarshallable)
       }
 
       complete {
