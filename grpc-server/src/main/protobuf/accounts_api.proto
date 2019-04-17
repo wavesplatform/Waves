@@ -22,9 +22,7 @@ message DataRequest {
 
 message BalancesRequest {
     bytes address = 1;
-    bool include_waves = 2;
-    bool include_all_assets = 3;
-    repeated bytes assets = 4;
+    repeated AssetId assets = 4;
 }
 
 message BalanceResponse {
