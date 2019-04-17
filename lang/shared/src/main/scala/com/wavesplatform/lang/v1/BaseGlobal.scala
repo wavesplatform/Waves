@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{ContentType, Expression, StdLibVersion, DApp => DAppType}
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
