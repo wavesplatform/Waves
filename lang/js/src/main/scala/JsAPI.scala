@@ -192,4 +192,20 @@ object JsAPI {
       identity
     )
   }
+
+  @JSExportTopLevel("estimate")
+  def estimate(input: String): js.Dynamic = {
+    val result = DirectiveParser(input)
+      .flatMap(extractDirectives)
+      .map {
+        case DirectiveSet(ver, scriptType, contentType) =>
+          Global.estimate(
+            ver,
+            contentType,
+            buildScriptContext(ver, scriptType == Asset, contentType == DAppType).compilerContext,
+            input
+          ).fold("error"  -> _, "complexity" -> _)
+      }
+    js.Dynamic.literal(result)
+  }
 }

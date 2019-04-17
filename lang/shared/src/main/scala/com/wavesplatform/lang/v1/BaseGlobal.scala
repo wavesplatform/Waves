@@ -2,8 +2,10 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.directives.values.{ContentType, Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 
@@ -73,4 +75,24 @@ trait BaseGlobal {
         scriptText
     }
   }
+
+  def estimate(
+    version:     StdLibVersion,
+    contentType: ContentType,
+    ctx:         CompilerContext,
+    input:       String
+  ): Either[String, Long] = contentType match {
+      case Expression =>
+        val vars  = utils.varNames(version, contentType)
+        val costs = utils.functionCosts(version)
+        for {
+          expr       <- ExpressionCompiler.compile(input, ctx)
+          complexity <- ScriptEstimator(vars, costs, expr)
+        } yield complexity
+      case DAppType =>
+        for {
+          dapp       <- ContractCompiler.compile(input, ctx)
+          complexity <- ContractScript.estimateComplexity(version, dapp)
+        } yield complexity._2
+    }
 }
