@@ -29,18 +29,21 @@ object ExchangeTransactionDiff {
 
     for {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
+      assetScripted = assets.count(_.flatMap(_.script).isDefined)
       _ <- Either.cond(
-        smartAssetsEnabled || !assets.exists(_.flatMap(_.script).isDefined),
+        smartAssetsEnabled || assetScripted != 0,
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
+      buyerScripted = blockchain.hasScript(buyer)
       _ <- Either.cond(
-        smartTradesEnabled || !blockchain.hasScript(buyer),
+        smartTradesEnabled || !buyerScripted,
         (),
         GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
+      sellerScripted = blockchain.hasScript(seller)
       _ <- Either.cond(
-        smartTradesEnabled || !blockchain.hasScript(seller),
+        smartTradesEnabled || !sellerScripted,
         (),
         GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
@@ -49,6 +52,7 @@ object ExchangeTransactionDiff {
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
+      scripts = assetScripted + Seq(buyerScripted, sellerScripted, blockchain.hasScript(tx.sender)).count(x => x)
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
@@ -86,7 +90,8 @@ object ExchangeTransactionDiff {
         orderFills = Map(
           tx.buyOrder.id()  -> VolumeAndFee(tx.amount, tx.buyMatcherFee),
           tx.sellOrder.id() -> VolumeAndFee(tx.amount, tx.sellMatcherFee)
-        )
+        ),
+        scriptsRun = scripts
       )
     }
   }
