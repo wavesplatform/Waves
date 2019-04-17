@@ -2,7 +2,7 @@ package com.wavesplatform.api.grpc
 
 import com.wavesplatform.api.http.ApiError.ApiErrorException
 import com.wavesplatform.api.http.{ApiError, TransactionNotExists, WalletAddressNotExists, WalletAlreadyExists, WalletLocked, WalletNotExist}
-import com.wavesplatform.transaction.ValidationError.ValidationErrorException
+import com.wavesplatform.lang.ValidationError.ValidationErrorException
 import io.grpc.Metadata.AsciiMarshaller
 import io.grpc.{Metadata, Status, StatusException}
 

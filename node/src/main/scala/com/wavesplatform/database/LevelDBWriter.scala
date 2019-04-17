@@ -14,7 +14,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -71,17 +71,11 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB,
-                    spendableBalanceChanged: Observer[(Address, Asset)],
-                    fs: FunctionalitySettings,
-                    val maxCacheSize: Int,
-                    val maxRollbackDepth: Int,
-                    val rememberBlocksInterval: Long,
-                    val storeTransactionsByAddress: Boolean)
+class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
-  private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
+  private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -127,8 +121,8 @@ class LevelDBWriter(writableDB: DB,
 
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
     AccountDataInfo((for {
-      key     <- accountDataKeys(address)
-      value   <- accountData(address, key)
+      key   <- accountDataKeys(address)
+      value <- accountData(address, key)
     } yield key -> value).toMap)
   }
 
@@ -214,6 +208,7 @@ class LevelDBWriter(writableDB: DB,
     c2.drop(1).map(kf(_).keyBytes)
   }
 
+  //noinspection ScalaStyle
   override protected def doAppend(block: Block,
                                   carry: Long,
                                   newAddresses: Map[Address, BigInt],
@@ -229,15 +224,16 @@ class LevelDBWriter(writableDB: DB,
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
                                   sponsorship: Map[IssuedAsset, Sponsorship],
-                                  totalFee: Long): Unit = readWrite { rw =>
+                                  totalFee: Long,
+                                  scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
 
     val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
 
-    if (previousSafeRollbackHeight < (height - maxRollbackDepth)) {
-      rw.put(Keys.safeRollbackHeight, height - maxRollbackDepth)
+    if (previousSafeRollbackHeight < (height - dbSettings.maxRollbackDepth)) {
+      rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
     }
 
     val transactions: Map[TransactionId, (Transaction, TxNum)] =
@@ -263,7 +259,7 @@ class LevelDBWriter(writableDB: DB,
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
-    val threshold        = height - maxRollbackDepth
+    val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
@@ -365,7 +361,7 @@ class LevelDBWriter(writableDB: DB,
       }
     }
 
-    if (storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
+    if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
       val kk        = Keys.addressTransactionSeqNr(addressId)
       val nextSeqNr = rw.get(kk) + 1
       val txTypeNumSeq = txIds.map { txId =>
@@ -413,6 +409,17 @@ class LevelDBWriter(writableDB: DB,
     expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
     rw.put(Keys.blockTransactionsFee(height), totalFee)
+
+    if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
+      case (txId, result) =>
+        val (txHeight, txNum) = transactions
+          .get(TransactionId(txId))
+          .map { case (_, txNum) => (height, txNum) }
+          .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
+          .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
+
+        rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+    }
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
@@ -473,7 +480,7 @@ class LevelDBWriter(writableDB: DB,
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
             discardLeaseBalance(address)
 
-            if (storeTransactionsByAddress) {
+            if (dbSettings.storeTransactionsByAddress) {
               val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
               val txSeqNr  = rw.get(kTxSeqNr)
               val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
@@ -524,7 +531,10 @@ class LevelDBWriter(writableDB: DB,
                   rw.delete(Keys.assetScript(asset)(currentHeight))
                   rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
 
-                case _: DataTransaction | _: InvokeScriptTransaction => // see changed data keys removal
+                case _: DataTransaction => // see changed data keys removal
+
+                case _: InvokeScriptTransaction =>
+                  rw.delete(Keys.invokeScriptResult(h, num))
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
@@ -610,7 +620,7 @@ class LevelDBWriter(writableDB: DB,
   }
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    if (!storeTransactionsByAddress)
+    if (!dbSettings.storeTransactionsByAddress)
       Left("Transactions by address are disabled, please enable it and rebuild the state")
     else
       readOnly { db =>
@@ -733,7 +743,7 @@ class LevelDBWriter(writableDB: DB,
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readOnly { db =>
     val txs = new ListBuffer[LeaseTransaction]()
 
     db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
@@ -745,12 +755,11 @@ class LevelDBWriter(writableDB: DB,
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
         val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        val tx = db
+        val txOption = db
           .get(Keys.transactionAt(height, txNum))
-          .collect { case lt: LeaseTransaction => lt }
-          .get
+          .collect { case lt: LeaseTransaction if predicate(lt) => lt }
 
-        txs.append(tx)
+        txs ++= txOption
       }
     }
 
@@ -993,6 +1002,15 @@ class LevelDBWriter(writableDB: DB,
       GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
     )
   }
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =
+    for {
+      _ <- Either.cond(dbSettings.storeInvokeScriptResults, (), GenericError("InvokeScript results are disabled"))
+      result <- Try(readOnly { db =>
+        val (height, txNum) = db.get(Keys.transactionHNById(txId)).getOrElse(throw new IllegalArgumentException("No such transaction"))
+        db.get(Keys.invokeScriptResult(height, txNum))
+      }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
+    } yield result
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

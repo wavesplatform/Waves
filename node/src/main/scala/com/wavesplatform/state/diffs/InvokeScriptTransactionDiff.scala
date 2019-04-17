@@ -152,18 +152,18 @@ object InvokeScriptTransactionDiff {
   }
 
   private def payableAndDataPart(height: Int, tx: InvokeScriptTransaction, ds: List[DataItem[_]], feePart: Map[Address, Portfolio]) = {
-    val r: Seq[DataEntry[_]] = ds.map {
+    val dataEntries: Seq[DataEntry[_]] = ds.map {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
       case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
-    if (r.length > ContractLimits.MaxWriteSetSize) {
+    if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
       Left(GenericError(s"WriteSec can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
-    } else if (r.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
+    } else if (dataEntries.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
       Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
     } else {
-      val totalDataBytes = r.map(_.toBytes.size).sum
+      val totalDataBytes = dataEntries.map(_.toBytes.length).sum
 
       val payablePart: Map[Address, Portfolio] = tx.payment
         .map {
@@ -179,15 +179,29 @@ object InvokeScriptTransactionDiff {
             }
         }
         .foldLeft(Map[Address, Portfolio]())(_ combine _)
-      if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
+
+      if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
+        val recordedData = InvokeScriptResult(
+          dataEntries,
+          payablePart.toVector.flatMap {
+            case (addr, portfolio) =>
+              val waves  = InvokeScriptResult.Payment(addr, Waves, portfolio.balance)
+              val assets = portfolio.assets.map { case (assetId, amount) => InvokeScriptResult.Payment(addr, assetId, amount) }
+              (assets ++ Some(waves)).filter(_.amount != 0)
+          }
+        )
+
         Right(
           Diff(
             height = height,
             tx = tx,
             portfolios = feePart combine payablePart,
-            accountData = Map(tx.dappAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-          ))
-      else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
+            accountData = Map(tx.dappAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap)),
+            scriptResults = Map(tx.id()      -> recordedData)
+          )
+        )
+      } else
+        Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
     }
   }
 
