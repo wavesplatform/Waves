@@ -3,16 +3,17 @@ syntax = "proto3";
 option java_package = "com.wavesplatform.protobuf.transaction";
 import "script.proto";
 import "recipient.proto";
+import "google/protobuf/empty.proto";
 
 message AssetId {
-    oneof id {
-        bytes waves = 1;
-        bytes issued_asset_id = 2;
+    oneof asset {
+        google.protobuf.Empty waves = 1;
+        bytes issued_asset = 2;
     }
 }
 
 message AssetAmount {
-    bytes asset_id = 1; // never empty!
+    bytes asset_id = 1; // Shouldn't be empty
     int64 amount = 2;
 }
 

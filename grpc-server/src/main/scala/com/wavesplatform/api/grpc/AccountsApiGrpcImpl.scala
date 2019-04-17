@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.{AssetAmount, PBTransactions}
+import com.wavesplatform.protobuf.transaction.{AssetAmount, AssetId, PBTransactions}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -16,7 +16,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
   private[this] val commonApi = new CommonAccountApi(blockchain, functionalitySettings)
 
   override def getBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = {
-    val wavesOption = if (request.includeWaves) {
+    val wavesOption = if (request.assets.exists(_.asset.isWaves)) {
       val details = commonApi.balanceDetails(request.address.toAddress)
       Some(
         BalanceResponse.WavesBalances(details.regular, details.generating, details.available, details.effective, details.leaseIn, details.leaseOut))
@@ -24,7 +24,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
       None
     }
 
-    val assetIdSet = request.assets.map(_.toByteStr).toSet
+    val assetIdSet = request.assets.collect { case AssetId(AssetId.Asset.IssuedAsset(assetId)) => assetId }
     val assets =
       if (assetIdSet.isEmpty)
         Observable.empty
@@ -32,7 +32,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
         Observable
           .defer(Observable.fromIterable(commonApi.portfolio(request.address.toAddress)))
           .collect {
-            case (IssuedAsset(assetId), balance) if request.includeAllAssets || assetIdSet.contains(assetId) =>
+            case (IssuedAsset(assetId), balance) if request.assets.isEmpty || assetIdSet.contains(assetId.toPBByteString) =>
               AssetAmount(assetId, balance)
           }
 
@@ -49,13 +49,13 @@ class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: Functio
     ScriptData(desc.script.getOrElse(ByteStr.empty).toPBByteString, desc.scriptText.getOrElse(""), desc.complexity)
   }
 
-  override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionWithHeight]): Unit = {
+  override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val transactions = Observable.defer(commonApi.activeLeases(request.address.toAddress) match {
       case Right(txs)  => Observable.fromIterable(txs)
       case Left(error) => Observable.raiseError(new IllegalArgumentException(error))
     })
 
-    val result = transactions.map { case (height, transaction) => TransactionWithHeight(Some(transaction.toPB), height) }
+    val result = transactions.map { case (height, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB)) }
     responseObserver.completeWith(result)
   }
 
