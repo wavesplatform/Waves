@@ -36,7 +36,7 @@ object Terms {
         def text(v: EVALUATED) = {
           v match {
             case co: CaseObj => co.prettyString(depth + 1)
-            case a           => a.toString
+            case a           => val str = a.toString; if (str.isEmpty) "<empty>" else str
           }
         }
         val parenthesisIndent = "\t" * depth

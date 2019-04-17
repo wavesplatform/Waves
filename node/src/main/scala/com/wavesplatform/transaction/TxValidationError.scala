@@ -49,27 +49,32 @@ object TxValidationError {
     def isAssetScript: Boolean
   }
 
-  case class ScriptExecutionError(error: String, log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType
+  case class ScriptExecutionError(error: String, log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType {
+    override def toString: String = {
+      val target = if (isAssetScript) "Asset" else "Account"
+      s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+    }
+  }
 
   case class TransactionNotAllowedByScript(log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
-      val logText = if (log.isEmpty) ""
-      else {
-        val text = log
-          .map {
-            case (name, Right(v: CaseObj)) => s"$name = ${v.prettyString(1)}"
-            case (name, Right(v))          => s"$name = $v"
-            case (name, l@Left(_))         => s"$name = $l"
-          }
-          .map("\t" + _)
-          .mkString("\n", "\n", "\n")
-
-        s", log = $text"
-      }
       val target = if (isAssetScript) "Asset" else "Account"
-      s"TransactionNotAllowedByScript(type = $target$logText)"
+      s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
     }
   }
+
+  def logToString(log: Log): String =
+    if (log.isEmpty) ""
+    else {
+      log
+        .map {
+          case (name, Right(v: CaseObj)) => s"$name = ${v.prettyString(1)}"
+          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
+          case (name, l@Left(_))         => s"$name = $l"
+        }
+        .map("\t" + _)
+        .mkString("\n", "\n", "\n")
+    }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
