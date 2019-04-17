@@ -55,11 +55,11 @@ case class InvokeScriptTrace(
     )
 
   private def toJson(v: ScriptResult) = Json.obj(
-    "dataItems" -> v.ds.map(item => Json.obj(
+    "data" -> v.ds.map(item => Json.obj(
       "key"   -> item.key,
       "value" -> item.value.toString
     )),
-    "transaction" -> v.ts.map { case (address, amount, assetId) => Json.obj(
+    "transfers" -> v.ts.map { case (address, amount, assetId) => Json.obj(
       "address" -> address.bytes.toString,
       "amount"  -> amount,
       "asset"   -> (assetId match {

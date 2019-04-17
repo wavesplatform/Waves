@@ -69,11 +69,11 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    "function" : "func",
         |    "args" : [ "param", "1" ],
         |    "result" : {
-        |      "dataItems" : [ {
+        |      "data" : [ {
         |        "key" : "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
         |        "value" : "700000000"
         |      } ],
-        |      "transaction" : [ {
+        |      "transfers" : [ {
         |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
         |        "amount" : 1,
         |        "asset" : "Waves"
