@@ -50,7 +50,7 @@ case class InvokeScriptTrace(
       "function"    -> function.function.funcName,
       "args"        -> function.args.map(_.toString),
       resultE match {
-        case Right(value) => "result" -> value.toString
+        case Right(value) => "result" -> toJson(value)
         case Left(e)      => "error"  -> TraceStep.errorJson(e)
       }
     )
@@ -82,9 +82,9 @@ object TraceStep {
     "type" -> (if (isAssetScript) "Asset" else "Account")
 
   private def logJson(l: Log): (String, JsValueWrapper) =
-    "vars" -> Json.arr(l.map {
+    "vars" -> l.map {
       case (k, Right(v))  => Json.obj("name" -> k, "value" -> v.toString)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)
-    })
+    }
 }
 
