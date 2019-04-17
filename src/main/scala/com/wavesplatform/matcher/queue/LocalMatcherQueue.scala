@@ -17,7 +17,11 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(
 
   private var lastUnreadOffset: QueueEventWithMeta.Offset = 0
   private val timer                                       = new Timer("local-dex-queue", true)
-  private val producer: Producer                          = if (settings.enableStoring) new LocalProducer(store, time) else IgnoreProducer
+  private val producer: Producer = {
+    val r = if (settings.enableStoring) new LocalProducer(store, time) else IgnoreProducer
+    log.info(s"Choosing ${r.getClass.getName} producer")
+    r
+  }
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
     if (settings.cleanBeforeConsume) store.dropUntil(fromOffset)

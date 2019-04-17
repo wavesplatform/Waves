@@ -23,7 +23,11 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   private val duringShutdown = new AtomicBoolean(false)
 
-  private val producer: Producer = if (settings.producer.enable) new KafkaProducer(settings, duringShutdown.get()) else IgnoreProducer
+  private val producer: Producer = {
+    val r = if (settings.producer.enable) new KafkaProducer(settings, duringShutdown.get()) else IgnoreProducer
+    log.info(s"Choosing ${r.getClass.getName} producer")
+    r
+  }
 
   private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
   private val consumerSettings = {
