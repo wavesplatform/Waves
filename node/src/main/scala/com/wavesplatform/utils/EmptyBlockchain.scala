@@ -111,6 +111,6 @@ object EmptyBlockchain extends Blockchain {
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 
-  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser])
-    : CloseableIterator[(Height, Transaction)] = CloseableIterator.empty
+  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] =
+    CloseableIterator.empty
 }

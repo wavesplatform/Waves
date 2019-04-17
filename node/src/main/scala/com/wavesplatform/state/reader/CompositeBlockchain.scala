@@ -106,12 +106,11 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keys
-      .map { id =>
-        diff.transactions(id)._2
-      }
+      .map(id => diff.transactions(id)._2)
       .collect { case lt: LeaseTransaction if predicate(lt) => lt }
       .toSet
-    val fromInner = inner.allActiveLeases(predicate).filterNot(ltx => canceled.keySet.contains(ltx.id()))
+
+    val fromInner = inner.allActiveLeases(ltx => canceled.keySet.contains(ltx.id()) && predicate(ltx))
     fromDiff ++ fromInner
   }
 
@@ -131,12 +130,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       .orElse(inner.invokeScriptResult(txId))
   }
 
-  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, Transaction)] = {
+  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
     val typeSet = ofTypes.toSet
     val diffTransactions = diff.transactions.valuesIterator
       .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
 
-    CloseableIterator.seq(diffTransactions, inner.transactionsIterator(reverse, ofTypes))
+    CloseableIterator.seq(diffTransactions, inner.transactionsIterator(ofTypes, reverse))
   }
 
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)

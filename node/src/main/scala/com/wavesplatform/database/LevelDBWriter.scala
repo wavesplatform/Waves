@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Alias
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{CloseableIterator, Paged, ScorexLogging}
@@ -624,7 +624,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     if (!dbSettings.storeTransactionsByAddress) {
       // Left("Transactions by address are disabled, please enable it and rebuild the state")
-      val result = transactionsIterator(reverse = true).collect {
+      val result = transactionsIterator().collect {
         case (height, tx: AuthorizedTransaction) if tx.sender.toAddress == address => (height, tx)
       }.toVector
       Right(result)
@@ -749,13 +749,27 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
-    val result = readStream { db =>
-      transactionsIterator(false, LeaseTransactionV1, LeaseTransactionV2)
-        .transform(_.collect { case (_, lt: LeaseTransaction) if loadLeaseStatus(db, lt.id()) && predicate(lt) => lt })
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readOnly { db =>
+    val txs = new ListBuffer[LeaseTransaction]()
+
+    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
+      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+
+      if (loadLeaseStatus(db, txId)) {
+        val heightNumBytes = kv.getValue
+
+        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+
+        val txOption = db
+          .get(Keys.transactionAt(height, txNum))
+          .collect { case lt: LeaseTransaction if predicate(lt) => lt }
+
+        txs ++= txOption
+      }
     }
 
-    result.toSet
+    txs.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
@@ -1004,7 +1018,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
-  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, Transaction)] = readStream { db =>
+  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean, idPredicate: TransactionId => Boolean): CloseableIterator[(Height, Transaction)] = readStream { db =>
     val baseIterator: CloseableIterator[(Height, TxNum)] =
       if (reverse) {
         for {

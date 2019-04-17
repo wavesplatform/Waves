@@ -96,8 +96,8 @@ trait Blockchain {
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
 
-  def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser] = Nil): CloseableIterator[(Height, Transaction)]
+  def transactionsIterator(ofTypes: Seq[TransactionParser] = Nil, reverse: Boolean = true): CloseableIterator[(Height, Transaction)]
 
-  def transactionsIterator(reverse: Boolean, ofTypes1: TransactionParser, ofTypes2: TransactionParser*): CloseableIterator[(Height, Transaction)] =
-    this.transactionsIterator(reverse, Vector(ofTypes1) ++ ofTypes2)
+  def transactionsIterator(ofTypes1: TransactionParser, ofTypes2: TransactionParser*): CloseableIterator[(Height, Transaction)] =
+    this.transactionsIterator(Vector(ofTypes1) ++ ofTypes2)
 }

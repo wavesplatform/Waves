@@ -9,7 +9,8 @@ import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portf
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.ProvenTransaction
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
+import com.wavesplatform.utils.CloseableIterator
 
 import scala.util.{Left, Right}
 
@@ -48,14 +49,18 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.asset).get
 
-      def wasBurnt =
-        blockchain
+      def wasBurnt: Boolean = {
+        val iterator: CloseableIterator[(Int, Transaction)] = blockchain
           .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
-          .getOrElse(Seq.empty)
-          .exists {
-            case (_, t: BurnTransaction) if t.asset == tx.asset => true
-            case _                                              => false
-          }
+          .fold(_ => blockchain.transactionsIterator(BurnTransactionV1, BurnTransactionV2), _.iterator)
+
+        try {
+          val result = iterator.collectFirst { case (_, burnTransaction: BurnTransaction) if burnTransaction.asset == tx.asset => burnTransaction }
+          result.isDefined
+        } finally {
+          iterator.close()
+        }
+      }
 
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
       if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {

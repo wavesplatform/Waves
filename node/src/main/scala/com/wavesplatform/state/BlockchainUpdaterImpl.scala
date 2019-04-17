@@ -637,7 +637,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
         }
         .collect { case lt: LeaseTransaction if predicate(lt) => lt }
         .toSet
-      val fromInner = blockchain.allActiveLeases(predicate).filterNot(ltx => canceled.keySet.contains(ltx.id()))
+      val fromInner = blockchain.allActiveLeases(ltx => !canceled.keySet.contains(ltx.id()) && predicate(ltx))
       fromDiff ++ fromInner
     }
   }
@@ -665,13 +665,13 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, Transaction)] = {
-    ngState.fold(blockchain.transactionsIterator(reverse, ofTypes)) { ng =>
+  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
+    ngState.fold(blockchain.transactionsIterator(ofTypes, reverse)) { ng =>
       val typeSet = ofTypes.toSet
       val ngTransactions = ng.bestLiquidDiff.transactions.valuesIterator
         .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
 
-      CloseableIterator.seq(ngTransactions, blockchain.transactionsIterator(reverse, ofTypes))
+      CloseableIterator.seq(ngTransactions, blockchain.transactionsIterator(ofTypes, reverse))
     }
   }
 
