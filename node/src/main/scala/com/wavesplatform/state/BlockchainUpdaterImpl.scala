@@ -665,8 +665,14 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[Transaction] = {
-    blockchain.transactionsIterator(ofTypes)
+  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, Transaction)] = {
+    ngState.fold(blockchain.transactionsIterator(reverse, ofTypes)) { ng =>
+      val typeSet = ofTypes.toSet
+      val ngTransactions = ng.bestLiquidDiff.transactions.valuesIterator
+        .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
+
+      CloseableIterator.seq(ngTransactions, blockchain.transactionsIterator(reverse, ofTypes))
+    }
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {

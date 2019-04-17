@@ -3,7 +3,7 @@ import java.io.Closeable
 
 import scala.collection.AbstractIterator
 
-trait CloseableIterator[+T] extends Iterator[T] with Closeable {
+sealed trait CloseableIterator[+T] extends Iterator[T] with Closeable {
   def transform[NewT](f: Iterator[T] => Iterator[NewT]): CloseableIterator[NewT] = {
     CloseableIterator(
       f(this),
@@ -25,8 +25,21 @@ object CloseableIterator {
       })
     }
 
-    override def hasNext: Boolean = !closed && iterator.hasNext
+    override def hasNext: Boolean = !closed && {
+      val hasNext = iterator.hasNext
+      if (!hasNext) close()
+      hasNext
+    }
+
     override def next(): T = iterator.next()
+
+    override def finalize(): Unit = {
+      if (!this.closed) {
+        System.err.println(s"CloseableIterator leaked: $this [${System.identityHashCode(this)}]")
+        this.close()
+      }
+      super.finalize()
+    }
   }
 
   def seq[T](iterators: CloseableIterator[T]*): CloseableIterator[T] = {

@@ -31,7 +31,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -309,21 +309,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   // TODO: Remove
   {
     val start = System.nanoTime()
-    blockchainUpdater.transactionsIterator()
-      .collect { case lt: LeaseTransaction => lt }
-      .take(1000)
-      .find(_.assetFee._2 == 123456)
-      .foreach(println)
-    println(s"ReadAll Taken ${(System.nanoTime() - start).nanos.toSeconds} seconds")
+    val iterator = blockchainUpdater.allActiveLeases()
+    println(iterator.size)
+    println(s"ReadTyped Taken ${(System.nanoTime() - start).nanos.toSeconds} seconds")
   }
-
   {
     val start = System.nanoTime()
-    blockchainUpdater.transactionsIterator(LeaseTransactionV1, LeaseTransactionV2)
-      .take(1000)
-      .find(_.assetFee._2 == 123456)
-      .foreach(println)
-    println(s"ReadTyped Taken ${(System.nanoTime() - start).nanos.toSeconds} seconds")
+    val iterator = blockchainUpdater.transactionsIterator(true, LeaseTransactionV1, LeaseTransactionV2)
+    println(iterator.size)
+    println(s"ReadTyped reverse Taken ${(System.nanoTime() - start).nanos.toSeconds} seconds")
+    iterator.close()
   }
   println("Finished")
 

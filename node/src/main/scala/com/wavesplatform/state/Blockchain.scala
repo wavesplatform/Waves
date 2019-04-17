@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
-import monix.reactive.Observable
 
 trait Blockchain {
   def height: Int
@@ -97,8 +96,8 @@ trait Blockchain {
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
 
-  def transactionsIterator(ofTypes: Seq[TransactionParser] = Nil): CloseableIterator[Transaction]
+  def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser] = Nil): CloseableIterator[(Height, Transaction)]
 
-  def transactionsIterator(ofTypes1: TransactionParser, ofTypes2: TransactionParser*): CloseableIterator[Transaction] =
-    this.transactionsIterator(Vector(ofTypes1) ++ ofTypes2)
+  def transactionsIterator(reverse: Boolean, ofTypes1: TransactionParser, ofTypes2: TransactionParser*): CloseableIterator[(Height, Transaction)] =
+    this.transactionsIterator(reverse, Vector(ofTypes1) ++ ofTypes2)
 }

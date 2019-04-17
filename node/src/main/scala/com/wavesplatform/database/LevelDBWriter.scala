@@ -15,15 +15,15 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
-import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{CloseableIterator, Paged, ScorexLogging}
@@ -622,9 +622,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    if (!dbSettings.storeTransactionsByAddress)
-      Left("Transactions by address are disabled, please enable it and rebuild the state")
-    else
+    if (!dbSettings.storeTransactionsByAddress) {
+      // Left("Transactions by address are disabled, please enable it and rebuild the state")
+      val result = transactionsIterator(reverse = true).collect {
+        case (height, tx: AuthorizedTransaction) if tx.sender.toAddress == address => (height, tx)
+      }.toVector
+      Right(result)
+    } else
       readOnly { db =>
         def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
           if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
@@ -745,27 +749,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readOnly { db =>
-    val txs = new ListBuffer[LeaseTransaction]()
-
-    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
-      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
-
-      if (loadLeaseStatus(db, txId)) {
-        val heightNumBytes = kv.getValue
-
-        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
-
-        val txOption = db
-          .get(Keys.transactionAt(height, txNum))
-          .collect { case lt: LeaseTransaction if predicate(lt) => lt }
-
-        txs ++= txOption
-      }
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
+    val result = readStream { db =>
+      transactionsIterator(false, LeaseTransactionV1, LeaseTransactionV2)
+        .transform(_.collect { case (_, lt: LeaseTransaction) if loadLeaseStatus(db, lt.id()) && predicate(lt) => lt })
     }
 
-    txs.toSet
+    result.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
@@ -1014,24 +1004,40 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
-  override def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[Transaction] = readStream { db =>
-    db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix)
-      .transform(_.flatMap { kv =>
-        val heightNumBytes = kv.getValue
+  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, Transaction)] = readStream { db =>
+    val baseIterator: CloseableIterator[(Height, TxNum)] =
+      if (reverse) {
+        for {
+          height <- (this.height to 0 by -1).iterator
+          (bh, _) <- this.blockHeaderAndSize(height).iterator
+          txNum <- bh.transactionCount to 0 by -1
+        } yield (Height(height), TxNum(txNum.toShort))
+      } else {
+        db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix)
+          .transform(_.map { kv =>
+            val heightNumBytes = kv.getValue
 
-        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+            val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+            val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        db.get(Keys.transactionBytesAt(height, txNum))
-          .flatMap { txBytes =>
-            if (ofTypes.isEmpty)
-              TransactionParsers.parseBytes(txBytes).toOption
-            else {
-              ofTypes.iterator
-                .map(_.parseBytes(txBytes))
-                .collectFirst { case Success(tx) => tx }
+            (height, txNum)
+          })
+      }
+
+    baseIterator
+      .transform(_.flatMap {
+        case (height, txNum) =>
+          db.get(Keys.transactionBytesAt(height, txNum))
+            .flatMap { txBytes =>
+              if (ofTypes.isEmpty)
+                TransactionParsers.parseBytes(txBytes).toOption
+              else {
+                ofTypes.iterator
+                  .map(_.parseBytes(txBytes))
+                  .collectFirst { case Success(tx) => tx }
+              }
             }
-          }
+            .map((height, _))
       })
   }
 

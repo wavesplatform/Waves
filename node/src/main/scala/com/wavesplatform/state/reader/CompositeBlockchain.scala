@@ -131,8 +131,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       .orElse(inner.invokeScriptResult(txId))
   }
 
-  override def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[Transaction] = {
-    inner.transactionsIterator(ofTypes)
+  override def transactionsIterator(reverse: Boolean, ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, Transaction)] = {
+    val typeSet = ofTypes.toSet
+    val diffTransactions = diff.transactions.valuesIterator
+      .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
+
+    CloseableIterator.seq(diffTransactions, inner.transactionsIterator(reverse, ofTypes))
   }
 
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
