@@ -5,10 +5,11 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import akka.kafka._
 import akka.kafka.scaladsl.{Consumer, Producer}
 import akka.pattern.ask
-import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
+import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
-import com.wavesplatform.matcher.queue.KafkaMatcherQueue.{Settings, eventDeserializer, eventSerializer}
+import com.wavesplatform.matcher.queue.KafkaMatcherQueue.{Settings, KafkaProducer, eventDeserializer}
+import com.wavesplatform.matcher.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
@@ -22,44 +23,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   private val duringShutdown = new AtomicBoolean(false)
 
-  private val producerControl = new AtomicReference[() => Unit](() => ())
-  private val producerSettings = {
-    val config = mat.system.settings.config.getConfig("akka.kafka.producer")
-    ProducerSettings(config, new ByteArraySerializer, eventSerializer)
-  }
-
-  private def newProducer =
-    Source
-      .queue[(QueueEvent, Promise[QueueEventWithMeta])](settings.producer.bufferSize, OverflowStrategy.backpressure)
-      .mapMaterializedValue { x =>
-        producerControl.set(() => x.complete())
-        x
-      }
-      .map {
-        case (payload, p) =>
-          ProducerMessage.single(new ProducerRecord[Array[Byte], QueueEvent](settings.topic, payload.assetPair.bytes, payload), passThrough = p)
-      }
-      .via(Producer.flexiFlow(producerSettings))
-      .map {
-        case ProducerMessage.Result(meta, ProducerMessage.Message(msg, passThrough)) =>
-          passThrough.success(QueueEventWithMeta(meta.offset(), meta.timestamp(), msg.value()))
-        case ProducerMessage.MultiResult(parts, passThrough) => throw new RuntimeException(s"MultiResult(parts=$parts, passThrough=$passThrough)")
-        case ProducerMessage.PassThroughResult(passThrough)  => throw new RuntimeException(s"PassThroughResult(passThrough=$passThrough)")
-      }
-      .toMat(Sink.ignore)(Keep.left)
-      .run()
-
-  private var producer = newProducer
-  watchProducer()
-
-  private def watchProducer(): Unit = {
-    producer.watchCompletion().onComplete { _ =>
-      if (!duringShutdown.get()) {
-        producer = newProducer
-        watchProducer()
-      }
-    }
-  }
+  private val producer: Producer = if (settings.producer.enable) new KafkaProducer(settings, duringShutdown.get()) else IgnoreProducer
 
   private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
   private val consumerSettings = {
@@ -98,11 +62,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
       .runWith(Sink.ignore)
   }
 
-  override def storeEvent(event: QueueEvent): Future[QueueEventWithMeta] = {
-    val p = Promise[QueueEventWithMeta]()
-    producer.offer((event, p))
-    p.future
-  }
+  override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
     implicit val timeout: Timeout = Timeout(consumerSettings.metadataRequestTimeout)
@@ -131,8 +91,6 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     duringShutdown.set(true)
     mat.system.stop(metadataConsumer)
     val stoppingConsumer = consumerControl.get().shutdown()
-    producer.complete()
-    Await.result(producer.watchCompletion(), timeout)
     Await.result(stoppingConsumer, timeout)
   }
 
@@ -141,7 +99,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 object KafkaMatcherQueue {
   case class Settings(topic: String, consumer: ConsumerSettings, producer: ProducerSettings)
   case class ConsumerSettings(bufferSize: Int, minBackoff: FiniteDuration, maxBackoff: FiniteDuration)
-  case class ProducerSettings(bufferSize: Int)
+  case class ProducerSettings(enable: Boolean, bufferSize: Int)
 
   val eventDeserializer: Deserializer[QueueEvent] = new Deserializer[QueueEvent] {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
@@ -153,5 +111,54 @@ object KafkaMatcherQueue {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
     override def serialize(topic: String, data: QueueEvent): Array[Byte]            = QueueEvent.toBytes(data)
     override def close(): Unit                                                      = {}
+  }
+
+  private class KafkaProducer(settings: Settings, duringShutdown: => Boolean)(implicit mat: ActorMaterializer) extends Producer {
+    private type InternalProducer = SourceQueueWithComplete[(QueueEvent, Promise[QueueEventWithMeta])]
+
+    private implicit val dispatcher: ExecutionContextExecutor = mat.system.dispatcher
+
+    private val producerSettings = {
+      val config = mat.system.settings.config.getConfig("akka.kafka.producer")
+      akka.kafka.ProducerSettings(config, new ByteArraySerializer, eventSerializer)
+    }
+
+    private var internal = newInternal
+    watch()
+
+    private def newInternal: InternalProducer =
+      Source
+        .queue[(QueueEvent, Promise[QueueEventWithMeta])](settings.producer.bufferSize, OverflowStrategy.backpressure)
+        .map {
+          case (payload, p) =>
+            ProducerMessage.single(new ProducerRecord[Array[Byte], QueueEvent](settings.topic, payload.assetPair.bytes, payload), passThrough = p)
+        }
+        .via(Producer.flexiFlow(producerSettings))
+        .map {
+          case ProducerMessage.Result(meta, ProducerMessage.Message(msg, passThrough)) =>
+            passThrough.success(QueueEventWithMeta(meta.offset(), meta.timestamp(), msg.value()))
+          case ProducerMessage.MultiResult(parts, passThrough) => throw new RuntimeException(s"MultiResult(parts=$parts, passThrough=$passThrough)")
+          case ProducerMessage.PassThroughResult(passThrough)  => throw new RuntimeException(s"PassThroughResult(passThrough=$passThrough)")
+        }
+        .toMat(Sink.ignore)(Keep.left)
+        .run()
+
+    private def watch(): Unit = internal.watchCompletion().onComplete { _ =>
+      if (!duringShutdown) {
+        internal = newInternal
+        watch()
+      }
+    }
+
+    override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
+      val p = Promise[QueueEventWithMeta]()
+      internal.offer((event, p))
+      p.future.map(Some(_))
+    }
+
+    override def close(timeout: FiniteDuration): Unit = {
+      internal.complete()
+      Await.result(internal.watchCompletion(), timeout)
+    }
   }
 }
