@@ -26,7 +26,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).right.get) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 0
       }
 
       "should count transactions going from a smart account" in {
@@ -35,7 +35,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).right.get) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 1
       }
     }
 
@@ -47,7 +47,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).right.get) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 0
       }
 
       "should count transactions working with smart tokens" in {
@@ -58,7 +58,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).right.get) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).resultE.right.get) shouldBe 1
       }
     }
 
@@ -70,7 +70,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
       (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
       (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).right.get) shouldBe 2
+      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).resultE.right.get) shouldBe 2
     }
   }
 

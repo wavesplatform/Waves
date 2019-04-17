@@ -136,7 +136,7 @@ object InvokeScriptTransactionDiff {
                   } for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
                 )
               }
-              scriptsInvoked <- {
+              scriptsInvoked <- TracedResult {
                 val totalScriptsInvoked =
                   tx.checkedAssets()
                     .collect { case asset @ IssuedAsset(_) => asset }
