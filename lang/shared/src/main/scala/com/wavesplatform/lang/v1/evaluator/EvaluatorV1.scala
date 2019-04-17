@@ -74,7 +74,7 @@ fields.get(field) match {
               .traverse[EvalM, EVALUATED](evalExpr)
               .flatMap { args =>
                 val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
-                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l("(arg)" + argName)))
+                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l(s"$argName")))
                 }
                 local {
                   set(LoggedEvaluationContext.Lenses.lets.set(ctx)(letDefsWithArgs)).flatMap(_ => evalExpr(func.ev))
