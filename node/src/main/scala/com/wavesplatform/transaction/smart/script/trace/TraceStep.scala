@@ -17,7 +17,7 @@ case class AccountVerifierTrace(
     errorO:  Option[ValidationError]
 ) extends TraceStep {
 
-  override def json: JsObject = Json.obj(
+  override lazy val json: JsObject = Json.obj(
     "address" -> address.address,
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> ApiError.fromValidationError(e).message)
@@ -29,7 +29,7 @@ case class AssetVerifierTrace(
     id:     ByteStr,
     errorO: Option[ValidationError]
 ) extends TraceStep {
-  override def json: JsObject = Json.obj(
+  override lazy val json: JsObject = Json.obj(
     "address" -> id.base58,
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> ApiError.fromValidationError(e).message)
@@ -42,15 +42,31 @@ case class InvokeScriptTrace(
     function:    FUNCTION_CALL,
     resultE:     Either[ValidationError, ScriptResult]
 ) extends TraceStep {
-  override def json: JsObject =
+
+  override lazy val json: JsObject =
     Json.obj(
       "dAppAddress" -> dAppAddress.address,
       "function"    -> function.function.funcName,
       "args"        -> function.args.map(_.toString),
       resultE match {
-        case Right(value) => "result" -> value.toString
+        case Right(value) => "result" -> toJson(value)
         case Left(e)      => "error"  -> ApiError.fromValidationError(e).message
       }
     )
+
+  private def toJson(v: ScriptResult) = Json.obj(
+    "dataItems" -> v.ds.map(item => Json.obj(
+      "key"   -> item.key,
+      "value" -> item.value.toString
+    )),
+    "transaction" -> v.ts.map { case (address, amount, assetId) => Json.obj(
+      "address" -> address.bytes.toString,
+      "amount"  -> amount,
+      "asset"   -> (assetId match {
+        case Some(id) => id.toString
+        case None     => "Waves"
+      })
+    )}
+  )
 }
 
