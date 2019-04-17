@@ -177,3 +177,13 @@ message ExchangeTransactionData {
 message SponsorFeeTransactionData {
     AssetAmount min_fee = 1;
 };
+
+message InvokeScriptResult {
+    message Payment {
+        bytes address = 1;
+        Amount amount = 2;
+    }
+
+    repeated DataTransactionData.DataEntry data_entries = 1;
+    repeated Payment payments = 2;
+}
