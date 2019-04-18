@@ -2,7 +2,6 @@ package com.wavesplatform.events
 
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.utils.ScorexLogging
