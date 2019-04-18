@@ -48,15 +48,14 @@ class UtxPoolImpl(time: Time,
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  override def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, (Boolean, Diff)] = {
-    pessimisticPortfolios
-      .getTransactionDiff(tx.id())
-      .fold(putTx(tx)) { diff =>
-        TracedResult.wrapValue((true, diff))
-      }
+  override def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+    val knownTx = pessimisticPortfolios.contains(tx.id())
+
+    if (knownTx) TracedResult.wrapValue(utxSettings.allowRebroadcasting)
+    else putNewTx(tx)
   }
 
-  protected def putTx(tx: Transaction): TracedResult[ValidationError, (Boolean, Diff)] = {
+  protected def putNewTx(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     def canReissue(blockchain: Blockchain, tx: Transaction): Either[GenericError, Unit] =
       PoolMetrics.checkCanReissue.measure(tx match {
         case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
@@ -145,13 +144,14 @@ class UtxPoolImpl(time: Time,
         diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
-        (true, diff)
+        transactions.put(tx.id(), tx)
+        true
       }
     }
 
     tracedResult.resultE.fold(
       err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}"),
-      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}, trace = ${tracedResult.trace}")
+      _ => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = true, trace = ${tracedResult.trace}")
     )
     tracedResult
   }
@@ -320,12 +320,14 @@ class UtxPoolImpl(time: Time,
       bytesStats.decrement(tx.bytes().length)
     }
   }
+
 }
 
 object UtxPoolImpl {
+
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)]) {
     private type Portfolios = Map[Address, Portfolio]
-    private val transactionPortfolios = new ConcurrentHashMap[ByteStr, (Diff, Portfolios)]()
+    private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
 
     def add(txId: ByteStr, txDiff: Diff): Unit = {
@@ -333,7 +335,7 @@ object UtxPoolImpl {
       val nonEmptyPessimisticPortfolios = pessimisticPortfolios.filterNot { case (_, portfolio) => portfolio.isEmpty }
 
       if (nonEmptyPessimisticPortfolios.nonEmpty &&
-          Option(transactionPortfolios.put(txId, (txDiff, nonEmptyPessimisticPortfolios))).isEmpty) {
+          Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
         }
@@ -345,29 +347,21 @@ object UtxPoolImpl {
       }
     }
 
-    def contains(txId: ByteStr): Boolean = transactionPortfolios.contains(txId)
+    def contains(txId: ByteStr): Boolean = transactionPortfolios.containsKey(txId)
 
     def getAggregated(accountAddr: Address): Portfolio = {
       val portfolios = for {
         txId <- transactions.getOrDefault(accountAddr, Set.empty).toSeq
-        (_, txPortfolios) = transactionPortfolios.getOrDefault(txId, (Diff.empty, Map.empty[Address, Portfolio]))
+        txPortfolios = transactionPortfolios.getOrDefault(txId, Map.empty[Address, Portfolio])
         txAccountPortfolio <- txPortfolios.get(accountAddr).toSeq
       } yield txAccountPortfolio
 
       Monoid.combineAll[Portfolio](portfolios)
     }
 
-    def getTransactionDiff(txId: ByteStr): Option[Diff] = {
-      val (diff, _) = transactionPortfolios
-        .getOrDefault(txId, (Diff.empty, Map.empty[Address, Portfolio]))
-
-      if (diff == Diff.empty) None
-      else Some(diff)
-    }
-
     def remove(txId: ByteStr): Unit = {
       Option(transactionPortfolios.remove(txId)) match {
-        case Some((_, txPortfolios)) =>
+        case Some(txPortfolios) =>
           txPortfolios.foreach {
             case (addr, p) =>
               transactions.computeIfPresent(addr, (_, prevTxs) => prevTxs - txId)
@@ -377,4 +371,5 @@ object UtxPoolImpl {
       }
     }
   }
+
 }

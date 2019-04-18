@@ -62,7 +62,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
           xs.view
             .map {
               case Left(e)   => TracedResult(Left(e))
-              case Right(tx) => utx.putIfNewTraced(tx).map { case (isNew, _) => (tx, isNew) }
+              case Right(tx) => utx.putIfNewTraced(tx).map { case shouldBroadcast => (tx, shouldBroadcast) }
             }
             .map {
               case TracedResult(result, log) =>

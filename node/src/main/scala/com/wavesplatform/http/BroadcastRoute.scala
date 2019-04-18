@@ -17,8 +17,8 @@ trait BroadcastRoute {
       tx <- TracedResult(v)
       r  <- utx.putIfNewTraced(tx)
     } yield {
-      val (added, _) = r
-      if (added) allChannels.broadcastTx(tx, None)
+      val shouldBroadcast = r
+      if (shouldBroadcast) allChannels.broadcastTx(tx, None)
       tx
     }
 
