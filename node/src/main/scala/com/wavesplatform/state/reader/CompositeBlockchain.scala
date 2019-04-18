@@ -110,7 +110,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       .collect { case lt: LeaseTransaction if predicate(lt) => lt }
       .toSet
 
-    val fromInner = inner.allActiveLeases(ltx => canceled.keySet.contains(ltx.id()) && predicate(ltx))
+    val fromInner = inner.allActiveLeases(ltx => !canceled.keySet.contains(ltx.id()) && predicate(ltx))
     fromDiff ++ fromInner
   }
 
