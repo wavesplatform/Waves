@@ -3,11 +3,12 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorRef, Props}
+import akka.persistence.serialization.Snapshot
 import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.matcher.api.AlreadyProcessed
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -30,7 +31,12 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
   private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
-  private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
+  private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = obcTestWithPrepare(_ => ()) { (pair, actor, probe) =>
+    probe.expectMsg(OrderBookSnapshotUpdated(pair, -1))
+    f(pair, actor, probe)
+  }
+
+  private def obcTestWithPrepare(prepare: AssetPair => Unit)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
     val b = ByteStr(new Array[Byte](32))
@@ -38,6 +44,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
     val tp   = TestProbe()
     val pair = AssetPair(Some(b), None)
+    prepare(pair)
+
     val actor = system.actorOf(
       Props(
         new OrderBookActor(
@@ -51,12 +59,27 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           -1
         ) with RestartableActor))
 
-    tp.expectMsg(OrderBookSnapshotUpdated(pair, -1))
-
     f(pair, actor, tp)
   }
 
   "OrderBookActor" should {
+    "recover from snapshot - 1" in obcTestWithPrepare { p =>
+      SnapshotUtils.provideSnapshot(
+        OrderBookActor.name(p),
+        Snapshot(OrderBookActor.Snapshot(-1, OrderBook.empty.snapshot))
+      )
+    } { (pair, _, tp) =>
+      tp.expectMsg(OrderBookSnapshotUpdated(pair, -1))
+    }
+
+    "recover from snapshot - 2" in obcTestWithPrepare { p =>
+      SnapshotUtils.provideSnapshot(
+        OrderBookActor.name(p),
+        Snapshot(OrderBookActor.Snapshot(50, OrderBook.empty.snapshot))
+      )
+    } { (pair, _, tp) =>
+      tp.expectMsg(OrderBookSnapshotUpdated(pair, 50))
+    }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, orderBook, tp) =>
       val ord1 = buy(pair, 10 * Order.PriceConstant, 100)

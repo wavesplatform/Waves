@@ -32,8 +32,8 @@ class MatcherActor(settings: MatcherSettings,
 
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
-  private var lastSnapshotSequenceNr: Long            = 0L
-  private var lastProcessedNr: Long                   = 0L
+  private var lastSnapshotSequenceNr: Long            = -1L
+  private var lastProcessedNr: Long                   = -1L
 
   private var snapshotsState = SnapshotsState.empty
 
@@ -124,6 +124,7 @@ class MatcherActor(settings: MatcherSettings,
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: QueueEventWithMeta =>
+      log.info(s"Got $request")
       request.event match {
         case QueueEvent.OrderBookDeleted(assetPair) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another

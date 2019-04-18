@@ -3,19 +3,17 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
-import akka.persistence.inmemory.extension.{InMemorySnapshotStorage, StorageExtension}
 import akka.persistence.serialization.Snapshot
-import akka.serialization.SerializationExtension
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, FanOutActor, NothingDoActor, RecoveringActor}
 import com.wavesplatform.matcher.market.OrderBookActor.OrderBookSnapshotUpdated
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook}
+import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -64,6 +62,26 @@ class MatcherActorSpecification
         case s @ Seq(MarketData(_, "Unknown", "Unknown", _, _, _)) =>
           s.size shouldBe 1
       }
+    }
+
+    "successfully routes the first place to the new order book" in {
+      val addressActor = TestProbe()
+      val actor        = defaultActor(addressActor = addressActor.ref)
+      val probe        = TestProbe()
+
+      val pair  = AssetPair(randomAssetId, randomAssetId)
+      val order = buy(pair, 2000, 1)
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(None)
+
+      (blockchain.accountScript _)
+        .when(order.matcherPublicKey.toAddress)
+        .returns(None)
+
+      probe.send(actor, wrap(order))
+      addressActor.expectMsgType[Events.OrderAdded]
     }
 
     "mark an order book as failed" when {
@@ -123,7 +141,7 @@ class MatcherActorSpecification
       val ob      = emptyOrderBookRefs
       var working = false
 
-      matcherHadOrderBooksBefore(pair)
+      matcherHadOrderBooksBefore(pair -> -1L)
       system.actorOf(
         Props(
           new MatcherActor(
@@ -145,7 +163,7 @@ class MatcherActorSpecification
         val ob      = emptyOrderBookRefs
         var stopped = false
 
-        matcherHadOrderBooksBefore(pair)
+        matcherHadOrderBooksBefore(pair -> -1L)
         val probe = TestProbe()
         val actor = probe.watch(
           system.actorOf(
@@ -169,7 +187,7 @@ class MatcherActorSpecification
         val ob      = emptyOrderBookRefs
         var stopped = false
 
-        matcherHadOrderBooksBefore(pair)
+        matcherHadOrderBooksBefore(pair -> -1L)
         val probe = TestProbe()
         val actor = probe.watch(
           system.actorOf(
@@ -258,7 +276,7 @@ class MatcherActorSpecification
         val fanOut = system.actorOf(Props(new FanOutActor))
         fanOut ! probe.ref
 
-        matcherHadOrderBooksBefore(pair1)
+        matcherHadOrderBooksBefore(pair1 -> -1L)
         val actor = system.actorOf(
           Props(
             new MatcherActor(
@@ -360,7 +378,8 @@ class MatcherActorSpecification
     (props, probe)
   }
 
-  private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs): TestActorRef[MatcherActor] = {
+  private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
+                           addressActor: ActorRef = TestProbe().ref): TestActorRef[MatcherActor] = {
     val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
 
     waitInitialization(
@@ -370,7 +389,7 @@ class MatcherActorSpecification
           doNothingOnRecovery,
           ob,
           (assetPair, matcher, offset) =>
-            OrderBookActor.props(matcher, TestProbe().ref, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, offset),
+            OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, offset),
           blockchain.assetDescription
         )
       ))
@@ -381,21 +400,12 @@ class MatcherActorSpecification
     x
   }
 
-  private def matcherHadOrderBooksBefore(pairs: AssetPair*): Unit = {
-    provideSnapshot(MatcherActor.name, Snapshot(MatcherActor.Snapshot(pairs.toSet)))
-    pairs.foreach { pair =>
-      provideSnapshot(OrderBookActor.name(pair), Snapshot(OrderBookActor.Snapshot(-1, OrderBook.empty.snapshot)))
+  private def matcherHadOrderBooksBefore(pairs: (AssetPair, Long)*): Unit = {
+    SnapshotUtils.provideSnapshot(MatcherActor.name, Snapshot(MatcherActor.Snapshot(pairs.map(_._1).toSet)))
+    pairs.foreach {
+      case (pair, offset) =>
+        SnapshotUtils.provideSnapshot(OrderBookActor.name(pair), Snapshot(OrderBookActor.Snapshot(offset, OrderBook.empty.snapshot)))
     }
-  }
-
-  private def provideSnapshot(actorName: String, snapshot: Snapshot): Unit = {
-    val snapshotBytes = SerializationExtension(system).serialize(snapshot).get
-    val p             = TestProbe()
-    p.send(
-      StorageExtension(system).snapshotStorage,
-      InMemorySnapshotStorage.Save(actorName, 0, 0, snapshotBytes)
-    )
-    p.expectMsg(akka.actor.Status.Success(""))
   }
 
   private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}

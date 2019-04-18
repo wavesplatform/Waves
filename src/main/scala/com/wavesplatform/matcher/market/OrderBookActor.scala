@@ -127,16 +127,17 @@ class OrderBookActor(owner: ActorRef,
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
+      lastProcessedOffset = math.max(startOffset, lastProcessedOffset) // lastProcessedOffset can't be < order book's creation offset
       processEvents(orderBook.allOrders.map(OrderAdded))
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
-      log.debug(s"Recovery completed: $orderBook")
+      log.debug(s"Recovery completed at $lastProcessedOffset: $orderBook")
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr}), startOffset=$startOffset")
       orderBook = OrderBook(snapshot.orderBook)
-      lastProcessedOffset = math.max(startOffset, snapshot.eventNr) // math.max(startOffset, -1)
+      lastProcessedOffset = snapshot.eventNr
       lastSavedSnapshotOffset = lastProcessedOffset
   }
 
