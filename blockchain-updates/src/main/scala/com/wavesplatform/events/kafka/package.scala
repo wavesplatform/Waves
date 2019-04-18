@@ -35,7 +35,6 @@ package object kafka {
     props
   }
 
-  // @todo check on startup if Kafka is available?
   def createProducer(settings: BlockchainUpdatesSettings): KafkaProducer[Int, BlockchainUpdated] =
     new KafkaProducer[Int, BlockchainUpdated](createProperties(settings), IntSerializer, BlockchainUpdatedSerializer)
 
