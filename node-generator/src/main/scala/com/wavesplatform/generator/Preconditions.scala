@@ -23,10 +23,11 @@ object Preconditions {
   private[this] val Fee = 1000000
 
   sealed abstract class PAction(val priority: Int)
-  final case class DeployScriptP(account: KeyPair, file: String)                                                          extends PAction(priority = 4)
-  final case class LeaseP(from: KeyPair, to: Address, amount: Long)                                                       extends PAction(3)
-  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean, scriptFile: String) extends PAction(2)
-  final case class CreateAccountP(seed: String, balance: Long)                                                            extends PAction(1)
+  final case class DeployScriptP(account: KeyPair, file: String)    extends PAction(priority = 4)
+  final case class LeaseP(from: KeyPair, to: Address, amount: Long) extends PAction(3)
+  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean, scriptFile: String)
+      extends PAction(2)
+  final case class CreateAccountP(seed: String, balance: Long) extends PAction(1)
 
   final case class PGenSettings(faucet: KeyPair, actions: List[PAction])
 
@@ -61,7 +62,18 @@ object Preconditions {
                 .map(_._1)
 
               val tx = IssueTransactionV2
-                .selfSigned(AddressScheme.current.chainId, issuer, assetName.getBytes(), assetDescription.getBytes, amount, decimals.toByte, reissueable, script, Fee, time.correctedTime())
+                .selfSigned(
+                  AddressScheme.current.chainId,
+                  issuer,
+                  assetName.getBytes(),
+                  assetDescription.getBytes,
+                  amount,
+                  decimals.toByte,
+                  reissueable,
+                  script,
+                  Fee,
+                  time.correctedTime()
+                )
                 .explicitGet()
               (uni.copy(issuedAssets = tx :: uni.issuedAssets), tx :: txs)
 
@@ -106,16 +118,17 @@ object Preconditions {
 
   private val assetSectionReader = new ValueReader[IssueP] {
     override def read(config: Config, path: String): IssueP = {
-      val conf = config.getConfig(path)
-      val Right(issuer) = KeyPair.fromSeed(conf.getString("issuer"))
+      val conf   = config.getConfig(path)
+      val issuer = KeyPair.fromSeed(conf.getString("issuer")).explicitGet()
 
       val name        = conf.as[Option[String]]("name").getOrElse("")
       val description = conf.as[Option[String]]("description").getOrElse("")
       val amount      = conf.as[Long]("amount")
       val decimals    = conf.as[Option[Int]]("decimals").getOrElse(0)
       val reissuable  = conf.as[Option[Boolean]]("reissuable").getOrElse(false)
+      val scriptFile  = conf.as[Option[String]]("script-file").getOrElse("")
 
-      IssueP(name, issuer, description, amount, decimals, reissuable)
+      IssueP(name, issuer, description, amount, decimals, reissuable, scriptFile)
     }
   }
 
