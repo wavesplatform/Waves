@@ -160,6 +160,14 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         override val chainId: Byte = finalConfig.addressScheme.toByte
       }
 
+      val time = new NTP("pool.ntp.org")
+      val (universe, initialTransactions) = preconditions
+        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
+
+      Universe.AccountsWithBalances = universe.accountsWithBalances
+      Universe.IssuedAssets = universe.issuedAssets
+      Universe.Leases = universe.leases
+
       val generator: TransactionGenerator = finalConfig.mode match {
         case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
@@ -175,14 +183,6 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
 
       sys.addShutdownHook(sender.close())
-
-      val time = new NTP("pool.ntp.org")
-      val (universe, initialTransactions) = preconditions
-        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
-
-      Universe.AccountsWithBalances = universe.accountsWithBalances
-      Universe.IssuedAssets = universe.issuedAssets
-      Universe.Leases = universe.leases
 
       @volatile
       var canContinue = true

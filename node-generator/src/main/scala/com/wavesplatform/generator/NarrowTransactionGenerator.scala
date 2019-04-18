@@ -3,10 +3,11 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{Address, Alias, KeyPair}
+import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
+import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -240,12 +241,15 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                   Terms.CONST_BYTESTR(ByteStr(b))
               }
 
-            val fc    = Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList)
-            val asset = randomFrom(validIssueTxs).fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
+            val fc = Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList)
+
+            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.assets.contains(new String(a.name))))
+              .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
+
             logOption(
               InvokeScriptTransaction.selfSigned(
                 sender,
-                Address.fromString(script.address).explicitGet(),
+                KeyPair.fromSeed(script.account).explicitGet().toAddress,
                 fc,
                 (0 to random.nextInt(5)).map(_ => InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
                 100000000L + random.nextInt(100000000),
@@ -290,7 +294,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 
 object NarrowTransactionGenerator {
   case class ScriptFunction(name: String, argTypes: Seq[String])
-  case class ScriptSettings(address: String, functions: Seq[ScriptFunction])
+  case class ScriptSettings(account: String, assets: Set[String], functions: Seq[ScriptFunction])
   case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4

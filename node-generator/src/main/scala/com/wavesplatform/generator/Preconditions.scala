@@ -3,14 +3,13 @@ package com.wavesplatform.generator
 import java.nio.file.{Files, Paths}
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.lease.LeaseTransactionV1
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
@@ -26,14 +25,14 @@ object Preconditions {
   sealed abstract class PAction(val priority: Int)
   final case class DeployScriptP(account: KeyPair, file: String)                                                          extends PAction(priority = 4)
   final case class LeaseP(from: KeyPair, to: Address, amount: Long)                                                       extends PAction(3)
-  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean) extends PAction(2)
+  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean, scriptFile: String) extends PAction(2)
   final case class CreateAccountP(seed: String, balance: Long)                                                            extends PAction(1)
 
   final case class PGenSettings(faucet: KeyPair, actions: List[PAction])
 
   final case class UniverseHolder(accountsWithBalances: List[(KeyPair, Long)] = Nil,
-                                  issuedAssets: List[ByteStr] = Nil,
-                                  leases: List[ByteStr] = Nil,
+                                  issuedAssets: List[IssueTransaction] = Nil,
+                                  leases: List[LeaseTransaction] = Nil,
                                   scripts: List[(Address, Script)] = Nil)
 
   def mk(settings: PGenSettings, time: Time): (UniverseHolder, List[Transaction]) = {
@@ -52,13 +51,19 @@ object Preconditions {
               val tx = LeaseTransactionV1
                 .selfSigned(from, amount, Fee, time.correctedTime(), to)
                 .explicitGet()
-              (uni.copy(leases = tx.id() :: uni.leases), tx :: txs)
+              (uni.copy(leases = tx :: uni.leases), tx :: txs)
 
-            case IssueP(assetName, issuer, assetDescription, amount, decimals, reissueable) =>
-              val tx = IssueTransactionV1
-                .selfSigned(issuer, assetName.getBytes(), assetDescription.getBytes, amount, decimals.toByte, reissueable, Fee, time.correctedTime())
+            case IssueP(assetName, issuer, assetDescription, amount, decimals, reissueable, scriptFile) =>
+              val script = Option(scriptFile)
+                .filter(_.nonEmpty)
+                .map(file => ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(file)))))
+                .flatMap(_.toOption)
+                .map(_._1)
+
+              val tx = IssueTransactionV2
+                .selfSigned(AddressScheme.current.chainId, issuer, assetName.getBytes(), assetDescription.getBytes, amount, decimals.toByte, reissueable, script, Fee, time.correctedTime())
                 .explicitGet()
-              (uni.copy(issuedAssets = tx.id() :: uni.issuedAssets), tx :: txs)
+              (uni.copy(issuedAssets = tx :: uni.issuedAssets), tx :: txs)
 
             case CreateAccountP(seed, balance) =>
               val acc = KeyPair
