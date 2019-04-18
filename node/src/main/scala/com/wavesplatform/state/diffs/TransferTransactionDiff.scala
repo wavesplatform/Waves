@@ -19,7 +19,7 @@ object TransferTransactionDiff {
       tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender)
 
-    def isSmartAsset = tx.feeAssetId match {
+    val isSmartAsset = tx.feeAssetId match {
       case Waves => false
       case asset @ IssuedAsset(_) =>
         blockchain
@@ -28,7 +28,7 @@ object TransferTransactionDiff {
           .isDefined
     }
 
-    val isInvalidEi = for {
+    for {
       recipient <- blockchain.resolveAlias(tx.recipient)
       _         <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
 
@@ -60,18 +60,13 @@ object TransferTransactionDiff {
             } else senderPf
         }
       )
+      scripts = tx.checkedAssets().count(blockchain.hasAssetScript) + (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 })
       assetIssued    = tx.assetId.fold(true)(blockchain.assetDescription(_).isDefined)
       feeAssetIssued = tx.feeAssetId.fold(true)(blockchain.assetDescription(_).isDefined)
-    } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
-
-    isInvalidEi match {
-      case Left(e) => Left(e)
-      case Right((portfolios, invalid)) =>
-        if (invalid)
-          Left(GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
-        else
-          Right(Diff(height, tx, portfolios))
-    }
+      _ <- Either.cond(blockTime <= s.allowUnissuedAssetsUntil || (assetIssued && feeAssetIssued),
+                       (),
+                       GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
+    } yield Diff(height, tx, portfolios, scriptsRun = scripts)
   }
 
   private def validateOverflow(blockchain: Blockchain, tx: TransferTransaction) = {

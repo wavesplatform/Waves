@@ -136,6 +136,21 @@ object InvokeScriptTransactionDiff {
                   } for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
                 )
               }
+              scriptsInvoked <- TracedResult {
+                val totalScriptsInvoked =
+                  tx.checkedAssets()
+                    .collect { case asset @ IssuedAsset(_) => asset }
+                    .count(blockchain.hasAssetScript) +
+                    ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+                    (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
+                val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+                Either.cond(
+                  minWaves <= wavesFee,
+                  totalScriptsInvoked,
+                  GenericError(s"Fee in ${tx.assetFee._1
+                    .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+                )
+              }
               _ <- foldScriptTransfers(blockchain, tx)(ps, dataAndPaymentDiff)
             } yield {
               val paymentReceiversMap: Map[Address, Portfolio] = Monoid
@@ -144,7 +159,7 @@ object InvokeScriptTransactionDiff {
                 .mapValues(l => Monoid.combineAll(l))
               val paymentFromContractMap = Map(tx.dappAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
               val transfers = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
-              dataAndPaymentDiff |+| Diff.stateOps(portfolios = transfers)
+              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers)
             }
         }
       case _ => Left(GenericError(s"No contract at address ${tx.dappAddress}"))
