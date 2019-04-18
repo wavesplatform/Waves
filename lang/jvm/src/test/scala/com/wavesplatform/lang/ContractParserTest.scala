@@ -234,4 +234,44 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |""".stripMargin
     parse(code)
   }
+
+  property("disallow function declarations after annotated funcions.") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        | func baz(arg:Int) = {
+        |    4
+        | }
+        |""".stripMargin
+    Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
+  }
+
+  property("disallow value declarations after annotated funcions.") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        | let baz = 4
+        |
+        |""".stripMargin
+    Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
+  }
+
 }
