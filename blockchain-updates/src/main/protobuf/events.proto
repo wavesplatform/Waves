@@ -39,4 +39,10 @@ message StateUpdated {
         int64 out = 3;
     }
     repeated LeasingUpdated leases = 4;
+
+    message DataEntryUpdated {
+        bytes address = 1;
+        DataTransactionData.DataEntry data_entry = 2;
+    }
+    repeated DataEntryUpdated data_entries = 5;
 }
