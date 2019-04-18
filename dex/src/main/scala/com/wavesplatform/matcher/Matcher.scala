@@ -16,13 +16,13 @@ import com.wavesplatform.db._
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.history.OrderHistoryActor
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, MatcherModel, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.state.VolumeAndFee
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
@@ -82,15 +82,12 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = {
 
+    import MatcherModel.{getAssetDecimals, toNormalized}
+
     val normalizedTickSize = settings.orderRestrictions.get(pair).withFilter(_.mergeSmallPrices).map { restrictions =>
-      def getDecimals(asset: Asset): Int =
-        asset.fold(8) { issuedAsset =>
-          context.blockchain
-            .assetDescription(issuedAsset)
-            .map(_.decimals)
-            .getOrElse(throw new Exception("Can not get asset decimals since asset not found!"))
-        }
-      MatcherModel.toNormalized(restrictions.tickSize, getDecimals(pair.priceAsset), getDecimals(pair.priceAsset)).max(1)
+      toNormalized(restrictions.tickSize,
+                   getAssetDecimals(context.blockchain, pair.priceAsset),
+                   getAssetDecimals(context.blockchain, pair.priceAsset)).max(1)
     }
 
     OrderBookActor.props(
@@ -196,6 +193,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private lazy val orderDb = OrderDB(settings, db)
 
+  private lazy val orderHistoryActor = context.actorSystem.actorOf(OrderHistoryActor.props(context.blockchain, settings.postgresConnection), "orderHistory")
+
   private lazy val addressActors =
     context.actorSystem.actorOf(
       Props(
@@ -211,7 +210,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               orderDb,
               id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
               matcherQueue.storeEvent
-            ))
+            )),
+          orderHistoryActor
         )),
       "addresses"
     )

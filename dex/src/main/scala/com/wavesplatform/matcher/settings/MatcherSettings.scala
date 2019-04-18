@@ -48,7 +48,8 @@ case class MatcherSettings(account: String,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            allowedAssetPairs: Set[AssetPair],
-                           allowOrderV3: Boolean)
+                           allowOrderV3: Boolean,
+                           postgresConnection: PostgresConnection)
 
 object MatcherSettings {
 
@@ -106,6 +107,8 @@ object MatcherSettings {
 
     val allowOrderV3 = config.as[Boolean]("allow-order-v3")
 
+    val postgresConnection = PostgresConnection("localhost", 5435, "postgres", "docker", "org.postgresql.ds.PGSimpleDataSource")
+
     MatcherSettings(
       account,
       bindAddress,
@@ -132,7 +135,8 @@ object MatcherSettings {
       deviation,
       orderRestrictions,
       allowedAssetPairs,
-      allowOrderV3
+      allowOrderV3,
+      postgresConnection
     )
   }
 }

@@ -57,7 +57,7 @@ class OrderBookActor(owner: ActorRef,
           case _: QueueEvent.OrderBookDeleted =>
             sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
             updateSnapshot(OrderBook.AggregatedSnapshot())
-            processEvents(orderBook.cancelAll())
+            processEvents(orderBook.cancelAll(request.timestamp))
             context.stop(self)
         }
       }
@@ -86,7 +86,7 @@ class OrderBookActor(owner: ActorRef,
   private def processEvents(events: Seq[Event]): Unit = {
     for (e <- events) {
       e match {
-        case Events.OrderAdded(order) =>
+        case Events.OrderAdded(order, _) =>
           log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
         case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
@@ -100,7 +100,7 @@ class OrderBookActor(owner: ActorRef,
                           |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                           |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
           }
-        case Events.OrderCanceled(order, unmatchable) =>
+        case Events.OrderCanceled(order, unmatchable, _) =>
           log.info(s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)")
       }
 
@@ -112,7 +112,7 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def onCancelOrder(request: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel) match {
+    cancelTimer.measure(orderBook.cancel(orderIdToCancel, request.timestamp) match {
       case Some(cancelEvent) =>
         processEvents(Seq(cancelEvent))
       case None =>
@@ -138,7 +138,7 @@ class OrderBookActor(owner: ActorRef,
       orderBook = OrderBook(snapshot.orderBook)
       lastProcessedOffset = snapshot.eventNr
       lastSavedSnapshotOffset = lastProcessedOffset
-      processEvents(orderBook.allOrders.map(OrderAdded).toSeq)
+      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)).toSeq)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {

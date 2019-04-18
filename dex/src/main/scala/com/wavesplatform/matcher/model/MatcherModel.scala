@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.{Blockchain, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange._
@@ -19,8 +19,26 @@ object MatcherModel {
     (BigDecimal.valueOf(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
   }
 
+  def toNormalized(value: Double, blockchain: Blockchain, pair: AssetPair): Long = {
+    val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
+    toNormalized(value, amountAssetDecimals, priceAssetDecimals)
+  }
+
   def fromNormalized(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double = {
     (BigDecimal.valueOf(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+  }
+
+  def getAssetDecimals(blockchain: Blockchain, asset: Asset): Int = {
+    asset.fold(8) { issuedAsset =>
+      blockchain
+        .assetDescription(issuedAsset)
+        .map(_.decimals)
+        .getOrElse(throw new Exception("Can not get asset decimals since asset not found!"))
+    }
+  }
+
+  def getPairDecimals(blockchain: Blockchain, pair: AssetPair): (Int, Int) = {
+    getAssetDecimals(blockchain, pair.amountAsset) -> getAssetDecimals(blockchain, pair.priceAsset)
   }
 }
 
@@ -149,9 +167,9 @@ object Events {
     def submittedRemaining: LimitOrder = submitted.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
   }
 
-  case class OrderAdded(order: LimitOrder) extends Event
+  case class OrderAdded(order: LimitOrder, timestamp: Long) extends Event
 
-  case class OrderCanceled(limitOrder: LimitOrder, unmatchable: Boolean) extends Event
+  case class OrderCanceled(limitOrder: LimitOrder, unmatchable: Boolean, timestamp: Long) extends Event
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 

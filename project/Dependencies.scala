@@ -29,6 +29,11 @@ object Dependencies {
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
+  private val quill = Seq(
+    "org.postgresql" % "postgresql"  % "9.4.1208",
+    "io.getquill"    %% "quill-jdbc" % "3.1.0"
+  )
+
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
   val enforcedVersions = Def.setting(
@@ -147,8 +152,8 @@ object Dependencies {
   ) ++ Seq(
     akkaModule("testkit"),
     akkaModule("persistence-tck"),
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
-  ).map(_ % Test) ++ test
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1",
+  ).map(_ % Test) ++ test ++ quill
 
   lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion

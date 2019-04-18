@@ -182,7 +182,7 @@ class AddressActor(
   }
 
   private def handleExecutionEvents: Receive = {
-    case OrderAdded(submitted) if submitted.order.sender.toAddress == owner =>
+    case OrderAdded(submitted, _) if submitted.order.sender.toAddress == owner =>
       log.trace(s"OrderAdded(${submitted.order.id()})")
       updateTimestamp(submitted.order.timestamp)
       release(submitted.order.id())
@@ -192,7 +192,7 @@ class AddressActor(
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
 
-    case OrderCanceled(lo, unmatchable) =>
+    case OrderCanceled(lo, unmatchable, _) =>
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       confirmPlacement(lo.order)
       pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCanceled(lo.order.id())))
