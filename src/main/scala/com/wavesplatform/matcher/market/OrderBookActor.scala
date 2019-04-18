@@ -24,7 +24,8 @@ class OrderBookActor(owner: ActorRef,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
-                     time: Time)
+                     time: Time,
+                     startOffset: QueueEventWithMeta.Offset)
     extends PersistentActor
     with ScorexLogging {
 
@@ -33,8 +34,8 @@ class OrderBookActor(owner: ActorRef,
   protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
   private var savingSnapshot: Option[QueueEventWithMeta.Offset]  = None
-  private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = -1L
-  private var lastProcessedOffset: QueueEventWithMeta.Offset     = -1L
+  private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = startOffset
+  private var lastProcessedOffset: QueueEventWithMeta.Offset     = startOffset
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
@@ -133,9 +134,9 @@ class OrderBookActor(owner: ActorRef,
       log.debug(s"Recovery completed: $orderBook")
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
-      log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
+      log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr}), startOffset=$startOffset")
       orderBook = OrderBook(snapshot.orderBook)
-      lastProcessedOffset = snapshot.eventNr
+      lastProcessedOffset = math.max(startOffset, snapshot.eventNr) // math.max(startOffset, -1)
       lastSavedSnapshotOffset = lastProcessedOffset
   }
 
@@ -158,8 +159,9 @@ object OrderBookActor {
             updateMarketStatus: MarketStatus => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
-            time: Time): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time))
+            time: Time,
+            startOffset: QueueEventWithMeta.Offset): Props =
+    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, startOffset))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

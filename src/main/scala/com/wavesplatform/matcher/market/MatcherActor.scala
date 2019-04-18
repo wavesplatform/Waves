@@ -21,7 +21,7 @@ import scorex.utils._
 class MatcherActor(settings: MatcherSettings,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-                   orderBookActorProps: (AssetPair, ActorRef) => Props,
+                   orderBookActorProps: (AssetPair, ActorRef, QueueEventWithMeta.Offset) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
     extends PersistentActor
     with ScorexLogging {
@@ -70,7 +70,7 @@ class MatcherActor(settings: MatcherSettings,
 
   private def createOrderBook(pair: AssetPair): ActorRef = {
     log.info(s"Creating order book for $pair")
-    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
+    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self, lastProcessedNr), OrderBookActor.name(pair)))
     childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
@@ -138,6 +138,8 @@ class MatcherActor(settings: MatcherSettings,
 
         case _ => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
+      // Should be done after runFor, because we create an order book with providing an offset
+      // If we update lastProcessedNr before, this event will be ignored after restart.
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
       createSnapshotFor(lastProcessedNr)
 
@@ -299,7 +301,7 @@ object MatcherActor {
   def props(matcherSettings: MatcherSettings,
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            orderBookProps: (AssetPair, ActorRef) => Props,
+            orderBookProps: (AssetPair, ActorRef, QueueEventWithMeta.Offset) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
