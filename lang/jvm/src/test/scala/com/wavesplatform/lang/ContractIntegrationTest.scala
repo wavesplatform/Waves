@@ -7,20 +7,20 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV1, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
+class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
   val ctx: CTX =
     PureContext.build(V3) |+|
@@ -82,6 +82,32 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     ).explicitGet() shouldBe ScriptResult(List(DataItem.Lng("1", 22)), List())
   }
 
+  property("@Callable exception error contains initialised values") {
+    val evalResult = parseCompileAndEvaluate(
+      """
+        | @Callable(invocation)
+        | func foo() = {
+        |   let a = 1
+        |   let b = 2
+        |   let isError = a != b
+        |   if (isError)
+        |     then throw("exception message")
+        |     else WriteSet([])
+        | }
+      """.stripMargin,
+      "foo"
+    )
+    inside(evalResult) {
+      case Left((error, log)) =>
+        error shouldBe "exception message"
+        log should contain allOf(
+          ("a",       Right(CONST_LONG(1))),
+          ("b",       Right(CONST_LONG(2))),
+          ("isError", Right(TRUE))
+        )
+    }
+  }
+
   property("Callable can't have more than 22 args") {
     val src =
       """
@@ -98,7 +124,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   def parseCompileAndEvaluate(script: String,
                               func: String,
-                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty))): Either[ExecutionError, ScriptResult] = {
+                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty))): Either[(ExecutionError, Log), ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
 

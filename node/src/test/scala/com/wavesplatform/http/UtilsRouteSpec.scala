@@ -79,7 +79,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe base64
-      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(CONST_LONG(1), CONST_LONG(2)))" // [WAIT] s"(1 == 2)"
+      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(1, 2))" // [WAIT] s"(1 == 2)"
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

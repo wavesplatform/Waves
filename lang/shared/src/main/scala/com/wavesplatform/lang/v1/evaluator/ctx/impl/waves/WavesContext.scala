@@ -341,6 +341,23 @@ object WavesContext {
         case _ => ???
       }
 
+    val assetInfoF: BaseFunction =
+      NativeFunction(
+        "assetInfo",
+        100,
+        GETASSETINFOBYID,
+        optionAsset,
+        "get asset info by id",
+        ("id", BYTESTR, "asset Id")
+      ) {
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          env.assetInfoById(id.arr).map(buildAssetInfo(_)) match {
+            case Some(result) => Right(result)
+            case _            => Right(unit)
+          }
+        case _ => ???
+      }
+
     val wavesBalanceF: UserFunction =
       UserFunction("wavesBalance", 109, LONG, "get WAVES balanse for account", ("@addressOrAlias", addressOrAliasType, "account")) {
         FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
@@ -418,7 +435,7 @@ object WavesContext {
 
     CTX(
       types ++ (if (version == V3) {
-                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType)
+                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType)
                 } else List.empty),
       commonVars ++ vars(version.id),
       functions ++ (if (version == V3) {
@@ -436,7 +453,7 @@ object WavesContext {
                         getBinaryByIndexF,
                         getStringByIndexF,
                         addressFromStringF
-                      ).map(withExtract)
+                      ).map(withExtract) :+ assetInfoF
                     } else {
                       List()
                     })

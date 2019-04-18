@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.parser.Expressions.FUNC
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.parser.Expressions.PART
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 object ContractCompiler {
@@ -128,26 +129,33 @@ object ContractCompiler {
     } yield DApp(ds, fs, v)
   }
 
+  def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
+    case x:PART.VALID[T]          => x.pure[CompileM]
+    case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
+  }
+
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {
       ctx <- get[CompilerContext, CompilationError]
-      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
+      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, PART.VALID[String]](handleValid)
       annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
         (af.anns.flatMap(_.args), af.f.args.map(_._1)))
-      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Boolean] {
+      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Option[PART.VALID[String]]] {
         case (annSeq, argSeq) =>
           for {
-            anns <- annSeq.toList.traverse[CompileM, String](handlePart)
-            args <- argSeq.toList.traverse[CompileM, String](handlePart)
-          } yield anns.forall(a => args.contains(a))
+            anns <- annSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
+            args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
+          } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
       }
-      _ <- annotationVars
-        .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
-          aVs.forall(!ctx.varDefs.contains(_)))
-      _ <- annAndFuncArgsIntersection
-        .ensure(Generic(contract.position.start, contract.position.start, "Script func args override annotation bindings")) { is =>
-          !(is contains true)
+      _ <- annotationVars.flatMap(a => a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
+        raiseError[CompilerContext, CompilationError, Unit](Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
+      })
+      _ <- annAndFuncArgsIntersection.flatMap {
+        _.headOption.flatten match {
+          case None => ().pure[CompileM]
+          case Some(PART.VALID(p,n)) => raiseError[CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
         }
+      }
     } yield ()
   }
 

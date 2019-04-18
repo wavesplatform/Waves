@@ -52,7 +52,7 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                               = ???
+      override def putIfNewTraced(tx: Transaction)                 = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
       override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
       override def pessimisticPortfolio(addr: Address): Portfolio          = ???
@@ -71,7 +71,7 @@ object Importer extends ScorexLogging {
         createInputStream(filename) match {
           case Success(inputStream) =>
             val db                = openDB(settings.dbSettings.directory)
-            val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), false)
+            val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
             val extAppender       = BlockAppender(blockchainUpdater, time, utxPoolStub, pos, settings, scheduler, verifyTransactions) _
             checkGenesis(settings, blockchainUpdater)

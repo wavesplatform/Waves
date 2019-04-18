@@ -16,7 +16,7 @@ trait ApiErrorMatchers { this: RouteTest =>
                     IndexedSeq(response.status, error.code, response.entity))
       } else {
         val responseJson = responseAs[JsObject]
-        MatchResult(responseJson == error.json,
+        MatchResult(responseJson - "trace" == error.json,
                     "expected {0}, but instead got {1}",
                     "expected not to get {0}, but instead did get it",
                     IndexedSeq(error.json, responseJson))

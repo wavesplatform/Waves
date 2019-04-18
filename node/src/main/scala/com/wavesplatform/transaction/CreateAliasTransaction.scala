@@ -1,14 +1,11 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{PublicKey, Alias}
-import com.wavesplatform.crypto._
+import com.wavesplatform.account.Alias
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-
-import scala.util.{Failure, Success, Try}
 
 trait CreateAliasTransaction extends ProvenTransaction with VersionedTransaction {
   def alias: Alias
