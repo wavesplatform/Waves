@@ -21,7 +21,7 @@ class NewWorker(settings: Settings,
                 node: InetSocketAddress,
                 nodeRestAddress: URL,
                 canContinue: () => Boolean,
-                initial: Seq[NetworkSender.Serializable])(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
+                initial: Seq[Transaction])(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
     extends ScorexLogging {
 
   def run(): Future[Unit] =
@@ -39,7 +39,7 @@ class NewWorker(settings: Settings,
     for {
       _ <- networkSender.send(channel, initial: _*)
       _ = log.info(s"Sending ${txs.length} to $channel")
-      _ <- networkSender.send(channel, txs.map(NetworkSender.Serializable.TX): _*)
+      _ <- networkSender.send(channel, txs: _*)
     } yield ()
   }
 

@@ -11,6 +11,7 @@ import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import monix.execution.Scheduler
@@ -151,6 +152,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       .load()
       .as[GeneratorSettings]("generator")
 
+  val wavesSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
+
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
     case Some(finalConfig) =>
@@ -180,7 +183,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
-      val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
+      val sender = new NetworkSender(wavesSettings.networkSettings.trafficLogger, finalConfig.addressScheme, "generator", nonce = Random.nextLong())
 
       sys.addShutdownHook(sender.close())
 
@@ -214,7 +217,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             node,
             nodeRestUrl,
             () => canContinue,
-            initialTransactions.map(NetworkSender.Serializable.TX)
+            initialTransactions
           )
       }
 

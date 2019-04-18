@@ -8,6 +8,7 @@ import cats.data._
 import cats.implicits._
 import com.wavesplatform.generator.Worker.Settings
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 
@@ -15,7 +16,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.control.NonFatal
 
-class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator, initial: List[NetworkSender.Serializable])(
+class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator, initial: List[Transaction])(
     implicit ec: ExecutionContext)
     extends ScorexLogging {
 
@@ -63,7 +64,7 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
       }
   }
 
-  private def trySend(channel: Channel, messages: Seq[NetworkSender.Serializable]): EitherT[Future, Throwable, Unit] = EitherT {
+  private def trySend(channel: Channel, messages: Seq[Transaction]): EitherT[Future, Throwable, Unit] = EitherT {
     sender
       .send(channel, messages: _*)
       .map { _ =>
@@ -93,7 +94,7 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
         }
       }
 
-      trySend(channel, txs.map(NetworkSender.Serializable.TX))
+      trySend(channel, txs)
         .leftMap(e => step -> e)
         .flatMap(_ => next)
     }
