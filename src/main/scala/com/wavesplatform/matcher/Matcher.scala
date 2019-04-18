@@ -300,7 +300,7 @@ class Matcher(actorSystem: ActorSystem,
 }
 
 object Matcher extends ScorexLogging {
-  type StoreEvent = QueueEvent => Future[QueueEventWithMeta]
+  type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
   def apply(actorSystem: ActorSystem,
             time: Time,

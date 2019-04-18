@@ -8,6 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
+import com.wavesplatform.matcher.api.SavingEventsDisabled
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.matcher.queue.QueueEvent
@@ -147,8 +148,11 @@ class AddressActor(
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
         Future.successful(error)
-      case Success(x) =>
-        log.info(s"Stored $x")
+      case Success(r) =>
+        r match {
+          case None    => promisedResponse.tryComplete(Success(SavingEventsDisabled))
+          case Some(x) => log.info(s"Stored $x")
+        }
         promisedResponse.future
     }
   }

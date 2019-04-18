@@ -37,6 +37,10 @@ case class SimpleResponse(code: StatusCode, message: String) extends WrappedMatc
 
 case class NotImplemented(message: String) extends WrappedMatcherResponse(C.NotImplemented, message)
 
+case object SavingEventsDisabled
+    extends WrappedMatcherResponse(C.NotImplemented,
+                                   Json.obj("status" -> "Disabled", "message" -> "This functionality is disabled, contact with admins"))
+
 case object InvalidSignature extends WrappedMatcherResponse(C.BadRequest, "Invalid signature")
 
 case object OperationTimedOut

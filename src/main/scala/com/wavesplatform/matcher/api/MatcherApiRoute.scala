@@ -512,7 +512,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
       unavailableOrderBookBarrier(pair) {
-        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map(_ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")))
+        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
+          case None => SavingEventsDisabled
+          case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+        })
       }
     }
   }

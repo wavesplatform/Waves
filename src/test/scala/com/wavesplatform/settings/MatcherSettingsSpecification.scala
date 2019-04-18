@@ -44,6 +44,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |      type = "kafka"
         |
         |      local {
+        |        enable-storing = no
         |        polling-interval = 1d
         |        max-elements-per-poll = 99
         |        clean-before-consume = no
@@ -58,7 +59,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |          max-backoff = 2d
         |        }
         |
-        |        producer.buffer-size = 200
+        |        producer {
+        |          enable = no
+        |          buffer-size = 200
+        |        }
         |      }
         |    }
         |    exchange-transaction-broadcast {
@@ -94,11 +98,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.balanceWatchingBufferInterval should be(33.seconds)
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
-      local = LocalMatcherQueue.Settings(1.day, 99, cleanBeforeConsume = false),
+      local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),
       kafka = KafkaMatcherQueue.Settings(
         "some-events",
         KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
-        KafkaMatcherQueue.ProducerSettings(200)
+        KafkaMatcherQueue.ProducerSettings(enable = false, 200)
       )
     )
     settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
