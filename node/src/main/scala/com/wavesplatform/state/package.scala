@@ -5,13 +5,11 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
-import com.wavesplatform.utils.Paged
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.utils.{CloseableIterator, Paged}
 import play.api.libs.json._
 import supertagged.TaggedType
 
@@ -22,40 +20,34 @@ package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsFromDiff(
-      b: Blockchain,
-      d: Option[Diff])(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
+  def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
-    def transactionsFromDiff(d: Diff): Seq[(Int, Transaction, Set[Address])] = d.transactions.values.view.toSeq.reverse
+    def transactionsFromDiff(d: Diff): CloseableIterator[(Int, Transaction, Set[Address])] =
+      d.transactions.values.toSeq.reverseIterator
 
-    def withPagination(s: Seq[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction, Set[Address])] =
+    def withPagination(txs: CloseableIterator[(Int, Transaction, Set[Address])]): CloseableIterator[(Int, Transaction, Set[Address])] =
       fromId match {
-        case None     => s
-        case Some(id) => s.dropWhile(_._2.id() != id).drop(1)
+        case None     => txs
+        case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: Seq[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction)] =
+    def withFilterAndLimit(txs: CloseableIterator[(Int, Transaction, Set[Address])]): CloseableIterator[(Int, Transaction)] =
       txs
-        .collect {
-          case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
-        }
-        .take(count)
+        .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
 
-    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Either[String, Seq[(Int, Transaction)]] =
-      s.length match {
-        case `count`        => Right(s)
-        case l if l < count => b.addressTransactions(address, types, count - l, None).map(s ++ _)
-        case _              => Right(s.take(count))
-      }
+    def withRestFromBlockchain(diffTxs: CloseableIterator[(Int, Transaction)]): CloseableIterator[(Int, Transaction)] =
+      diffTxs ++ b.addressTransactions(address, types, None)
 
-    def transactions: Diff => Either[String, Seq[(Int, Transaction)]] =
+    def transactions: Diff => CloseableIterator[(Int, Transaction)] =
       withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
 
-    d.fold(b.addressTransactions(address, types, count, fromId)) { diff =>
+    d.fold(b.addressTransactions(address, types, fromId)) { diff =>
       fromId match {
-        case Some(id) if !diff.transactions.contains(id) =>
-          b.addressTransactions(address, types, count, fromId)
-        case _ => transactions(diff)
+        case Some(id) if !diff.transactions.contains(id) => b.addressTransactions(address, types, fromId)
+        case _ => transactions(diff).map(kv => (Height(kv._1), kv._2))
       }
     }
   }
@@ -119,15 +111,15 @@ package object state {
 
     def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
-        .addressTransactions(address, Set(CreateAliasTransactionV1.typeId), Int.MaxValue, None)
-        .explicitGet()
+        .addressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None)
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
+        .closeAfter(_.toVector)
 
     def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
       blockchain
-        .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-        .explicitGet()
+        .addressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None)
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
+        .closeAfter(_.toVector)
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain

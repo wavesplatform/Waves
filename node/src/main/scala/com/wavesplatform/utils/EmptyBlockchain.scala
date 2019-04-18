@@ -9,10 +9,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
@@ -58,8 +57,9 @@ object EmptyBlockchain extends Blockchain {
 
   override def transactionHeight(id: ByteStr): Option[Int] = None
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    Right(Seq.empty)
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = CloseableIterator.empty
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
