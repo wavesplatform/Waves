@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
@@ -110,7 +110,4 @@ object EmptyBlockchain extends Blockchain {
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
-
-  override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] =
-    CloseableIterator.empty
 }

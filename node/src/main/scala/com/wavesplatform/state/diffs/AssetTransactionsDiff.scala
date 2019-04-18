@@ -7,10 +7,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
-import com.wavesplatform.utils.CloseableIterator
 
 import scala.util.{Left, Right}
 
@@ -50,16 +49,12 @@ object AssetTransactionsDiff {
       val oldInfo = blockchain.assetDescription(tx.asset).get
 
       def wasBurnt: Boolean = {
-        val iterator: CloseableIterator[(Int, Transaction)] = blockchain
+        val burns = blockchain
           .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
-          .fold(_ => blockchain.transactionsIterator(BurnTransactionV1, BurnTransactionV2), _.iterator)
+          .getOrElse(Nil)
 
-        try {
-          val result = iterator.collectFirst { case (_, burnTransaction: BurnTransaction) if burnTransaction.asset == tx.asset => burnTransaction }
-          result.isDefined
-        } finally {
-          iterator.close()
-        }
+        val result = burns.collectFirst { case (_, btx: BurnTransaction) if btx.asset == btx.asset => btx }
+        result.isDefined
       }
 
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
