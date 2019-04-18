@@ -9,8 +9,6 @@ import com.wavesplatform.state.{BlockAdded, MicroBlockAdded, RollbackCompleted}
 object PBEvents {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
-  // @todo deserialization to vanilla
-
   private def protobufStateUpdated(reason: (Short, ByteStr), su: VanillaStateUpdated): PBStateUpdated = {
     val reasonType = reason._1 match {
       case 0 => BLOCK
