@@ -663,7 +663,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               .filter(tp => types.contains(tp.typeId))
               .toVector
 
-            transactionsIterator(parsers, reverse = false)
+            transactionsIterator(parsers, reverse = true)
               .transform(takeAfter(_, maybeAfter))
           }
 
