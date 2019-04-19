@@ -5,8 +5,8 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.generator.NarrowTransactionGenerator.{ScriptFunctionArg, Settings}
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -230,28 +230,24 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             val function = randomFrom(script.functions).get
             val sender   = randomFrom(accounts).get
             val data = for {
-              argType <- function.argTypes
+              ScriptFunctionArg(argType, value) <- function.args
             } yield
               argType.toLowerCase match {
-                case "integer" => Terms.CONST_LONG(random.nextLong)
-                case "string"  => Terms.CONST_STRING(random.nextLong.toString)
-                case "boolean" => Terms.CONST_BOOLEAN(random.nextBoolean())
-                case "binary" =>
-                  val size = random.nextInt(MaxValueSize + 1)
-                  val b    = new Array[Byte](size)
-                  random.nextBytes(b)
-                  Terms.CONST_BYTESTR(ByteStr(b))
+                case "integer" => Terms.CONST_LONG(value.toLong)
+                case "string"  => Terms.CONST_STRING(value.toString)
+                case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
+                case "binary" => Terms.CONST_BYTESTR(Base58.decode(value))
               }
 
             val fc = Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList)
 
-            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.assets.contains(new String(a.name))))
+            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(new String(a.name))))
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
 
             logOption(
               InvokeScriptTransaction.selfSigned(
                 sender,
-                KeyPair.fromSeed(script.account).explicitGet().toAddress,
+                KeyPair.fromSeed(script.dappAccount).explicitGet().toAddress,
                 fc,
                 Seq(InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
                 100000000L + random.nextInt(100000000),
@@ -295,8 +291,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 }
 
 object NarrowTransactionGenerator {
-  case class ScriptFunction(name: String, argTypes: Seq[String])
-  case class ScriptSettings(account: String, assets: Set[String], functions: Seq[ScriptFunction])
+  case class ScriptFunctionArg(`type`: String, value: String)
+  case class ScriptFunction(name: String, args: Seq[ScriptFunctionArg)
+  case class ScriptSettings(dappAccount: String, paymentAssets: Set[String], functions: Seq[ScriptFunction])
   case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4
