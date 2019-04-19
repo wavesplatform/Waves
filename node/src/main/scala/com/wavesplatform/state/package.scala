@@ -25,29 +25,28 @@ package object state {
       types: Set[TransactionParser],
       fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
-    def transactionsFromDiff(d: Diff): CloseableIterator[(Int, Transaction, Set[Address])] =
+    def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
       d.transactions.values.toSeq.reverseIterator
 
-    def withPagination(txs: CloseableIterator[(Int, Transaction, Set[Address])]): CloseableIterator[(Int, Transaction, Set[Address])] =
+    def withPagination(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction, Set[Address])] =
       fromId match {
         case None     => txs
         case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: CloseableIterator[(Int, Transaction, Set[Address])]): CloseableIterator[(Int, Transaction)] =
+    def withFilterAndLimit(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction)] =
       txs
         .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
 
-    def withRestFromBlockchain(diffTxs: CloseableIterator[(Int, Transaction)]): CloseableIterator[(Int, Transaction)] =
-      diffTxs ++ b.addressTransactions(address, types, None)
-
-    def transactions: Diff => CloseableIterator[(Int, Transaction)] =
-      withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
+    def transactions: Diff => Iterator[(Int, Transaction)] =
+      withFilterAndLimit _ compose withPagination compose transactionsFromDiff
 
     d.fold(b.addressTransactions(address, types, fromId)) { diff =>
       fromId match {
         case Some(id) if !diff.transactions.contains(id) => b.addressTransactions(address, types, fromId)
-        case _ => transactions(diff).map(kv => (Height(kv._1), kv._2))
+        case _ =>
+          val diffTxs = transactions(diff).map(kv => (Height(kv._1), kv._2))
+          CloseableIterator.seq(diffTxs, b.addressTransactions(address, types, None))
       }
     }
   }

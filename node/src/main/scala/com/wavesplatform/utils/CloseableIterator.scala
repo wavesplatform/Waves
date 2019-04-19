@@ -1,28 +1,27 @@
 package com.wavesplatform.utils
 import java.io.Closeable
-import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.collection.{AbstractIterator, GenTraversableOnce, Iterator}
 
 //noinspection ScalaStyle
 sealed trait CloseableIterator[+A] extends Iterator[A] with Closeable {
-  def transform[B](f: Iterator[A] => Iterator[B]): CloseableIterator[B] = {
+  private[this] def replaceIterator[B](iterator: Iterator[B]): CloseableIterator[B] =
     CloseableIterator(
-      f(this),
+      iterator,
       () => this.close()
     )
-  }
 
-  override def collect[B](pf: PartialFunction[A, B]): CloseableIterator[B] = transform(_ => super.collect(pf))
-  override def map[B](f: A => B): CloseableIterator[B]                     = transform(_ => super.map(f))
-  override def filter(p: A => Boolean): CloseableIterator[A]               = transform(_ => super.filter(p))
-  override def take(n: Int): CloseableIterator[A]                          = transform(_ => super.take(n))
-  override def drop(n: Int): CloseableIterator[A]                          = transform(_ => super.drop(n))
-  override def takeWhile(p: A => Boolean): CloseableIterator[A]            = transform(_ => super.takeWhile(p))
-  override def dropWhile(p: A => Boolean): CloseableIterator[A]            = transform(_ => super.dropWhile(p))
+  def transform[B](f: Iterator[A] => Iterator[B]): CloseableIterator[B]    = replaceIterator(f(this))
+  override def collect[B](pf: PartialFunction[A, B]): CloseableIterator[B] = replaceIterator(super.collect(pf))
+  override def map[B](f: A => B): CloseableIterator[B]                     = replaceIterator(super.map(f))
+  override def filter(p: A => Boolean): CloseableIterator[A]               = replaceIterator(super.filter(p))
+  override def take(n: Int): CloseableIterator[A]                          = replaceIterator(super.take(n))
+  override def drop(n: Int): CloseableIterator[A]                          = replaceIterator(super.drop(n))
+  override def takeWhile(p: A => Boolean): CloseableIterator[A]            = replaceIterator(super.takeWhile(p))
+  override def dropWhile(p: A => Boolean): CloseableIterator[A]            = replaceIterator(super.dropWhile(p))
 
   override def flatMap[B](f: A => GenTraversableOnce[B]): CloseableIterator[B] = {
-    @transient
+    @volatile
     var closeables = List.empty[Closeable]
 
     CloseableIterator(
@@ -39,9 +38,7 @@ sealed trait CloseableIterator[+A] extends Iterator[A] with Closeable {
       }, { () =>
         try {
           closeables.foreach(_.close())
-        } finally {
-          this.close()
-        }
+        } finally this.close()
       }
     )
   }
@@ -102,30 +99,7 @@ object CloseableIterator {
   }
 
   def defer[T](f: => CloseableIterator[T]): CloseableIterator[T] = {
-    val initialized = new AtomicBoolean(false)
-
-    //noinspection ScalaStyle
-    @volatile var lazyIterator: CloseableIterator[T] = null
-
-    def createIteratorInstance() = {
-      if (initialized.compareAndSet(false, true)) lazyIterator = f
-      lazyIterator
-    }
-
-    CloseableIterator(
-      new AbstractIterator[T] {
-        private[this] var iteratorInstance: Iterator[T] = _
-        override def hasNext: Boolean = {
-          if (iteratorInstance == null) iteratorInstance = createIteratorInstance()
-          iteratorInstance.hasNext
-        }
-        override def next(): T = {
-          if (iteratorInstance == null) iteratorInstance = createIteratorInstance()
-          iteratorInstance.next()
-        }
-      },
-      () => if (lazyIterator != null) lazyIterator.close()
-    )
+    new DeferredCloseableIterator(() => f)
   }
 
   def close(iterator: Iterator[_]): Unit = iterator match {
@@ -133,5 +107,25 @@ object CloseableIterator {
     case _            => // Ignore
   }
 
-  implicit def fromIterator[T](iterator: Iterator[T]): CloseableIterator[T] = apply(iterator, () => ())
+  def using[T, V](iterator: CloseableIterator[T])(f: CloseableIterator[T] => V): V =
+    iterator.closeAfter(f)
+
+  implicit def fromIterator[T](iterator: Iterator[T]): CloseableIterator[T] = iterator match {
+    case c: CloseableIterator[T] => c
+    case _                       => apply(iterator, () => ())
+  }
+
+  private[this] class DeferredCloseableIterator[+T](createIterator: () => CloseableIterator[T]) extends CloseableIterator[T] {
+    //noinspection ScalaStyle
+    private[this] var lazyIterator: CloseableIterator[T] = _
+
+    private[this] def underlying: CloseableIterator[T] = {
+      if (lazyIterator == null) synchronized(if (lazyIterator == null) lazyIterator = createIterator())
+      lazyIterator
+    }
+
+    override def close(): Unit    = synchronized(if (lazyIterator != null) lazyIterator.close())
+    override def hasNext: Boolean = underlying.hasNext
+    override def next(): T        = underlying.next()
+  }
 }
