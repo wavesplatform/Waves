@@ -5,7 +5,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
@@ -57,21 +57,21 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val oneHalf    = Long.MaxValue / 2 + 1
         val overflow   = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
         val overflowEi = create(assetId, sender, overflow, timestamp, fee, attachment, proofs)
-        overflowEi shouldBe Left(ValidationError.OverflowError)
+        overflowEi shouldBe Left(TxValidationError.OverflowError)
 
         val feeOverflow   = List(ParsedTransfer(sender.toAddress, oneHalf))
         val feeOverflowEi = create(assetId, sender, feeOverflow, timestamp, oneHalf, attachment, proofs)
-        feeOverflowEi shouldBe Left(ValidationError.OverflowError)
+        feeOverflowEi shouldBe Left(TxValidationError.OverflowError)
 
         val longAttachment   = Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
         val longAttachmentEi = create(assetId, sender, transfers, timestamp, fee, longAttachment, proofs)
-        longAttachmentEi shouldBe Left(ValidationError.TooBigArray)
+        longAttachmentEi shouldBe Left(TxValidationError.TooBigArray)
 
         val noFeeEi = create(assetId, sender, feeOverflow, timestamp, 0, attachment, proofs)
-        noFeeEi shouldBe Left(ValidationError.InsufficientFee())
+        noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
 
         val negativeFeeEi = create(assetId, sender, feeOverflow, timestamp, -100, attachment, proofs)
-        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
+        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
     }
   }
 

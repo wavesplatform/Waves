@@ -2,10 +2,10 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.RxExtensionLoader.ExtensionBlocks
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, ChannelClosedAndSyncWith}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel

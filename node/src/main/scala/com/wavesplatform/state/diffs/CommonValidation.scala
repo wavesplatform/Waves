@@ -5,17 +5,18 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
@@ -113,7 +114,7 @@ object CommonValidation {
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
-        ValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
+        TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
@@ -196,7 +197,9 @@ object CommonValidation {
     if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > settings.maxTransactionTimeForwardOffset.toMillis)
       Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
        |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
-       |relative to block timestamp $time""".stripMargin.replaceAll("\n", " ")))
+       |relative to block timestamp $time""".stripMargin
+        .replaceAll("\n", " ")
+        .replaceAll("\r", "")))
     else Right(tx)
   }
 
@@ -205,7 +208,10 @@ object CommonValidation {
       case Some(t) if (t - tx.timestamp) > settings.maxTransactionTimeBackOffset.toMillis =>
         Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
          |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
-         |relative to previous block timestamp $prevBlockTime""".stripMargin.replaceAll("\n", " ")))
+         |relative to previous block timestamp $prevBlockTime"""
+          .stripMargin
+          .replaceAll("\n", " ")
+          .replaceAll("\r", "")))
       case _ => Right(tx)
     }
 
@@ -263,8 +269,8 @@ object CommonValidation {
     def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
       val (feeAssetInfo, feeAmount) = inputFee
       val assetsCount = tx match {
-        case tx: ExchangeTransaction => tx.checkedAssets().collect { case a @ IssuedAsset(_) => a }.count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
-        case _                       => tx.checkedAssets().collect { case a @ IssuedAsset(_) => a }.count(blockchain.hasAssetScript)
+        case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
+        case _                       => tx.checkedAssets().count(blockchain.hasAssetScript)
       }
       if (isSmartToken(inputFee)) {
         //Left(GenericError("Using smart asset for sponsorship is disabled."))

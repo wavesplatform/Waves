@@ -1,8 +1,8 @@
 package com.wavesplatform.account
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 sealed trait Alias extends AddressOrAlias {
   lazy val stringRepr: String = Alias.Prefix + chainId.toChar + ":" + name

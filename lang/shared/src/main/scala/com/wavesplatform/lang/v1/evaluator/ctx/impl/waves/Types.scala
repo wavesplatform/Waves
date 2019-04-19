@@ -28,6 +28,20 @@ object Types {
   )
 
   val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
+  val assetType = CASETYPEREF(
+    "Asset",
+    List(
+      "totalAmount" -> LONG,
+      "decimals"    -> LONG,
+      "issuer"      -> BYTESTR,
+      "reissuable"  -> BOOLEAN,
+      "scripted"    -> BOOLEAN,
+      "sponsored"   -> BOOLEAN
+    )
+  )
+  val optionAsset = UNION(assetType, UNIT)
+
+  val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
   val optionAddress = UNION(addressType, UNIT)
   val listTransfers = LIST(transfer)

@@ -286,4 +286,16 @@ object Bindings {
         "featureVotes"                   -> header.featureVotes.map(CONST_LONG)
       )
     )
+  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
+    CaseObj(
+      assetType,
+      Map(
+        "totalAmount" -> sAInfo.totalAmount,
+        "decimals"    -> sAInfo.decimals.toLong,
+        "issuer"      -> sAInfo.issuer,
+        "reissuable"  -> sAInfo.reissuable,
+        "scripted"    -> sAInfo.scripted,
+        "sponsored"   -> sAInfo.sponsored
+      )
+    )
 }

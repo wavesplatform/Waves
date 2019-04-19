@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.collection.JavaConverters._
@@ -28,6 +28,7 @@ object DocExport {
           override def inputEntity: Environment.InputEntity                                                            = ???
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+          override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
@@ -109,7 +110,7 @@ object DocExport {
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
       case class FieldTypes(name: String, types: java.util.List[TransactionField])
       val transactionsType       = fullContext.types.filter(v => v.name == "Transaction")
-      val transactionsTypesNames = transactionsType.flatMap({ case UNION(union, _) => union.map(_.name) }).toSet
+      val transactionsTypesNames = transactionsType.collect({ case UNION(union, _) => union.map(_.name) }).flatten.toSet
       def transactionDocs(types: Seq[FINAL], fieldsFlt: String => Boolean = (_ => true)) = {
         val transactionsTypes =
           types.flatMap({

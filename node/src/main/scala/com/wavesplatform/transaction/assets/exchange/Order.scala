@@ -4,9 +4,10 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
@@ -193,6 +194,7 @@ object Order {
             matcherFeeAssetId: Asset): Order = version match {
     case 3 =>
       OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, proofs)
+    case _ => Order(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
   }
 
   def correctAmount(a: Long, price: Long): Long = {

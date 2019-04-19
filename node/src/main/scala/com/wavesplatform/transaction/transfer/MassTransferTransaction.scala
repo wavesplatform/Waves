@@ -2,13 +2,14 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.Validation
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, toJson}
@@ -72,7 +73,11 @@ case class MassTransferTransaction private (assetId: Asset,
   def compactJson(recipients: Set[AddressOrAlias]): JsObject =
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
-  override def checkedAssets(): Seq[Asset] = Seq(assetId)
+  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
+    case Waves => Seq()
+    case a: IssuedAsset => Seq(a)
+  }
+
   override def version: Byte               = MassTransferTransaction.version
 }
 
@@ -95,16 +100,16 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Try { tx.transfers.map(_.amount).fold(tx.fee)(Math.addExact) }
         .fold(
-          ex => Left(ValidationError.OverflowError),
+          ex => Left(OverflowError),
           totalAmount =>
             if (tx.transfers.lengthCompare(MaxTransferCount) > 0) {
-              Left(ValidationError.GenericError(s"Number of transfers ${tx.transfers.length} is greater than $MaxTransferCount"))
+              Left(GenericError(s"Number of transfers ${tx.transfers.length} is greater than $MaxTransferCount"))
             } else if (tx.transfers.exists(_.amount < 0)) {
-              Left(ValidationError.GenericError("One of the transfers has negative amount"))
+              Left(GenericError("One of the transfers has negative amount"))
             } else if (tx.attachment.length > TransferTransaction.MaxAttachmentSize) {
-              Left(ValidationError.TooBigArray)
+              Left(TooBigArray)
             } else if (tx.fee <= 0) {
-              Left(ValidationError.InsufficientFee())
+              Left(InsufficientFee())
             } else {
               Right(tx)
           }
@@ -123,16 +128,16 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     Try {
       transfers.map(_.amount).fold(feeAmount)(Math.addExact)
     }.fold(
-      ex => Left(ValidationError.OverflowError),
+      ex => Left(OverflowError),
       totalAmount =>
         if (transfers.lengthCompare(MaxTransferCount) > 0) {
-          Left(ValidationError.GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount"))
+          Left(GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount"))
         } else if (transfers.exists(_.amount < 0)) {
-          Left(ValidationError.GenericError("One of the transfers has negative amount"))
+          Left(GenericError("One of the transfers has negative amount"))
         } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-          Left(ValidationError.TooBigArray)
+          Left(TooBigArray)
         } else if (feeAmount <= 0) {
-          Left(ValidationError.InsufficientFee())
+          Left(InsufficientFee())
         } else {
           Right(MassTransferTransaction(assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
       }
@@ -178,7 +183,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
       TransfersBytes(tailIndex(3)),
       LongBytes(tailIndex(4), "Timestamp"),
       LongBytes(tailIndex(5), "Fee"),
-      BytesArrayUndefinedLength(tailIndex(6), "Attachments"),
+      BytesArrayUndefinedLength(tailIndex(6), "Attachments", TransferTransaction.MaxAttachmentSize),
       ProofsBytes(tailIndex(7))
     ) mapN {
       case (sender, assetId, transfer, timestamp, fee, attachment, proofs) =>

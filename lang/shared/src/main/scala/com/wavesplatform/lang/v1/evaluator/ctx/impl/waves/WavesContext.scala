@@ -343,6 +343,23 @@ object WavesContext {
         case _ => ???
       }
 
+    val assetInfoF: BaseFunction =
+      NativeFunction(
+        "assetInfo",
+        100,
+        GETASSETINFOBYID,
+        optionAsset,
+        "get asset info by id",
+        ("id", BYTESTR, "asset Id")
+      ) {
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          env.assetInfoById(id.arr).map(buildAssetInfo(_)) match {
+            case Some(result) => Right(result)
+            case _            => Right(unit)
+          }
+        case _ => ???
+      }
+
     val wavesBalanceF: UserFunction =
       UserFunction("wavesBalance", 109, LONG, "get WAVES balanse for account", ("@addressOrAlias", addressOrAliasType, "account")) {
         FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
@@ -525,13 +542,29 @@ object WavesContext {
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3 || version == V4) {
-                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType)
+      types ++ (if (version == V3) {
+                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType)
                 } else List.empty),
       commonVars ++ vars(version.id),
-      functions ++
-        (if (version == V3) v3Functions.map(withExtract) else List.empty) ++
-        (if (version == V4) v3Functions.map(withExtract) ++ v4Functions else List.empty)
+      functions ++ (if (version == V3) {
+                      List(
+                        getIntegerFromStateF,
+                        getBooleanFromStateF,
+                        getBinaryFromStateF,
+                        getStringFromStateF,
+                        getIntegerFromArrayF,
+                        getBooleanFromArrayF,
+                        getBinaryFromArrayF,
+                        getStringFromArrayF,
+                        getIntegerByIndexF,
+                        getBooleanByIndexF,
+                        getBinaryByIndexF,
+                        getStringByIndexF,
+                        addressFromStringF
+                      ).map(withExtract) :+ assetInfoF
+                    } else {
+                      List()
+                    })
     )
   }
 

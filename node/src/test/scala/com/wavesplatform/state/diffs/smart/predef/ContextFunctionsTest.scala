@@ -1,19 +1,21 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.Global
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
 import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.utils.compilerContext
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -39,12 +41,13 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
     genesis2 = GenesisTransaction.create(recipient, ENOUGH_AMT * 3, ts).explicitGet()
     dataTransaction <- compactDataTransactionGen(recipient)
     transfer        <- transferGeneratorP(ts, master, recipient.toAddress, 100000000L)
+    transfer2       <- transferGeneratorPV2(ts + 15, master, recipient.toAddress, 100000L)
 
     untypedScript <- Gen
       .choose(1, 3)
       .map {
-        case 1 => scriptWithPureFunctions(dataTransaction, transfer)
-        case 2 => scriptWithWavesFunctions(dataTransaction, transfer)
+        case 1 => scriptWithV1PureFunctions(dataTransaction, transfer)
+        case 2 => scriptWithV1WavesFunctions(dataTransaction, transfer)
         case 3 => scriptWithCryptoFunctions
       }
       .map(x => Parser.parseExpr(x).get.value)
@@ -55,11 +58,11 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(recipient, Some(typedScript), 100000000L, ts).explicitGet()
 
-  } yield (Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer)
+  } yield (master, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
 
   property("validation of all functions from contexts") {
     forAll(preconditionsAndPayments) {
-      case (genesis, setScriptTransaction, dataTransaction, transfer) =>
+      case (_, genesis, setScriptTransaction, dataTransaction, transfer, _) =>
         assertDiffAndState(smartEnabledFS) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
@@ -70,7 +73,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
   property("reading from data transaction array by key") {
     forAll(preconditionsAndPayments) {
-      case (_, _, tx, _) =>
+      case (_, _, _, tx, _, _) =>
         val int  = tx.data(0)
         val bool = tx.data(1)
         val bin  = tx.data(2)
@@ -123,7 +126,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
   property("reading from data transaction array by index") {
     forAll(preconditionsAndPayments, Gen.choose(4, 40)) {
-      case ((_, _, tx, _), badIndex) =>
+      case ((_, _, _, tx, _, _), badIndex) =>
         val int  = tx.data(0)
         val bool = tx.data(1)
         val bin  = tx.data(2)
@@ -254,5 +257,68 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         |sha256( de ) != base58'123'
       """.stripMargin
     runScript(script) shouldBe Left(s"base64Encode input exceeds ${Global.MaxBase64Bytes}")
+  }
+
+  property("get assetInfo by asset id") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+
+          val quantity    = 100000000L
+          val decimals    = 6.toByte
+          val reissuable  = true
+          val assetScript = None
+          val sponsored   = false
+          val issueTx = IssueTransactionV2
+            .selfSigned(
+              AddressScheme.current.chainId,
+              masterAcc,
+              "testAsset".getBytes(),
+              "Test asset".getBytes(),
+              quantity,
+              decimals,
+              reissuable,
+              assetScript,
+              MinIssueFee * 2,
+              dataTransaction.timestamp + 5
+            )
+            .right
+            .get
+
+          append(Seq(transferTx, issueTx)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+              | {-# STDLIB_VERSION 3 #-}
+              | {-# CONTENT_TYPE EXPRESSION #-}
+              | {-# SCRIPT_TYPE ACCOUNT #-}
+              |
+              | let aInfoOpt = assetInfo(base58'${issueTx.assetId.value}')
+              |
+              | let aInfo = extract(aInfoOpt)
+              | let totalAmount = aInfo.totalAmount == $quantity
+              | let decimals = aInfo.decimals == $decimals
+              | let issuer = aInfo.issuer == base58'${issueTx.sender}'
+              | let scripted = aInfo.scripted == ${assetScript.nonEmpty}
+              | let reissuable = aInfo.reissuable == $reissuable
+              | let sponsored = aInfo.sponsored == $sponsored
+              |
+              | isDefined(aInfoOpt) && totalAmount && decimals && issuer && scripted && reissuable && sponsored
+              |
+              |
+            """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
   }
 }

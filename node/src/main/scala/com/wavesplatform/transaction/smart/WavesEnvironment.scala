@@ -7,8 +7,9 @@ import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParsers}
 import monix.eval.Coeval
@@ -125,5 +126,18 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
         com.wavesplatform.crypto.fastHash(script.bytes().arr)
       }
     } yield maybeScript).toOption.flatten
+  }
+
+  override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
+    blockchain.assetDescription(IssuedAsset(id)).map{
+      assetDesc =>
+        ScriptAssetInfo(
+          totalAmount = assetDesc.totalVolume.toLong,
+          decimals = assetDesc.decimals,
+          issuer = assetDesc.issuer,
+          reissuable = assetDesc.reissuable,
+          scripted = assetDesc.script.nonEmpty,
+          sponsored = assetDesc.sponsorship != 0)
+    }
   }
 }

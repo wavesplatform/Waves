@@ -4,11 +4,12 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 trait Blockchain {
   def height: Int
@@ -69,8 +70,9 @@ trait Blockchain {
   def assetScript(id: IssuedAsset): Option[Script]
   def hasAssetScript(id: IssuedAsset): Boolean
 
-  def accountData(acc: Address): AccountDataInfo
+  def accountDataKeys(address: Address): Seq[String]
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
+  def accountData(acc: Address): AccountDataInfo
 
   def leaseBalance(address: Address): LeaseBalance
 
@@ -85,10 +87,12 @@ trait Blockchain {
 
   def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo]
   // the following methods are used exclusively by patches
-  def allActiveLeases: Set[LeaseTransaction]
+  def allActiveLeases(predicate: LeaseTransaction => Boolean = _ => true): Set[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
+
+  def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
 }

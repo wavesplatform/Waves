@@ -3,9 +3,10 @@ package com.wavesplatform.it
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 package object sync {
   val smartFee: Long                   = 0.004.waves

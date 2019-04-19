@@ -6,6 +6,8 @@ import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.script.ContractScript
+import monix.execution.Scheduler
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
@@ -15,8 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.ContractScript
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -45,7 +46,7 @@ class AddressRouteSpec
     mock[ChannelGroup],
     new TestTime,
     TestFunctionalitySettings.Stub
-  ).route
+  )(Scheduler.global).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

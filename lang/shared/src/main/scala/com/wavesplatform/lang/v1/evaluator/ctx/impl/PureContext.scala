@@ -74,8 +74,8 @@ object PureContext {
     }
 
   lazy val throwWithMessage: BaseFunction = NativeFunction("throw", 1, THROW, NOTHING, "Fail script", ("err", STRING, "Error message")) {
-    case (err @ CONST_STRING(s)) :: Nil => Left(s)
-    case _                              => Left(defaultThrowMessage)
+    case CONST_STRING(s) :: Nil => Left(s)
+    case _                      => Left(defaultThrowMessage)
   }
 
   lazy val throwNoMessage: BaseFunction = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1, V4 -> 1), NOTHING, "Fail script") {

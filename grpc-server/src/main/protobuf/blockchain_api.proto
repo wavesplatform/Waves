@@ -1,0 +1,51 @@
+syntax = "proto3";
+package com.wavesplatform.api.grpc;
+
+import "google/protobuf/empty.proto";
+
+service BlockchainApi {
+    rpc GetActivationStatus (ActivationStatusRequest) returns (ActivationStatusResponse);
+    rpc GetBaseTarget (google.protobuf.Empty) returns (BaseTargetResponse);
+    rpc GetCumulativeScore (google.protobuf.Empty) returns (ScoreResponse);
+}
+
+message ActivationStatusRequest {
+    int32 height = 1;
+}
+
+message ActivationStatusResponse {
+    int32 height = 1;
+    int32 voting_interval = 2;
+    int32 voting_threshold = 3;
+    int32 next_check = 4;
+    repeated FeatureActivationStatus features = 5;
+}
+
+message FeatureActivationStatus {
+    enum BlockchainFeatureStatus {
+        UNDEFINED = 0;
+        APPROVED = 1;
+        ACTIVATED = 2;
+    };
+
+    enum NodeFeatureStatus {
+        NOT_IMPLEMENTED = 0;
+        IMPLEMENTED = 1;
+        VOTED = 2;
+    }
+
+    int32 id = 1;
+    string description = 2;
+    BlockchainFeatureStatus blockchain_status = 3;
+    NodeFeatureStatus node_status = 4;
+    int32 activation_height = 5;
+    int32 supporting_blocks = 6;
+}
+
+message BaseTargetResponse {
+    int64 base_target = 1;
+}
+
+message ScoreResponse {
+    bytes score = 1; // BigInt
+}

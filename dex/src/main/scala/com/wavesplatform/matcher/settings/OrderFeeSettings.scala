@@ -1,13 +1,14 @@
-package com.wavesplatform.settings
+package com.wavesplatform.matcher.settings
 
 import cats.data.Validated.Valid
 import cats.implicits._
-import com.wavesplatform.settings.AssetType.AssetType
-import com.wavesplatform.settings.FeeMode.FeeMode
+import com.wavesplatform.matcher.settings.AssetType.AssetType
+import com.wavesplatform.matcher.settings.FeeMode.FeeMode
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{Waves, _}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
@@ -88,7 +89,7 @@ object OrderFeeSettings {
       case FeeMode.PERCENT => validatePercentSettings
     }
 
-    cfgValidator.validate[FeeMode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
+    cfgValidator.validate[FeeMode](s"$path.mode").toEither >>= (mode => getSettingsByMode(mode).toEither) match {
       case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString(", "))
       case Right(orderFeeSettings) => orderFeeSettings
     }

@@ -55,7 +55,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
           Task {
             concurrent.blocking(utx.putIfNew(transaction)) match {
               case Right((isNew, _)) =>
-                if (isNew) Some(allChannels.write(RawBytes.from(transaction), (_: Channel) != sender))
+                if (isNew) Some(allChannels.write(transaction, (_: Channel) != sender))
                 else None
 
               case Left(error) =>

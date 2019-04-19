@@ -1,12 +1,13 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import com.wavesplatform.account.{PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, Proofs}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads}

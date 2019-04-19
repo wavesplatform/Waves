@@ -4,14 +4,15 @@ import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
@@ -81,6 +82,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
+  override def accountDataKeys(acc: Address): Seq[String] = Seq.empty
+
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
@@ -95,7 +98,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo] = Map.empty
 
-  override def allActiveLeases: Set[LeaseTransaction] = Set.empty
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = Set.empty
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,
                                          height: Int,
@@ -107,4 +110,6 @@ object EmptyBlockchain extends Blockchain {
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 }

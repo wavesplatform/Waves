@@ -6,9 +6,9 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 object Keys {
@@ -162,7 +162,12 @@ object Keys {
       Longs.fromByteArray,
       Longs.toByteArray
     )
-  val MinerBalancesInfoAtHeightPrefix: Short = 56
+
+  val InvokeScriptResultPrefix: Short = 56
+  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
+    Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
+
+  val MinerBalancesInfoAtHeightPrefix: Short = 57
   def minerBalancesInfoAtHeight(height: Height): Key[Map[AddressId, MinerBalanceInfo]] =
     Key(
       "miner-balances-info-at-height",

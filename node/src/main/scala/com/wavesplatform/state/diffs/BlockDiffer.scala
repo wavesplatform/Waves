@@ -7,14 +7,17 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.transaction.ValidationError.ActivationError
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.TxValidationError.ActivationError
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.TxValidationError._
 
 object BlockDiffer extends ScorexLogging {
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
@@ -25,7 +28,15 @@ object BlockDiffer extends ScorexLogging {
                                                 maybePrevBlock: Option[Block],
                                                 block: Block,
                                                 constraint: Constraint,
-                                                verify: Boolean = true): Either[ValidationError, Result[Constraint]] = {
+                                                verify: Boolean = true): Either[ValidationError, Result[Constraint]] =
+    fromBlockTraced(settings, blockchain, maybePrevBlock, block, constraint, verify).resultE
+
+  def fromBlockTraced[Constraint <: MiningConstraint](settings: FunctionalitySettings,
+                                                      blockchain: Blockchain,
+                                                      maybePrevBlock: Option[Block],
+                                                      block: Block,
+                                                      constraint: Constraint,
+                                                      verify: Boolean = true): TracedResult[ValidationError, Result[Constraint]] = {
     val stateHeight = blockchain.height
 
     // height switch is next after activation
@@ -46,7 +57,7 @@ object BlockDiffer extends ScorexLogging {
         None
 
     for {
-      _ <- block.signaturesValid()
+      _ <- TracedResult(block.signaturesValid())
       r <- apply(
         settings,
         blockchain,
@@ -64,16 +75,29 @@ object BlockDiffer extends ScorexLogging {
   }
 
   def fromMicroBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
+                                                blockchain: Blockchain,
+                                                prevBlockTimestamp: Option[Long],
+                                                micro: MicroBlock,
+                                                timestamp: Long,
+                                                constraint: Constraint,
+                                                verify: Boolean = true): Either[ValidationError, Result[Constraint]] =
+    fromMicroBlockTraced(settings, blockchain, prevBlockTimestamp, micro, timestamp, constraint, verify).resultE
+
+  def fromMicroBlockTraced[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                      blockchain: Blockchain,
                                                      prevBlockTimestamp: Option[Long],
                                                      micro: MicroBlock,
                                                      timestamp: Long,
                                                      constraint: Constraint,
-                                                     verify: Boolean = true): Either[ValidationError, Result[Constraint]] = {
+                                                     verify: Boolean = true): TracedResult[ValidationError, Result[Constraint]] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
-      _ <- Either.cond(blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
-      _ <- micro.signaturesValid()
+      _ <- TracedResult(Either.cond(
+        blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id),
+        (),
+        ActivationError(s"MicroBlocks are not yet activated")
+      ))
+      _ <- TracedResult(micro.signaturesValid())
       r <- apply(
         settings,
         blockchain,
@@ -100,9 +124,9 @@ object BlockDiffer extends ScorexLogging {
                                                     timestamp: Long,
                                                     txs: Seq[Transaction],
                                                     currentBlockHeight: Int,
-                                                    verify: Boolean): Either[ValidationError, Result[Constraint]] = {
-    def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction): Constraint =
-      constraint.put(blockchain, tx).asInstanceOf[Constraint]
+                                                    verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
+    def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
+      constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
 
     val txDiffer       = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
@@ -130,27 +154,30 @@ object BlockDiffer extends ScorexLogging {
     }
 
     txs
-      .foldLeft(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError]) {
-        case (r @ Left(_), _) => r
-        case (Right(Result(currDiff, carryFee, currTotalFee, currConstraint)), tx) =>
+      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError])) {
+        case (acc @ TracedResult(Left(_), _), _) => acc
+        case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint)), _), tx) =>
           val updatedBlockchain = composite(blockchain, currDiff)
-          val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
-          if (updatedConstraint.isOverfilled)
-            Left(ValidationError.GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint"))
-          else
-            txDiffer(updatedBlockchain, tx).map { newDiff =>
+          txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
+            val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
+            if (updatedConstraint.isOverfilled)
+              TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
+            else {
               val updatedDiff = currDiff.combine(newDiff)
 
               val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
               val totalWavesFee                = currTotalFee + curBlockFees.balance + nextBlockFee
 
-              if (hasNg) {
-                val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
-                Result(diff, carryFee + nextBlockFee, totalWavesFee, updatedConstraint)
-              } else {
-                Result(updatedDiff, 0L, totalWavesFee, updatedConstraint)
-              }
+              Right(
+                if (hasNg) {
+                  val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
+                  Result(diff, carryFee + nextBlockFee, totalWavesFee, updatedConstraint)
+                } else {
+                  Result(updatedDiff, 0L, totalWavesFee, updatedConstraint)
+                }
+              )
             }
+          }
       }
       .map {
         case Result(diff, carry, totalFee, constraint) =>

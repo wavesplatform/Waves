@@ -20,7 +20,7 @@ import org.scalatest.{FreeSpec, Matchers}
 class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, true)
+    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
     val settings      = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {

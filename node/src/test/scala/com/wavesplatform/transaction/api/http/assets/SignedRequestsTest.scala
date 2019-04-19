@@ -3,8 +3,8 @@ package com.wavesplatform.transaction.api.http.assets
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.smart.script.Script
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 

@@ -5,6 +5,8 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
@@ -12,9 +14,7 @@ import com.wavesplatform.state.StateSyntheticBenchmark._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.compilerContext
 import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
 

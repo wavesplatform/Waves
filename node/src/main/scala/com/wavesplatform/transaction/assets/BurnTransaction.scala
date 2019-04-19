@@ -1,7 +1,9 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -41,7 +43,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
       Longs.toByteArray(timestamp)
     )
   }
-  override def checkedAssets(): Seq[Asset] = Seq(asset)
+  override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
 }
 
 object BurnTransaction {
@@ -54,8 +56,8 @@ object BurnTransaction {
 
   def validateBurnParams(amount: Long, fee: Long): Either[ValidationError, Unit] =
     if (amount < 0) {
-      Left(ValidationError.NegativeAmount(amount, "assets"))
+      Left(NegativeAmount(amount, "assets"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(InsufficientFee())
     } else Right(())
 }

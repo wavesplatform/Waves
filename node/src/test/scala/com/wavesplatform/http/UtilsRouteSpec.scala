@@ -5,11 +5,11 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V2
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -51,19 +51,13 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "true"
     }
 
-    val NEW_LINE = scala.util.Properties.lineSeparator
-
     Post(routePath("/script/decompile"), "AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAbAmSEV") ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
       (json \ "SCRIPT_TYPE").as[String] shouldBe "ACCOUNT"
 
-      val expectedResult =
-        s"""{-# STDLIB_VERSION 3 #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |$NEW_LINE$NEW_LINE$NEW_LINE@Verifier(tx)${NEW_LINE}func verify () = true$NEW_LINE""".stripMargin
+      val expectedResult = "{-# STDLIB_VERSION 3 #-}\n{-# SCRIPT_TYPE ACCOUNT #-}\n{-# CONTENT_TYPE DAPP #-}\n\n\n\n@Verifier(tx)\nfunc verify () = true\n"
       (json \ "script").as[String] shouldBe expectedResult
     }
   }
@@ -85,7 +79,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe base64
-      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(CONST_LONG(1), CONST_LONG(2)))" // [WAIT] s"(1 == 2)"
+      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(1, 2))" // [WAIT] s"(1 == 2)"
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

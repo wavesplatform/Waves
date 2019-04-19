@@ -5,14 +5,14 @@ import "script.proto";
 import "recipient.proto";
 
 message AssetAmount {
-    bytes assetId = 1;
+    bytes asset_id = 1;
     int64 amount = 2;
 }
 
 message Amount {
     oneof amount {
-        int64 wavesAmount = 1;
-        AssetAmount assetAmount = 2;
+        int64 waves_amount = 1;
+        AssetAmount asset_amount = 2;
     }
 }
 
@@ -22,8 +22,8 @@ message SignedTransaction {
 }
 
 message Transaction {
-    int32 chainId = 1;
-    bytes senderPublicKey = 2;
+    int32 chain_id = 1;
+    bytes sender_public_key = 2;
     Amount fee = 3;
     int64 timestamp = 4;
     int32 version = 5;
@@ -37,24 +37,24 @@ message Transaction {
         BurnTransactionData burn = 106;
         ExchangeTransactionData exchange = 107;
         LeaseTransactionData lease = 108;
-        LeaseCancelTransactionData leaseCancel = 109;
-        CreateAliasTransactionData createAlias = 110;
-        MassTransferTransactionData massTransfer = 111;
-        DataTransactionData dataTransaction = 112;
-        SetScriptTransactionData setScript = 113;
-        SponsorFeeTransactionData sponsorFee = 114;
-        SetAssetScriptTransactionData setAssetScript = 115;
+        LeaseCancelTransactionData lease_cancel = 109;
+        CreateAliasTransactionData create_alias = 110;
+        MassTransferTransactionData mass_transfer = 111;
+        DataTransactionData data_transaction = 112;
+        SetScriptTransactionData set_script = 113;
+        SponsorFeeTransactionData sponsor_fee = 114;
+        SetAssetScriptTransactionData set_asset_script = 115;
         // TODO: 116 = contract invocation
     };
 };
 
 message GenesisTransactionData {
-    bytes recipientAddress = 1;
+    bytes recipient_address = 1;
     int64 amount = 2;
 };
 
 message PaymentTransactionData {
-    bytes address = 1;
+    bytes recipient_address = 1;
     int64 amount = 2;
 };
 
@@ -72,10 +72,10 @@ message DataTransactionData {
     message DataEntry {
         string key = 1;
         oneof value {
-            int64 intValue = 10;
-            bool boolValue = 11;
-            bytes binaryValue = 12;
-            string stringValue = 13;
+            int64 int_value = 10;
+            bool bool_value = 11;
+            bytes binary_value = 12;
+            string string_value = 13;
         };
     };
 
@@ -88,7 +88,7 @@ message MassTransferTransactionData {
         int64 amount = 2;
     };
 
-    bytes assetId = 1;
+    bytes asset_id = 1;
     repeated Transfer transfers = 2;
     bytes attachment = 3;
 };
@@ -99,11 +99,11 @@ message LeaseTransactionData {
 };
 
 message LeaseCancelTransactionData {
-    bytes leaseId = 1;
+    bytes lease_id = 1;
 };
 
 message BurnTransactionData {
-    AssetAmount assetAmount = 1;;
+    AssetAmount asset_amount = 1;
 };
 
 message IssueTransactionData {
@@ -117,12 +117,12 @@ message IssueTransactionData {
 
 
 message ReissueTransactionData {
-    AssetAmount assetAmount = 1;
+    AssetAmount asset_amount = 1;
     bool reissuable = 2;
 };
 
 message SetAssetScriptTransactionData {
-    bytes assetId = 1;
+    bytes asset_id = 1;
     Script script = 2;
 };
 
@@ -132,13 +132,13 @@ message SetScriptTransactionData {
 
 message ExchangeTransactionData {
     message BuySellOrders {
-        Order buyOrder = 1;
-        Order sellOrder = 2;
+        Order buy_order = 1;
+        Order sell_order = 2;
     }
 
     message MakerTakerOrders {
-        Order makerOrder = 1;
-        Order takerOrder = 2;
+        Order maker_order = 1;
+        Order taker_order = 2;
     }
 
     message Order {
@@ -148,34 +148,42 @@ message ExchangeTransactionData {
         };
 
         message AssetPair {
-            bytes amountAssetId = 1;
-            bytes priceAssetId = 2;
+            bytes amount_asset_id = 1;
+            bytes price_asset_id = 2;
         };
 
-        int32 chainId = 1;
-        bytes senderPublicKey = 2;
-        bytes matcherPublicKey = 3;
-        AssetPair assetPair = 4;
-        Side orderSide = 5;
+        int32 chain_id = 1;
+        bytes sender_public_key = 2;
+        bytes matcher_public_key = 3;
+        AssetPair asset_pair = 4;
+        Side order_side = 5;
         int64 amount = 6;
         int64 price = 7;
         int64 timestamp = 8;
         int64 expiration = 9;
-        Amount matcherFee = 10;
+        Amount matcher_fee = 10;
         int32 version = 11;
         repeated bytes proofs = 12;
     };
 
-    oneof orders {
-        BuySellOrders buySellOrders = 1;
-        MakerTakerOrders makerTakerOrders = 2;
-    }
-    int64 amount = 3;
-    int64 price = 4;
-    int64 buyMatcherFee = 5;
-    int64 sellMatcherFee = 6;
+    int64 amount = 1;
+    int64 price = 2;
+    int64 buy_matcher_fee = 3;
+    int64 sell_matcher_fee = 4;
+    repeated Order orders = 5;
+    int32 taker = 6;
 };
 
 message SponsorFeeTransactionData {
-    AssetAmount minFee = 1;
+    AssetAmount min_fee = 1;
 };
+
+message InvokeScriptResult {
+    message Payment {
+        bytes address = 1;
+        Amount amount = 2;
+    }
+
+    repeated DataTransactionData.DataEntry data_entries = 1;
+    repeated Payment payments = 2;
+}

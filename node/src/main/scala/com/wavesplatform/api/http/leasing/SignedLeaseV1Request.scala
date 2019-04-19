@@ -1,9 +1,9 @@
 package com.wavesplatform.api.http.leasing
 
-import com.wavesplatform.account.{PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
-import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.lease.LeaseTransactionV1
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}

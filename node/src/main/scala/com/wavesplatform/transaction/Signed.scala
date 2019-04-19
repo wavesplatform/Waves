@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.transaction.ValidationError.InvalidSignature
+import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
@@ -13,10 +13,12 @@ trait Signed extends Authorized {
   protected val signatureValid: Coeval[Boolean]
 
   @ApiModelProperty(hidden = true)
-  protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq.empty)
+  protected val signedDescendants: Coeval[Seq[Signed]] =
+    Coeval(Nil)
 
   @ApiModelProperty(hidden = true)
-  protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
+  protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] =
+    Signed.validateTask[this.type](this).memoize
 
   @ApiModelProperty(hidden = true)
   val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =
@@ -24,26 +26,12 @@ trait Signed extends Authorized {
 }
 
 object Signed {
-
   type E[A] = Either[InvalidSignature, A]
-  private implicit val scheduler: SchedulerService = {
-    val cores       = Runtime.getRuntime.availableProcessors()
-    val parallelism = (cores / 2).max(1).min(4)
-    Scheduler.computation(name = "sig-validator", parallelism = parallelism)
-  }
 
-  private def validateTask[S <: Signed](s: S): Task[E[S]] =
-    Task {
-      if (!s.signatureValid()) Task.now(Left(InvalidSignature(s, None)))
-      else if (s.signedDescendants().isEmpty) Task.now(Right(s))
-      else
-        Task.wanderUnordered(s.signedDescendants())(s => s.signaturesValidMemoized) map { l =>
-          l.find(_.isLeft) match {
-            case Some(e) => Left(e.left.get)
-            case None    => Right(s)
-          }
-        }
-    }.flatten
+  private implicit lazy val scheduler: SchedulerService = {
+    val parallelism = (Runtime.getRuntime.availableProcessors() / 2).max(1).min(4)
+    Scheduler.computation(parallelism, "sig-validator")
+  }
 
   def validateOrdered[S <: Signed](ss: Seq[S]): E[Seq[S]] =
     Await.result(Task
@@ -57,4 +45,20 @@ object Signed {
                    .runAsync,
                  Duration.Inf)
 
+  private def validateTask[S <: Signed](signedEntity: S): Task[E[S]] =
+    Task {
+      import cats.instances.either._
+      import cats.instances.list._
+      import cats.syntax.traverse._
+
+      if (!signedEntity.signatureValid()) {
+        Task.now(Left(InvalidSignature(signedEntity, None)))
+      } else if (signedEntity.signedDescendants().isEmpty) {
+        Task.now(Right(signedEntity))
+      } else {
+        Task
+          .wanderUnordered(signedEntity.signedDescendants())(s => s.signaturesValidMemoized)
+          .map(_.sequence.map(_ => signedEntity))
+      }
+    }.flatten
 }

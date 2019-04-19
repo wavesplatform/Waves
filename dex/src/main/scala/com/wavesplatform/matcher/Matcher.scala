@@ -18,10 +18,11 @@ import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, MatcherModel, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.state.VolumeAndFee
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
@@ -63,7 +64,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings.orderFee)
+  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -79,17 +80,32 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
-    matcherActor,
-    addressActors,
-    pair,
-    updateOrderBookCache(pair),
-    marketStatuses.put(pair, _),
-    tx => exchangeTxPool.execute(() => context.addToUtx(tx)),
-    settings,
-    transactionCreator.createTransaction,
-    context.time
-  )
+  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = {
+
+    val normalizedTickSize = settings.orderRestrictions.get(pair).withFilter(_.mergeSmallPrices).map { restrictions =>
+      def getDecimals(asset: Asset): Int =
+        asset.fold(8) { issuedAsset =>
+          context.blockchain
+            .assetDescription(issuedAsset)
+            .map(_.decimals)
+            .getOrElse(throw new Exception("Can not get asset decimals since asset not found!"))
+        }
+      MatcherModel.toNormalized(restrictions.tickSize, getDecimals(pair.priceAsset), getDecimals(pair.priceAsset)).max(1)
+    }
+
+    OrderBookActor.props(
+      matcherActor,
+      addressActors,
+      pair,
+      updateOrderBookCache(pair),
+      marketStatuses.put(pair, _),
+      tx => exchangeTxPool.execute(() => context.utx.putIfNew(tx).map(r => if (r._1) context.broadcastTx(tx))),
+      settings,
+      transactionCreator.createTransaction,
+      context.time,
+      normalizedTickSize
+    )
+  }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
@@ -116,7 +132,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
                                           matcherPublicKey.toAddress,
                                           context.time,
                                           settings.orderFee,
-                                          settings.orderAmountRestrictions)(o)
+                                          settings.orderRestrictions)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(o.assetPair, x))
     } yield o
   }
@@ -189,7 +205,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           address =>
             Props(new AddressActor(
               address,
-              context.spendableBalance(address, _),
+              context.utx.spendableBalance(address, _),
               5.seconds,
               context.time,
               orderDb,

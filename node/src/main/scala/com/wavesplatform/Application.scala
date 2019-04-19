@@ -42,6 +42,7 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -57,6 +58,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   app =>
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
+  private[this] val apiScheduler = Scheduler(actorSystem.dispatcher)
 
   private val db = openDB(settings.dbSettings.directory)
 
@@ -64,7 +66,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, settings.dbSettings.storeTransactionsByAddress)
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -204,14 +206,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     val extensionContext = new Context {
-      override def settings: WavesSettings                                  = app.settings
-      override def blockchain: Blockchain                                   = app.blockchainUpdater
-      override def time: Time                                               = app.time
-      override def wallet: Wallet                                           = app.wallet
-      override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
-      override def spendableBalance(address: Address, assetId: Asset): Long = utxStorage.spendableBalance(address, assetId)
-      override def addToUtx(tx: Transaction): Unit                          = utxStorage.putIfNew(tx)
-      override def actorSystem: ActorSystem                                 = app.actorSystem
+      override def settings: WavesSettings                               = app.settings
+      override def blockchain: Blockchain                                = app.blockchainUpdater
+      override def time: Time                                            = app.time
+      override def wallet: Wallet                                        = app.wallet
+      override def utx: UtxPool                                          = utxStorage
+      override def broadcastTx(tx: Transaction): Unit                    = allChannels.broadcastTx(tx, None)
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -223,14 +225,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels)(apiScheduler),
         TransactionsApiRoute(settings.restAPISettings,
                              settings.blockchainSettings.functionalitySettings,
                              wallet,
                              blockchainUpdater,
                              utxStorage,
                              allChannels,
-                             time),
+                             time)(apiScheduler),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
         PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
@@ -242,7 +244,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                         utxStorage,
                         allChannels,
                         time,
-                        settings.blockchainSettings.functionalitySettings),
+                        settings.blockchainSettings.functionalitySettings)(apiScheduler),
         DebugApiRoute(
           settings,
           time,
@@ -262,10 +264,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot
         ),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, blockchainUpdater, time),
+        AssetsApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, utxStorage, allChannels, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, blockchainUpdater),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
+        LeaseApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
         AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, blockchainUpdater),
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
@@ -320,12 +322,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
 
       log.info("Closing REST API")
-      if (settings.restAPISettings.enable) {
+      if (settings.restAPISettings.enable)
         Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
-      }
-      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
-        upnp.deletePort(addr.getPort)
-      }
+      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
 
       log.debug("Closing peer database")
       peerDatabase.close()

@@ -2,10 +2,10 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.{GenericError, Validation}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, Validation}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 
@@ -25,6 +25,7 @@ object MassTransferTransactionDiff {
 
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender   = Address.fromPublicKey(tx.sender)
+      val scripts = tx.checkedAssets().count(blockchain.hasAssetScript) + (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 })
       val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
       val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) =>
         (u._1 combine v._1, u._2 + v._2)
@@ -43,7 +44,7 @@ object MassTransferTransactionDiff {
         case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
       }
 
-      Either.cond(assetIssued, Diff(height, tx, completePortfolio), GenericError(s"Attempt to transfer a nonexistent asset"))
+      Either.cond(assetIssued, Diff(height, tx, completePortfolio, scriptsRun = scripts), GenericError(s"Attempt to transfer a nonexistent asset"))
     }
   }
 }
