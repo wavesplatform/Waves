@@ -367,11 +367,11 @@ package object database {
   }
 
   implicit class DBExt(val db: DB) extends AnyVal {
-    def readOnlyStream[A](f: ReadOnlyDB => Iterator[A]): CloseableIterator[A] = {
+    def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = {
       val snapshot = db.getSnapshot
       val iterator = f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
       CloseableIterator(iterator, { () =>
-        CloseableIterator.close(iterator)
+        iterator.close()
         snapshot.close()
       })
     }

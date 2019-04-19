@@ -81,7 +81,8 @@ object CloseableIterator {
       hasNext
     }
 
-    override def next(): T = iterator.next()
+    override def next(): T =
+      iterator.next()
 
     override def finalize(): Unit = {
       if (!this.closed) {
@@ -90,6 +91,9 @@ object CloseableIterator {
       }
       super.finalize()
     }
+
+    override def toString(): String =
+      s"Closeable($iterator)"
   }
 
   def seq[T](iterators: CloseableIterator[T]*): CloseableIterator[T] = {
@@ -121,7 +125,8 @@ object CloseableIterator {
     private[this] var lazyIterator: CloseableIterator[T] = _
 
     private[this] def underlying: CloseableIterator[T] = {
-      if (lazyIterator == null) synchronized(if (lazyIterator == null) lazyIterator = createIterator().ensuring(_ != null, "Created iterator shouldn't be null"))
+      if (lazyIterator == null)
+        synchronized(if (lazyIterator == null) lazyIterator = createIterator().ensuring(_ != null, "Created iterator shouldn't be null"))
       lazyIterator
     }
 
