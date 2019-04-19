@@ -24,8 +24,7 @@ class OrderBookActor(owner: ActorRef,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
-                     time: Time,
-                     startOffset: QueueEventWithMeta.Offset)
+                     time: Time)
     extends PersistentActor
     with ScorexLogging {
 
@@ -34,8 +33,8 @@ class OrderBookActor(owner: ActorRef,
   protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
   private var savingSnapshot: Option[QueueEventWithMeta.Offset]  = None
-  private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = startOffset
-  private var lastProcessedOffset: QueueEventWithMeta.Offset     = startOffset
+  private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = -1L
+  private var lastProcessedOffset: QueueEventWithMeta.Offset     = -1L
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
@@ -127,15 +126,14 @@ class OrderBookActor(owner: ActorRef,
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
-      lastProcessedOffset = math.max(startOffset, lastProcessedOffset) // lastProcessedOffset can't be < order book's creation offset
+      log.debug(s"Recovery completed at $lastProcessedOffset: $orderBook")
       processEvents(orderBook.allOrders.map(OrderAdded))
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
-      log.debug(s"Recovery completed at $lastProcessedOffset: $orderBook")
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
-      log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr}), startOffset=$startOffset")
+      log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
       orderBook = OrderBook(snapshot.orderBook)
       lastProcessedOffset = snapshot.eventNr
       lastSavedSnapshotOffset = lastProcessedOffset
@@ -160,9 +158,8 @@ object OrderBookActor {
             updateMarketStatus: MarketStatus => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
-            time: Time,
-            startOffset: QueueEventWithMeta.Offset): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, startOffset))
+            time: Time): Props =
+    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

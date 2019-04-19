@@ -55,8 +55,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           update(pair),
           p => Option(md.get(p)),
           txFactory,
-          ntpTime,
-          -1
+          ntpTime
         ) with RestartableActor))
 
     f(pair, actor, tp)

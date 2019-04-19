@@ -72,7 +72,7 @@ class Matcher(actorSystem: ActorSystem,
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef, startOffset: QueueEventWithMeta.Offset): Props = OrderBookActor.props(
+  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
     matcherActor,
     addressActors,
     pair,
@@ -80,8 +80,7 @@ class Matcher(actorSystem: ActorSystem,
     marketStatuses.put(pair, _),
     matcherSettings,
     transactionCreator.createTransaction,
-    time,
-    startOffset
+    time
   )
 
   private val matcherQueue: MatcherQueue = settings.matcherSettings.eventsQueue.tpe match {
@@ -274,7 +273,7 @@ class Matcher(actorSystem: ActorSystem,
   private def waitSnapshotsRestored(timeout: FiniteDuration): Future[Unit] = {
     val failure = Promise[Unit]()
     actorSystem.scheduler.scheduleOnce(timeout) {
-      failure.failure(new TimeoutException("Can't restore snapshots in time"))
+      failure.failure(new TimeoutException(s"Can't restore snapshots in ${timeout.toSeconds} seconds"))
     }
 
     Future.firstCompletedOf[Unit](List(snapshotsRestore.future, failure.future))
@@ -289,9 +288,11 @@ class Matcher(actorSystem: ActorSystem,
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     val p = Promise[Unit]()
 
+    // TODO Женя
     def loop(): Unit = {
       if (currentOffset >= lastQueueOffset) p.trySuccess(())
-      else if (deadline.isOverdue()) p.tryFailure(new TimeoutException("Can't process all events in time"))
+      else if (deadline.isOverdue())
+        p.tryFailure(new TimeoutException(s"Can't process all events in ${settings.matcherSettings.startEventsProcessingTimeout.toMinutes} minutes"))
       else actorSystem.scheduler.scheduleOnce(1.second)(loop())
     }
 
@@ -322,7 +323,7 @@ object Matcher extends ScorexLogging {
       Some(matcher)
     } catch {
       case NonFatal(e) =>
-        log.warn("Error starting matcher", e)
+        log.warn("Can't start matcher", e)
         forceStopApplication(ErrorStartingMatcher)
         None
     }

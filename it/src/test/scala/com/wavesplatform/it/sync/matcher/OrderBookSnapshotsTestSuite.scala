@@ -24,32 +24,63 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   private val (issue1, issue2, assetPair1) = issueAssetPair(aliceAcc, 8, 8)
   private val assetPair2                   = AssetPair(assetPair1.amountAsset, None)
 
-  private val ordersPackSize = 11
-  private val ordersPack = Gen
-    .containerOfN[Vector, Order](ordersPackSize - 1, orderGen(matcherNode.publicKey, aliceAcc, List(assetPair1)))
+  private val ordersPack1Size = 11
+  private val ordersPack1 = Gen
+    .containerOfN[Vector, Order](ordersPack1Size - 1, orderGen(matcherNode.publicKey, aliceAcc, List(assetPair1)))
     .sample
     .get :+ orderGen(matcherNode.publicKey, aliceAcc, List(assetPair2)).sample.get
 
+  private val ordersPack2Size = interval.toInt
+  private val ordersPack2 = Gen
+    .containerOfN[Vector, Order](ordersPack2Size, orderGen(matcherNode.publicKey, aliceAcc, List(assetPair2)))
+    .sample
+    .get
+
   "Order books are created with right offsets" in {
-    ordersPack.foreach { order =>
+    ordersPack1.foreach { order =>
       matcherNode.placeOrder(order)
     }
 
-    matcherNode.waitFor[QueueEventWithMeta.Offset]("all events are consumed")(_.getCurrentOffset, _ == ordersPackSize - 1, 300.millis)
-    val allSnapshotOffsets = matcherNode.getAllSnapshotOffsets
+    matcherNode.waitFor[QueueEventWithMeta.Offset]("ordersPack1Size - all events are consumed")(
+      _.getCurrentOffset,
+      _ == ordersPack1Size - 1,
+      300.millis
+    )
+    val allSnapshotOffsets1 = matcherNode.getAllSnapshotOffsets
 
-    allSnapshotOffsets(assetPair1.key) should be < interval
+    withClue("We doesn't show pairs, those have snapshot's offset equal to -1") {
+      if (allSnapshotOffsets1.contains(assetPair1.key)) allSnapshotOffsets1(assetPair1.key) should be < interval
+      if (allSnapshotOffsets1.contains(assetPair2.key)) allSnapshotOffsets1(assetPair2.key) should be < interval
+    }
 
-    // [0;{N}] orders to the assetPair, {N+1} order to assetPair2
-    // the offset of assetPair2's order books should be {N} to be able to process {N+1} after restart
-    // see OrderBookActor.executeCommands
-    allSnapshotOffsets(assetPair2.key) shouldBe (ordersPackSize - 2) // -2 because snapshot offsets are the indexes, those start from 0
+    ordersPack2.foreach { order =>
+      matcherNode.placeOrder(order)
+    }
+
+    matcherNode.waitFor[QueueEventWithMeta.Offset]("ordersPack2Size - all events are consumed")(
+      _.getCurrentOffset,
+      _ == ordersPack1Size + ordersPack2Size - 1,
+      300.millis
+    )
+    val allSnapshotOffsets2 = matcherNode.getAllSnapshotOffsets
+    withClue("Asset pairs has right offsets") {
+      allSnapshotOffsets2.foreach {
+        case (pair, offset) =>
+          withClue(pair) {
+            offset should be < (interval * 2)
+          }
+      }
+    }
   }
 
   "All events are processed after restart" in {
     docker.killAndStartContainer(dockerNodes().head)
-    matcherNode.waitFor[QueueEventWithMeta.Offset]("all events are consumed")(_.getCurrentOffset, _ == ordersPackSize - 1, 300.millis)
-    ordersPack.foreach { order =>
+    matcherNode.waitFor[QueueEventWithMeta.Offset]("all events are consumed")(
+      _.getCurrentOffset,
+      _ == ordersPack1Size + ordersPack2Size - 1,
+      300.millis
+    )
+    ordersPack1.foreach { order =>
       matcherNode.orderStatus(order.idStr(), order.assetPair) should not be OrderStatus.NotFound.name
     }
   }

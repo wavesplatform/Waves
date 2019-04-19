@@ -21,7 +21,7 @@ import scorex.utils._
 class MatcherActor(settings: MatcherSettings,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-                   orderBookActorProps: (AssetPair, ActorRef, QueueEventWithMeta.Offset) => Props,
+                   orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
     extends PersistentActor
     with ScorexLogging {
@@ -70,7 +70,7 @@ class MatcherActor(settings: MatcherSettings,
 
   private def createOrderBook(pair: AssetPair): ActorRef = {
     log.info(s"Creating order book for $pair")
-    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self, lastProcessedNr), OrderBookActor.name(pair)))
+    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
     childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
@@ -105,7 +105,7 @@ class MatcherActor(settings: MatcherSettings,
         orderBooks.get.get(assetPair) match {
           case Some(Right(actorRef)) =>
             log.info(
-              s"The $assetPair order book should do a snapshot, the current offset is $offset. The next snapshot: ${updatedSnapshotState.nearestSnapshotOffset}")
+              s"The $assetPair order book should do a snapshot, the current offset is $offset. The next snapshot candidate: ${updatedSnapshotState.nearestSnapshotOffset}")
             actorRef ! SaveSnapshot(offset)
 
           case Some(Left(_)) =>
@@ -121,10 +121,11 @@ class MatcherActor(settings: MatcherSettings,
   private def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
-    case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
+    case GetSnapshotOffsets =>
+      log.info(s"Got GetSnapshotOffsets")
+      sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: QueueEventWithMeta =>
-      log.info(s"Got $request")
       request.event match {
         case QueueEvent.OrderBookDeleted(assetPair) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
@@ -139,8 +140,6 @@ class MatcherActor(settings: MatcherSettings,
 
         case _ => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
-      // Should be done after runFor, because we create an order book with providing an offset
-      // If we update lastProcessedNr before, this event will be ignored after restart.
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
       createSnapshotFor(lastProcessedNr)
 
@@ -151,6 +150,7 @@ class MatcherActor(settings: MatcherSettings,
       shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = () => context.stop(self))
 
       context.children.foreach(context.unwatch)
+      log.info("context.become(snapshotsCommands orElse shutdownFallback)")
       context.become(snapshotsCommands orElse shutdownFallback)
 
       if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
@@ -192,6 +192,7 @@ class MatcherActor(settings: MatcherSettings,
       } else {
         val obs = orderBooks.get()
         log.info(s"Recovery completed, waiting order books to restore: ${obs.keys.mkString(", ")}")
+        log.info("context.become(collectOrderBooks(obs.size, Long.MaxValue, Long.MinValue, Map.empty))")
         context.become(collectOrderBooks(obs.size, Long.MaxValue, Long.MinValue, Map.empty))
       }
   }
@@ -208,9 +209,10 @@ class MatcherActor(settings: MatcherSettings,
       val updatedNewestEventNr        = math.max(newestEventNr, snapshotEventNr)
       val updatedCurrentOffsets       = currentOffsets.updated(assetPair, snapshotEventNr)
 
-      if (updatedRestOrderBooksNumber > 0)
+      if (updatedRestOrderBooksNumber > 0) {
+        log.info("context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))")
         context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))
-      else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
+      } else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
 
     case Terminated(ref) =>
       context.stop(self)
@@ -221,23 +223,27 @@ class MatcherActor(settings: MatcherSettings,
       context.stop(self)
       recoveryCompletedWithEventNr(Left("Received Shutdown command"))
 
-    case _ => stash()
+    case x =>
+      log.info(s"Stashed $x")
+      stash()
   }
 
   private def becomeWorking(oldestEventNr: EventOffset, newestEventNr: EventOffset, currentOffsets: Map[AssetPair, EventOffset]): Unit = {
+    log.info("unstashAll")
+    unstashAll()
+
+    log.info("context.become(receiveCommand)")
     context.become(receiveCommand)
 
     snapshotsState = SnapshotsState(
-      startOffsetToSnapshot = lastProcessedNr,
       currentOffsets = currentOffsets,
-      lastProcessedNr = lastProcessedNr,
+      lastProcessedOffset = newestEventNr,
       interval = settings.snapshotsInterval
     )
 
     log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, newestEventNr: $newestEventNr")
     log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
-    unstashAll()
     recoveryCompletedWithEventNr(Right((self, oldestEventNr)))
   }
 
@@ -293,7 +299,7 @@ class MatcherActor(settings: MatcherSettings,
 
   override def receiveCommand: Receive = forwardToOrderBook orElse snapshotsCommands
 
-  override def persistenceId: String = "matcher"
+  override def persistenceId: String = MatcherActor.name
 }
 
 object MatcherActor {
@@ -302,7 +308,7 @@ object MatcherActor {
   def props(matcherSettings: MatcherSettings,
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            orderBookProps: (AssetPair, ActorRef, QueueEventWithMeta.Offset) => Props,
+            orderBookProps: (AssetPair, ActorRef) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
