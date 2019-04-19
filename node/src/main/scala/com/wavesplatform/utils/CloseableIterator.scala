@@ -121,7 +121,7 @@ object CloseableIterator {
     private[this] var lazyIterator: CloseableIterator[T] = _
 
     private[this] def underlying: CloseableIterator[T] = {
-      if (lazyIterator == null) synchronized(if (lazyIterator == null) lazyIterator = createIterator())
+      if (lazyIterator == null) synchronized(if (lazyIterator == null) lazyIterator = createIterator().ensuring(_ != null, "Created iterator shouldn't be null"))
       lazyIterator
     }
 
