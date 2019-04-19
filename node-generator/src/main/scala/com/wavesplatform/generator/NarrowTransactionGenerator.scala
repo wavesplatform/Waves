@@ -6,7 +6,7 @@ import cats.Show
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.generator.NarrowTransactionGenerator.{ScriptFunctionArg, Settings}
+import com.wavesplatform.generator.NarrowTransactionGenerator.{ScriptSettings, Settings}
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -230,7 +230,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             val function = randomFrom(script.functions).get
             val sender   = randomFrom(accounts).get
             val data = for {
-              ScriptFunctionArg(argType, value) <- function.args
+              ScriptSettings.Function.Arg(argType, value) <- function.args
             } yield
               argType.toLowerCase match {
                 case "integer" => Terms.CONST_LONG(value.toLong)
@@ -291,10 +291,15 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 }
 
 object NarrowTransactionGenerator {
-  case class ScriptFunctionArg(`type`: String, value: String)
-  case class ScriptFunction(name: String, args: Seq[ScriptFunctionArg)
-  case class ScriptSettings(dappAccount: String, paymentAssets: Set[String], functions: Seq[ScriptFunction])
-  case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
+  final case class ScriptSettings(dappAccount: String, paymentAssets: Set[String], functions: Seq[ScriptSettings.Function])
+  object ScriptSettings {
+    final case class Function(name: String, args: Seq[Function.Arg])
+    object Function {
+      final case class Arg(`type`: String, value: String)
+    }
+  }
+
+  final case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30
