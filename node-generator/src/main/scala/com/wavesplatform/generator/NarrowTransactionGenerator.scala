@@ -251,7 +251,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                 sender,
                 KeyPair.fromSeed(script.account).explicitGet().toAddress,
                 fc,
-                (0 to random.nextInt(5)).map(_ => InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
                 100000000L + random.nextInt(100000000),
                 Waves,
                 ts
