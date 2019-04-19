@@ -4,15 +4,14 @@ import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{KeyPair, AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dexgen.cli.ScoptImplicits
 import com.wavesplatform.dexgen.config.FicusImplicits
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
-import com.wavesplatform.it.api.Transaction
-import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
@@ -72,6 +71,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
       .writes[SignedMassTransferRequest]
       .transform((jsobj: JsObject) => jsobj + ("version" -> JsNumber(1)) + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
 
+  val wavesSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
   AddressScheme.current = new AddressScheme { override val chainId: Byte = defaultConfig.chainId.head.toByte }
 
@@ -173,7 +173,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
       val threadPool                            = Executors.newFixedThreadPool(ordersDistr.size + 1)
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
-      val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
+      val sender = new NetworkSender(wavesSettings.networkSettings.trafficLogger, finalConfig.addressScheme, "generator", nonce = Random.nextLong())
       sys.addShutdownHook(sender.close())
 
       val endpoint = finalConfig.sendTo.head.getHostString
