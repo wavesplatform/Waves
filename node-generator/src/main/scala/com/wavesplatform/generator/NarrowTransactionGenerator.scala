@@ -3,7 +3,7 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{Alias, KeyPair}
+import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
@@ -39,23 +39,25 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
     object preconditions {
       val issueTransactionSender = randomFrom(accounts).get
 
-      val tradeAssetIssue = IssueTransactionV1
+      val tradeAssetIssue = IssueTransactionV2
         .selfSigned(
+          AddressScheme.current.chainId,
           issueTransactionSender,
           "TRADE".getBytes,
           "Waves DEX is the best exchange ever".getBytes,
           100000000,
           2,
           reissuable = false,
-          100000000L + random.nextInt(100000000),
-          System.currentTimeMillis()
+          fee = 100000000L + random.nextInt(100000000),
+          timestamp = System.currentTimeMillis(),
+          script = Some(null)
         )
         .right
         .get
 
       val tradeAssetDistribution = {
         tradeAssetIssue +: accounts.map(acc => {
-          TransferTransactionV1
+          TransferTransactionV2
             .selfSigned(
               IssuedAsset(tradeAssetIssue.id()),
               issueTransactionSender,
@@ -77,9 +79,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
     val generated = (0 until (n * 1.2).toInt).foldLeft(
       (
         Seq.empty[Transaction],
-        Seq.empty[IssueTransactionV1],
-        Seq.empty[IssueTransactionV1],
-        Seq.empty[LeaseTransactionV1],
+        Seq.empty[IssueTransactionV2],
+        Seq.empty[IssueTransactionV2],
+        Seq.empty[LeaseTransactionV2],
         Seq.empty[CreateAliasTransaction]
       )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), i) =>
@@ -88,7 +90,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         val ts = now + i
 
         val tx = typeGen.getRandom match {
-          case IssueTransactionV1 =>
+          case IssueTransactionV2 =>
             val sender      = randomFrom(accounts).get
             val name        = new Array[Byte](10)
             val description = new Array[Byte](10)
@@ -97,9 +99,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             val reissuable = random.nextBoolean()
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
-              IssueTransactionV1
-                .selfSigned(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + random.nextInt(100000000), ts))
-          case TransferTransactionV1 =>
+              IssueTransactionV2
+                .selfSigned(AddressScheme.current.chainId, sender, name, description, amount, Random.nextInt(9).toByte, reissuable, Some(null), 100000000L + random.nextInt(100000000), ts))
+          case TransferTransactionV2 =>
             val useAlias  = random.nextBoolean()
             val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
             val sendAsset = random.nextBoolean()
@@ -113,7 +115,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             senderAndAssetOpt.flatMap {
               case (sender, asset) =>
                 logOption(
-                  TransferTransactionV1
+                  TransferTransactionV2
                     .selfSigned(
                       Asset.fromCompatId(asset),
                       sender,
@@ -125,50 +127,50 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                       Array.fill(random.nextInt(100))(random.nextInt().toByte)
                     ))
             }
-          case ReissueTransactionV1 =>
+          case ReissueTransactionV2 =>
             val reissuable = random.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(ReissueTransactionV1.selfSigned(sender, IssuedAsset(assetTx.id()), Random.nextInt(Int.MaxValue), reissuable, 100000000L, ts))
+              logOption(ReissueTransactionV2.selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(assetTx.id()), Random.nextInt(Int.MaxValue), reissuable, 100000000L, ts))
             })
-          case BurnTransactionV1 =>
+          case BurnTransactionV2 =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(BurnTransactionV1.selfSigned(sender, IssuedAsset(assetTx.id()), Random.nextInt(1000), 100000000L, ts))
+              logOption(BurnTransactionV2.selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(assetTx.id()), Random.nextInt(1000), 100000000L, ts))
             })
-          case ExchangeTransactionV1 =>
+          case ExchangeTransactionV2 =>
             val matcher   = randomFrom(accounts).get
             val seller    = randomFrom(accounts).get
             val pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
-            val sellOrder = OrderV1.sell(seller, matcher, pair, 1, 100000000, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
+            val sellOrder = OrderV2.sell(seller, matcher, pair, 1, 100000000, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
-            val buyOrder  = OrderV1.buy(buyer, matcher, pair, 1, 100000000, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
-            logOption(ExchangeTransactionV1.create(matcher, buyOrder, sellOrder, 1, 100000000, 300000, 300000, moreThatStandartFee * 3, ts))
+            val buyOrder  = OrderV2.buy(buyer, matcher, pair, 1, 100000000, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
+            logOption(ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 1, 100000000, 300000, 300000, moreThatStandartFee * 3, ts))
           case ExchangeTransactionV2 =>
             val matcher = randomFrom(accounts).get
             val seller  = randomFrom(accounts).get
             val pair    = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
             // XXX generate order version
-            val sellOrder = OrderV1.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
+            val sellOrder = OrderV2.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
-            val buyOrder  = OrderV1.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
+            val buyOrder  = OrderV2.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
             logOption(ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
-          case LeaseTransactionV1 =>
+          case LeaseTransactionV2 =>
             val sender   = randomFrom(accounts).get
             val useAlias = random.nextBoolean()
             val recipientOpt =
               if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
-            recipientOpt.flatMap(recipient => logOption(LeaseTransactionV1.selfSigned(sender, 1, moreThatStandartFee * 3, ts, recipient)))
-          case LeaseCancelTransactionV1 =>
+            recipientOpt.flatMap(recipient => logOption(LeaseTransactionV2.selfSigned(sender, 1, moreThatStandartFee * 3, ts, recipient)))
+          case LeaseCancelTransactionV2 =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
-              logOption(LeaseCancelTransactionV1.selfSigned(sender, lease.id(), moreThatStandartFee * 3, ts))
+              logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThatStandartFee * 3, ts))
             })
-          case CreateAliasTransactionV1 =>
+          case CreateAliasTransactionV2 =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.create(aliasString).explicitGet(), 100000, ts))
+            logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 100000, ts))
           case MassTransferTransaction =>
             val transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {
@@ -259,14 +261,14 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
-          case Some(tx: IssueTransactionV1) => validIssueTxs :+ tx
+          case Some(tx: IssueTransactionV2) => validIssueTxs :+ tx
           case _                            => validIssueTxs
         }, tx match {
-          case Some(tx: IssueTransactionV1) if tx.reissuable  => reissuableIssueTxs :+ tx
+          case Some(tx: IssueTransactionV2) if tx.reissuable  => reissuableIssueTxs :+ tx
           case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id() != tx.id())
           case _                                              => reissuableIssueTxs
         }, tx match {
-          case Some(tx: LeaseTransactionV1)     => activeLeaseTransactions :+ tx
+          case Some(tx: LeaseTransactionV2)     => activeLeaseTransactions :+ tx
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id() != tx.leaseId)
           case _                                => activeLeaseTransactions
         }, tx match {

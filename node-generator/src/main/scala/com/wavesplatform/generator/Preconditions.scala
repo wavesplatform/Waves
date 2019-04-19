@@ -9,10 +9,10 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
@@ -43,7 +43,7 @@ object Preconditions {
         case ((uni, txs), action) =>
           action match {
             case LeaseP(from, to, amount) =>
-              val tx = LeaseTransactionV1
+              val tx = LeaseTransactionV2
                 .selfSigned(from, amount, Fee, time.correctedTime(), to)
                 .explicitGet()
               (uni.copy(leases = tx :: uni.leases), tx :: txs)
@@ -73,7 +73,7 @@ object Preconditions {
 
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = KeyPair.fromSeed(seed).explicitGet()
-              val transferTx = TransferTransactionV1
+              val transferTx = TransferTransactionV2
                 .selfSigned(Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, Fee, "Generator".getBytes())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
