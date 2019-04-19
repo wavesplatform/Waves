@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
@@ -315,7 +315,7 @@ object PBTransactions {
         } yield tx
 
       case _ =>
-        Left(ValidationError.UnsupportedTransactionType)
+        Left(TxValidationError.UnsupportedTransactionType)
     }
 
     result
