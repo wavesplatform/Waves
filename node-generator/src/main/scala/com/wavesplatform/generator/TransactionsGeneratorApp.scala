@@ -167,7 +167,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val (universe, initialTransactions) = preconditions
         .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
 
-      Universe.AccountsWithBalances = universe.accountsWithBalances
+      Universe.Accounts = universe.accounts
       Universe.IssuedAssets = universe.issuedAssets
       Universe.Leases = universe.leases
 

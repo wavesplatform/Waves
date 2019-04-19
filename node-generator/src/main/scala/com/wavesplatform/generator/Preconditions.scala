@@ -22,19 +22,19 @@ import scala.collection.generic.CanBuildFrom
 object Preconditions {
   private[this] val Fee = 1000000
 
+  final case class CreatedAccount(keyPair: KeyPair, balance: Long, script: Option[Script])
+
   sealed abstract class PAction(val priority: Int)
-  final case class DeployScriptP(account: KeyPair, file: String)    extends PAction(priority = 4)
   final case class LeaseP(from: KeyPair, to: Address, amount: Long) extends PAction(3)
   final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean, scriptFile: String)
       extends PAction(2)
-  final case class CreateAccountP(seed: String, balance: Long) extends PAction(1)
+  final case class CreateAccountP(seed: String, balance: Long, scriptFile: Option[String]) extends PAction(1)
 
   final case class PGenSettings(faucet: KeyPair, actions: List[PAction])
 
-  final case class UniverseHolder(accountsWithBalances: List[(KeyPair, Long)] = Nil,
+  final case class UniverseHolder(accounts: List[CreatedAccount] = Nil,
                                   issuedAssets: List[IssueTransaction] = Nil,
-                                  leases: List[LeaseTransaction] = Nil,
-                                  scripts: List[(Address, Script)] = Nil)
+                                  leases: List[LeaseTransaction] = Nil)
 
   def mk(settings: PGenSettings, time: Time): (UniverseHolder, List[Transaction]) = {
     settings.actions
@@ -42,12 +42,6 @@ object Preconditions {
       .foldLeft((UniverseHolder(), List.empty[Transaction])) {
         case ((uni, txs), action) =>
           action match {
-            case DeployScriptP(account, file) =>
-              val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
-              val Right((script, _)) = ScriptCompiler.compile(scriptText)
-              val Right(tx)          = SetScriptTransaction.selfSigned(account, Some(script), Fee, time.correctedTime())
-              (uni.copy(scripts = uni.scripts :+ (account.toAddress -> script)), tx :: txs)
-
             case LeaseP(from, to, amount) =>
               val tx = LeaseTransactionV1
                 .selfSigned(from, amount, Fee, time.correctedTime(), to)
@@ -77,14 +71,20 @@ object Preconditions {
                 .explicitGet()
               (uni.copy(issuedAssets = tx :: uni.issuedAssets), tx :: txs)
 
-            case CreateAccountP(seed, balance) =>
-              val acc = KeyPair
-                .fromSeed(seed)
-                .explicitGet()
-              val tx = TransferTransactionV1
+            case CreateAccountP(seed, balance, scriptOption) =>
+              val acc = KeyPair.fromSeed(seed).explicitGet()
+              val transferTx = TransferTransactionV1
                 .selfSigned(Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, Fee, "Generator".getBytes())
                 .explicitGet()
-              (uni.copy(accountsWithBalances = (acc, balance) :: uni.accountsWithBalances), tx :: txs)
+              val scriptAndTx = scriptOption.map { file =>
+                val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
+                val Right((script, _)) = ScriptCompiler.compile(scriptText)
+                val Right(tx)          = SetScriptTransaction.selfSigned(acc, Some(script), Fee, time.correctedTime())
+                (script, tx)
+              }
+
+              val addTxs = List(transferTx) ++ scriptAndTx.map(_._2)
+              (uni.copy(accounts = CreatedAccount(acc, balance, scriptAndTx.map(_._1)) :: uni.accounts), addTxs ::: txs)
           }
       }
   }
@@ -95,8 +95,9 @@ object Preconditions {
 
       val seed    = conf.as[String]("seed")
       val balance = conf.as[Long]("balance")
+      val scriptFile = conf.as[Option[String]]("script-file").filter(_.nonEmpty)
 
-      CreateAccountP(seed, balance)
+      CreateAccountP(seed, balance, scriptFile)
     }
   }
 
@@ -132,17 +133,6 @@ object Preconditions {
     }
   }
 
-  private val deployScriptSectionReader = new ValueReader[DeployScriptP] {
-    override def read(config: Config, path: String): DeployScriptP = {
-      val conf = config.getConfig(path)
-
-      val from = KeyPair.fromSeed(conf.as[String]("account")).explicitGet()
-      val file = conf.as[String]("file")
-
-      DeployScriptP(from, file)
-    }
-  }
-
   implicit val preconditionsReader = new ValueReader[PGenSettings] {
     override def read(config: Config, path: String): PGenSettings = {
       val faucet = KeyPair
@@ -169,14 +159,7 @@ object Preconditions {
         )
       )
 
-      val scripts = config.as[List[DeployScriptP]](s"$path.scripts")(
-        traversableReader(
-          deployScriptSectionReader,
-          implicitly[CanBuildFrom[Nothing, DeployScriptP, List[DeployScriptP]]]
-        )
-      )
-
-      val actions = accounts ++ assets ++ leases ++ scripts
+      val actions = accounts ++ assets ++ leases
       PGenSettings(faucet, actions)
     }
   }
