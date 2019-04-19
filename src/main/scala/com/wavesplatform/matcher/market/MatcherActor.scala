@@ -201,9 +201,9 @@ class MatcherActor(settings: MatcherSettings,
       log.info(s"Last snapshot for $assetPair did at $snapshotEventNr")
 
       val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
-      val updatedOldestEventNr        = math.min(oldestEventNr, snapshotEventNr)
+      val updatedOldestEventNr        = if (snapshotEventNr > -1) math.min(oldestEventNr, snapshotEventNr) else oldestEventNr
       val updatedNewestEventNr        = math.max(newestEventNr, snapshotEventNr)
-      val updatedCurrentOffsets       = currentOffsets.updated(assetPair, snapshotEventNr)
+      val updatedCurrentOffsets       = if (snapshotEventNr > -1) currentOffsets.updated(assetPair, snapshotEventNr) else currentOffsets
 
       if (updatedRestOrderBooksNumber > 0)
         context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))
