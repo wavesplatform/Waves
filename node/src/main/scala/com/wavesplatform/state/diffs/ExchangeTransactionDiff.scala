@@ -31,7 +31,7 @@ object ExchangeTransactionDiff {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       assetScripted = assets.count(_.flatMap(_.script).isDefined)
       _ <- Either.cond(
-        smartAssetsEnabled || assetScripted != 0,
+        smartAssetsEnabled || assetScripted == 0,
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
