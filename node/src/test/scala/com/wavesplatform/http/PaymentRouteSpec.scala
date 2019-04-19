@@ -26,9 +26,7 @@ class PaymentRouteSpec
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(true)).anyNumberOfTimes()
-
-  (utx.putIfNewTraced _)
+  (utx.putIfNew _)
     .when(*)
     .onCall((t: Transaction) => TracedResult(Right(true)))
     .anyNumberOfTimes()

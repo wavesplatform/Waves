@@ -53,7 +53,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
       .mapParallelUnordered(settings.parallelism) {
         case (sender, transaction) =>
           Task {
-            concurrent.blocking(utx.putIfNew(transaction)) match {
+            concurrent.blocking(utx.putIfNew(transaction).resultE) match {
               case Right(shouldBroadcast) =>
                 if (shouldBroadcast) Some(allChannels.write(transaction, (_: Channel) != sender))
                 else None

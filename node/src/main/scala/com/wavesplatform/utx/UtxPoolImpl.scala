@@ -48,7 +48,7 @@ class UtxPoolImpl(time: Time,
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  override def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+  override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     val knownTx = pessimisticPortfolios.contains(tx.id())
 
     if (knownTx) TracedResult.wrapValue(utxSettings.allowRebroadcasting)

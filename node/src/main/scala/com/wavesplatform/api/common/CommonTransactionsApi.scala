@@ -58,8 +58,8 @@ private[api] class CommonTransactionsApi(functionalitySettings: FunctionalitySet
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, VanillaTransaction] = {
     val result = for {
-      r <- utx.putIfNewTraced(tx)
-      _ = if (r) broadcast(tx) else ()
+      shouldBroadcast <- utx.putIfNew(tx)
+      _ = if (shouldBroadcast) broadcast(tx) else ()
     } yield tx
 
     result

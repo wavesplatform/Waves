@@ -11,9 +11,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 trait UtxPool extends AutoCloseable {
   self =>
 
-  def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, Boolean]
-
-  def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = putIfNewTraced(tx).resultE
+  def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean]
 
   def removeAll(txs: Traversable[Transaction]): Unit
 

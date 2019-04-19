@@ -28,9 +28,8 @@ class AssetsBroadcastRouteSpec
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
-  (utx.putIfNewTraced _)
+  (utx.putIfNew _)
     .when(*)
     .onCall((t: Transaction) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
     .anyNumberOfTimes()
@@ -159,8 +158,7 @@ class AssetsBroadcastRouteSpec
 
   "compatibility" - {
     val alwaysApproveUtx = stub[UtxPool]
-    (alwaysApproveUtx.putIfNew _).when(*).onCall((_: Transaction) => Right(true)).anyNumberOfTimes()
-    (alwaysApproveUtx.putIfNewTraced _).when(*).onCall((_: Transaction) => TracedResult(Right(true))).anyNumberOfTimes()
+    (alwaysApproveUtx.putIfNew _).when(*).onCall((_: Transaction) => TracedResult(Right(true))).anyNumberOfTimes()
 
     val alwaysSendAllChannels = stub[ChannelGroup]
     (alwaysSendAllChannels

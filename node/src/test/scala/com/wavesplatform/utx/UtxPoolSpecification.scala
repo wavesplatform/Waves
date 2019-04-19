@@ -362,8 +362,8 @@ class UtxPoolSpecification
                   Set.empty,
                   allowTransactionsFromSmartAccounts = true,
                   allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head) shouldBe 'right
-      all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
+      utx.putIfNew(txs.head).resultE shouldBe 'right
+      all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool size limit")
     }
 
     "does not add new transactions when full in bytes" in utxTest(
@@ -375,8 +375,8 @@ class UtxPoolSpecification
                   Set.empty,
                   allowTransactionsFromSmartAccounts = true,
                   allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head) shouldBe 'right
-      all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool bytes size limit")
+      utx.putIfNew(txs.head).resultE shouldBe 'right
+      all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool bytes size limit")
     }
 
     "adds new transactions when skip checks is allowed" in {
@@ -402,8 +402,8 @@ class UtxPoolSpecification
                             allowSkipChecks = allowSkipChecks == 1)
               val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, utxSettings)
 
-              utx.putIfNew(headTransaction) shouldBe 'right
-              utx.putIfNew(vipTransaction) shouldBe (if (allowSkipChecks == 1) 'right else 'left)
+              utx.putIfNew(headTransaction).resultE shouldBe 'right
+              utx.putIfNew(vipTransaction).resultE shouldBe (if (allowSkipChecks == 1) 'right else 'left)
           }
       }
     }
@@ -417,8 +417,8 @@ class UtxPoolSpecification
                                 Set.empty,
                                 allowTransactionsFromSmartAccounts = true,
                                 allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head) shouldBe 'right
-      utx.putIfNew(txs.head) should matchPattern { case Right(false) => }
+      utx.putIfNew(txs.head).resultE shouldBe 'right
+      utx.putIfNew(txs.head).resultE should matchPattern { case Right(false) => }
     }
 
     "broadcast transaction even if it already in pool if allowRebroadcasting == true" in utxTest(
@@ -430,13 +430,13 @@ class UtxPoolSpecification
                                 Set.empty,
                                 allowTransactionsFromSmartAccounts = true,
                                 allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head) shouldBe 'right
-      utx.putIfNew(txs.head) should matchPattern { case Right(true) => }
+      utx.putIfNew(txs.head).resultE shouldBe 'right
+      utx.putIfNew(txs.head).resultE should matchPattern { case Right(true) => }
     }
 
     "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) {
       case (utx, _, txs, _) =>
-        all(txs.map(utx.putIfNew)) shouldBe 'right
+        all(txs.map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
         utx.all.size shouldEqual txs.size
 
         val maxNumber             = Math.max(utx.all.size / 2, 3)
@@ -449,7 +449,7 @@ class UtxPoolSpecification
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) {
       case (utx, time, txs, _) =>
-        all(txs.map(utx.putIfNew)) shouldBe 'right
+        all(txs.map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
         utx.all.size shouldEqual txs.size
 
         time.advance(maxAge + 1000.millis)
@@ -461,7 +461,7 @@ class UtxPoolSpecification
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) {
       case (utx, time, txs, offset) =>
-        all(txs.map(utx.putIfNew)) shouldBe 'right
+        all(txs.map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
         utx.all.size shouldEqual txs.size
 
         time.advance(offset)
@@ -500,7 +500,7 @@ class UtxPoolSpecification
             (richAccount, genesisBlock, scripted, unscripted)
           }
 
-        val Some((account, block, scripted, unscripted)) = generateBlock.sample
+        val Some((_, block, scripted, unscripted)) = generateBlock.sample
         d.blockchainUpdater.processBlock(block) shouldBe 'right
 
         val utx = new UtxPoolImpl(
@@ -517,7 +517,7 @@ class UtxPoolSpecification
                       allowTransactionsFromSmartAccounts = true,
                       allowSkipChecks = false)
         )
-        all((scripted ++ unscripted).map(utx.putIfNew)) shouldBe 'right
+        all((scripted ++ unscripted).map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
 
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber),
@@ -564,7 +564,7 @@ class UtxPoolSpecification
 
     "spendableBalance" - {
       "equal to state's portfolio if utx is empty" in forAll(emptyUtxPool) {
-        case (sender, state, utxPool) =>
+        case (sender, _, utxPool) =>
           val pessimisticAssetIds = {
             val p = utxPool.pessimisticPortfolio(sender)
             p.assetIds.filter(x => p.balanceOf(x) != 0)
@@ -605,7 +605,7 @@ class UtxPoolSpecification
         forAll(transferGen) {
           case (_, utxPool, txs) =>
             val r = txs.forall { tx =>
-              utxPool.putIfNew(tx) match {
+              utxPool.putIfNew(tx).resultE match {
                 case Left(SenderIsBlacklisted(_)) => true
                 case _                            => false
               }
@@ -621,7 +621,7 @@ class UtxPoolSpecification
         forAll(transferGen) {
           case (_, utxPool, txs) =>
             all(txs.map { t =>
-              utxPool.putIfNew(t)
+              utxPool.putIfNew(t).resultE
             }) shouldBe 'right
             utxPool.all.size shouldEqual txs.size
         }
@@ -638,7 +638,7 @@ class UtxPoolSpecification
           } yield (utx, tx)
 
         val (utx, tx) = enoughFeeTxWithScriptedAccount.sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-        utx.putIfNew(tx) should produce("signature from scripted account")
+        utx.putIfNew(tx).resultE should produce("signature from scripted account")
       }
 
       "any transaction from scripted account is not allowed if smartAccounts disabled in utx pool" - {
@@ -655,11 +655,11 @@ class UtxPoolSpecification
 
         "v1" in {
           val (utx1, tx1) = enoughFeeTxWithScriptedAccount(1).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-          utx1.putIfNew(tx1) shouldBe 'left
+          utx1.putIfNew(tx1).resultE shouldBe 'left
         }
         "v2" in {
           val (utx2, tx2) = enoughFeeTxWithScriptedAccount(2).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-          utx2.putIfNew(tx2) should produce("denied from UTX pool")
+          utx2.putIfNew(tx2).resultE should produce("denied from UTX pool")
         }
       }
     }

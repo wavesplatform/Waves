@@ -30,9 +30,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
-  (utx.putIfNew _).when(*).onCall((_: Transaction) => Right(true)).anyNumberOfTimes()
 
-  (utx.putIfNewTraced _)
+  (utx.putIfNew _)
     .when(*)
     .onCall((_: Transaction) => TracedResult(Right(true)))
     .anyNumberOfTimes()
