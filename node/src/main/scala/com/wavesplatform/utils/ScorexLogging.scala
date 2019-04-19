@@ -59,7 +59,7 @@ case class LoggerFacade(logger: Logger) {
 }
 
 trait ScorexLogging {
-  protected def log = LoggerFacade(LoggerFactory.getLogger(this.getClass))
+  protected lazy val log = LoggerFacade(LoggerFactory.getLogger(this.getClass))
 
   implicit class TaskExt[A](t: Task[A]) {
     def runAsyncLogErr(implicit s: Scheduler): CancelableFuture[A] = logErr.runAsync
