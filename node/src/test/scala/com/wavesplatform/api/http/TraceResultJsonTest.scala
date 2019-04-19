@@ -75,7 +75,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |      "transfers" : [ {
         |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
         |        "amount" : 1,
-        |        "asset" : "Waves"
+        |        "assetId" : null
         |      } ]
         |    }
         |  } ],

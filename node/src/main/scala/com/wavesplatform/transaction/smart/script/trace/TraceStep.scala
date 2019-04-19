@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json.{JsObject, JsString, JsValue, Json}
+import play.api.libs.json.{JsNull, JsObject, JsString, JsValue, Json}
 
 sealed abstract class TraceStep {
   def json: JsObject
@@ -63,9 +63,9 @@ case class InvokeScriptTrace(
     "transfers" -> v.ts.map { case (address, amount, assetId) => Json.obj(
       "address" -> address.bytes.toString,
       "amount"  -> amount,
-      "asset"   -> (assetId match {
+      "assetId" -> (assetId match {
         case Some(id) => id.toString
-        case None     => "Waves"
+        case None     => JsNull
       })
     )}
   )
