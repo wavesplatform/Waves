@@ -24,6 +24,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    make-snapshots-at-start = yes
         |    snapshots-loading-timeout = 423s
         |    start-events-processing-timeout = 543s
+        |    order-books-recovering-timeout = 111s
         |    rest-order-limit = 100
         |    price-assets = [
         |      WAVES
@@ -86,6 +87,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.makeSnapshotsAtStart should be(true)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
+    settings.orderBooksRecoveringTimeout should be(111.seconds)
     settings.maxOrdersPerRequest should be(100)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.blacklistedAssets shouldBe Set("a")

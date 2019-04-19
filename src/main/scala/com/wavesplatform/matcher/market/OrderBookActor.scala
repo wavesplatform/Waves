@@ -32,6 +32,7 @@ class OrderBookActor(owner: ActorRef,
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
+  private var notifyAddresses         = false
   private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
   private var lastProcessedOffset     = Option.empty[QueueEventWithMeta.Offset]
@@ -60,6 +61,12 @@ class OrderBookActor(owner: ActorRef,
               context.stop(self)
           }
       }
+
+    case MatcherActor.StartNotifyAddresses =>
+      notifyAddresses = true
+      processEvents(orderBook.allOrders.map(OrderAdded))
+      sender() ! MatcherActor.AddressesNotified
+
     case ForceStartOrderBook(p) if p == assetPair =>
       sender() ! OrderBookCreated(assetPair)
   }
@@ -96,14 +103,14 @@ class OrderBookActor(owner: ActorRef,
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
-                          |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-                          |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
+                   |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
+                   |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
           }
         case Events.OrderCanceled(order, unmatchable) =>
           log.info(s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)")
       }
 
-      addressActor ! e
+      if (notifyAddresses) addressActor ! e
     }
 
     updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
@@ -131,7 +138,6 @@ class OrderBookActor(owner: ActorRef,
         case None    => log.debug("Recovery completed")
         case Some(x) => log.debug(s"Recovery completed at $x: $orderBook")
       }
-      processEvents(orderBook.allOrders.map(OrderAdded))
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)

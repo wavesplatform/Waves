@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, gracefulStop}
+import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
@@ -255,6 +255,8 @@ class Matcher(actorSystem: ActorSystem,
       lastOffsetQueue <- getLastOffset(deadline)
       _ = log.info(s"Last queue offset is $lastOffsetQueue")
       _ <- waitOffsetReached(lastOffsetQueue, deadline)
+      _ = log.info("Last offset has been reached, waiting order books to recover address actors")
+      _ <- matcher.ask(MatcherActor.StartNotifyAddresses)(settings.matcherSettings.orderBooksRecoveringTimeout)
     } yield ()
 
     startGuard.onComplete {

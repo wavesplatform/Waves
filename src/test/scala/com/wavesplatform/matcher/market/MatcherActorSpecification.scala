@@ -64,7 +64,7 @@ class MatcherActorSpecification
       }
     }
 
-    "successfully routes the first place to the new order book" in {
+    "successfully route the first place to the new order book" in {
       val addressActor = TestProbe()
       val actor        = defaultActor(addressActor = addressActor.ref)
       val probe        = TestProbe()
@@ -367,7 +367,7 @@ class MatcherActorSpecification
   private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
                            addressActor: ActorRef = TestProbe().ref): TestActorRef[MatcherActor] = {
     val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
-    waitInitialization(
+    val r = waitInitialization(
       TestActorRef(
         new MatcherActor(
           matcherSettings,
@@ -377,6 +377,9 @@ class MatcherActorSpecification
           blockchain.assetDescription
         )
       ))
+    val probe = TestProbe()
+    probe.send(r, MatcherActor.StartNotifyAddresses)
+    r
   }
 
   private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = {

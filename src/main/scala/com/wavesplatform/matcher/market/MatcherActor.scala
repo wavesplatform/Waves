@@ -6,11 +6,11 @@ import akka.actor.{ActorRef, Props, SupervisorStrategy, Terminated}
 import akka.persistence._
 import com.google.common.base.Charsets
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.matcher.{MatcherSettings, WatchDistributedCompletionActor}
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -30,6 +30,7 @@ class MatcherActor(settings: MatcherSettings,
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
+  private var notifyAddresses                         = false
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
   private var lastSnapshotSequenceNr: Long            = -1L
@@ -74,6 +75,7 @@ class MatcherActor(settings: MatcherSettings,
     childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
+    if (notifyAddresses) orderBook ! StartNotifyAddresses
     orderBook
   }
 
@@ -143,6 +145,12 @@ class MatcherActor(settings: MatcherSettings,
 
     case request: ForceStartOrderBook =>
       runFor(request.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
+
+    case StartNotifyAddresses =>
+      val s = sender()
+      if (childrenNames.isEmpty) s ! AddressesNotified
+      else context.actorOf(recoverAddressesWatcherProps(childrenNames.keys.toSet, s), "order-book-recover-addresses")
+      notifyAddresses = true
 
     case Shutdown =>
       shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = () => context.stop(self))
@@ -348,6 +356,9 @@ object MatcherActor {
 
   case class MatcherRecovered(oldestEventNr: Long)
 
+  case object StartNotifyAddresses
+  case object AddressesNotified
+
   case object Shutdown
 
   case class AssetInfo(decimals: Int)
@@ -366,4 +377,7 @@ object MatcherActor {
     else if (buffer2.isEmpty) 1
     else ByteArray.compare(buffer1.get, buffer2.get)
   }
+
+  private def recoverAddressesWatcherProps(orderBooks: Set[ActorRef], receiver: ActorRef): Props =
+    WatchDistributedCompletionActor.props(orderBooks, receiver, StartNotifyAddresses, AddressesNotified)
 }
