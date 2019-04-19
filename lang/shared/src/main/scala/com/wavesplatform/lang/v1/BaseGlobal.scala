@@ -49,23 +49,23 @@ trait BaseGlobal {
   def compileExpression(input: String,
                         context: CompilerContext,
                         restrictToLetBlockOnly: Boolean,
-                        stdLibVersion: StdLibVersion): Either[String, (Array[Byte], Terms.EXPR)] = {
+                        stdLibVersion: StdLibVersion): Either[String, (Array[Byte], Terms.EXPR, Long)] =
     for {
       ex <- ExpressionCompiler.compile(input, context)
       illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
-    } yield (x, ex)
-  }
 
-  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, (Array[Byte], DApp)] = {
-    ContractCompiler
-      .compile(input, ctx)
-      .map { ast =>
-        val ser = serializeContract(ast, stdLibVersion)
-        (ser, ast)
-      }
-  }
+      vars  = utils.varNames(stdLibVersion, Expression)
+      costs = utils.functionCosts(stdLibVersion)
+      complexity <- ScriptEstimator(vars, costs, ex)
+    } yield (x, ex, complexity)
+
+  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, (Array[Byte], DApp, Long)] =
+    for {
+      dapp       <- ContractCompiler.compile(input, ctx)
+      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp)
+    } yield (serializeContract(dapp, stdLibVersion), dapp, complexity._2)
 
   def decompile(compiledCode: String): Either[ScriptParseError, String] = {
     Script.fromBase64String(compiledCode, checkComplexity = false).right.map{
@@ -74,24 +74,4 @@ trait BaseGlobal {
         scriptText
     }
   }
-
-  def estimate(
-    version:     StdLibVersion,
-    contentType: ContentType,
-    ctx:         CompilerContext,
-    input:       String
-  ): Either[String, Long] = contentType match {
-      case Expression =>
-        val vars  = utils.varNames(version, contentType)
-        val costs = utils.functionCosts(version)
-        for {
-          expr       <- ExpressionCompiler.compile(input, ctx)
-          complexity <- ScriptEstimator(vars, costs, expr)
-        } yield complexity
-      case DAppType =>
-        for {
-          dapp       <- ContractCompiler.compile(input, ctx)
-          complexity <- ContractScript.estimateComplexity(version, dapp)
-        } yield complexity._2
-    }
 }

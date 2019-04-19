@@ -156,8 +156,12 @@ object JsAPI {
                   err => {
                     js.Dynamic.literal("error" -> err)
                   }, {
-                    case (bytes, ast) =>
-                      js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                    case (bytes, ast, complexity) =>
+                      js.Dynamic.literal(
+                        "result"     -> Global.toBuffer(bytes),
+                        "ast"        -> toJs(ast),
+                        "complexity" -> complexity
+                      )
                   }
                 )
             case DAppType =>
@@ -168,8 +172,12 @@ object JsAPI {
                   err => {
                     js.Dynamic.literal("error" -> err)
                   }, {
-                    case (bytes, ast) =>
-                      js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                    case (bytes, ast, complexity) =>
+                      js.Dynamic.literal(
+                        "result"     -> Global.toBuffer(bytes),
+                        "ast"        -> toJs(ast),
+                        "complexity" -> complexity
+                      )
                   }
                 )
           }
@@ -192,21 +200,4 @@ object JsAPI {
       identity
     )
   }
-
-  @JSExportTopLevel("estimate")
-  def estimate(input: String): js.Dynamic =
-    DirectiveParser(input)
-      .flatMap(extractDirectives)
-      .flatMap { case DirectiveSet(version, scriptType, contentType) =>
-          Global.estimate(
-            version,
-            contentType,
-            buildScriptContext(version, scriptType == Asset, contentType == DAppType).compilerContext,
-            input
-          )
-      }
-      .fold(
-        e => js.Dynamic.literal(error = e),
-        c => js.Dynamic.literal(complexity = c)
-      )
 }
