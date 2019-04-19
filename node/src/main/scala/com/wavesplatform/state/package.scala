@@ -108,17 +108,15 @@ package object state {
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
-    def aliasesOfAddress(address: Address): Seq[Alias] =
+    def aliasesOfAddress(address: Address): CloseableIterator[Alias] =
       blockchain
         .addressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None)
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
-        .closeAfter(_.toVector)
 
-    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
+    def activeLeases(address: Address): CloseableIterator[(Int, LeaseTransaction)] =
       blockchain
         .addressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None)
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
-        .closeAfter(_.toVector)
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain
