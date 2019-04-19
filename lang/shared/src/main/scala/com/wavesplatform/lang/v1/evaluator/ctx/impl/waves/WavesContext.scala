@@ -542,29 +542,13 @@ object WavesContext {
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) {
+      types ++ (if (version == V3 || version == V4) {
                   List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType)
                 } else List.empty),
       commonVars ++ vars(version.id),
-      functions ++ (if (version == V3) {
-                      List(
-                        getIntegerFromStateF,
-                        getBooleanFromStateF,
-                        getBinaryFromStateF,
-                        getStringFromStateF,
-                        getIntegerFromArrayF,
-                        getBooleanFromArrayF,
-                        getBinaryFromArrayF,
-                        getStringFromArrayF,
-                        getIntegerByIndexF,
-                        getBooleanByIndexF,
-                        getBinaryByIndexF,
-                        getStringByIndexF,
-                        addressFromStringF
-                      ).map(withExtract) :+ assetInfoF
-                    } else {
-                      List()
-                    })
+      functions ++
+        (if (version == V3 || version == V4) v3Functions.map(withExtract) :+ assetInfoF else List.empty) ++
+        (if (version == V4) v4Functions else List.empty)
     )
   }
 

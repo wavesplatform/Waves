@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
@@ -9,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
@@ -38,6 +39,10 @@ package object utils {
       override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
       override def tthis: Recipient.Address                                                                        = ???
+      override def transactionParser(bytes: Array[Byte]): Option[Tx]                                               = ???
+      override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
+      override def accountScriptHash(addressOrAlias: Recipient): Option[Array[Byte]]                               = ???
+      override def calculatePoSDelay(hit: ByteStr, baseTarget: Long, balance: Long): Long                          = ???
     }
     directives
       .filter(_.isRight)

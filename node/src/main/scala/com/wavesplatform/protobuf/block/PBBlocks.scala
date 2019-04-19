@@ -65,21 +65,19 @@ object PBBlocks {
     new PBBlock(
       Some(
         PBBlock.Header(
-          Some(PBBlock.Header(
-            0: Byte,
-            ByteString.copyFrom(reference),
-            baseTarget,
-            ByteString.copyFrom(generationSignature),
-            featureVotes.map(shortToInt).toSeq,
-            timestamp,
-            version,
-            ByteString.copyFrom(generator),
-            ByteString.copyFrom(transactionTreeHash),
-            ByteString.copyFrom(minerWavesBalancesTreeHash),
-            ByteString.copyFrom(minerEffectiveBalancesTreeHash)
-          )),
-          ByteString.copyFrom(signature)
-        )),
+          0: Byte,
+          ByteString.copyFrom(reference),
+          baseTarget,
+          ByteString.copyFrom(generationSignature),
+          featureVotes.map(shortToInt).toSeq,
+          timestamp,
+          version,
+          ByteString.copyFrom(generator),
+          ByteString.copyFrom(transactionTreeHash),
+          ByteString.copyFrom(minerWavesBalancesTreeHash),
+          ByteString.copyFrom(minerEffectiveBalancesTreeHash)
+        )
+      ),
       ByteString.copyFrom(signature),
       transactionData.map(PBTransactions.protobuf)
     )

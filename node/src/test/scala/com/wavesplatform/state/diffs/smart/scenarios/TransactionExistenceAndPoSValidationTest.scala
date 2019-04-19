@@ -9,6 +9,9 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V4}
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
@@ -16,8 +19,6 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils.Merkle
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -107,7 +108,7 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
 
         val untypedScript = Parser.parseExpr(scriptSource).get.value
         val typedScript =
-          ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+          ExpressionCompiler(compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
         forAll(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) { blocks =>
           val dataTx =
@@ -153,7 +154,7 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
 
       val untypedScript = Parser.parseExpr(scriptSource).get.value
       val typedScript =
-        ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+        ExpressionCompiler(compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
       forAll(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) { blocks =>
         val dataTx =
@@ -212,7 +213,7 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
     forAll(accountGen, accountGen, Gen.oneOf(leafs)) { (miner, gateway, leaf) =>
       val untypedScript = Parser.parseExpr(scriptSource).get.value
       val typedScript =
-        ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+        ExpressionCompiler(compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
       forAll(gen(miner, gateway, ExprScript(V4, typedScript).explicitGet())) { blocks =>
         val proof =
@@ -270,7 +271,6 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
            |   byAddress == expectedHash
          """.stripMargin)
 
-
       forAll(gen(miner, gateway, ExprScript(V4, gatewayScript).explicitGet())) { blocks =>
         val minerScriptTx =
           SetScriptTransaction
@@ -283,12 +283,14 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
             .explicitGet()
 
         val minerAliasTx =
-          CreateAliasTransactionV1.selfSigned(
-            miner,
-            alias,
-            5 * 10000000,
-            System.currentTimeMillis()
-          ).explicitGet()
+          CreateAliasTransactionV1
+            .selfSigned(
+              miner,
+              alias,
+              5 * 10000000,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
 
         val dataTx =
           DataTransaction
@@ -323,17 +325,17 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
 
   def compile(src: String): EXPR = {
     val untypedScript = Parser.parseExpr(src).get.value
-    ExpressionCompiler(com.wavesplatform.utils.compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+    ExpressionCompiler(compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()._1
   }
 
   def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
-    def _proofBytes(lvls: List[(Digest, Side)], acc: Array[Byte]): Array[Byte] = {
+    def loop(lvls: List[(Digest, Side)], acc: Array[Byte]): Array[Byte] = {
       lvls match {
-        case (d, s) :: xs => _proofBytes(xs, Array.concat(acc, s +: d.length.toByte +: d))
+        case (d, s) :: xs => loop(xs, Array.concat(acc, s +: d.length.toByte +: d))
         case Nil          => acc
       }
     }
 
-    _proofBytes(mp.levels.toList, Array.emptyByteArray)
+    loop(mp.levels.toList, Array.emptyByteArray)
   }
 }

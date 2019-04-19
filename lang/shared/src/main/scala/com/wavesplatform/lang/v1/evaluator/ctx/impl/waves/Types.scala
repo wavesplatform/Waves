@@ -27,7 +27,6 @@ object Types {
     )
   )
 
-  val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
   val assetType = CASETYPEREF(
     "Asset",
     List(
