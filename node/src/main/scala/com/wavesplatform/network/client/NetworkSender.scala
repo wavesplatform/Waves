@@ -26,7 +26,7 @@ class NetworkSender(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char
 
     if (channel.isOpen) {
       def write(messages: Seq[Any]): Future[Unit] = {
-        val (send, keep) = messages.splitAt(1000)
+        val (send, keep) = messages.splitAt(100)
         val futures = send.map { msg =>
           val result = Promise[Unit]()
           channel.write(msg).addListener { (f: io.netty.util.concurrent.Future[Void]) =>
