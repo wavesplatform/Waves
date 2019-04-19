@@ -7,8 +7,8 @@ import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -58,8 +58,8 @@ private[api] class CommonTransactionsApi(functionalitySettings: FunctionalitySet
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, VanillaTransaction] = {
     val result = for {
-      r <- utx.putIfNewTraced(tx)
-      _ = if (r._1) broadcast(tx) else ()
+      shouldBroadcast <- utx.putIfNew(tx)
+      _ = if (shouldBroadcast) broadcast(tx) else ()
     } yield tx
 
     result

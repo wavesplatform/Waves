@@ -15,10 +15,10 @@ trait BroadcastRoute {
   protected def doBroadcast(v: Either[ValidationError, Transaction]): TracedResult[ApiError, Transaction] = {
     val r = for {
       tx <- TracedResult(v)
-      r  <- utx.putIfNewTraced(tx)
+      r  <- utx.putIfNew(tx)
     } yield {
-      val (added, _) = r
-      if (added) allChannels.broadcastTx(tx, None)
+      val shouldBroadcast = r
+      if (shouldBroadcast) allChannels.broadcastTx(tx, None)
       tx
     }
 
