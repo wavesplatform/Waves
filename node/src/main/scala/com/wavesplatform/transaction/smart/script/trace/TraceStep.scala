@@ -1,12 +1,13 @@
 package com.wavesplatform.transaction.smart.script.trace
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.evaluator.ScriptResult
-import play.api.libs.json.{JsObject, Json}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
+import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import play.api.libs.json.Json.JsValueWrapper
+import play.api.libs.json.{JsObject, JsString, JsValue, Json}
 
 sealed abstract class TraceStep {
   def json: JsObject
@@ -20,7 +21,7 @@ case class AccountVerifierTrace(
   override lazy val json: JsObject = Json.obj(
     "address" -> address.address,
   ) ++ (errorO match {
-    case Some(e) => Json.obj("error"  -> ApiError.fromValidationError(e).message)
+    case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
   })
 }
@@ -32,7 +33,7 @@ case class AssetVerifierTrace(
   override lazy val json: JsObject = Json.obj(
     "address" -> id.base58,
   ) ++ (errorO match {
-    case Some(e) => Json.obj("error"  -> ApiError.fromValidationError(e).message)
+    case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
   })
 }
@@ -50,7 +51,7 @@ case class InvokeScriptTrace(
       "args"        -> function.args.map(_.toString),
       resultE match {
         case Right(value) => "result" -> toJson(value)
-        case Left(e)      => "error"  -> ApiError.fromValidationError(e).message
+        case Left(e)      => "error"  -> TraceStep.errorJson(e)
       }
     )
 
@@ -68,5 +69,22 @@ case class InvokeScriptTrace(
       })
     )}
   )
+}
+
+object TraceStep {
+  def errorJson(e: ValidationError): JsValue = e match {
+    case ScriptExecutionError(error, log, isAssetScript)   => Json.obj(logType(isAssetScript), logJson(log), "reason" -> error)
+    case TransactionNotAllowedByScript(log, isAssetScript) => Json.obj(logType(isAssetScript), logJson(log))
+    case a                                                 => JsString(a.toString)
+  }
+
+  private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =
+    "type" -> (if (isAssetScript) "Asset" else "Account")
+
+  private def logJson(l: Log): (String, JsValueWrapper) =
+    "vars" -> l.map {
+      case (k, Right(v))  => Json.obj("name" -> k, "value" -> v.toString)
+      case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)
+    }
 }
 
