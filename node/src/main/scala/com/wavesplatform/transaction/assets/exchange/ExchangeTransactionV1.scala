@@ -6,6 +6,7 @@ import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
@@ -102,8 +103,8 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     (
       IntBytes(tailIndex(1), "Buy order object length (BN)"),
       IntBytes(tailIndex(2), "Sell order object length (SN)"),
-      OrderV1Bytes(tailIndex(3), "Buy order object", "BN"),
-      OrderV1Bytes(tailIndex(4), "Sell order object", "SN"),
+      OrderV1Bytes(tailIndex(3), "Buy order object", "BN, see OrderV1 structure"),
+      OrderV1Bytes(tailIndex(4), "Sell order object", "SN, see OrderV1 structure"),
       LongBytes(tailIndex(5), "Price"),
       LongBytes(tailIndex(6), "Amount"),
       LongBytes(tailIndex(7), "Buy matcher fee"),

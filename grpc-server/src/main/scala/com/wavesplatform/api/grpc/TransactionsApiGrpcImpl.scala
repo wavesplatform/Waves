@@ -3,11 +3,11 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.TransactionNotExists
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
@@ -73,6 +73,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     commonApi
       .broadcastTransaction(tx.toVanilla)
       .map(_.toPB)
+      .resultE
       .toFuture
   }
 }

@@ -3,10 +3,13 @@ package com.wavesplatform.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 
@@ -50,7 +53,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
               _.toTx,
               _.eliminate(
                 _.toTx,
-                _ => Left(ValidationError.UnsupportedTransactionType)
+                _ => Left(UnsupportedTransactionType)
               )
             )
           }
@@ -58,26 +61,30 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
         .map { xs: List[Either[ValidationError, Transaction]] =>
           xs.view
             .map {
-              case Left(e)   => Left(e)
-              case Right(tx) => utx.putIfNew(tx).map { case (isNew, _) => (tx, isNew) }
+              case Left(e)   => TracedResult(Left(e))
+              case Right(tx) => utx.putIfNewTraced(tx).map { case (isNew, _) => (tx, isNew) }
             }
             .map {
-              case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, tx)) => Right(tx -> false)
-              case Left(e)                                                                    => Left(ApiError.fromValidationError(e))
-              case Right(x)                                                                   => Right(x)
+              case TracedResult(result, log) =>
+                val mapped = result match {
+                  case Left(TransactionValidationError(_: AlreadyInTheState, tx)) => Right(tx -> false)
+                  case Left(e)                                                    => Left(ApiError.fromValidationError(e))
+                  case Right(x)                                                   => Right(x)
+                }
+                (mapped, log)
             }
             .toList
         }
 
       r.foreach { xs =>
-        val newTxs = xs.collect { case Right((tx, true)) => tx }
+        val newTxs = xs.collect { case (Right((tx, true)), _) => tx }
         allChannels.broadcastTx(newTxs)
       }
 
       r.map { xs =>
         xs.map {
-          case Left(e)        => e.json
-          case Right((tx, _)) => tx.json()
+          case (l @ Left(e),    trace) => TracedResult(Left(e), trace).json
+          case (Right((tx, _)), trace) => TracedResult(Right(tx), trace).json
         }
       }
     }
@@ -90,7 +97,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
           _.toTx,
           _.eliminate(
             _.toTx,
-            _ => Left(ValidationError.UnsupportedTransactionType)
+            _ => Left(UnsupportedTransactionType)
           )
         )
       )

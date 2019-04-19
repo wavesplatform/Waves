@@ -4,6 +4,7 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, TRUE}
 import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, UserFunction}
+import com.wavesplatform.lang.utils._
 import org.scalatest.{FreeSpec, Matchers}
 
 class UtilsSpecification extends FreeSpec with Matchers {

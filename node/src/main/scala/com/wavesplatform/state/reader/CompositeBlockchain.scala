@@ -6,14 +6,15 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
 
@@ -101,15 +102,15 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = {
+  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keys
       .map { id =>
         diff.transactions(id)._2
       }
-      .collect { case lt: LeaseTransaction => lt }
+      .collect { case lt: LeaseTransaction if predicate(lt) => lt }
       .toSet
-    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+    val fromInner = inner.allActiveLeases(predicate).filterNot(ltx => canceled.keySet.contains(ltx.id()))
     fromDiff ++ fromInner
   }
 
@@ -120,6 +121,13 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     }
 
     inner.collectLposPortfolios(pf) ++ b.result()
+  }
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = {
+    diff.scriptResults
+      .get(txId)
+      .toRight(GenericError("InvokeScript result not found"))
+      .orElse(inner.invokeScriptResult(txId))
   }
 
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
@@ -150,6 +158,10 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       case Some(None)    => false
       case Some(Some(_)) => true
     }
+  }
+
+  override def accountDataKeys(acc: Address): Seq[String] = {
+    inner.accountDataKeys(acc) ++ diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
   }
 
   override def accountData(acc: Address): AccountDataInfo = {

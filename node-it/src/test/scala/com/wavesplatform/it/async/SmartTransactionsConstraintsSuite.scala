@@ -11,7 +11,7 @@ import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
 

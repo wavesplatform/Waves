@@ -16,14 +16,16 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG}
-import com.wavesplatform.transaction.ValidationError.InvalidRequestSignature
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.smart.Verifier
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -70,7 +72,7 @@ case class DebugApiRoute(ws: WavesSettings,
 
   override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate ~ stateChanges
   }
 
   @Path("/blocks/{howMany}")
@@ -348,15 +350,47 @@ case class DebugApiRoute(ws: WavesSettings,
         import ws.blockchainSettings.{functionalitySettings => fs}
         val h  = blockchain.height
         val t0 = System.nanoTime
-        val diffEi = for {
-          tx <- TransactionFactory.fromSignedRequest(jsv)
+        val tracedDiff = for {
+          tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
           _  <- Verifier(blockchain, h)(tx)
           ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
-        val response  = Json.obj("valid" -> diffEi.isRight, "validationTime" -> timeSpent)
-        diffEi.fold(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)), _ => response)
+        val response  = Json.obj(
+          "valid"          -> tracedDiff.resultE.isRight,
+          "validationTime" -> timeSpent,
+          "trace"          -> tracedDiff.trace.map(_.toString)
+        )
+        tracedDiff.resultE.fold(
+          err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
+            _ => response
+        )
       }
+    }
+  }
+
+  @Path("/stateChanges")
+  @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "query")
+    ))
+  def stateChanges: Route = (get & path("stateChanges") & parameter("transactionId") & handleExceptions(jsonExceptionHandler)) { transactionId =>
+    val txEither = for {
+      txId <- Base58.tryDecodeWithLimit(transactionId).toEither.left.map(err => GenericError(s"Invalid Base58: ${err.getMessage}"))
+      tx <- blockchain.transactionInfo(txId).toRight(GenericError("Transaction not found"))
+    } yield tx._2
+
+    txEither match {
+      case Right(tx: InvokeScriptTransaction) =>
+        val result = blockchain.invokeScriptResult(TransactionId(tx.id()))
+        complete(result)
+
+      case Left(error) =>
+        complete(error)
+
+      case _ =>
+        complete(StatusCodes.NotImplemented)
     }
   }
 }

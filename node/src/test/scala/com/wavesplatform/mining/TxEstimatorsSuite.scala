@@ -1,60 +1,76 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import org.scalamock.scalatest.PathMockFactory
+import com.wavesplatform.settings.TestFunctionalitySettings
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
-class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with TransactionGen {
+class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with TransactionGen {
+  def differ = TransactionDiffer(TestFunctionalitySettings.Enabled, None, System.currentTimeMillis(), 1, false) _
+  val preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures
   "scriptRunNumber" - {
     "smart account" - {
       "should not count transactions going from a regular account" in {
-        val blockchain = stub[Blockchain]
-        (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
+        val blockchain = mock[Blockchain]
+        (blockchain.hasScript _).expects(*).returning(false).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 0
       }
 
       "should count transactions going from a smart account" in {
-        val blockchain = stub[Blockchain]
-        (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
+        val blockchain = mock[Blockchain]
+        (blockchain.hasScript _).expects(*).returning(true).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 1
       }
     }
 
     "smart tokens" - {
       "should not count transactions working with a regular tokens" in {
-        val blockchain = stub[Blockchain]
-        (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
-        (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => None).anyNumberOfTimes()
+        val blockchain = mock[Blockchain]
+        (blockchain.hasScript _).expects(*).returning(false).anyNumberOfTimes()
+        (blockchain.assetDescription _).expects(*).returning(None).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 0
       }
 
       "should count transactions working with smart tokens" in {
-        val blockchain = stub[Blockchain]
-        (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
-        (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => Some(assetDescription)).anyNumberOfTimes()
+        val blockchain = mock[Blockchain]
+        (blockchain.hasScript _).expects(*).returning(false).anyNumberOfTimes()
+        (blockchain.hasAssetScript _).expects(*).returning(true).anyNumberOfTimes()
+        (blockchain.assetDescription _).expects(*).returning(Some(assetDescription)).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).resultE.right.get) shouldBe 1
       }
     }
 
     "both - should double count transactions working with smart tokens from samrt account" in {
-      val blockchain = stub[Blockchain]
-      (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
-      (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => Some(assetDescription)).anyNumberOfTimes()
+      val blockchain = mock[Blockchain]
+      (blockchain.hasScript _).expects(*).returning(true).anyNumberOfTimes()
+      (blockchain.hasAssetScript _).expects(*).returning(true).anyNumberOfTimes()
+      (blockchain.assetDescription _).expects(*).returning(Some(assetDescription)).anyNumberOfTimes()
+      (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
+      (blockchain.height _).expects().returning(1).anyNumberOfTimes()
 
-      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 2
+      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).resultE.right.get) shouldBe 2
     }
   }
 

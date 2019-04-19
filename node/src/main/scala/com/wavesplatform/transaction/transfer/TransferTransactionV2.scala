@@ -2,10 +2,11 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -95,7 +96,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
       LongBytes(tailIndex(5), "Amount"),
       LongBytes(tailIndex(6), "Fee"),
       AddressOrAliasBytes(tailIndex(7), "Recipient"),
-      BytesArrayUndefinedLength(tailIndex(8), "Attachment"),
+      BytesArrayUndefinedLength(tailIndex(8), "Attachment", TransferTransaction.MaxAttachmentSize),
       ProofsBytes(tailIndex(9))
     ) mapN {
       case (senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments, proofs) =>

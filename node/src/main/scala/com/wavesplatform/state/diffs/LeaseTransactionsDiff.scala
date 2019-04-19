@@ -3,11 +3,11 @@ package com.wavesplatform.state.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease._
 
 import scala.util.{Left, Right}
@@ -29,7 +29,8 @@ object LeaseTransactionsDiff {
             sender    -> Portfolio(-tx.fee, LeaseBalance(0, tx.amount), Map.empty),
             recipient -> Portfolio(0, LeaseBalance(tx.amount, 0), Map.empty)
           )
-          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.id() -> true)))
+          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.id() -> true),
+            scriptsRun = (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 })))
         }
       }
     }

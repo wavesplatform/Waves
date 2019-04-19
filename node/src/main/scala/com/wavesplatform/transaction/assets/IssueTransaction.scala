@@ -4,11 +4,12 @@ import java.nio.charset.StandardCharsets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 

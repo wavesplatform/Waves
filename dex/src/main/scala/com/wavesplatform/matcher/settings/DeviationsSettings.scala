@@ -1,4 +1,4 @@
-package com.wavesplatform.settings
+package com.wavesplatform.matcher.settings
 
 import cats.implicits._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator

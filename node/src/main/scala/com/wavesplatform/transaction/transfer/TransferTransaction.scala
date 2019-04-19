@@ -4,8 +4,10 @@ import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
@@ -50,7 +52,10 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeArray(attachment)
     )
   }
-  override def checkedAssets(): Seq[Asset] = Seq(assetId)
+  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
+    case Waves => Seq()
+    case a: IssuedAsset => Seq(a)
+  }
 }
 
 object TransferTransaction {

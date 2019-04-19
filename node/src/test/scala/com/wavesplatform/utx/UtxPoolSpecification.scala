@@ -16,6 +16,8 @@ import com.wavesplatform.db.{WithDomain, openDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.mining._
@@ -23,10 +25,8 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
+import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
@@ -44,15 +44,15 @@ import scala.concurrent.duration._
 private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
-  final case class TempDB(fs: FunctionalitySettings) {
+  final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path   = Files.createTempDirectory("leveldb-test")
     val db     = openDB(path.toAbsolutePath.toString)
-    val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, 100000, 2000, 120 * 60 * 1000, false)
+    val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings)
 
-    Runtime.getRuntime.addShutdownHook(new Thread(() => {
+    sys.addShutdownHook {
       db.close()
       TestHelpers.deleteRecursively(path)
-    }))
+    }
   }
 }
 
@@ -86,8 +86,8 @@ class UtxPoolSpecification
         genesisSettings
       ), featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
-    val dbContext = TempDB(settings.blockchainSettings.functionalitySettings)
-    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), ignoreSpendableBalanceChanged, false)
+    val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), ignoreSpendableBalanceChanged)
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }

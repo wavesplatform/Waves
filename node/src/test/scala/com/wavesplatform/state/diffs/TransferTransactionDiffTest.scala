@@ -8,10 +8,10 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxValidationError}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -94,7 +94,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         }
 
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(transfer)), rdDisabled) { diffEi =>
-          diffEi shouldBe Left(TransactionDiffer.TransactionValidationError(ValidationError.OverflowError, transfer))
+          diffEi shouldBe Left(TransactionDiffer.TransactionValidationError(TxValidationError.OverflowError, transfer))
         }
     }
   }

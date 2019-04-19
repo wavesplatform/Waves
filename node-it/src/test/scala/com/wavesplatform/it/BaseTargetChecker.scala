@@ -22,28 +22,30 @@ object BaseTargetChecker {
       .withFallback(defaultApplication())
       .withFallback(defaultReference())
       .resolve()
-    val settings         = WavesSettings.fromRootConfig(sharedConfig)
-    val genesisBlock     = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
-    val db               = openDB("/tmp/tmp-db")
-    val time             = new NTP("ntp.pool.org")
-    val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-    val bu               = StorageFactory(settings, db, time, portfolioChanges, false)
-    val pos              = new PoSSelector(bu, settings.blockchainSettings, settings.synchronizationSettings)
-    bu.processBlock(genesisBlock)
+
+    val settings          = WavesSettings.fromRootConfig(sharedConfig)
+    val db                = openDB("/tmp/tmp-db")
+    val ntpTime           = new NTP("ntp.pool.org")
+    val portfolioChanges  = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+    val blockchainUpdater = StorageFactory(settings, db, ntpTime, portfolioChanges)
+    val poSSelector       = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
 
     try {
+      val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
+      blockchainUpdater.processBlock(genesisBlock)
+
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
         case cfg if cfg.as[Boolean]("waves.miner.enable") =>
           val account   = PublicKey(cfg.as[ByteStr]("public-key").arr)
           val address   = account.toAddress
-          val balance   = bu.balance(address, Waves)
+          val balance   = blockchainUpdater.balance(address, Waves)
           val consensus = genesisBlock.consensusData
-          val timeDelay = pos
-            .getValidBlockDelay(bu.height, account, consensus.baseTarget, balance)
+          val timeDelay = poSSelector
+            .getValidBlockDelay(blockchainUpdater.height, account, consensus.baseTarget, balance)
             .explicitGet()
 
           f"$address: ${timeDelay * 1e-3}%10.3f s"
       }
-    } finally time.close()
+    } finally ntpTime.close()
   }
 }

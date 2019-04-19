@@ -113,30 +113,30 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       case DataTransaction(sender, data, fee, timestamp, proofs) =>
         val dataTooBig   = List.tabulate(100)(n => StringDataEntry((100 + n).toString, "a" * 1527))
         val dataTooBigEi = DataTransaction.create(sender, dataTooBig, fee, timestamp, proofs)
-        dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
+        dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
 
         val emptyKey   = List(IntegerDataEntry("", 2))
         val emptyKeyEi = DataTransaction.create(sender, emptyKey, fee, timestamp, proofs)
-        emptyKeyEi shouldBe Left(ValidationError.GenericError("Empty key found"))
+        emptyKeyEi shouldBe Left(TxValidationError.GenericError("Empty key found"))
 
         val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = DataTransaction.create(sender, keyTooLong, fee, timestamp, proofs)
-        keyTooLongEi shouldBe Left(ValidationError.TooBigArray)
+        keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
         val valueTooLongEi = DataTransaction.create(sender, valueTooLong, fee, timestamp, proofs)
-        valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
+        valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val e               = BooleanDataEntry("dupe", true)
         val duplicateKeys   = e +: data.drop(3) :+ e
         val duplicateKeysEi = DataTransaction.create(sender, duplicateKeys, fee, timestamp, proofs)
-        duplicateKeysEi shouldBe Left(ValidationError.GenericError("Duplicate keys found"))
+        duplicateKeysEi shouldBe Left(TxValidationError.GenericError("Duplicate keys found"))
 
         val noFeeEi = DataTransaction.create(sender, data, 0, timestamp, proofs)
-        noFeeEi shouldBe Left(ValidationError.InsufficientFee())
+        noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
 
         val negativeFeeEi = DataTransaction.create(sender, data, -100, timestamp, proofs)
-        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
+        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
     }
   }
 

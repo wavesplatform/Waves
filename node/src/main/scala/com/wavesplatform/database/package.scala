@@ -13,12 +13,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import org.iq80.leveldb.{DB, ReadOptions}
 
 package object database {
+  final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
+
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
     def writeByteStr(s: ByteStr) = {
       output.write(s.arr)
@@ -387,10 +389,10 @@ package object database {
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
 
-    def iterateOver(prefix: Short)(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit =
+    def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)
 
-    def iterateOver(prefix: Array[Byte])(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit = {
+    def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
       val iterator = db.iterator()
       try {
         iterator.seek(prefix)

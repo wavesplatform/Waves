@@ -109,7 +109,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
+    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -125,7 +125,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                               = ???
+      override def putIfNewTraced(tx: Transaction)                 = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
       override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
       override def pessimisticPortfolio(addr: Address): Portfolio          = ???

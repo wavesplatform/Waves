@@ -6,9 +6,10 @@ import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.InvalidAddress
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.{ScorexLogging, base58Length}
+import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
@@ -94,6 +95,11 @@ object Address extends ScorexLogging {
     val fullHash = crypto.secureHash(withoutChecksum)
     fullHash.take(ChecksumLength)
   }
+
+  implicit val jsonFormat: Format[Address] = Format[Address](
+    Reads(jsValue => fromString(jsValue.as[String]).fold(err => JsError(err.toString), JsSuccess(_))),
+    Writes(addr => JsString(addr.stringRepr))
+  )
 
   @inline
   private[this] def scheme: AddressScheme = AddressScheme.current

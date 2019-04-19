@@ -6,6 +6,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TransactionParsers._
 import com.wavesplatform.transaction.description.{AddressBytes, ByteEntity, LongBytes}
@@ -74,7 +75,7 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
 
       byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
         Either
-          .cond(tx.amount >= 0, tx, ValidationError.NegativeAmount(tx.amount, "waves"))
+          .cond(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves"))
           .foldToTry
       }
     }.flatten
@@ -82,7 +83,7 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     if (amount < 0) {
-      Left(ValidationError.NegativeAmount(amount, "waves"))
+      Left(TxValidationError.NegativeAmount(amount, "waves"))
     } else {
       val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
       Right(GenesisTransaction(recipient, amount, timestamp, signature))

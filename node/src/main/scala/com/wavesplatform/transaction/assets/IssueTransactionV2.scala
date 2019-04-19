@@ -2,16 +2,17 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.transaction.{validation, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -82,7 +83,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
       _ <- Either.cond(script.forall(_.isInstanceOf[ExprScript]),
                        (),
-                       ValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
+                       TxValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
     } yield IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
   }
 
@@ -120,8 +121,8 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyBytes(tailIndex(2), "Sender's public key"),
-      BytesArrayUndefinedLength(tailIndex(3), "Name"),
-      BytesArrayUndefinedLength(tailIndex(4), "Description"),
+      BytesArrayUndefinedLength(tailIndex(3), "Name", validation.MaxAssetNameLength, validation.MinAssetNameLength),
+      BytesArrayUndefinedLength(tailIndex(4), "Description", validation.MaxDescriptionLength),
       LongBytes(tailIndex(5), "Quantity"),
       OneByte(tailIndex(6), "Decimals"),
       BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)"),

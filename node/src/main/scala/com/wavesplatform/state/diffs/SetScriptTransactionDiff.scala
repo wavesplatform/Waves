@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 import scala.util.Right
@@ -13,6 +13,7 @@ object SetScriptTransactionDiff {
       Diff(height = height,
            tx = tx,
            portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-           scripts = Map(tx.sender.toAddress    -> scriptOpt)))
+           scripts = Map(tx.sender.toAddress    -> scriptOpt),
+           scriptsRun = (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 })))
   }
 }

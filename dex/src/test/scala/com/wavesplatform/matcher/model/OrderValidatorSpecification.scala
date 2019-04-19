@@ -3,24 +3,26 @@ package com.wavesplatform.matcher.model
 import java.util.concurrent.ConcurrentHashMap
 
 import com.google.common.base.Charsets
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.model.OrderValidator.Result
-import com.wavesplatform.settings.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.settings.{AssetType, Constants, DeviationsSettings, OrderAmountSettings}
+import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
@@ -219,7 +221,7 @@ class OrderValidatorSpecification
         case (order, sender, orderFeeSettings) =>
           val baseFee = orderFeeSettings match {
             case FixedWavesSettings(fee) => fee
-            case _                       => OrderValidator.exchangeTransactionCreationFee
+            case _                       => matcherSettings.exchangeTxBaseFee
           }
 
           val orderValidator = setScriptsAndValidate(orderFeeSettings)(None, None, None, None) _ // assets and accounts don't have any scripts
@@ -391,26 +393,89 @@ class OrderValidatorSpecification
           }
       }
 
-      "amount does not meet matcher's settings requirements" in forAll(orderWithFeeSettingsGenerator) {
-        case (order, sender, orderFeeSettings) =>
-          def updateOrderAmount(amt: Long): Order = Order.sign(order.updateAmount(amt), sender)
-          def normalize(value: Double): Long      = (BigDecimal.valueOf(value) * BigDecimal(10).pow(defaultAssetDecimals).toLongExact).toLong
+      "amount or price does not meet matcher's settings requirements" in {
+        def decimalsGen(asset: Asset): Gen[Int] = asset.fold(Gen.const(defaultAssetDecimals))(_ => Gen.choose(0, defaultAssetDecimals))
+        val sizeGen: Gen[Double]                = Gen.choose(1, 10000000).map(s => BigDecimal(s) / BigDecimal(10).pow(8)).map(_.toDouble)
 
-          val amountSettings               = OrderAmountSettings(stepSize = 1, minAmount = 1, maxAmount = 1000000)
-          val emptyRestrictions            = Map.empty[AssetPair, OrderAmountSettings]
-          val restrictionsWithNonOrderPair = Map(AssetPair.createAssetPair("ETH", "BTC").get -> amountSettings)
-          val defaultRestrictions          = Map(order.assetPair -> amountSettings)
+        val preconditions = for {
+          (order, sender, orderFeeSettings) <- orderWithFeeSettingsGenerator
+          amountAssetDecimals               <- decimalsGen(order.assetPair.amountAsset)
+          priceAssetDecimals                <- decimalsGen(order.assetPair.priceAsset)
+          stepSize                          <- sizeGen
+          tickSize                          <- sizeGen
+        } yield (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize)
 
-          val validateByAmount: Map[AssetPair, OrderAmountSettings] => Order => Result[Order] =
-            map => setScriptsAndValidate(orderFeeSettings, orderAmountRestrictions = map)(None, None, None, None)
+        forAll(preconditions) {
+          case (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize) =>
+            def normalizeAmount(value: Double): Long = MatcherModel.toNormalized(value, -amountAssetDecimals, -8) // value * 10 ^ amountAssetDecimals
+            def normalizePrice(value: Double): Long  = MatcherModel.toNormalized(value, amountAssetDecimals, priceAssetDecimals)
 
-          validateByAmount(emptyRestrictions)(order) shouldBe 'right
-          validateByAmount(restrictionsWithNonOrderPair)(order) shouldBe 'right
-          validateByAmount(defaultRestrictions)(updateOrderAmount(normalize(amountSettings.minAmount))) shouldBe 'right
+            def denormalizeAmount(value: Long): Double = MatcherModel.fromNormalized(value, -amountAssetDecimals, -8)
+            def denormalizePrice(value: Long): Double  = MatcherModel.fromNormalized(value, amountAssetDecimals, priceAssetDecimals)
 
-          validateByAmount(defaultRestrictions)(updateOrderAmount(normalize(amountSettings.minAmount) + 1)) should produce("OrderInvalidAmount") // amount is not a multiple of step size
-          validateByAmount(defaultRestrictions)(updateOrderAmount(normalize(amountSettings.maxAmount + 1))) should produce("OrderInvalidAmount") // too big amount
-          validateByAmount(defaultRestrictions)(updateOrderAmount(normalize(amountSettings.minAmount - 1))) should produce("OrderInvalidAmount") // to small amount
+            val normalizedStepSize = normalizeAmount(stepSize).max(2) // if normalized size == 1 then all amounts/prices are multiple of size
+            val normalizedTickSize = normalizePrice(tickSize).max(2)
+
+            def getRestrictionsByOrder(order: Order, mergeSmallPrices: Boolean = false): OrderRestrictionsSettings = OrderRestrictionsSettings(
+              stepSize = denormalizeAmount(normalizedStepSize),
+              minAmount = denormalizeAmount(order.amount / 2),
+              maxAmount = denormalizeAmount(order.amount * 2),
+              tickSize = denormalizePrice(normalizedTickSize),
+              minPrice = denormalizePrice(order.price / 2),
+              maxPrice = denormalizePrice(order.price * 2),
+              mergeSmallPrices = mergeSmallPrices
+            )
+
+            def updateOrderAmount(ord: Order, amt: Long): Order = Order.sign(ord.updateAmount(amt), sender)
+            def updateOrderPrice(ord: Order, prc: Long): Order  = Order.sign(ord.updatePrice(prc), sender)
+
+            val correctPrice  = (order.price / normalizedTickSize * normalizedTickSize).max(normalizedTickSize)                                     // price is a multiple of the tick size
+            val correctAmount = (Order.correctAmount(order.amount, correctPrice) / normalizedStepSize * normalizedStepSize).max(normalizedStepSize) // amount is a multiple of the step size
+
+            val defaultOrder        = Order.sign(order.updatePrice(correctPrice).updateAmount(correctAmount), sender)
+            val defaultRestrictions = getRestrictionsByOrder(defaultOrder)
+
+            val emptyRestrictionsMap            = Map.empty[AssetPair, OrderRestrictionsSettings]
+            val restrictionsMapWithNonOrderPair = Map(AssetPair.createAssetPair("ETH", "BTC").get -> defaultRestrictions)
+            val defaultRestrictionsMap          = Map(defaultOrder.assetPair -> defaultRestrictions)
+
+            val orderValidator: Map[AssetPair, OrderRestrictionsSettings] => Order => Result[Order] =
+              map => setScriptsAndValidate(orderFeeSettings, orderRestrictions = map)(None, None, None, None, amountAssetDecimals, priceAssetDecimals)
+
+            orderValidator(emptyRestrictionsMap)(defaultOrder) shouldBe 'right
+            orderValidator(restrictionsMapWithNonOrderPair)(defaultOrder) shouldBe 'right
+            orderValidator(defaultRestrictionsMap)(defaultOrder) shouldBe 'right
+
+            val orderWithNonMultipleAmount = updateOrderAmount(defaultOrder, defaultOrder.amount + 1)
+
+            val restrictionsMapWithBigMinAmount =
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(minAmount = denormalizeAmount((defaultOrder.amount * 1.5).toLong)))
+
+            val restrictionsMapWithSmallMaxAmount =
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxAmount = denormalizeAmount((defaultOrder.amount / 1.5).toLong)))
+
+            orderValidator(defaultRestrictionsMap)(orderWithNonMultipleAmount) should produce("OrderInvalidAmount")
+            orderValidator(restrictionsMapWithBigMinAmount)(defaultOrder) should produce("OrderInvalidAmount")
+            orderValidator(restrictionsMapWithSmallMaxAmount)(defaultOrder) should produce("OrderInvalidAmount")
+
+            val insignificantDecimals     = (priceAssetDecimals - amountAssetDecimals).max(0)
+            val orderWithNonMultiplePrice = updateOrderPrice(defaultOrder, defaultOrder.price + BigDecimal(10).pow(insignificantDecimals).toLongExact)
+
+            val restrictionsMapWithBigMinPrice =
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(minPrice = denormalizePrice((defaultOrder.price * 1.5).toLong)))
+
+            val restrictionsMapWithSmallMaxPrice =
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxPrice = denormalizePrice((defaultOrder.price / 1.5).toLong)))
+
+            val defaultRestrictionsMergeSmallPrices =
+              Map(defaultOrder.assetPair -> defaultRestrictions.copy(mergeSmallPrices = true))
+
+            orderValidator(restrictionsMapWithBigMinPrice)(defaultOrder) should produce("OrderInvalidPrice")
+            orderValidator(restrictionsMapWithSmallMaxPrice)(defaultOrder) should produce("OrderInvalidPrice")
+
+            orderValidator(defaultRestrictionsMap)(orderWithNonMultiplePrice) should produce("OrderInvalidPrice")
+            orderValidator(defaultRestrictionsMergeSmallPrices)(orderWithNonMultiplePrice) shouldBe 'right
+        }
       }
     }
 
@@ -606,17 +671,11 @@ class OrderValidatorSpecification
   }
 
   private def mkOrderValidator(bc: Blockchain, tc: ExchangeTransactionCreator) =
-    OrderValidator.blockchainAware(bc,
-                                   tc.createTransaction,
-                                   MatcherAccount,
-                                   ntpTime,
-                                   matcherSettings.orderFee,
-                                   matcherSettings.orderAmountRestrictions)(_)
+    OrderValidator.blockchainAware(bc, tc.createTransaction, MatcherAccount, ntpTime, matcherSettings.orderFee, matcherSettings.orderRestrictions)(_)
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(blockchain: Blockchain) =
-    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings.orderFee)
+  private def exchangeTransactionCreator(blockchain: Blockchain) = new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
@@ -642,27 +701,32 @@ class OrderValidatorSpecification
         )(order)
 
   private def setScriptsAndValidate(orderFeeSettings: OrderFeeSettings,
-                                    orderAmountRestrictions: Map[AssetPair, OrderAmountSettings] = matcherSettings.orderAmountRestrictions)(
+                                    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings] = matcherSettings.orderRestrictions)(
       amountAssetScript: Option[Script],
       priceAssetScript: Option[Script],
       matcherFeeAssetScript: Option[Script],
-      matcherAccountScript: Option[Script])(order: Order): OrderValidator.Result[Order] = {
+      matcherAccountScript: Option[Script],
+      amountAssetDecimals: Int = defaultAssetDecimals,
+      priceAssetDecimals: Int = defaultAssetDecimals,
+      matcherFeeAssetDecimals: Int = defaultAssetDecimals)(order: Order): OrderValidator.Result[Order] = {
 
     val blockchain = stub[Blockchain]
 
     activate(blockchain, BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0, BlockchainFeatures.SmartAssets -> 0)
 
-    def prepareAssets(assetsAndScripts: (Asset, Option[Script])*): Unit = assetsAndScripts foreach {
-      case (asset: IssuedAsset, scriptOption) =>
-        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(defaultAssetDecimals))
+    def prepareAssets(assetsAndScripts: (Asset, Option[Script], Int)*): Unit = assetsAndScripts foreach {
+      case (asset: IssuedAsset, scriptOption, decimals) =>
+        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(decimals))
         (blockchain.assetScript _).when(asset).returns(scriptOption)
         (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)
       case _ =>
     }
 
-    prepareAssets(order.assetPair.amountAsset -> amountAssetScript,
-                  order.assetPair.priceAsset  -> priceAssetScript,
-                  order.matcherFeeAssetId     -> matcherFeeAssetScript)
+    prepareAssets(
+      (order.assetPair.amountAsset, amountAssetScript, amountAssetDecimals),
+      (order.assetPair.priceAsset, priceAssetScript, priceAssetDecimals),
+      (order.matcherFeeAssetId, matcherFeeAssetScript, matcherFeeAssetDecimals)
+    )
 
     (blockchain.accountScript _).when(MatcherAccount.toAddress).returns(matcherAccountScript)
     (blockchain.hasScript _).when(MatcherAccount.toAddress).returns(matcherAccountScript.isDefined)
@@ -672,7 +736,6 @@ class OrderValidatorSpecification
 
     val transactionCreator = exchangeTransactionCreator(blockchain).createTransaction _
 
-    OrderValidator.blockchainAware(blockchain, transactionCreator, MatcherAccount.toAddress, ntpTime, orderFeeSettings, orderAmountRestrictions)(
-      order)
+    OrderValidator.blockchainAware(blockchain, transactionCreator, MatcherAccount.toAddress, ntpTime, orderFeeSettings, orderRestrictions)(order)
   }
 }
