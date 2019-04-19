@@ -627,17 +627,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readLock {
-    ngState.fold(blockchain.allActiveLeases(predicate)) { ng =>
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = readLock {
+    ngState.fold(blockchain.allActiveLeases) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
-      val fromDiff = active.keys
-        .map { id =>
-          ng.bestLiquidDiff.transactions(id)._2
-        }
-        .collect { case lt: LeaseTransaction if predicate(lt) => lt }
-        .toSet
-      val fromInner = blockchain.allActiveLeases(ltx => !canceled.keySet.contains(ltx.id()) && predicate(ltx))
-      fromDiff ++ fromInner
+      val fromDiff = active.keysIterator
+        .map(id => ng.bestLiquidDiff.transactions(id)._2)
+        .collect { case lt: LeaseTransaction => lt }
+
+      val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+      CloseableIterator.seq(fromDiff, fromInner)
     }
   }
 

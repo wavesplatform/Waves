@@ -742,10 +742,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readOnly { db =>
-    val txs = new ListBuffer[LeaseTransaction]()
-
-    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = readStream { db =>
+    db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix).flatMap { kv =>
       val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
 
       if (loadLeaseStatus(db, txId)) {
@@ -754,15 +752,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
         val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        val txOption = db
+        db
           .get(Keys.transactionAt(height, txNum))
-          .collect { case lt: LeaseTransaction if predicate(lt) => lt }
-
-        txs ++= txOption
-      }
+          .collect { case lt: LeaseTransaction => lt }
+      } else None
     }
-
-    txs.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>

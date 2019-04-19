@@ -103,15 +103,14 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keys
+    val fromDiff = active.keysIterator
       .map(id => diff.transactions(id)._2)
-      .collect { case lt: LeaseTransaction if predicate(lt) => lt }
-      .toSet
+      .collect { case lt: LeaseTransaction => lt }
 
-    val fromInner = inner.allActiveLeases(ltx => !canceled.keySet.contains(ltx.id()) && predicate(ltx))
-    fromDiff ++ fromInner
+    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+    CloseableIterator.seq(fromDiff, fromInner)
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {

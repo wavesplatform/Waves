@@ -5,20 +5,21 @@ import scala.collection.{AbstractIterator, GenTraversableOnce, Iterator}
 
 //noinspection ScalaStyle
 sealed trait CloseableIterator[+A] extends Iterator[A] with Closeable {
-  private[this] def replaceIterator[B](iterator: Iterator[B]): CloseableIterator[B] =
+  private[this] def withIterator[B](iterator: Iterator[B]): CloseableIterator[B] =
     CloseableIterator(
       iterator,
       () => this.close()
     )
 
-  def transform[B](f: Iterator[A] => Iterator[B]): CloseableIterator[B]    = replaceIterator(f(this))
-  override def collect[B](pf: PartialFunction[A, B]): CloseableIterator[B] = replaceIterator(super.collect(pf))
-  override def map[B](f: A => B): CloseableIterator[B]                     = replaceIterator(super.map(f))
-  override def filter(p: A => Boolean): CloseableIterator[A]               = replaceIterator(super.filter(p))
-  override def take(n: Int): CloseableIterator[A]                          = replaceIterator(super.take(n))
-  override def drop(n: Int): CloseableIterator[A]                          = replaceIterator(super.drop(n))
-  override def takeWhile(p: A => Boolean): CloseableIterator[A]            = replaceIterator(super.takeWhile(p))
-  override def dropWhile(p: A => Boolean): CloseableIterator[A]            = replaceIterator(super.dropWhile(p))
+  def transform[B](f: Iterator[A] => Iterator[B]): CloseableIterator[B]    = withIterator(f(this))
+  override def collect[B](pf: PartialFunction[A, B]): CloseableIterator[B] = withIterator(super.collect(pf))
+  override def map[B](f: A => B): CloseableIterator[B]                     = withIterator(super.map(f))
+  override def filter(p: A => Boolean): CloseableIterator[A]               = withIterator(super.filter(p))
+  override def filterNot(p: A => Boolean): CloseableIterator[A]            = withIterator(super.filterNot(p))
+  override def take(n: Int): CloseableIterator[A]                          = withIterator(super.take(n))
+  override def drop(n: Int): CloseableIterator[A]                          = withIterator(super.drop(n))
+  override def takeWhile(p: A => Boolean): CloseableIterator[A]            = withIterator(super.takeWhile(p))
+  override def dropWhile(p: A => Boolean): CloseableIterator[A]            = withIterator(super.dropWhile(p))
 
   override def flatMap[B](f: A => GenTraversableOnce[B]): CloseableIterator[B] = {
     @volatile
