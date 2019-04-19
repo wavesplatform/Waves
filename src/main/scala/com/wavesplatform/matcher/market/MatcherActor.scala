@@ -121,9 +121,7 @@ class MatcherActor(settings: MatcherSettings,
   private def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
-    case GetSnapshotOffsets =>
-      log.info(s"Got GetSnapshotOffsets")
-      sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
+    case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: QueueEventWithMeta =>
       request.event match {
@@ -150,7 +148,6 @@ class MatcherActor(settings: MatcherSettings,
       shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = () => context.stop(self))
 
       context.children.foreach(context.unwatch)
-      log.info("context.become(snapshotsCommands orElse shutdownFallback)")
       context.become(snapshotsCommands orElse shutdownFallback)
 
       if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
@@ -192,7 +189,6 @@ class MatcherActor(settings: MatcherSettings,
       } else {
         val obs = orderBooks.get()
         log.info(s"Recovery completed, waiting order books to restore: ${obs.keys.mkString(", ")}")
-        log.info("context.become(collectOrderBooks(obs.size, Long.MaxValue, Long.MinValue, Map.empty))")
         context.become(collectOrderBooks(obs.size, Long.MaxValue, Long.MinValue, Map.empty))
       }
   }
@@ -209,10 +205,9 @@ class MatcherActor(settings: MatcherSettings,
       val updatedNewestEventNr        = math.max(newestEventNr, snapshotEventNr)
       val updatedCurrentOffsets       = currentOffsets.updated(assetPair, snapshotEventNr)
 
-      if (updatedRestOrderBooksNumber > 0) {
-        log.info("context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))")
+      if (updatedRestOrderBooksNumber > 0)
         context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))
-      } else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
+      else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
 
     case Terminated(ref) =>
       context.stop(self)
@@ -223,16 +218,10 @@ class MatcherActor(settings: MatcherSettings,
       context.stop(self)
       recoveryCompletedWithEventNr(Left("Received Shutdown command"))
 
-    case x =>
-      log.info(s"Stashed $x")
-      stash()
+    case _ => stash()
   }
 
   private def becomeWorking(oldestEventNr: EventOffset, newestEventNr: EventOffset, currentOffsets: Map[AssetPair, EventOffset]): Unit = {
-    log.info("unstashAll")
-    unstashAll()
-
-    log.info("context.become(receiveCommand)")
     context.become(receiveCommand)
 
     snapshotsState = SnapshotsState(
@@ -244,6 +233,7 @@ class MatcherActor(settings: MatcherSettings,
     log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, newestEventNr: $newestEventNr")
     log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
+    unstashAll()
     recoveryCompletedWithEventNr(Right((self, oldestEventNr)))
   }
 

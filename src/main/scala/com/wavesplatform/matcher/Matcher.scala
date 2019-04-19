@@ -288,7 +288,6 @@ class Matcher(actorSystem: ActorSystem,
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     val p = Promise[Unit]()
 
-    // TODO Женя
     def loop(): Unit = {
       if (currentOffset >= lastQueueOffset) p.trySuccess(())
       else if (deadline.isOverdue())
