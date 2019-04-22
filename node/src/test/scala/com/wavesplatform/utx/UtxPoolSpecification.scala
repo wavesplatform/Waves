@@ -321,7 +321,7 @@ class UtxPoolSpecification
       (sender, senderBalance, bcu) <- stateGen
       preconditions                <- preconditionsGen(bcu.lastBlockId.get, sender)
     } yield {
-      val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
+      // val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
       preconditions.foreach(b => bcu.processBlock(b).explicitGet())
       val utx = new UtxPoolImpl(
         new TestTime(),

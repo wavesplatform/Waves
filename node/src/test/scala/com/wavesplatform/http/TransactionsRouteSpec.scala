@@ -44,7 +44,7 @@ class TransactionsRouteSpec
   private val blockchain  = mock[Blockchain]
   private val utx         = mock[UtxPool]
   private val allChannels = mock[ChannelGroup]
-  private val route       = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime)().route
+  private val route       = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -68,7 +68,7 @@ class TransactionsRouteSpec
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime)().route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -103,7 +103,7 @@ class TransactionsRouteSpec
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime)().route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -134,7 +134,7 @@ class TransactionsRouteSpec
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime)().route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -176,7 +176,7 @@ class TransactionsRouteSpec
           )))
           .anyNumberOfTimes()
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime)().route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -219,7 +219,7 @@ class TransactionsRouteSpec
           )))
           .anyNumberOfTimes()
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime)().route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
