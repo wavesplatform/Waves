@@ -40,7 +40,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse(s"""{
                          "type": 16,
-                         "id": "AkoaZ4TvxxDcdDXKKfYetpZEaiAVdvdoRmDQYojiARzq",
+                         "id": "5HmTeyE2MJvVmQduKi2cRbd6M4DCWR3pu91XAc37QiPu",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
                          "senderPublicKey": "$publicKey",
                          "fee": 100000,

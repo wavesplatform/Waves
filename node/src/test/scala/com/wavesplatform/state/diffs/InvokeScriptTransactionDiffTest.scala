@@ -467,12 +467,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
             case List(
-              InvokeScriptTrace(dAppAddress, function, Right(ScriptResult(_, transactions))),
+              InvokeScriptTrace(dAppAddress, functionOpt, Right(ScriptResult(_, transactions))),
               AssetVerifierTrace(allowedAssetId, None),
               AssetVerifierTrace(bannedAssetId,  Some(TransactionNotAllowedByScript(_, _)))
             ) =>
               dAppAddress shouldBe ci.dappAddress
-              function    shouldBe ci.funcCallOpt
+              functionOpt shouldBe ci.funcCallOpt
 
               allowedAssetId shouldBe asset1.id.value
               bannedAssetId  shouldBe asset2.id.value

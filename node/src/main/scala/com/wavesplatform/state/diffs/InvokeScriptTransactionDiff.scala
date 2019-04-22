@@ -86,7 +86,7 @@ object InvokeScriptTransactionDiff {
           case Some(funcCall) =>
             val scriptResultE = evalContract(contract)
             for {
-              scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dappAddress, funcCall, scriptResultE)))
+              scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dappAddress, Some(funcCall), scriptResultE)))
               ScriptResult(ds, ps) = scriptResult
 
               pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {

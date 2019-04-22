@@ -39,18 +39,21 @@ case class AssetVerifierTrace(
 
 case class InvokeScriptTrace(
     dAppAddress: Address,
-    function:    FUNCTION_CALL,
+    functionOpt:    Option[FUNCTION_CALL],
     resultE:     Either[ValidationError, ScriptResult]
 ) extends TraceStep {
-  override def json: JsObject =
+  override def json: JsObject = {
+    val funcName: String = functionOpt.map(_.function.funcName).getOrElse("")
+    val funcArgs: Iterable[String] = functionOpt.map(_.args.map(_.toString)).getOrElse(List.empty)
     Json.obj(
       "dAppAddress" -> dAppAddress.address,
-      "function"    -> function.function.funcName,
-      "args"        -> function.args.map(_.toString),
+      "function"    -> funcName,
+      "args"        -> funcArgs,
       resultE match {
         case Right(value) => "result" -> value.toString
         case Left(e)      => "error"  -> ApiError.fromValidationError(e).message
       }
     )
+  }
 }
 
