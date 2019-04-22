@@ -44,6 +44,7 @@ scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable f
 inConfig(Compile)(
   Seq(
     mainClass := Some("com.wavesplatform.Application"),
+    discoveredMainClasses := (mainClass in Compile).value.toSeq,
     sourceGenerators += versionSource,
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
@@ -95,7 +96,6 @@ val batScriptPattern   = "bin/([^.]+)\\.bat".r
 
 inConfig(Universal)(
   Seq(
-    discoveredMainClasses := mainClass.value.toSeq,
     mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
     mappings := {
       val scriptSuffix = network.value.packageSuffix
