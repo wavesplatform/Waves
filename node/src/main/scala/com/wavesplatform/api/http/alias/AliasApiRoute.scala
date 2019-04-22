@@ -59,7 +59,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, Seq[String]] = com.wavesplatform.account.Address
       .fromString(addressString)
-      .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr))
+      .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr).toVector)
       .left
       .map(ApiError.fromValidationError)
     complete(result)

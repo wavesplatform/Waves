@@ -7,9 +7,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.ProvenTransaction
 
 import scala.util.{Left, Right}
 
@@ -52,14 +52,14 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.asset).get
 
-      def wasBurnt =
-        blockchain
+      def wasBurnt: Boolean = {
+        val burns = blockchain
           .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
-          .getOrElse(Seq.empty)
-          .exists {
-            case (_, t: BurnTransaction) if t.asset == tx.asset => true
-            case _                                              => false
-          }
+          .getOrElse(Nil)
+
+        val result = burns.collectFirst { case (_, btx: BurnTransaction) if btx.asset == btx.asset => btx }
+        result.isDefined
+      }
 
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
       if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {

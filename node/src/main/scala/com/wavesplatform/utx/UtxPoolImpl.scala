@@ -48,7 +48,14 @@ class UtxPoolImpl(time: Time,
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  override def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, (Boolean, Diff)] = {
+  override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+    val knownTx = pessimisticPortfolios.contains(tx.id())
+
+    if (knownTx) TracedResult.wrapValue(utxSettings.allowRebroadcasting)
+    else putNewTx(tx)
+  }
+
+  protected def putNewTx(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     def canReissue(blockchain: Blockchain, tx: Transaction): Either[GenericError, Unit] =
       PoolMetrics.checkCanReissue.measure(tx match {
         case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
@@ -66,13 +73,13 @@ class UtxPoolImpl(time: Time,
         case scripted if TxCheck.isScripted(scripted) =>
           for {
             _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts,
-              (),
-              GenericError("transactions from scripted accounts are denied from UTX pool"))
+                             (),
+                             GenericError("transactions from scripted accounts are denied from UTX pool"))
 
             scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
             _ <- Either.cond(skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
-              (),
-              GenericError("Transaction pool scripted txs size limit is reached"))
+                             (),
+                             GenericError("Transaction pool scripted txs size limit is reached"))
           } yield tx
 
         case _ =>
@@ -112,6 +119,7 @@ class UtxPoolImpl(time: Time,
     }
 
     PoolMetrics.putRequestStats.increment()
+
     val tracedResult = PoolMetrics.putTimeStats.measure {
       val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
 
@@ -122,8 +130,8 @@ class UtxPoolImpl(time: Time,
           .map(_.bytes().length)
           .sum
         _ <- Either.cond(skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-          (),
-          GenericError("Transaction pool bytes size limit is reached"))
+                         (),
+                         GenericError("Transaction pool bytes size limit is reached"))
 
         _ <- checkScripted(blockchain, tx, skipSizeCheck)
         _ <- checkNotBlacklisted(tx)
@@ -136,15 +144,14 @@ class UtxPoolImpl(time: Time,
         diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
-        val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
-        if (isNew) PoolMetrics.addTransaction(tx)
-        (isNew, diff)
+        transactions.put(tx.id(), tx)
+        true
       }
     }
 
     tracedResult.resultE.fold(
       err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}"),
-      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}, trace = ${tracedResult.trace}")
+      _ => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = true, trace = ${tracedResult.trace}")
     )
     tracedResult
   }
@@ -192,15 +199,16 @@ class UtxPoolImpl(time: Time,
             } else {
               differ(updatedBlockchain, tx).resultE match {
                 case Right(newDiff) =>
-                 val updatedRest       = currRest.put(updatedBlockchain, tx, newDiff)
-                 if (updatedRest.isOverfilled) {
-                   if (updatedRest != lastOverfilled) {
-                     log.trace(s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
-                   }
-                   (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
-                 } else {
-                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
-                 }
+                  val updatedRest = currRest.put(updatedBlockchain, tx, newDiff)
+                  if (updatedRest.isOverfilled) {
+                    if (updatedRest != lastOverfilled) {
+                      log.trace(
+                        s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+                    }
+                    (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
+                  } else {
+                    (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                  }
                 case Left(_) =>
                   (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
               }
@@ -312,9 +320,11 @@ class UtxPoolImpl(time: Time,
       bytesStats.decrement(tx.bytes().length)
     }
   }
+
 }
 
 object UtxPoolImpl {
+
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)]) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
@@ -336,6 +346,8 @@ object UtxPoolImpl {
         case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
       }
     }
+
+    def contains(txId: ByteStr): Boolean = transactionPortfolios.containsKey(txId)
 
     def getAggregated(accountAddr: Address): Portfolio = {
       val portfolios = for {
@@ -359,4 +371,5 @@ object UtxPoolImpl {
       }
     }
   }
+
 }

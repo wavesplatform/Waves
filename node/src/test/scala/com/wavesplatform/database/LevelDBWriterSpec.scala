@@ -280,7 +280,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
           bcu.processBlock(block).explicitGet()
         }
 
-        bcu.allActiveLeases() shouldBe leases.toSet
+        bcu.allActiveLeases.toSet shouldBe leases.toSet
 
         val emptyBlock = TestBlock
           .create(
@@ -292,7 +292,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         // some leases in liquid state, we should add one block over to store them in db
         bcu.processBlock(emptyBlock)
 
-        defaultWriter.allActiveLeases() shouldBe leases.toSet
+        defaultWriter.allActiveLeases.toSet shouldBe leases.toSet
 
         val l = leases(Random.nextInt(leases.length - 1))
 
@@ -322,8 +322,8 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         bcu.processBlock(b)
         bcu.processBlock(b2)
 
-        bcu.allActiveLeases() shouldBe (leases.toSet - l)
-        defaultWriter.allActiveLeases() shouldBe (leases.toSet - l)
+        bcu.allActiveLeases.toSet shouldBe (leases.toSet - l)
+        defaultWriter.allActiveLeases.toSet shouldBe (leases.toSet - l)
 
         bcu.shutdown()
       } finally {
