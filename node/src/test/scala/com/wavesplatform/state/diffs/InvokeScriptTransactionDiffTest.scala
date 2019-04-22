@@ -251,6 +251,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
+            blockDiff.scriptsRun shouldBe 1
             newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
@@ -281,6 +282,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
+            blockDiff.scriptsRun shouldBe 1
             newState.balance(acc, Waves) shouldBe amount
         }
     }
@@ -321,6 +323,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci, asset, invoker) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
+            blockDiff.scriptsRun shouldBe 2
             newState.balance(acc, Waves) shouldBe amount
             newState.balance(invoker, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
             newState.balance(ci.dappAddress, IssuedAsset(asset.id())) shouldBe 1
@@ -361,6 +364,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           fs
         ) { blockDiffEi =>
           blockDiffEi.resultE shouldBe 'right
+          blockDiffEi.resultE.right.get.scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
               AssetVerifierTrace(attachedAssetId, None),
@@ -416,8 +420,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci)), fs) {
           case (blockDiff, newState) =>
+            blockDiff.scriptsRun shouldBe 3
             newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
             newState.balance(acc, IssuedAsset(asset.id())) shouldBe amount
         }
@@ -653,6 +658,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                            TestBlock.create(Seq(ci)),
                            fs) {
           case (blockDiff, newState) =>
+            blockDiff.scriptsRun shouldBe 1
             newState.balance(acc, Waves) shouldBe amount
             newState.balance(ci.sender, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity / 10 - ci.fee)
             newState.balance(master, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity - sponsoredAsset.quantity / 10 + ci.fee)
