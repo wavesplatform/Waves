@@ -30,15 +30,14 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
       new ApiResponse(code = 200, message = "Json activation status")
     ))
   def status: Route = (get & path("status")) {
-    import blockchain.settings.functionalitySettings
     val height = blockchain.height
 
     complete(
       Json.toJson(ActivationStatus(
         height,
-        functionalitySettings.activationWindowSize(height),
-        functionalitySettings.blocksForFeatureActivation(height),
-        functionalitySettings.activationWindow(height).last,
+        blockchain.settings.functionalitySettings.activationWindowSize(height),
+        blockchain.settings.functionalitySettings.blocksForFeatureActivation(height),
+        blockchain.settings.functionalitySettings.activationWindow(height).last,
         (blockchain.featureVotes(height).keySet ++
           blockchain.approvedFeatures.keySet ++
           BlockchainFeatures.implemented).toSeq.sorted.map(id => {

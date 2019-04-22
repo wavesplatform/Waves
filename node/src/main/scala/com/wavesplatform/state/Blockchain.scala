@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser, Tra
 import com.wavesplatform.utils.CloseableIterator
 
 trait Blockchain {
-  val settings: BlockchainSettings
+  def settings: BlockchainSettings
 
   def height: Int
   def score: BigInt

@@ -11,7 +11,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
+import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionParser
@@ -67,6 +67,7 @@ class TransactionsRouteSpec
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
