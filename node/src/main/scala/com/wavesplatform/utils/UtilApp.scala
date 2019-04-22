@@ -101,7 +101,7 @@ object UtilApp {
           .text("Output file name"),
         opt[String]('f', "format")
           .action((f, c) => c.copy(format = f))
-          .text("Output data format")
+          .text("Output data format (plain/base58/base64)")
           .validate {
             case "base64" | "base58" | "plain" => success
             case fs                            => failure(s"Invalid format: $fs")
