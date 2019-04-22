@@ -24,6 +24,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
+//noinspection ScalaStyle
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
 
@@ -86,7 +87,7 @@ object Explorer extends ScorexLogging {
     "invoke-script-result"
   )
 
-  def main(args: Array[String]): Unit = {
+  def _main(args: Array[String]): Unit = {
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
 
     val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))

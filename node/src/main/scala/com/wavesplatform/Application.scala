@@ -364,17 +364,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application extends ScorexLogging {
-
-  private def readConfig(userConfigPath: Option[String]): Config = {
-    val maybeConfigFile = for {
-      maybeFilename <- userConfigPath
-      file = new File(maybeFilename)
-      if file.exists
-    } yield ConfigFactory.parseFile(file)
-
-    loadConfig(maybeConfigFile)
-  }
-
   def main(args: Array[String]): Unit = {
 
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
@@ -388,7 +377,26 @@ object Application extends ScorexLogging {
     // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
     System.setProperty("org.aspectj.tracing.factory", "default")
 
-    val config = readConfig(args.headOption)
+    args.headOption.getOrElse("") match {
+      case "export" => Exporter._main(args.tail)
+      case "import" => Importer._main(args.tail)
+      case "explore" => Explorer._main(args.tail)
+      case _ => startNode(args.headOption)
+    }
+  }
+
+  private[this] def startNode(configFile: Option[String]): Unit ={
+    def readConfig(userConfigPath: Option[String]): Config = {
+      val maybeConfigFile = for {
+        maybeFilename <- userConfigPath
+        file = new File(maybeFilename)
+        if file.exists
+      } yield ConfigFactory.parseFile(file)
+
+      loadConfig(maybeConfigFile)
+    }
+
+    val config = readConfig(config)
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))

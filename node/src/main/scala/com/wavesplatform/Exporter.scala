@@ -19,7 +19,8 @@ import monix.reactive.Observer
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
-  def main(args: Array[String]): Unit = {
+  //noinspection ScalaStyle
+  def _main(args: Array[String]): Unit = {
     val configFilename       = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val outputFilenamePrefix = Try(args(1)).toOption.getOrElse("blockchain")
     val exportHeight         = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)

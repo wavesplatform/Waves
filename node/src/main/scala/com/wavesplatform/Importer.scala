@@ -26,7 +26,8 @@ import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
-  def main(args: Array[String]): Unit = {
+  //noinspection ScalaStyle
+  def _main(args: Array[String]): Unit = {
     val argi = args.iterator
     val (verifyTransactions, configOpt) = {
       Try(argi.next) match {
