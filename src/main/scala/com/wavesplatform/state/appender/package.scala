@@ -96,7 +96,7 @@ package object appender extends ScorexLogging {
     metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
-        metrics.utxPutIfNew.measure(discarded.foreach(utxStorage.putIfNew))
+        metrics.utxDiscardedPut.measure(discarded.foreach(utxStorage.putIfNew))
         blockchainUpdater.height
       }
     }
@@ -150,6 +150,6 @@ package object appender extends ScorexLogging {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block")
     val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all")
-    val utxPutIfNew              = Kamon.timer("block-appender.utx-put-if-new")
+    val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put")
   }
 }
