@@ -32,7 +32,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -264,10 +264,22 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot
         ),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-        AssetsApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, utxStorage, allChannels, blockchainUpdater, time),
+        AssetsApiRoute(settings.restAPISettings,
+                       settings.blockchainSettings.functionalitySettings,
+                       wallet,
+                       utxStorage,
+                       allChannels,
+                       blockchainUpdater,
+                       time),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, blockchainUpdater),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
+        LeaseApiRoute(settings.restAPISettings,
+                      settings.blockchainSettings.functionalitySettings,
+                      wallet,
+                      blockchainUpdater,
+                      utxStorage,
+                      allChannels,
+                      time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
         AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, blockchainUpdater),
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
@@ -378,14 +390,15 @@ object Application extends ScorexLogging {
     System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
-      case "export" => Exporter._main(args.tail)
-      case "import" => Importer._main(args.tail)
+      case "export"  => Exporter._main(args.tail)
+      case "import"  => Importer._main(args.tail)
       case "explore" => Explorer._main(args.tail)
-      case _ => startNode(args.headOption)
+      case "util"    => UtilApp._main(args.tail)
+      case _         => startNode(args.headOption)
     }
   }
 
-  private[this] def startNode(configFile: Option[String]): Unit ={
+  private[this] def startNode(configFile: Option[String]): Unit = {
     def readConfig(userConfigPath: Option[String]): Config = {
       val maybeConfigFile = for {
         maybeFilename <- userConfigPath
