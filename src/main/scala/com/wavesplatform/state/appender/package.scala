@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.metrics._
 import com.wavesplatform.network._
