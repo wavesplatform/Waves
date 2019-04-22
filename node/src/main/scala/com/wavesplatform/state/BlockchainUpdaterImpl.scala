@@ -56,7 +56,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
 
-  override def settings: BlockchainSettings = wavesSettings.blockchainSettings
+  override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
   override def isLastBlockId(id: ByteStr): Boolean = readLock {
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)

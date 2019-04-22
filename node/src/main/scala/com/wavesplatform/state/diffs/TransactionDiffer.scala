@@ -48,7 +48,7 @@ object TransactionDiffer extends ScorexLogging {
             _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
             _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
-            _ <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
+            _ <- CommonValidation.checkFee(blockchain, currentBlockHeight, tx)
           } yield ()
         })
       diff <- unverified(settings, currentBlockTimestamp, currentBlockHeight)(blockchain, tx)

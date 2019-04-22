@@ -13,11 +13,10 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.TxValidationError.ActivationError
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.transaction.TxValidationError._
 
 object BlockDiffer extends ScorexLogging {
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
@@ -41,7 +40,7 @@ object BlockDiffer extends ScorexLogging {
 
     // height switch is next after activation
     val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain, settings)
+    val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     lazy val prevBlockFeeDistr: Option[Portfolio] =
       if (stateHeight >= sponsorshipHeight)
@@ -131,7 +130,7 @@ object BlockDiffer extends ScorexLogging {
     val txDiffer       = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
     val hasNg          = currentBlockFeeDistr.isEmpty
-    val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, settings)
+    val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     def clearSponsorship(blockchain: Blockchain, portfolio: Portfolio): (Portfolio, Long) = {
       val spPf =

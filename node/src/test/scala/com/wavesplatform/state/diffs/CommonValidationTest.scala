@@ -6,13 +6,13 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -53,7 +53,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
-          f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
+          f(CommonValidation.checkFee(blockchain, 1, transferTx))
         }
     }
   }
@@ -76,7 +76,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
-          f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
+          f(CommonValidation.checkFee(blockchain, 1, transferTx))
         }
     }
   }
@@ -194,7 +194,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
-          f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
+          f(CommonValidation.checkFee(blockchain, 1, transferTx))
         }
     }
   }

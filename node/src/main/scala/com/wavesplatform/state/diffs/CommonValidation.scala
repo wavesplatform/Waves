@@ -231,11 +231,11 @@ object CommonValidation {
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
     type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
     def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
         // This could be true for private blockchains
         feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
       } else
@@ -301,10 +301,10 @@ object CommonValidation {
       }
   }
 
-  def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
-        minAFee <- getMinFee(blockchain, fs, height, tx)
+        minAFee <- getMinFee(blockchain, height, tx)
         minWaves   = minAFee._3
         minFee     = minAFee._2
         feeAssetId = minAFee._1

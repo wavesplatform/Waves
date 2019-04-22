@@ -30,7 +30,7 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
       new ApiResponse(code = 200, message = "Json activation status")
     ))
   def status: Route = (get & path("status")) {
-
+    import blockchain.settings.functionalitySettings
     val height = blockchain.height
 
     complete(

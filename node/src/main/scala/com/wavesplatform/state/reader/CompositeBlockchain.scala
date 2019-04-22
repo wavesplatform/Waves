@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
-  override def settings: BlockchainSettings = inner.settings
+  override val settings: BlockchainSettings = inner.settings
 
   private def diff = maybeDiff.getOrElse(Diff.empty)
 
