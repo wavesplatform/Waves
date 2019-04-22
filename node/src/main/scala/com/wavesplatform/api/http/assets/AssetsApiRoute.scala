@@ -46,7 +46,7 @@ case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, 
     with BroadcastRoute
     with WithSettings {
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain, fs)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   private[this] val commonAssetsApi = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {

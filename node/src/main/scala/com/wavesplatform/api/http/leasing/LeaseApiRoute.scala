@@ -24,7 +24,7 @@ case class LeaseApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, w
     with BroadcastRoute
     with WithSettings {
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain, fs)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
 
   override val route = pathPrefix("leasing") {
     lease ~ cancel ~ active

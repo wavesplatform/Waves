@@ -14,7 +14,7 @@ import scala.concurrent.Future
 
 class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: FunctionalitySettings)(implicit sc: Scheduler)
     extends AccountsApiGrpc.AccountsApi {
-  private[this] val commonApi = new CommonAccountApi(blockchain, functionalitySettings)
+  private[this] val commonApi = new CommonAccountApi(blockchain)
 
   override def getPortfolio(request: PortfolioRequest): Future[PortfolioResponse] = Future {
     val wavesOption = if (request.includeWaves) {

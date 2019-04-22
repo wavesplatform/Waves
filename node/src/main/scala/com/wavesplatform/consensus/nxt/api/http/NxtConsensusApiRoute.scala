@@ -3,7 +3,6 @@ package com.wavesplatform.consensus.nxt.api.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress, WithSettings}
-import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
@@ -33,7 +32,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
-        complete(Json.obj("address" -> account.address, "balance" -> GeneratingBalanceProvider.balance(blockchain, fs, account)))
+        complete(Json.obj("address" -> account.address, "balance" -> blockchain.generatingBalance(account)))
     }
   }
 

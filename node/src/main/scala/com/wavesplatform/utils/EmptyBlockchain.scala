@@ -1,11 +1,13 @@
 package com.wavesplatform.utils
 
 import cats.kernel.Monoid
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -14,7 +16,9 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-object EmptyBlockchain extends Blockchain {
+case object EmptyBlockchain extends Blockchain {
+  override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
+
   override def height: Int = 0
 
   override def score: BigInt = 0
