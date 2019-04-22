@@ -1,11 +1,9 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -40,7 +38,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 
   "/transfer" - {
-    val route = AssetsApiRoute(restAPISettings, WavesSettings.fromRootConfig(ConfigFactory.load()).blockchainSettings.functionalitySettings, wallet, utx, allChannels, state, new TestTime()).route
+    val route = AssetsApiRoute(restAPISettings, wallet, utx, allChannels, state, new TestTime()).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 

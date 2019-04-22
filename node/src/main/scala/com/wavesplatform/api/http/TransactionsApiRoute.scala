@@ -13,7 +13,7 @@ import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
@@ -36,20 +36,14 @@ import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(settings: RestAPISettings,
-                                functionalitySettings: FunctionalitySettings,
-                                wallet: Wallet,
-                                blockchain: Blockchain,
-                                utx: UtxPool,
-                                allChannels: ChannelGroup,
-                                time: Time)(implicit sc: Scheduler)
+case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(implicit sc: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions
     with WithSettings {
 
   import com.wavesplatform.network._
-  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels.broadcastTx(_, None))
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, allChannels.broadcastTx(_, None))
 
   override lazy val route =
     pathPrefix("transactions") {

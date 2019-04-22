@@ -4,21 +4,16 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.reactive.Observable
 
-private[api] class CommonTransactionsApi(functionalitySettings: FunctionalitySettings,
-                                         wallet: Wallet,
-                                         blockchain: Blockchain,
-                                         utx: UtxPool,
-                                         broadcast: VanillaTransaction => Unit) {
+private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, broadcast: VanillaTransaction => Unit) {
 
   private[this] val TransactionsBatchLimit = 100
 

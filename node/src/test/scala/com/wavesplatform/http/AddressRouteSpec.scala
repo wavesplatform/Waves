@@ -14,10 +14,9 @@ import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunctio
 // [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -38,15 +37,7 @@ class AddressRouteSpec
   private val allAddresses = allAccounts.map(_.address)
   private val blockchain   = stub[Blockchain]
 
-  private val route = AddressApiRoute(
-    restAPISettings,
-    testWallet,
-    blockchain,
-    mock[UtxPool],
-    mock[ChannelGroup],
-    new TestTime,
-    TestFunctionalitySettings.Stub
-  )(Scheduler.global).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, blockchain, mock[UtxPool], mock[ChannelGroup], new TestTime)(Scheduler.global).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -19,7 +19,7 @@ import play.api.libs.json.JsNumber
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {

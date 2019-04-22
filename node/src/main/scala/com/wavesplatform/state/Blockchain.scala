@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
 trait Blockchain {
-  def settings: BlockchainSettings
+  val settings: BlockchainSettings
 
   def height: Int
   def score: BigInt

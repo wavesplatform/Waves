@@ -4,7 +4,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress, WithSettings}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -12,7 +12,7 @@ import play.api.libs.json.Json
 
 @Path("/consensus")
 @Api(value = "/consensus")
-case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain, fs: FunctionalitySettings)
+case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain)
     extends ApiRoute
     with CommonApiFunctions
     with WithSettings {

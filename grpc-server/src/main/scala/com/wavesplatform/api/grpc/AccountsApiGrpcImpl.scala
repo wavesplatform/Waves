@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.{AssetAmount, DataTransactionData, PBTransactions}
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -12,7 +11,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class AccountsApiGrpcImpl(blockchain: Blockchain, functionalitySettings: FunctionalitySettings)(implicit sc: Scheduler)
+class AccountsApiGrpcImpl(blockchain: Blockchain)(sc: Scheduler)
     extends AccountsApiGrpc.AccountsApi {
   private[this] val commonApi = new CommonAccountApi(blockchain)
 
