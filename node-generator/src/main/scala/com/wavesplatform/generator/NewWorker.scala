@@ -27,32 +27,31 @@ class NewWorker(settings: Settings,
   def run(): Future[Unit] =
     pullAndWriteTask().map(_ => ()).runAsyncLogErr(Scheduler(ec))
 
-  private[this] def utxSpace: Task[Int] = Task.defer {
-    import org.asynchttpclient.Dsl._
-    val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
-    Task
-      .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
-      .map(r => (Json.parse(r.getResponseBody) \ "size").as[Int])
-  }
-
-  private[this] def writeTransactions(channel: Channel, txs: Seq[Transaction]): Task[Unit] = Task.fromFuture {
-    for {
-      _ <- networkSender.send(channel, initial: _*)
-      _ = log.info(s"Sending ${txs.length} to $channel")
-      _ <- networkSender.send(channel, txs: _*)
-    } yield ()
-  }
-
   private[this] def pullAndWriteTask(channel: Option[Channel] = None): Task[Option[Channel]] =
     if (!canContinue())
       Task.now(None)
     else {
-      val baseTask = for {
-        validChannel <- if (channel.exists(_.isOpen)) Task.now(channel.get)
-        else Task.fromFuture(networkSender.connect(node))
+      val nodeUTXTransactionsCount: Task[Int] = Task.defer {
+        import org.asynchttpclient.Dsl._
+        val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
+        Task
+          .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+          .map(r => (Json.parse(r.getResponseBody) \ "size").as[Int])
+      }
 
-        txCount <- utxSpace
-        _       <- writeTransactions(validChannel, transactionSource.take(settings.utxLimit - txCount).toVector)
+      def writeTransactions(channel: Channel, txs: Seq[Transaction]): Task[Unit] = Task.fromFuture {
+        for {
+          _ <- networkSender.send(channel, initial: _*)
+          _ <- networkSender.send(channel, txs: _*)
+        } yield ()
+      }
+
+      val baseTask = for {
+        validChannel <- Task.defer(if (channel.exists(_.isOpen)) Task.now(channel.get) else Task.fromFuture(networkSender.connect(node)))
+        txCount <- nodeUTXTransactionsCount
+        txToSendCount = settings.utxLimit - txCount
+        _ = log.info(s"Sending $txToSendCount to $validChannel")
+        _       <- writeTransactions(validChannel, transactionSource.take(txToSendCount).toStream)
       } yield Option(validChannel)
 
       val withReconnect = baseTask.onErrorRecoverWith {
