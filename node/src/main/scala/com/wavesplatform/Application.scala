@@ -409,7 +409,7 @@ object Application extends ScorexLogging {
       loadConfig(maybeConfigFile)
     }
 
-    val config = readConfig(config)
+    val config = readConfig(configFile)
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))

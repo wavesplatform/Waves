@@ -2,8 +2,8 @@ package com.wavesplatform.account
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.{crypto, utils}
 import play.api.libs.json.{Format, Json, Writes}
 
 import scala.util.{Failure, Success}
@@ -27,7 +27,7 @@ object KeyPair {
   implicit def toAddress(keyPair: KeyPair): Address  = keyPair.toAddress
 
   implicit val jsonFormat: Format[KeyPair] = Format(
-    Json.reads[KeyPair],
+    utils.byteStrWrites.map(KeyPair(_)),
     Writes(v => Json.obj("seed" -> Base58.encode(v.seed), "publicKey" -> v.publicKey, "privateKey" -> v.privateKey))
   )
 }
