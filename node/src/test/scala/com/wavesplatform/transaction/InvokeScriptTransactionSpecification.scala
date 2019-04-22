@@ -83,6 +83,45 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     AddressScheme.current = DefaultAddressScheme
   }
 
+  property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
+    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
+    val js = Json.parse(s"""{
+                         "type": 16,
+                         "id": "BwLYcWEWisDyGyuCaXFwcuD557W1qpXWn5fB9mtzyazq",
+                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "senderPublicKey": "$publicKey",
+                         "fee": 100000,
+                         "feeAssetId": null,
+                         "timestamp": 1526910778245,
+                         "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
+                         "version": 1,
+                         "dappAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "payment" : [{
+                            "amount" : 7,
+                            "assetId" : "$publicKey"
+                            }]
+                        }
+    """)
+
+    val tx = InvokeScriptTransaction
+      .selfSigned(
+        KeyPair("test3".getBytes()),
+        KeyPair("test4".getBytes()),
+        None,
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        100000,
+        Waves,
+        1526910778245L,
+      )
+      .right
+      .get
+
+    (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
+
+    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
+    AddressScheme.current = DefaultAddressScheme
+  }
+
   property("Signed InvokeScriptTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(

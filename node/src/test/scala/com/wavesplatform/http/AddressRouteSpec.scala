@@ -184,9 +184,9 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AQAAAAZ2ZXJpZnkAAAAABiDCPeI="
-      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
+      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),None,Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
 // [WAIT]                                           Decompiler(
 //      testContract,
 //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)

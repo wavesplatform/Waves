@@ -74,6 +74,11 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | func foo(a:ByteVector) = {
         |  WriteSet([DataEntry("a", a), DataEntry("sender", inv.caller.bytes)])
         | }
+        |
+        | @Default(inv)
+        | func foo() = {
+        |  WriteSet([DataEntry("a", "b"), DataEntry("sender", "senderId")])
+        | }
         | 
         | @Verifier(t)
         | func verify() = {
