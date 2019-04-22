@@ -16,8 +16,9 @@ object CancelLeaseOverflow extends ScorexLogging {
 
     val leasesToCancel = concurrent.blocking {
       blockchain
-        .allActiveLeases(tx => addressSet.contains(tx.sender.toAddress))
-        .map(_.id())
+        .allActiveLeases
+        .collect { case tx if addressSet.contains(tx.sender.toAddress) => tx.id() }
+        .toVector
     }
 
     leasesToCancel.foreach(id => log.info(s"Cancelling lease $id"))

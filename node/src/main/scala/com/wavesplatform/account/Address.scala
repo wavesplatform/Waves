@@ -28,14 +28,14 @@ object Address extends ScorexLogging {
 
   private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = CacheBuilder
     .newBuilder()
-    .weakKeys()
-    .maximumSize(1000000)
+    .softValues()
+    .maximumSize(200000)
     .build()
 
   private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder
     .newBuilder()
-    .weakKeys()
-    .maximumSize(1000000)
+    .softValues()
+    .maximumSize(200000)
     .build()
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {

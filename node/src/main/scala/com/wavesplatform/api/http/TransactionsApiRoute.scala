@@ -282,7 +282,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = (concurrent.blocking(blockchain.aliasesOfAddress(address) :+ address)).toSet
+      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 
       /**
         * Produces compact representation for large transactions by stripping unnecessary data.
