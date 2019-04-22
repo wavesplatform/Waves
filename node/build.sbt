@@ -95,6 +95,7 @@ val batScriptPattern   = "bin/([^.]+)\\.bat".r
 
 inConfig(Universal)(
   Seq(
+    discoveredMainClasses := mainClass.value.toSeq,
     mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
     mappings := {
       val scriptSuffix = network.value.packageSuffix
