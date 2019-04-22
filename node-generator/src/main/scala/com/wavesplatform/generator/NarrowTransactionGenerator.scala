@@ -264,7 +264,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             logOption(
               InvokeScriptTransaction.selfSigned(
                 sender,
-                KeyPair.fromSeed(script.dappAccount).explicitGet().toAddress,
+                GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
                 fc,
                 Seq(InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
                 100000000L + random.nextInt(100000000),

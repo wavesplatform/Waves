@@ -142,11 +142,6 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
-  val preconditions =
-    ConfigFactory
-      .load("preconditions.conf")
-      .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
-
   val defaultConfig =
     ConfigFactory
       .load()
@@ -164,6 +159,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       }
 
       val time = new NTP("pool.ntp.org")
+
+      val preconditions =
+        ConfigFactory
+          .load("preconditions.conf")
+          .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
+
       val (universe, initialTransactions) = preconditions
         .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
 

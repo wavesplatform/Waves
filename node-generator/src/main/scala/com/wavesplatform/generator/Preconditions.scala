@@ -20,7 +20,7 @@ import net.ceedubs.ficus.readers.ValueReader
 import scala.collection.generic.CanBuildFrom
 
 object Preconditions {
-  private[this] val Fee = 1000000
+  private[this] val Fee = 1500000L
 
   final case class CreatedAccount(keyPair: KeyPair, balance: Long, script: Option[Script])
 
@@ -65,14 +65,14 @@ object Preconditions {
                   decimals.toByte,
                   reissueable,
                   script,
-                  Fee,
+                  100000000 + Fee,
                   time.correctedTime()
                 )
                 .explicitGet()
               (uni.copy(issuedAssets = tx :: uni.issuedAssets), tx :: txs)
 
             case CreateAccountP(seed, balance, scriptOption) =>
-              val acc = KeyPair.fromSeed(seed).explicitGet()
+              val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransactionV2
                 .selfSigned(Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, Fee, "Generator".getBytes())
                 .explicitGet()
@@ -110,8 +110,8 @@ object Preconditions {
       val amount = conf.as[Long]("amount")
 
       LeaseP(
-        KeyPair.fromSeed(from).explicitGet(),
-        KeyPair.fromSeed(to).explicitGet(),
+        GeneratorSettings.toKeyPair(from),
+        GeneratorSettings.toKeyPair(to),
         amount
       )
     }
@@ -120,7 +120,7 @@ object Preconditions {
   private val assetSectionReader = new ValueReader[IssueP] {
     override def read(config: Config, path: String): IssueP = {
       val conf   = config.getConfig(path)
-      val issuer = KeyPair.fromSeed(conf.getString("issuer")).explicitGet()
+      val issuer = GeneratorSettings.toKeyPair(conf.getString("issuer"))
 
       val name        = conf.as[Option[String]]("name").getOrElse("")
       val description = conf.as[Option[String]]("description").getOrElse("")
@@ -135,9 +135,7 @@ object Preconditions {
 
   implicit val preconditionsReader = new ValueReader[PGenSettings] {
     override def read(config: Config, path: String): PGenSettings = {
-      val faucet = KeyPair
-        .fromSeed(config.as[String](s"$path.faucet"))
-        .explicitGet()
+      val faucet = GeneratorSettings.toKeyPair(config.as[String](s"$path.faucet"))
 
       val accounts =
         config.as[List[CreateAccountP]](s"$path.accounts")(

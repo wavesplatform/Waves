@@ -39,12 +39,11 @@ class NewWorker(settings: Settings,
           .map(r => (Json.parse(r.getResponseBody) \ "size").as[Int])
       }
 
-      def writeTransactions(channel: Channel, txs: Seq[Transaction]): Task[Unit] = Task.fromFuture {
+      def writeTransactions(channel: Channel, txs: Seq[Transaction]): Task[Unit] =
         for {
-          _ <- networkSender.send(channel, initial: _*)
-          _ <- networkSender.send(channel, txs: _*)
+          _ <- Task.fromFuture(networkSender.send(channel, initial: _*))
+          _ <- Task.fromFuture(networkSender.send(channel, txs: _*))
         } yield ()
-      }
 
       val baseTask = for {
         validChannel <- Task.defer(if (channel.exists(_.isOpen)) Task.now(channel.get) else Task.fromFuture(networkSender.connect(node)))
