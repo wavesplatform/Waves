@@ -2,13 +2,16 @@ package com.wavesplatform.utils
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Version
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import play.api.libs.json.Json
+import com.wavesplatform.wallet.Wallet
+import play.api.libs.json.{JsObject, Json}
 import scopt.OParser
 
 import scala.io.StdIn
@@ -26,29 +29,32 @@ object UtilApp {
     case object CreateKeyPair   extends Mode
     case object Hash            extends Mode
     case object SerializeTx     extends Mode
+    case object SignTx          extends Mode
   }
 
   case class CompileOptions(assetScript: Boolean = false)
   case class SignOptions(privateKey: PrivateKey = null)
   case class VerifyOptions(publicKey: PublicKey = null, signature: Array[Byte] = Array.emptyByteArray)
   case class HashOptions(mode: String = "fast")
+  case class SignTxOptions(signerAddress: String = "")
 
-  case class Command(mode: Command.Mode = null,
-                     inputData: Option[String] = null,
+  case class Command(mode: Command.Mode = Command.CompileScript,
+                     inputData: Option[String] = None,
                      inputFile: Option[String] = None,
                      outputFile: Option[String] = None,
                      format: String = "plain",
                      compileOptions: CompileOptions = CompileOptions(),
                      signOptions: SignOptions = SignOptions(),
                      verifyOptions: VerifyOptions = VerifyOptions(),
-                     hashOptions: HashOptions = HashOptions())
+                     hashOptions: HashOptions = HashOptions(),
+                     signTxOptions: SignTxOptions = SignTxOptions())
 
   def _main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
       case Some(c) =>
         val inBytes = IO.readInput(c)
         val result = {
-          val f = c.mode match {
+          val doF = c.mode match {
             case Command.CompileScript   => Actions.doCompile _
             case Command.DecompileScript => Actions.doDecompile _
             case Command.SignBytes       => Actions.doSign _
@@ -56,8 +62,9 @@ object UtilApp {
             case Command.CreateKeyPair   => Actions.doCreateKeyPair _
             case Command.Hash            => Actions.doHash _
             case Command.SerializeTx     => Actions.doSerializeTx _
+            case Command.SignTx          => Actions.doSignTx _
           }
-          f(c, inBytes)
+          doF(c, inBytes)
         }
 
         result match {
@@ -138,15 +145,29 @@ object UtilApp {
           .text("Sign bytes with provided private key")
           .action((_, c) => c.copy(mode = Command.SignBytes)),
         cmd("create-keys")
-          .text("Generates key pair from seed")
+          .text("Generate key pair from seed")
           .action((_, c) => c.copy(mode = Command.CreateKeyPair))
       ),
       cmd("transaction").children(
         cmd("serialize")
           .text("Serialize JSON transaction")
-          .action((_, c) => c.copy(mode = Command.SerializeTx))
+          .action((_, c) => c.copy(mode = Command.SerializeTx)),
+        cmd("sign")
+          .text("Sign JSON transaction")
+          .action((_, c) => c.copy(mode = Command.SignTx))
+          .children(
+            opt[String]('s', "signer")
+              .text("Signer address")
+              .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
+          )
       )
     )
+  }
+
+  private[this] object NodeState {
+    lazy val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
+    lazy val wallet   = Wallet(settings.walletSettings)
+    lazy val time     = new NTP(settings.ntpServer)
   }
 
   private[this] object Actions {
@@ -194,6 +215,13 @@ object UtilApp {
         .map(_.toString)
         .map(_.bytes())
     }
+
+    def doSignTx(c: Command, data: Array[Byte]): ActionResult =
+      TransactionFactory
+        .parseRequestAndSign(NodeState.wallet, c.signTxOptions.signerAddress, NodeState.time, Json.parse(data).as[JsObject])
+        .left
+        .map(_.toString)
+        .map(tx => Json.toBytes(tx.json()))
   }
 
   private[this] object IO {
