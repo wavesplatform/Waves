@@ -5,7 +5,7 @@ import java.nio.file.{Files, Paths}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Version
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TransactionFactory
@@ -267,7 +267,7 @@ object UtilApp {
     }
 
     private[this] def tryDecode(v: Array[Byte]) =
-      Try(Base58.decode(new String(v).replaceAll("\\s+", "")))
+      Try(FastBase58.decode(new String(v).replaceAll("\\s+", "")))
         .orElse(Try(Base64.decode(new String(v).replaceAll("\\s+", ""))))
         .getOrElse(v)
   }
