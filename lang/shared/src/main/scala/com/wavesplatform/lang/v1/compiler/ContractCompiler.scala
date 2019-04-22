@@ -42,9 +42,9 @@ object ContractCompiler {
             .cond(
               tpe match {
                 case _
-                    if tpe <= UNION(WavesContext.writeSetType,
-                                    WavesContext.scriptTransferSetType,
-                                    WavesContext.scriptResultType) =>
+                  if tpe <= UNION(WavesContext.writeSetType,
+                    WavesContext.scriptTransferSetType,
+                    WavesContext.scriptResultType) =>
                   true
                 case _ => false
               },
@@ -52,12 +52,26 @@ object ContractCompiler {
               Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
             )
             .toCompileM
-           _ <- Either.cond(
-             func.name.getBytes().size <= ContractLimits.MaxCallableFunctionNameInBytes,
-             (),
-             Generic(af.f.name.position.start, af.f.name.position.end, s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes}"))
-            .toCompileM
         } yield CallableFunction(c, func)
+
+      case (List(c: DefaultFuncAnnotation), (func, tpe, _)) =>
+        for {
+          _ <- Either
+            .cond(
+              tpe match {
+                case _
+                  if tpe <= UNION(WavesContext.writeSetType,
+                    WavesContext.scriptTransferSetType,
+                    WavesContext.scriptResultType) =>
+                  true
+                case _ => false
+              },
+              (),
+              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
+            )
+            .toCompileM
+        } yield DefaultFunction(c, func)
+
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
         for {
           _ <- Either
@@ -90,9 +104,25 @@ object ContractCompiler {
 
   private def compileContract(contract: Expressions.DAPP): CompileM[DApp] = {
     for {
-      ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
-      _  <- validateDuplicateVarsInContract(contract)
-      l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
+      decs <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
+      _    <- validateDuplicateVarsInContract(contract)
+      funcNameWithWrongSize = contract.fs
+        .map(af => Expressions.PART.toOption[String](af.name))
+        .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes().size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
+        .map(_.get)
+      _ <- Either
+        .cond(
+          funcNameWithWrongSize.isEmpty,
+          (),
+          Generic(
+            contract.position.start,
+            contract.position.end,
+            s"Annotated function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} for functions with name: ${funcNameWithWrongSize
+              .mkString(", ")}"
+          )
+        )
+        .toCompileM
+      l <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
       duplicatedFuncNames = l.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
       _ <- Either
         .cond(
@@ -111,8 +141,25 @@ object ContractCompiler {
                   s"Script functions can have no more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
         )
         .toCompileM
+
+      callableFuncs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
+
+      defaultFunctions = l.filter(_.isInstanceOf[DefaultFunction]).map(_.asInstanceOf[DefaultFunction])
+      defaultFuncOpt <- defaultFunctions match {
+        case Nil => Option.empty[DefaultFunction].pure[CompileM]
+        case df :: Nil =>
+          if (df.u.args.isEmpty)
+            Option.apply(df).pure[CompileM]
+          else
+            raiseError[CompilerContext, CompilationError, Option[DefaultFunction]](
+              Generic(contract.position.start, contract.position.start, "Default function must have 0 arguments"))
+        case _ =>
+          raiseError[CompilerContext, CompilationError, Option[DefaultFunction]](
+            Generic(contract.position.start, contract.position.start, "Can't have more than 1 default function defined"))
+      }
+
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
-      v <- verifierFunctions match {
+      verifierFuncOpt <- verifierFunctions match {
         case Nil => Option.empty[VerifierFunction].pure[CompileM]
         case vf :: Nil =>
           if (vf.u.args.isEmpty)
@@ -124,8 +171,7 @@ object ContractCompiler {
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
-      fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
-    } yield DApp(ds, fs, v)
+    } yield DApp(decs, callableFuncs, defaultFuncOpt, verifierFuncOpt)
   }
 
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
@@ -151,11 +197,13 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] =
-    compileContract(contract)
+  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] = {
+    val tmp = compileContract(contract)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
+    tmp
+  }
 
   def compile(input: String, ctx: CompilerContext): Either[String, DApp] = {
     Parser.parseContract(input) match {

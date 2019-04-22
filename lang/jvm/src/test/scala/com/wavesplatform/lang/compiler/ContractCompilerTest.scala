@@ -4,7 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
@@ -42,6 +42,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
+          | @Default(invocation)
+          | func default() = {
+          |   let sender0 = invocation.caller.bytes
+          |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
+          | }
+          |
           | @Verifier(t)
           | func verify() = {
           |   t.id == base58''
@@ -75,12 +81,35 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           )
         )),
         Some(
+          DefaultFunction(
+            DefaultFuncAnnotation("invocation"),
+            Terms.FUNC(
+              "default",
+              List.empty,
+              LET_BLOCK(
+                LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
+                FUNCTION_CALL(
+                  User(FieldNames.WriteSet),
+                  List(FUNCTION_CALL(
+                    Native(1100),
+                    List(
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), CONST_STRING("b"))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
+                    )
+                  ))
+                )
+              )
+            )
+          )
+        ),
+        Some(
           VerifierFunction(
             VerifierAnnotation("t"),
             FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty))))
           ))
       ))
-    compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
+    val resTmp = compiler.ContractCompiler(ctx, expr)
+    resTmp shouldBe expectedResult
   }
 
   private val cmpCtx: CompilerContext =

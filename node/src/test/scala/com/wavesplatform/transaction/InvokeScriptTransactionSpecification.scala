@@ -25,7 +25,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       val deser = InvokeScriptTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
       deser.dappAddress shouldEqual transaction.dappAddress
-      deser.fc shouldEqual transaction.fc
+      deser.funcCallOpt shouldEqual transaction.funcCallOpt
       deser.payment shouldEqual transaction.payment
       deser.fee shouldEqual transaction.fee
       deser.timestamp shouldEqual transaction.timestamp
@@ -68,7 +68,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       .selfSigned(
         KeyPair("test3".getBytes()),
         KeyPair("test4".getBytes()),
-        Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)))),
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get))))),
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
@@ -89,7 +89,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
+      call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(1, Waves))),
       dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
@@ -105,7 +105,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     InvokeScriptTransaction.create(
       pk,
       pk.toAddress,
-      Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList),
+      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
       Seq(),
       1,
       Waves,
@@ -121,7 +121,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     InvokeScriptTransaction.create(
       pk,
       pk.toAddress,
-      Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString))),
+      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString)))),
       Seq(),
       1,
       Waves,
@@ -136,7 +136,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
+      call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(0, Waves))),
       dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
@@ -152,7 +152,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
+      call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(-1, Waves))),
       dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,

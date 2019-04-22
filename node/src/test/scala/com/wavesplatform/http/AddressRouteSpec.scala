@@ -177,7 +177,7 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe 0
     }
 
-    val testContract = DApp(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    val testContract = DApp(List(), List(), None, Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .onCall((_: Address) => Some(ContractScript(V3, testContract).explicitGet()))

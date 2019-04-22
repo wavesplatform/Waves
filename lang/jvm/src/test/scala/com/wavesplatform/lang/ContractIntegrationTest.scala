@@ -131,14 +131,14 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User(func), args), Recipient.Address(callerAddress), callerPublicKey, None, ByteStr.empty)
+      Invocation(Some(Terms.FUNCTION_CALL(FunctionHeader.User(func), args)), Recipient.Address(callerAddress), callerPublicKey, None, ByteStr.empty)
     )
   }
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
-    val evalm    = ContractEvaluator.verify(compiled.dec, compiled.vf.get, tx)
+    val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
     EvaluatorV1.evalWithLogging(Right(ctx.evaluationContext), evalm)._2
   }
 
@@ -192,7 +192,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       dappAddress = Recipient.Address(ByteStr.empty),
       maybePayment = None,
       feeAssetId = None,
-      funcName = "foo",
+      funcName = Some("foo"),
       funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes), CONST_STRING("ok"))
     )
     parseCompileAndVerify(

@@ -113,7 +113,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         .selfSigned(
           sender = caller,
           dappAddress = contract,
-          fc = fc,
+          fc = Some(fc),
           p = Seq(),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,

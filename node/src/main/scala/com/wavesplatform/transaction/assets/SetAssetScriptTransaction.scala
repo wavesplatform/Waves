@@ -50,7 +50,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
         asset.id.arr,
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp),
-        Deser.serializeOption(script)(s => s.bytes().arr)
+        Deser.serializeOptionOfArray(script)(s => s.bytes().arr)
       )
     )
 

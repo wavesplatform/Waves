@@ -94,6 +94,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
+      None,
       None
     )
   }
@@ -133,6 +134,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
+      None,
       None
     )
   }
@@ -197,7 +199,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_STRING("Not-a-Number")))
       ci = InvokeScriptTransaction
-        .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
+        .selfSigned(invoker, master, Some(fc), payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
           IssuedAsset(issueTx.id())
         } else { Waves }, ts)
         .explicitGet()
@@ -238,7 +240,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci = InvokeScriptTransaction
-        .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
+        .selfSigned(invoker, master, Some(fc), payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
           IssuedAsset(issueTx.id())
         } else { Waves }, ts)
         .explicitGet()
@@ -254,7 +256,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
-                "argument" -> BinaryDataEntry("argument", ci.fc.args(0).asInstanceOf[CONST_BYTESTR].bs)
+                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args(0).asInstanceOf[CONST_BYTESTR].bs)
               ))
         }
     }
@@ -470,7 +472,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               AssetVerifierTrace(bannedAssetId,  Some(TransactionNotAllowedByScript(_, _)))
             ) =>
               dAppAddress shouldBe ci.dappAddress
-              function    shouldBe ci.fc
+              function    shouldBe ci.funcCallOpt
 
               allowedAssetId shouldBe asset1.id.value
               bannedAssetId  shouldBe asset2.id.value
@@ -555,7 +557,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci = InvokeScriptTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(invoker, master, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
     } yield ci) { _ should produce("NonPositiveAmount") }
   }
 

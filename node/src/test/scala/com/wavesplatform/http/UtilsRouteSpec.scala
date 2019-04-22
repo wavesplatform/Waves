@@ -4,8 +4,10 @@ import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.directives.values.V2
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V2, V3}
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -27,6 +29,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   val script = FUNCTION_CALL(
     function = PureContext.eq.header,
     args = List(CONST_LONG(1), CONST_LONG(2))
+  )
+
+  val dapp = DApp(
+    decs = List.empty,
+    callableFuncs = List.empty,
+    defaultFuncOpt = None,
+    verifierFuncOpt = Some(
+      VerifierFunction(VerifierAnnotation("tx"), FUNC("verify", List(), TRUE))
+    )
   )
 
   routePath("/script/decompile") in {
@@ -51,7 +62,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "true"
     }
 
-    Post(routePath("/script/decompile"), "AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAbAmSEV") ~> route ~> check {
+    val dappBytes = ContractScript(V3, dapp).explicitGet().bytes().base64
+    Post(routePath("/script/decompile"), dappBytes) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
