@@ -70,7 +70,7 @@ object GenesisBlockGenerator extends App {
   val outputConfFile = args
     .drop(1)
     .headOption
-    .map(new File(_).ensuring(f => f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
+    .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
   val settings: Settings = {
     implicit val _ = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
