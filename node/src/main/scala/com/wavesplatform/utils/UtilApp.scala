@@ -83,7 +83,7 @@ object UtilApp {
     import builder._
 
     OParser.sequence(
-      programName("Waves Util"),
+      programName("waves util"),
       head("Waves Util", Version.VersionString),
       OParser.sequence(
         opt[String]('s', name = "data")
