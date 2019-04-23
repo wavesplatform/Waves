@@ -9,8 +9,10 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction.{ValidationError, _}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
+import kamon.Kamon
 
 import scala.util.{Left, Right}
 
