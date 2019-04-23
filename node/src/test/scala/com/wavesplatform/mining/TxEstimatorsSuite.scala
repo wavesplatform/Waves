@@ -16,7 +16,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
 class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with TransactionGen {
-  def differ = TransactionDiffer(None, System.currentTimeMillis(), 1, false)() _
+  def differ = TransactionDiffer(None, System.currentTimeMillis(), 1, false) _
   val preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures
   "scriptRunNumber" - {
     "smart account" - {
