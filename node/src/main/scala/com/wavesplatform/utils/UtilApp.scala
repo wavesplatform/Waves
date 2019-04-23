@@ -117,7 +117,7 @@ object UtilApp {
       ),
       cmd("hash")
         .children(
-          opt('m', "mode")
+          opt[String]('m', "mode")
             .action((m, c) => c.copy(hashOptions = c.hashOptions.copy(mode = m)))
         )
         .action((_, c) => c.copy(mode = Command.Hash)),
