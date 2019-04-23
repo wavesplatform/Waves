@@ -76,7 +76,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | }
         |
         | @Default(inv)
-        | func foo() = {
+        | func default() = {
         |  WriteSet([DataEntry("a", "b"), DataEntry("sender", "senderId")])
         | }
         | 
@@ -134,6 +134,31 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     sender.getData(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
     sender.getData(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+  }
+
+  test("contract caller invokes a default function on a contract") {
+
+    val tx =
+      InvokeScriptTransaction
+        .selfSigned(
+          sender = caller,
+          dappAddress = contract,
+          fc = None,
+          p = Seq(),
+          timestamp = System.currentTimeMillis(),
+          fee = 1.waves,
+          feeAssetId = Waves
+        )
+        .explicitGet()
+
+    val invokeScriptId = sender
+      .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
+
+    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "b")
+    sender.getData(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
   }
 
   test("verifier works") {

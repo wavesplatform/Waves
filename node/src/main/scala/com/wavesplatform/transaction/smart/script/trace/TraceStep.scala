@@ -15,7 +15,7 @@ sealed abstract class TraceStep {
 
 case class AccountVerifierTrace(
     address: Address,
-    errorO:  Option[ValidationError]
+    errorO: Option[ValidationError]
 ) extends TraceStep {
 
   override lazy val json: JsObject = Json.obj(
@@ -27,7 +27,7 @@ case class AccountVerifierTrace(
 }
 
 case class AssetVerifierTrace(
-    id:     ByteStr,
+    id: ByteStr,
     errorO: Option[ValidationError]
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
@@ -40,12 +40,12 @@ case class AssetVerifierTrace(
 
 case class InvokeScriptTrace(
     dAppAddress: Address,
-    functionOpt:    Option[FUNCTION_CALL],
-    resultE:     Either[ValidationError, ScriptResult]
+    functionOpt: Option[FUNCTION_CALL],
+    resultE: Either[ValidationError, ScriptResult]
 ) extends TraceStep {
 
-  override lazy val json: JsObject =
-    val funcName: String = functionOpt.map(_.function.funcName).getOrElse("")
+  override lazy val json: JsObject = {
+    val funcName: String           = functionOpt.map(_.function.funcName).getOrElse("")
     val funcArgs: Iterable[String] = functionOpt.map(_.args.map(_.toString)).getOrElse(List.empty)
     Json.obj(
       "dAppAddress" -> dAppAddress.address,
@@ -56,20 +56,26 @@ case class InvokeScriptTrace(
         case Left(e)      => "error"  -> TraceStep.errorJson(e)
       }
     )
+  }
 
   private def toJson(v: ScriptResult) = Json.obj(
-    "data" -> v.ds.map(item => Json.obj(
-      "key"   -> item.key,
-      "value" -> item.value.toString
-    )),
-    "transfers" -> v.ts.map { case (address, amount, assetId) => Json.obj(
-      "address" -> address.bytes.toString,
-      "amount"  -> amount,
-      "assetId" -> (assetId match {
-        case Some(id) => id.toString
-        case None     => JsNull
-      })
-    )}
+    "data" -> v.ds.map(
+      item =>
+        Json.obj(
+          "key"   -> item.key,
+          "value" -> item.value.toString
+      )),
+    "transfers" -> v.ts.map {
+      case (address, amount, assetId) =>
+        Json.obj(
+          "address" -> address.bytes.toString,
+          "amount"  -> amount,
+          "assetId" -> (assetId match {
+            case Some(id) => id.toString
+            case None     => JsNull
+          })
+        )
+    }
   )
 }
 
@@ -89,4 +95,3 @@ object TraceStep {
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)
     }
 }
-

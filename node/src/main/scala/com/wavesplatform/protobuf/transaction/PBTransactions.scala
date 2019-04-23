@@ -6,6 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
+import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -289,29 +290,33 @@ object PBTransactions {
         vt.assets.SponsorFeeTransaction.create(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
       case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+        import com.wavesplatform.common.utils._
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
           address <- Address.fromBytes(dappAddress.toByteArray)
 
-          fcAndLength <- Serde
-            .deserialize(functionCall.toByteArray)
-            .left
-            .map(str => GenericError(s"Invalid InvokeScript function call: $str"))
+          desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1
 
-          fc = fcAndLength._1
+          _ <- Either.cond(desFCOpt.isEmpty || desFCOpt.get.isRight,
+                           (),
+                           GenericError(s"Invalid InvokeScript function call: ${desFCOpt.get.left.get}"))
 
-          _ <- Either.cond(fc.isInstanceOf[FUNCTION_CALL], (), GenericError(s"Not a function call: $fc"))
+          fcOpt = desFCOpt.map(_.explicitGet()._1)
 
-          tx <- vt.smart.InvokeScriptTransaction.create(sender,
-                                                        address,
-                                                        fc.asInstanceOf[FUNCTION_CALL],
-                                                        payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
-                                                        feeAmount,
-                                                        feeAssetId,
-                                                        timestamp,
-                                                        proofs)
+          _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
+
+          tx <- vt.smart.InvokeScriptTransaction.create(
+            sender,
+            address,
+            fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
+            payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
+            feeAmount,
+            feeAssetId,
+            timestamp,
+            proofs
+          )
         } yield tx
 
       case _ =>
@@ -506,7 +511,6 @@ object PBTransactions {
         }
 
       case Data.DataTransaction(DataTransactionData(data)) =>
-
         vt.DataTransaction(
           sender,
           data.toList.map(toVanillaDataEntry),
@@ -537,7 +541,7 @@ object PBTransactions {
           chainId,
           sender,
           Address.fromBytes(dappAddress.toByteArray).explicitGet(),
-          Serde.deserialize(functionCall.toByteArray).explicitGet()._1.asInstanceOf[FUNCTION_CALL],
+          Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
           feeAmount,
           feeAssetId,
@@ -662,11 +666,12 @@ object PBTransactions {
         val data = SponsorFeeTransactionData(Some(AssetAmount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SponsorFee(data))
 
-      case vt.smart.InvokeScriptTransaction(chainId, sender, dappAddress, fc, payment, fee, feeAssetId, timestamp, proofs) =>
+      case vt.smart.InvokeScriptTransaction(chainId, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
         import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.serialization.Deser
 
         val data = InvokeScriptTransactionData(dappAddress.toByteString,
-                                               ByteString.copyFrom(Serde.serialize(fc)),
+                                               ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
                                                payment.map(p => (p.assetId, p.amount): Amount))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
 
