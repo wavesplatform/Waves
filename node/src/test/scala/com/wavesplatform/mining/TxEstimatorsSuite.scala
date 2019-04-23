@@ -5,18 +5,18 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V1
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
 class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with TransactionGen {
-  def differ = TransactionDiffer(TestFunctionalitySettings.Enabled, None, System.currentTimeMillis(), 1, false) _
+  def differ = TransactionDiffer(None, System.currentTimeMillis(), 1, false)() _
   val preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures
   "scriptRunNumber" - {
     "smart account" - {

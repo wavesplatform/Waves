@@ -289,8 +289,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-                BlockDiffer.fromMicroBlock(functionalitySettings,
-                                           this,
+                BlockDiffer.fromMicroBlock(this,
                                            blockchain.lastBlockTimestamp,
                                            microBlock,
                                            ng.base.timestamp,

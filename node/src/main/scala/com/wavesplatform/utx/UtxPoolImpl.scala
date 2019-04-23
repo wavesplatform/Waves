@@ -137,7 +137,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
       for {
         _    <- TracedResult(checks)
-        diff <- TransactionDiffer(blockchain.settings.functionalitySettings, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
+        diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
         transactions.put(tx.id(), tx)
@@ -182,7 +182,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    val differ = TransactionDiffer(blockchain.settings.functionalitySettings, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)() _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
@@ -238,7 +238,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
                  height: Int = blockchain.height): Either[ValidationError, Diff] = {
       for {
         _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
-        diff <- TransactionDiffer(blockchain.settings.functionalitySettings, lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
+        diff <- TransactionDiffer(lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
       } yield diff
     }
 

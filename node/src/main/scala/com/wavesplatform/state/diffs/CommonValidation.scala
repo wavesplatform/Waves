@@ -47,10 +47,9 @@ object CommonValidation {
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          settings: FunctionalitySettings,
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
-    if (blockTime >= settings.allowTemporaryNegativeUntil) {
+    if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -99,7 +98,6 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             settings: FunctionalitySettings,
                                              height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
