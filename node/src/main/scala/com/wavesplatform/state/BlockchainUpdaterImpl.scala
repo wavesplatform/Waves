@@ -141,7 +141,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
+                  .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map(r => Some((r, Seq.empty[Transaction])))
             }
           case Some(ng) =>
@@ -151,7 +151,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 val miningConstraints = MiningConstraints(blockchain, height)
 
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
+                  .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map { r =>
                     log.trace(
                       s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
@@ -167,7 +167,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                   val miningConstraints = MiningConstraints(blockchain, height)
 
                   BlockDiffer
-                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
+                    .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                     .map(r => Some((r, Seq.empty[Transaction])))
                 }
               } else
@@ -192,7 +192,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
                     val diff = BlockDiffer
                       .fromBlock(
-                        functionalitySettings,
                         CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
                         Some(referencedForgedBlock),
                         block,
@@ -289,12 +288,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-                BlockDiffer.fromMicroBlock(this,
-                                           blockchain.lastBlockTimestamp,
-                                           microBlock,
-                                           ng.base.timestamp,
-                                           mdConstraint,
-                                           verify)
+                BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint, verify)
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint) = blockDifferResult
@@ -481,7 +475,9 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       .orElse(blockchain.transactionInfo(id))
   }
 
-  override def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)]=
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     readLock {
       addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, fromId)
     }

@@ -55,7 +55,6 @@ object BlockDiffer extends ScorexLogging {
     for {
       _ <- TracedResult(block.signaturesValid())
       r <- apply(
-        settings,
         blockchain,
         constraint,
         maybePrevBlock.map(_.timestamp),

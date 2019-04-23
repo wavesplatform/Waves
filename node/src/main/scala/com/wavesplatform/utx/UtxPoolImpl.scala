@@ -182,7 +182,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)() _
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
