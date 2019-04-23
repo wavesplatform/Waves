@@ -38,7 +38,7 @@ class AddressActor(
   import AddressActor._
   import context.dispatcher
 
-  protected override def log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
+  protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
 
   private val pendingCancellation = MutableMap.empty[ByteStr, Promise[Resp]]
   private val pendingPlacement    = MutableMap.empty[ByteStr, Promise[Resp]]
