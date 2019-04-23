@@ -2,21 +2,21 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.{ContractLimits, compiler}
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.Common
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -672,7 +672,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if function name length is longer than 255 bytes") {
-    val longName = "a" * (ContractLimits.MaxCallableFunctionNameInBytes + 1)
+    val longName = "a" * (ContractLimits.MaxAnnotatedFunctionNameInBytes + 1)
     val ctx      = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
@@ -690,7 +690,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if function name length is equal to 255 bytes") {
-    val longName = "a" * ContractLimits.MaxCallableFunctionNameInBytes
+    val longName = "a" * ContractLimits.MaxAnnotatedFunctionNameInBytes
     val ctx      = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
