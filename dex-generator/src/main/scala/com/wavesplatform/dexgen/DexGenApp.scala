@@ -7,6 +7,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.dexgen.cli.ScoptImplicits
 import com.wavesplatform.dexgen.config.FicusImplicits
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
