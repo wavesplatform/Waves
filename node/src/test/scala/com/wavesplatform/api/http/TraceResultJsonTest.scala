@@ -87,7 +87,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    "amount" : 1,
         |    "assetId" : null
         |  } ],
-        |  "id" : "8xJAPeQ7Xd93EXeq1bmkKD84DE2S4pyUqpeuzrQ89B2y",
+        |  "id" : "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
         |  "timestamp" : 1111
         |}""".stripMargin
   }
@@ -149,7 +149,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       |      "amount" : 1,
       |      "assetId" : null
       |    } ],
-      |    "id" : "8xJAPeQ7Xd93EXeq1bmkKD84DE2S4pyUqpeuzrQ89B2y",
+      |    "id" : "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
       |    "type" : 16,
       |    "version" : 1,
       |    "timestamp" : 1111
