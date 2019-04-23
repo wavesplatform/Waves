@@ -1,7 +1,9 @@
 package com.wavesplatform.state
 
+import cats.implicits._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
@@ -9,9 +11,11 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction.{ValidationError, _}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
+import io.netty.channel.Channel
+import io.netty.channel.group.ChannelGroup
+import monix.eval.Task
 import kamon.Kamon
 
 import scala.util.{Left, Right}

@@ -72,7 +72,7 @@ object BlockAppender extends ScorexLogging {
 
   private[this] object metrics {
     val blockSignaturesValidation = Kamon.timer("block-appender.block-signatures-validation")
-    val blockReceivingLag        = Kamon.histogram("block-appender.receiving-lag")
-    val blockProcessingTimeStats = Kamon.timer("block-appender.processing-time")
+    val blockReceivingLag         = Kamon.histogram("block-appender.receiving-lag")
+    val blockProcessingTimeStats  = Kamon.timer("block-appender.processing-time")
   }
 }
