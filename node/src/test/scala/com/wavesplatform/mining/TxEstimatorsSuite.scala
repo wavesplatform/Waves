@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{BlockchainSettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
+//noinspection ScalaStyle
 class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with TransactionGen {
   def differ = TransactionDiffer(None, System.currentTimeMillis(), 1, false) _
   val preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures
@@ -25,6 +26,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.hasScript _).expects(*).returning(false).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.settings _).expects().returning(BlockchainSettings('T', TestFunctionalitySettings.Enabled, null)).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 0
       }
@@ -34,6 +36,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.hasScript _).expects(*).returning(true).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.settings _).expects().returning(BlockchainSettings('T', TestFunctionalitySettings.Enabled, null)).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferWavesTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 1
       }
@@ -46,6 +49,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.assetDescription _).expects(*).returning(None).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.settings _).expects().returning(BlockchainSettings('T', TestFunctionalitySettings.Enabled, null)).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferWavesTx).resultE.right.get) shouldBe 0
       }
@@ -57,6 +61,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
         (blockchain.assetDescription _).expects(*).returning(Some(assetDescription)).anyNumberOfTimes()
         (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.settings _).expects().returning(BlockchainSettings('T', TestFunctionalitySettings.Enabled, null)).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).resultE.right.get) shouldBe 1
       }
@@ -69,6 +74,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with MockFactory with Tra
       (blockchain.assetDescription _).expects(*).returning(Some(assetDescription)).anyNumberOfTimes()
       (blockchain.activatedFeatures _).expects().returning(preActivatedFeatures).anyNumberOfTimes()
       (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+      (blockchain.settings _).expects().returning(BlockchainSettings('T', TestFunctionalitySettings.Enabled, null)).anyNumberOfTimes()
 
       TxEstimators.scriptRunNumber(blockchain, transferAssetsTx, differ(blockchain, transferAssetsTx).resultE.right.get) shouldBe 2
     }
