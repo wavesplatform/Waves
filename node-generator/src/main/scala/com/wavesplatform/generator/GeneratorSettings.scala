@@ -1,15 +1,17 @@
 package com.wavesplatform.generator
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URL}
+import java.nio.charset.StandardCharsets
 
 import cats.Show
 import cats.implicits.showInterpolator
+import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],
-                             sendTo: Seq[InetSocketAddress],
+                             sendTo: Seq[NodeAddress],
                              worker: Worker.Settings,
                              mode: Mode.Value,
                              narrow: NarrowTransactionGenerator.Settings,
@@ -19,10 +21,12 @@ case class GeneratorSettings(chainId: String,
                              oracle: OracleTransactionGenerator.Settings,
                              swarm: SmartGenerator.Settings) {
   val addressScheme: Char                        = chainId.head
-  val privateKeyAccounts: Seq[KeyPair] = accounts.map(s => KeyPair.fromSeed(s).explicitGet())
+  val privateKeyAccounts: Seq[KeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
 }
 
 object GeneratorSettings {
+  case class NodeAddress(networkAddress: InetSocketAddress, apiAddress: URL)
+
   implicit val toPrintable: Show[GeneratorSettings] = { x =>
     import x._
 
@@ -45,5 +49,9 @@ object GeneratorSettings {
        |mode: $mode
        |$mode settings:
        |  ${modeSettings.split('\n').mkString("\n  ")}""".stripMargin
+  }
+
+  def toKeyPair(seedText: String): KeyPair = {
+    KeyPair(com.wavesplatform.crypto.secureHash(Bytes.concat(Ints.toByteArray(0), seedText.getBytes(StandardCharsets.UTF_8))))
   }
 }
