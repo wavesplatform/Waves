@@ -8,11 +8,11 @@ object CancelInvalidLeaseIn extends ScorexLogging {
   def apply(blockchain: Blockchain): Diff = {
     log.info("Collecting lease in overflows")
 
-    val allActiveLeases = blockchain.allActiveLeases
+    val allActiveLeases = blockchain.allActiveLeases.toVector
 
-    log.info(s"Collected ${allActiveLeases.size} active leases")
+    log.info(s"Collected ${allActiveLeases.length} active leases")
 
-    val leaseInBalances = allActiveLeases.toSeq
+    val leaseInBalances = allActiveLeases
       .map(lt => blockchain.resolveAlias(lt.recipient).explicitGet() -> lt.amount)
       .groupBy(_._1)
       .mapValues(_.map(_._2).sum)

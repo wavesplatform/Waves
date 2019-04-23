@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
-import com.wavesplatform.state.diffs.smart.predef.scriptWithAllFunctions
+import com.wavesplatform.state.diffs.smart.predef.scriptWithAllV1Functions
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.WavesEnvironment
@@ -106,7 +106,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       .right
       .get
 
-    Parser.parseExpr(scriptWithAllFunctions(dtx, ttx)).get.value
+    Parser.parseExpr(scriptWithAllV1Functions(dtx, ttx)).get.value
   }
 
   property("func complexity map size is equal stdLib SupportedVersions count") {

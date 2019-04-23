@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -73,7 +73,11 @@ case class MassTransferTransaction private (assetId: Asset,
   def compactJson(recipients: Set[AddressOrAlias]): JsObject =
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
-  override def checkedAssets(): Seq[Asset] = Seq(assetId)
+  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
+    case Waves => Seq()
+    case a: IssuedAsset => Seq(a)
+  }
+
   override def version: Byte               = MassTransferTransaction.version
 }
 

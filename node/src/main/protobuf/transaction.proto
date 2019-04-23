@@ -44,7 +44,7 @@ message Transaction {
         SetScriptTransactionData set_script = 113;
         SponsorFeeTransactionData sponsor_fee = 114;
         SetAssetScriptTransactionData set_asset_script = 115;
-        // TODO: 116 = contract invocation
+        InvokeScriptTransactionData invoke_script = 116;
     };
 };
 
@@ -177,3 +177,19 @@ message ExchangeTransactionData {
 message SponsorFeeTransactionData {
     AssetAmount min_fee = 1;
 };
+
+message InvokeScriptTransactionData {
+    bytes dapp_address = 1;
+    bytes function_call = 2;
+    repeated Amount payments = 3;
+}
+
+message InvokeScriptResult {
+    message Payment {
+        bytes address = 1;
+        Amount amount = 2;
+    }
+
+    repeated DataTransactionData.DataEntry data_entries = 1;
+    repeated Payment payments = 2;
+}

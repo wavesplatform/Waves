@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
@@ -16,9 +17,14 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.utils.CloseableIterator
 import org.iq80.leveldb.{DB, ReadOptions}
 
+import scala.util.control.NonFatal
+
 package object database {
+  final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
+
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
     def writeByteStr(s: ByteStr) = {
       output.write(s.arr)
@@ -361,6 +367,15 @@ package object database {
   }
 
   implicit class DBExt(val db: DB) extends AnyVal {
+    def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = {
+      val snapshot = db.getSnapshot
+      val iterator = f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
+      CloseableIterator(iterator, { () =>
+        iterator.close()
+        snapshot.close()
+      })
+    }
+
     def readOnly[A](f: ReadOnlyDB => A): A = {
       val snapshot = db.getSnapshot
       try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
@@ -387,15 +402,40 @@ package object database {
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
 
-    def iterateOver(prefix: Short)(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit =
+    def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)
 
-    def iterateOver(prefix: Array[Byte])(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit = {
+    def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
       val iterator = db.iterator()
       try {
         iterator.seek(prefix)
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
       } finally iterator.close()
+    }
+
+    def iterateOverStream(): CloseableIterator[DBEntry] = {
+      import scala.collection.JavaConverters._
+      val dbIter = db.iterator()
+      CloseableIterator(
+        dbIter.asScala,
+        () => dbIter.close()
+      )
+    }
+
+    def iterateOverStream(prefix: Array[Byte]): CloseableIterator[DBEntry] = {
+      import scala.collection.JavaConverters._
+      val dbIter = db.iterator()
+      try {
+        dbIter.seek(prefix)
+        CloseableIterator(
+          dbIter.asScala.takeWhile(_.getKey.startsWith(prefix)),
+          () => dbIter.close()
+        )
+      } catch {
+        case NonFatal(err) =>
+          dbIter.close()
+          throw new IOException("Couldn't create DB iterator", err)
+      }
     }
   }
 }
