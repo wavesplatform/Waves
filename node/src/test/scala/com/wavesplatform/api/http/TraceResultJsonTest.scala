@@ -25,7 +25,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       tx        <- InvokeScriptTransaction.create(
         sender      = publicKey,
         dappAddress = address,
-        fc          = FUNCTION_CALL(User("func"), List(CONST_STRING("param"), CONST_LONG(1))),
+        fc          = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param"), CONST_LONG(1)))),
         p           = List(Payment(1, Waves)),
         fee         = 10000000,
         feeAssetId  = Waves,
@@ -38,7 +38,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
   property("suitable TracedResult json") {
     val trace = List(InvokeScriptTrace(
       tx.dappAddress,
-      tx.fc,
+      tx.funcCallOpt,
       Right(ScriptResult(
         List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",700000000)),
         List((Recipient.Address(tx.dappAddress.bytes), 1, None))
@@ -101,7 +101,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
 
     val trace = List(InvokeScriptTrace(
       tx.dappAddress,
-      tx.fc,
+      tx.funcCallOpt,
       Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false))
     ))
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)
