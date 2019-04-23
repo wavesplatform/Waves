@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
@@ -42,7 +42,7 @@ class MultiDimensionalMiningConstraintSuite
     }
 
     "put(transaction)" - tests(createConstConstraint(_, transactionSize = 1)) { (initConstraint, txs) =>
-      txs.foldLeft(initConstraint)(_.put(stub[Blockchain], _))
+      txs.foldLeft(initConstraint)(_.put(stub[Blockchain], _, Diff.empty))
     }
   }
 

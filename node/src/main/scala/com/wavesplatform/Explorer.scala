@@ -84,6 +84,7 @@ object Explorer extends ScorexLogging {
     "address-transaction-seq-nr",
     "address-transaction-height-type-and-nums",
     "transaction-height-and-nums-by-id",
+    "block-transactions-fee",
     "invoke-script-result"
   )
 

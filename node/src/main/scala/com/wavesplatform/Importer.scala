@@ -39,7 +39,7 @@ object Importer extends ScorexLogging {
 
         implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
-          override def putIfNewTraced(tx: Transaction)                         = ???
+          override def putIfNew(tx: Transaction)                               = ???
           override def removeAll(txs: Traversable[Transaction]): Unit          = {}
           override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
           override def pessimisticPortfolio(addr: Address): Portfolio          = ???

@@ -26,9 +26,7 @@ class LeaseBroadcastRouteSpec
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
-
-  (utx.putIfNewTraced _)
+  (utx.putIfNew _)
     .when(*)
     .onCall((t: Transaction) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
     .anyNumberOfTimes()

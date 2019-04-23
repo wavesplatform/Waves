@@ -4,16 +4,14 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.state.{Diff, Portfolio}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 
 trait UtxPool extends AutoCloseable {
   self =>
 
-  def putIfNewTraced(tx: Transaction): TracedResult[ValidationError, (Boolean, Diff)]
-
-  def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNewTraced(tx).resultE
+  def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean]
 
   def removeAll(txs: Traversable[Transaction]): Unit
 
