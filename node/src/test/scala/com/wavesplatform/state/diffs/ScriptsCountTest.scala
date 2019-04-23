@@ -6,12 +6,8 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
