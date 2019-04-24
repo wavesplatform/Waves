@@ -161,8 +161,12 @@ object JsAPI {
                   err => {
                     js.Dynamic.literal("error" -> err)
                   }, {
-                    case (bytes, ast) =>
-                      js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                    case (bytes, ast, complexity) =>
+                      js.Dynamic.literal(
+                        "result"     -> Global.toBuffer(bytes),
+                        "ast"        -> toJs(ast),
+                        "complexity" -> complexity
+                      )
                   }
                 )
             case DAppType =>
@@ -173,8 +177,12 @@ object JsAPI {
                   err => {
                     js.Dynamic.literal("error" -> err)
                   }, {
-                    case (bytes, ast) =>
-                      js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                    case (bytes, ast, complexity) =>
+                      js.Dynamic.literal(
+                        "result"     -> Global.toBuffer(bytes),
+                        "ast"        -> toJs(ast),
+                        "complexity" -> complexity
+                      )
                   }
                 )
           }

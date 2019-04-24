@@ -9,7 +9,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser, TransactionParsers}
+import com.wavesplatform.utils.CloseableIterator
 
 trait Blockchain {
   def height: Int
@@ -46,10 +47,24 @@ trait Blockchain {
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
 
+  def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)]
+
+  // Compatibility
   def addressTransactions(address: Address,
                           types: Set[Transaction.Type],
                           count: Int,
-                          fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]]
+                          fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]] = {
+    def createTransactionsList(): Seq[(Height, Transaction)] = concurrent.blocking {
+      addressTransactions(address, TransactionParsers.forTypeSet(types), fromId)
+        .take(count)
+        .closeAfter(_.toVector)
+    }
+
+    fromId match {
+      case Some(id) => transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())
+      case None     => Right(createTransactionsList())
+    }
+  }
 
   def containsTransaction(tx: Transaction): Boolean
 
@@ -87,7 +102,7 @@ trait Blockchain {
 
   def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo]
   // the following methods are used exclusively by patches
-  def allActiveLeases(predicate: LeaseTransaction => Boolean = _ => true): Set[LeaseTransaction]
+  def allActiveLeases: CloseableIterator[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

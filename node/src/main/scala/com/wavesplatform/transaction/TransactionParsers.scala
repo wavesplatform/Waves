@@ -75,6 +75,15 @@ object TransactionParsers {
         else oldParseBytes(headByte, data)
       }
 
+  def forTypes(types: Byte*): Set[TransactionParser] =
+    forTypeSet(types.toSet)
+
+  def forTypeSet(types: Set[Byte]): Set[TransactionParser] =
+    all.values.filter(tp => types.contains(tp.typeId)).toSet
+
+  def allVersions(parsers: TransactionParser*): Set[TransactionParser] =
+    forTypeSet(parsers.map(_.typeId).toSet)
+
   private def oldParseBytes(tpe: Byte, data: Array[Byte]): Try[Transaction] =
     old
       .get(tpe)
