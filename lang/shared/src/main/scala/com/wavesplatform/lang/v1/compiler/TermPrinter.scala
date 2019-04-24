@@ -27,13 +27,16 @@ object TermPrinter {
 
   private def printArr(toDest: String => Unit, arr: ARR): Unit = {
     toDest("[")
-    var i = 0
-    while (i < arr.xs.length - 1) {
-      print(toDest, arr.xs(i))
-      toDest(", ")
-      i = i + 1
+    val length = arr.xs.length
+    if (length > 0) {
+      var i = 0
+      while (i < length - 1) {
+        print(toDest, arr.xs(i))
+        toDest(", ")
+        i = i + 1
+      }
+      print(toDest, arr.xs(length - 1))
     }
-    print(toDest, arr.xs(arr.xs.length - 1))
     toDest("]")
   }
 
