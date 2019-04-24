@@ -555,4 +555,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](sampleScript, None) should produce("all possible types are List(Int, String)")
   }
+
+  property("big assignment chain") {
+    val count = 5000
+    val script =
+      s"""
+         | let a0 = 1
+         | ${1 to count map (i => s"let a$i = a${i - 1}") mkString "\n"}
+         | a$count == a$count
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
 }
