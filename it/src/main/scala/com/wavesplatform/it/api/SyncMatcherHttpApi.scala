@@ -22,15 +22,39 @@ import scala.util.{Failure, Try}
 object SyncMatcherHttpApi extends Assertions {
 
   case class NotFoundErrorMessage(message: String)
+  case class NotFoundErrorDetails(details: String)
   case class ErrorMessage(error: Int, message: String)
 
   object NotFoundErrorMessage {
     implicit val format: Format[NotFoundErrorMessage] = Json.format
   }
+  object NotFoundErrorDetails {
+    implicit val format: Format[NotFoundErrorDetails] = Json.format
+  }
 
+  //  def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+  //    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+  //      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
+  //    case Failure(e) => Assertions.fail(e)
+  //    case _          => Assertions.fail(s"Expecting not found error")
+  //  }
+  //
+  //  def assertNotFoundAndDetails[R](f: => R, errorDetails: String): Assertion = Try(f) match {
+  //    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+  //      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorDetails].details.contains(errorDetails))
+  //    case Failure(e) => Assertions.fail(e)
+  //    case _          => Assertions.fail(s"Expecting not found error")
+  //  }
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
+
+      val containsError =
+        Seq("details", "message")
+          .map(parse(responseBody).\)
+          .collectFirst { case lookupResult if lookupResult.isDefined => lookupResult.get.toString }
+          .exists(_.contains(errorMessage))
+
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && containsError)
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
   }

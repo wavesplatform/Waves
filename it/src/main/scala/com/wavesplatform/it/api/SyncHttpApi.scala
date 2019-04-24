@@ -3,6 +3,7 @@ package com.wavesplatform.it.api
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
@@ -58,7 +59,14 @@ object SyncHttpApi extends Assertions {
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
+
+      val containsError =
+        Seq("details", "message")
+          .map(parse(responseBody).\)
+          .collectFirst { case lookupResult if lookupResult.isDefined => lookupResult.get.toString }
+          .exists(_.contains(errorMessage))
+
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && containsError)
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
   }
@@ -351,7 +359,7 @@ object SyncHttpApi extends Assertions {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
-    private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 12 * nodes.head.blockDelay//8
     private val ConditionAwaitTime      = 5.minutes
 
     def height(implicit pos: Position): Seq[Int] =
