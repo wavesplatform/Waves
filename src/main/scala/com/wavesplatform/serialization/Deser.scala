@@ -7,7 +7,7 @@ object Deser {
   def serializeBoolean(b: Boolean): Array[Byte] = if (b) Array(1: Byte) else Array(0: Byte)
 
   def serializeArray(b: Array[Byte]): Array[Byte] = {
-    val lengthBytes = Shorts.toByteArray(b.length.toShort)
+    val lengthBytes = Shorts.toByteArray(b.length.ensuring(_.isValidShort).toShort)
     Bytes.concat(lengthBytes, b)
   }
 
@@ -43,7 +43,7 @@ object Deser {
   def serializeOption[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] = b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
 
   def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {
-    val countBytes  = Shorts.toByteArray(bs.length.toShort)
+    val countBytes  = Shorts.toByteArray(bs.length.ensuring(_.isValidShort).toShort)
     val arraysBytes = Bytes.concat(bs.map(serializeArray): _*)
 
     Bytes.concat(countBytes, arraysBytes)
