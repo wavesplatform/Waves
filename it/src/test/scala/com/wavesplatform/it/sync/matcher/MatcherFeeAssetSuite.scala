@@ -299,7 +299,6 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
         val expirationTimestamp = ts + Order.MaxLiveTime - 10000
         val amount = 100
         val aliceWavesPair = AssetPair(aliceAsset, Waves)
-        aliceNode.transfer(aliceAcc.address, bobAcc.address, someAssetAmount / 2, minFee, Some(aliceAssetBase58), None, 2, waitForTx = true)//TODO: remove after uncomment
 
         val aliceOrderIdFill = matcherNode
           .placeOrder(Order
