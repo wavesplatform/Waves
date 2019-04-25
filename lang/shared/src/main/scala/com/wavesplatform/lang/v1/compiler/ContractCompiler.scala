@@ -206,11 +206,10 @@ object ContractCompiler {
   }
 
   def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] = {
-    val tmp = compileContract(contract)
+    compileContract(contract)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
-    tmp
   }
 
   def compile(input: String, ctx: CompilerContext): Either[String, DApp] = {

@@ -108,8 +108,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty))))
           ))
       ))
-    val resTmp = compiler.ContractCompiler(ctx, expr)
-    resTmp shouldBe expectedResult
+    compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
 
   property("contract with default func compiles") {
@@ -162,8 +161,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         ),
         None
       ))
-    val resTmp = compiler.ContractCompiler(ctx, expr)
-    resTmp shouldBe expectedResult
+    compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
 
   private val cmpCtx: CompilerContext =
@@ -305,6 +303,25 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Verifier(arg)
           | func foo(a: Int) = {
           |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
+  }
+
+  property("default function must have 0 arguments") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 3 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          |
+          | @Default(invocation)
+          | func default(a: Int) = {
+          |   let sender0 = invocation.caller.bytes
+          |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
           | }
         """.stripMargin
       Parser.parseContract(script).get.value
