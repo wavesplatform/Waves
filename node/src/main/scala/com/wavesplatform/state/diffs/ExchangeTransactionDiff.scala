@@ -6,10 +6,10 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderV3}
-import com.wavesplatform.transaction.Asset
 
 import scala.util.Right
 
@@ -52,7 +52,7 @@ object ExchangeTransactionDiff {
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
-      scripts = assetScripted + Seq(/* buyerScripted, sellerScripted,*/ blockchain.hasScript(tx.sender)).count(x => x)
+      scripts = assetScripted + Seq(/* buyerScripted, sellerScripted,*/ blockchain.hasScript(tx.sender)).count(x => x) // TODO: Consider fixing with fork parameter
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
