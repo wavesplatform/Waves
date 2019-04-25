@@ -59,7 +59,7 @@ object ExchangeTransactionDiff {
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
-          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
           .count(identity)
 
         assetScripted +
