@@ -40,7 +40,7 @@ object AssetTransactionsDiff {
             assetScripts = Map(tx.asset          -> tx.script),
             scriptsRun =
               // Asset script doesn't count before Ride4DApps activation
-              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
                 Some(tx.sender.toAddress).count(blockchain.hasScript)
               else
                 countScriptRuns(blockchain, tx)
@@ -64,7 +64,7 @@ object AssetTransactionsDiff {
         result.isDefined
       }
 
-      val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
+      val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, height)
       if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
         if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
           Left(GenericError("Asset total value overflow"))
@@ -84,7 +84,7 @@ object AssetTransactionsDiff {
     }
 
   def burn(blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
+    val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, height)
 
     validateAsset(tx, blockchain, tx.asset, !burnAnyTokensEnabled).map { _ =>
       Diff(
