@@ -47,7 +47,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
         sender,
         dappAddress.bytes.arr,
         Serde.serialize(fc),
-        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
+        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
         Longs.toByteArray(fee),
         feeAssetId.byteRepr,
         Longs.toByteArray(timestamp)

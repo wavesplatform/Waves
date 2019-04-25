@@ -40,7 +40,7 @@ case class IssueTransactionV2 private (chainId: Byte,
       Bytes.concat(
         Array(builder.typeId, version, chainId),
         bytesBase(),
-        Deser.serializeOption(script)(s => s.bytes().arr)
+        Deser.serializeOptionOfArray(script)(s => s.bytes().arr)
       )
     )
 
