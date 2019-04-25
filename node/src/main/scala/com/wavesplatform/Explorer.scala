@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 
-import com.google.common.primitives.Shorts
+import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
@@ -251,6 +251,13 @@ object Explorer extends ScorexLogging {
 
           println(txs.length)
           txs.foreach(println)
+
+        case "MBIH" =>
+          db.iterateOver(Keys.MinerBalancesInfoAtHeightPrefix) { entry =>
+            val h = Ints.fromByteArray(entry.getKey.drop(2))
+
+            println(h)
+          }
 
         case "AP" =>
           val address   = Address.fromString(args(2)).explicitGet()

@@ -24,6 +24,7 @@ object Merkle {
   type TxTree = TxTree.Type
 
   def mkTxTree(txs: Seq[Transaction]): TxTree = {
+
     val elements =
       txs.view
         .map(_.bytes())
