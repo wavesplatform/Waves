@@ -52,7 +52,7 @@ object ExchangeTransactionDiff {
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
-      scripts = assetScripted + Seq(buyerScripted, sellerScripted, blockchain.hasScript(tx.sender)).count(x => x)
+      scripts = assetScripted + Seq(/* buyerScripted, sellerScripted,*/ blockchain.hasScript(tx.sender)).count(x => x)
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
