@@ -1,4 +1,6 @@
 package com.wavesplatform.mining
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
@@ -10,7 +12,7 @@ private[mining] object ScriptRunsLegacy extends ScorexLogging {
   @elidable(elidable.ASSERTION)
   def assertEquals(blockchain: Blockchain, tx: Transaction, scriptRuns: Int): Unit = {
     lazy val oldRulesRuns: Int = calculateForTransaction(blockchain, tx)
-    assert(scriptRuns == oldRulesRuns, s"$tx script runs $scriptRuns not equals to legacy $oldRulesRuns")
+    assert(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps) || scriptRuns == oldRulesRuns, s"$tx script runs $scriptRuns not equals to legacy $oldRulesRuns")
   }
 
   private[this] def calculateForTransaction(blockchain: Blockchain, tx: Transaction): Int = {

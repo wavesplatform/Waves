@@ -52,7 +52,20 @@ object ExchangeTransactionDiff {
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
       sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
-      scripts = assetScripted + Seq(/* buyerScripted, sellerScripted,*/ blockchain.hasScript(tx.sender)).count(x => x) // TODO: Consider fixing with fork parameter
+      scripts = {
+        import com.wavesplatform.features.FeatureProvider._
+
+        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasScript)
+
+        // Don't count before Ride4DApps activation
+        val ordersScripted = Seq(buyerScripted, sellerScripted)
+          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+          .count(identity)
+
+        assetScripted +
+          addressScripted +
+          ordersScripted
+      }
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
