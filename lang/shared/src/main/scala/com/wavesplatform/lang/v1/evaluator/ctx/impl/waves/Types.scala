@@ -20,6 +20,16 @@ object Types {
       "sponsored"   -> BOOLEAN
     )
   )
+
+  val blockInfo = CASETYPEREF(
+    "BlockInfo",
+    List(
+      "time"   -> LONG,
+      "height" -> LONG,
+      "generationSignature" -> BYTESTR
+    )
+  )
+
   val optionAsset = UNION(assetType, UNIT)
 
   val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
