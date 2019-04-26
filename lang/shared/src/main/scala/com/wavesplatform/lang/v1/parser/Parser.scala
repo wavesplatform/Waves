@@ -190,7 +190,7 @@ object Parser {
     case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
-  val annotatedFunc: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep ~ funcP ~~ Index).map {
+  val annotatedFunc: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep(min=1) ~ funcP ~~ Index).map {
     case (start, as, f, end) => ANNOTATEDFUNC(Pos(start, end), as, f)
   }
 
@@ -366,9 +366,12 @@ object Parser {
   def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[DAPP, Char, String] =
-    P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ End ~~ Index)
-      .map {
+    P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(min=1) ~ End ~~ Index) .map {
         case (ds, fs, end) => DAPP(Pos(0, end), ds.toList, fs.toList)
       }
-      .parse(str)
+      .parse(str) match {
+        case (f@Parsed.Failure(m, o, e)) if(m.toString.startsWith("!(declaration.rep(")) =>
+          Parsed.Failure(s"Local functions should be defined before @Callable one: ${str.substring(o)}", o, e)
+        case s => s
+      }
 }

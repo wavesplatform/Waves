@@ -357,10 +357,11 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
-      Terms.FUNCTION_CALL(
+      Some(
+        Terms.FUNCTION_CALL(
         function = FunctionHeader.User("testfunc"),
         args = List(TRUE)
-      ),
+      )),
       Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
       smartMinFee,
       Waves,

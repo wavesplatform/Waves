@@ -1,9 +1,8 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.contract.{DApp, ContractSerDe}
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -19,20 +18,26 @@ trait TypedScriptGen {
       expr <- exprGen
     } yield Terms.LET(name, expr)
 
-  private def funcGen =
+  private def funcGen(withArgs: Boolean = true) =
     for {
-      name <- Gen.alphaStr.filter(_.getBytes.length <= ContractLimits.MaxCallableFunctionNameInBytes)
+      name <- Gen.alphaStr.filter(_.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes)
       arg0 <- Gen.alphaStr
       args <- Gen.listOf(Gen.alphaStr)
-      allArgs = arg0 +: args
-      returned <- Gen.oneOf(allArgs)
-    } yield Terms.FUNC(name, allArgs, Terms.REF(returned))
+      allArgs = if (withArgs) arg0 +: args else List.empty
+      body <- if (withArgs) Gen.oneOf(allArgs).map(Terms.REF(_)) else Gen.const(Terms.TRUE)
+    } yield Terms.FUNC(name, allArgs, body)
 
   private def callableGen =
     for {
       binding <- Gen.alphaStr
-      fnc     <- funcGen
+      fnc     <- funcGen()
     } yield CallableFunction(CallableAnnotation(binding), fnc)
+
+  private def defaultFuncGen =
+    for {
+      binding <- Gen.alphaStr
+      fnc     <- funcGen(false)
+    } yield DefaultFunction(DefaultFuncAnnotation(binding), fnc)
 
   private def verifierGen =
     for {
@@ -43,14 +48,15 @@ trait TypedScriptGen {
 
   def contractGen =
     for {
-      nLets      <- Gen.chooseNum(0, 5)
-      nFuncs     <- Gen.chooseNum(0, 5)
-      nCallables <- Gen.chooseNum(0, 5)
-      lets       <- Gen.listOfN(nLets, letGen)
-      funcs      <- Gen.listOfN(nFuncs, funcGen)
-      callables  <- Gen.listOfN(nCallables, callableGen)
-      verifier   <- Gen.option(verifierGen)
-      c = DApp(lets ++ funcs, callables, verifier)
+      nLets       <- Gen.chooseNum(0, 5)
+      nFuncs      <- Gen.chooseNum(0, 5)
+      nCallables  <- Gen.chooseNum(0, 5)
+      lets        <- Gen.listOfN(nLets, letGen)
+      funcs       <- Gen.listOfN(nFuncs, funcGen())
+      callables   <- Gen.listOfN(nCallables, callableGen)
+      defaultFunc <- Gen.option(defaultFuncGen)
+      verifier    <- Gen.option(verifierGen)
+      c = DApp(lets ++ funcs, callables, defaultFunc, verifier)
       if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
     } yield c
 

@@ -25,7 +25,7 @@ import scala.util.Try
 case class InvokeScriptTransaction private (chainId: Byte,
                                             sender: PublicKey,
                                             dappAddress: Address,
-                                            fc: Terms.FUNCTION_CALL,
+                                            funcCallOpt: Option[Terms.FUNCTION_CALL],
                                             payment: Seq[Payment],
                                             fee: Long,
                                             feeAssetId: Asset,
@@ -46,8 +46,8 @@ case class InvokeScriptTransaction private (chainId: Byte,
         Array(builder.typeId, version, chainId),
         sender,
         dappAddress.bytes.arr,
-        Serde.serialize(fc),
-        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
+        Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
+        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOptionOfArray(pmt.assetId.compatId)(_.arr))),
         Longs.toByteArray(fee),
         feeAssetId.byteRepr,
         Longs.toByteArray(timestamp)
@@ -61,9 +61,12 @@ case class InvokeScriptTransaction private (chainId: Byte,
         ++ Json.obj(
           "version"     -> version,
           "dappAddress" -> dappAddress.bytes,
-          "call"        -> InvokeScriptTransaction.functionCallToJson(fc),
           "payment"     -> payment
         )
+        ++ (funcCallOpt match {
+          case Some(fc) => Json.obj("call" -> InvokeScriptTransaction.functionCallToJson(fc))
+          case None     => JsObject.empty
+        })
     )
 
   override def checkedAssets(): Seq[IssuedAsset] = payment.toSeq collect { case Payment(_, assetId: IssuedAsset) => assetId }
@@ -110,9 +113,11 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
           Either
             .cond(tx.payment.forall(_.amount > 0), (), NonPositiveAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
         .flatMap(_ =>
-          Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
-                      (),
-                      GenericError("all arguments of invokeScript must be EVALUATED")))
+          Either.cond(
+            tx.funcCallOpt.isEmpty || tx.funcCallOpt.get.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
+            (),
+            GenericError("all arguments of invokeScript must be EVALUATED")
+        ))
         .map(_ => tx)
         .foldToTry
     }
@@ -120,7 +125,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   def create(sender: PublicKey,
              dappAddress: Address,
-             fc: Terms.FUNCTION_CALL,
+             fc: Option[Terms.FUNCTION_CALL],
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
@@ -129,23 +134,23 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     for {
       _ <- Either.cond(fee > 0, (), InsufficientFee(s"insufficient fee: $fee"))
       _ <- Either.cond(
-        fc.args.size <= ContractLimits.MaxInvokeScriptArgs,
+        fc.isEmpty || fc.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
         (),
         GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
       )
       _ <- Either.cond(
-        fc.function match {
-          case FunctionHeader.User(name) => name.getBytes.length <= ContractLimits.MaxCallableFunctionNameInBytes
+        fc.isEmpty || (fc.get.function match {
+          case FunctionHeader.User(name) => name.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
           case _                         => true
-        },
+        }),
         (),
-        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes} bytes")
+        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
       )
       _ <- checkAmounts(p)
       _ <- Either.cond(p.length <= 1, (), GenericError("Multiple payment isn't allowed now"))
       _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), GenericError("duplicate payments"))
 
-      _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
+      _ <- Either.cond(fc.isEmpty || fc.get.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of invokeScript must be EVALUATED"))
       tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
@@ -166,7 +171,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   def signed(sender: PublicKey,
              dappAddress: Address,
-             fc: Terms.FUNCTION_CALL,
+             fc: Option[Terms.FUNCTION_CALL],
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
@@ -179,7 +184,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   def selfSigned(sender: KeyPair,
                  dappAddress: Address,
-                 fc: Terms.FUNCTION_CALL,
+                 fc: Option[Terms.FUNCTION_CALL],
                  p: Seq[Payment],
                  fee: Long,
                  feeAssetId: Asset,
@@ -192,7 +197,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
-      FunctionCallBytes(tailIndex(4), "Function call"),
+      OptionBytes(tailIndex(4), "Function call", FunctionCallBytes(tailIndex(4), "Function call")),
       SeqBytes(tailIndex(5), "Payments", PaymentBytes(tailIndex(5), "Payment")),
       LongBytes(tailIndex(6), "Fee"),
       OptionBytes(tailIndex(7), "Fee's asset ID", AssetIdBytes(tailIndex(7), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)")
