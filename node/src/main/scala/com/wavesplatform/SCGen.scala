@@ -1,11 +1,10 @@
 package com.wavesplatform
 
-import java.io.{File, FileOutputStream, PrintStream}
+import java.io.{File, PrintStream}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.openDB
 import com.wavesplatform.state.Height
@@ -99,7 +98,7 @@ object SCGen extends App with ScorexLogging {
             } else {
               Merkle.mkTxTree(block.transactionData).rootHash
             }
-          val balanceHash = Merkle.mkMinerBalanceTree(balances).rootHash
+          val balanceHash    = Merkle.mkMinerBalanceTree(balances).rootHash
           val effBalanceHash = Merkle.mkMinerBalanceTree(effectiveBalances).rootHash
 
           val json = block
