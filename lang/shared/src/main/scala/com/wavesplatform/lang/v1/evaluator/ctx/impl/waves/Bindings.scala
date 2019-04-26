@@ -285,7 +285,7 @@ object Bindings {
     CaseObj(
       blockInfo,
       Map(
-        "time"   -> blockInf.timestamp,
+        "timestamp"   -> blockInf.timestamp,
         "height" -> blockInf.height.toLong,
         "generationSignature" -> blockInf.generationSignature
       )

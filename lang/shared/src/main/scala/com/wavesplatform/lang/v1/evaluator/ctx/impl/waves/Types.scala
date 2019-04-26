@@ -24,8 +24,8 @@ object Types {
   val blockInfo = CASETYPEREF(
     "BlockInfo",
     List(
-      "time"   -> LONG,
-      "height" -> LONG,
+      "timestamp"           -> LONG,
+      "height"              -> LONG,
       "generationSignature" -> BYTESTR
     )
   )
