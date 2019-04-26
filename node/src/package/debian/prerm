@@ -1,0 +1,13 @@
+${{header}}
+${{loader-functions}}
+${{detect-loader}}
+
+if [ "$1" = remove ]; then
+    if is_systemd; then
+        stopService ${{app_name}} || true
+    elif is_upstart; then
+        service ${{app_name}} stop || true
+    fi
+fi
+
+exit 0

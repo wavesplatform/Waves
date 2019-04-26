@@ -1,0 +1,67 @@
+${{header}}
+${{loader-functions}}
+
+if [ "$1" = upgrade ]; then
+    if dpkg --compare-versions "$2" lt 0.7.5 ; then
+        # change home directory and remove legacy data files
+        rm -f /home/${{app_name}}/waves/data/blockchain.dat
+        rm -f /home/${{app_name}}/waves/data/peers.dat
+
+        # delete legacy configuration files
+        for file_to_remove in application.conf application-dev.conf logback-to-file.xml logback.xml reference.conf logback-overrides.xml
+        do
+            rm -f /usr/share/${{app_name}}/conf/$file_to_remove
+        done
+
+        rm -fr /usr/share/${{app_name}}/conf/target
+
+        chmod -s -x /usr/share/${{app_name}}/conf/* || true
+
+        # move wallet file to a new default location
+        if [ -f /home/${{app_name}}/waves/wallet/wallet.s.dat ]; then
+            echo Moving wallet file to a new default location ...
+            mkdir -p /var/lib/${{app_name}}/wallet/
+            mv /home/${{app_name}}/waves/wallet/wallet.s.dat /var/lib/${{app_name}}/wallet/wallet.dat
+        fi
+
+        if [ -f /etc/${{app_name}}.conf ]; then
+            echo Moving node configuration file from /etc/${{app_name}}.conf to /etc/${{app_name}}/waves.conf ...
+            mv /etc/${{app_name}}.conf /etc/${{app_name}}/waves.conf || true
+        fi
+
+        # if config file has not been manually altered, just remove waves.directory and wallet.file keys
+        sed -i.bak '/directory\s*=\s*"\?\/home\/waves\/waves"\?\|file\s*=\s*"\?\/home\/waves\/waves\/wallet\/wallet\.s\.dat/d' /etc/${{app_name}}/waves.conf
+
+        if [ -d /home/${{app_name}}/waves/data ]; then
+            echo Moving data files ...
+
+            mv /home/${{app_name}}/waves/data /var/lib/${{app_name}}/data || true
+            mv /home/${{app_name}}/waves/journal /var/lib/${{app_name}}/journal || true
+            mv /home/${{app_name}}/waves/snapshots /var/lib/${{app_name}}/snapshots || true
+        fi
+
+        if [ -f /etc/${{app_name}}.json ]; then
+            echo Moving legacy configuration file to a new location ...
+            cp /etc/${{app_name}}.json /etc/${{app_name}}/waves.json
+            chmod -x /etc/${{app_name}}/waves.json
+        fi
+
+        rm -f /etc/${{app_name}}.json
+        rm -f /usr/share/${{app_name}}/settings.json
+    fi
+
+    if dpkg --compare-versions "$2" le 0.8.7 && [ -f /etc/${{app_name}}/waves.conf ] ; then
+        echo Backing up local configuration file ...
+        mv /etc/${{app_name}}/waves.conf /etc/${{app_name}}/waves.conf.bak
+    fi
+
+    if dpkg --compare-versions "$2" lt 0.8.11 ; then
+        rm -f /etc/${{app_name}}/upstart.conf
+        if [ -L /etc/init/${{app_name}}.conf ] ; then
+            rm -f /etc/init/${{app_name}}.conf
+        fi
+        chmod -x /etc/${{app_name}}/application.ini
+    fi
+fi
+
+exit 0
