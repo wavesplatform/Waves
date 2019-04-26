@@ -14,8 +14,6 @@ import com.wavesplatform.transaction.assets._
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
-  def scripts(blockchain: Blockchain, tx: ProvenTransaction) = tx.checkedAssets().count(blockchain.hasAssetScript) + (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-
   def issue(blockchain: Blockchain, height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
@@ -25,8 +23,8 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
-        assetScripts = if (tx.script.isEmpty) { Map() } else { Map(asset -> tx.script) },
-        scriptsRun = scripts(blockchain, tx)
+        assetScripts = Map(asset -> tx.script).filter(_._2.isDefined),
+        scriptsRun = countScriptRuns(blockchain, tx)
       ))
   }
 
@@ -40,7 +38,12 @@ object AssetTransactionsDiff {
             tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
             assetScripts = Map(tx.asset          -> tx.script),
-            scriptsRun = scripts(blockchain, tx)
+            scriptsRun =
+              // Asset script doesn't count before Ride4DApps activation
+              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
+                Some(tx.sender.toAddress).count(blockchain.hasScript)
+              else
+                countScriptRuns(blockchain, tx)
           ))
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
@@ -61,7 +64,7 @@ object AssetTransactionsDiff {
         result.isDefined
       }
 
-      val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
+      val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, height)
       if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
         if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
           Left(GenericError("Asset total value overflow"))
@@ -72,7 +75,7 @@ object AssetTransactionsDiff {
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))),
               assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable)),
-              scriptsRun = scripts(blockchain, tx)
+              scriptsRun = countScriptRuns(blockchain, tx)
             ))
         }
       } else {
@@ -81,7 +84,7 @@ object AssetTransactionsDiff {
     }
 
   def burn(blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
+    val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, height)
 
     validateAsset(tx, blockchain, tx.asset, !burnAnyTokensEnabled).map { _ =>
       Diff(
@@ -89,7 +92,7 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))),
         assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity)),
-        scriptsRun = scripts(blockchain, tx)
+        scriptsRun = countScriptRuns(blockchain, tx)
       )
     }
   }
@@ -104,17 +107,21 @@ object AssetTransactionsDiff {
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
           sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
-          scriptsRun = scripts(blockchain, tx)
+          scriptsRun = countScriptRuns(blockchain, tx)
         ),
         GenericError("Sponsorship smart assets is disabled.")
       )
     }
   }
 
-  private def validateAsset(tx: ProvenTransaction,
-                            blockchain: Blockchain,
-                            assetId: IssuedAsset,
-                            issuerOnly: Boolean): Either[ValidationError, Unit] = {
+  private[this] def validateAsset(tx: ProvenTransaction,
+                                  blockchain: Blockchain,
+                                  assetId: IssuedAsset,
+                                  issuerOnly: Boolean): Either[ValidationError, Unit] = {
+    @inline
+    def validIssuer(issuerOnly: Boolean, sender: PublicKey, issuer: PublicKey) =
+      !issuerOnly || sender == issuer
+
     blockchain.transactionInfo(assetId.id) match {
       case Some((_, sitx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
         Left(GenericError("Asset was issued by other address"))
@@ -125,8 +132,6 @@ object AssetTransactionsDiff {
     }
   }
 
-  private def validIssuer(issuerOnly: Boolean, sender: PublicKey, issuer: PublicKey): Boolean = {
-    if (issuerOnly) sender equals issuer
-    else true
-  }
+  private[this] def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
+    tx.checkedAssets().count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
 }
