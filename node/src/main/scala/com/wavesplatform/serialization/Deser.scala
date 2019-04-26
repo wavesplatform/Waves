@@ -14,9 +14,13 @@ object Deser {
       throw new IllegalArgumentException(s"Attempting to serialize array with size, but the size($length) exceeds MaxShort(${Short.MaxValue})")
   }
 
-  def parseArraySize(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
+  def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
     val length = Shorts.fromByteArray(bytes.slice(position, position + 2))
     (bytes.slice(position + 2, position + 2 + length), position + 2 + length)
+  }
+
+  def parseArrayByLength(bytes: Array[Byte], position: Int, length: Int): (Array[Byte], Int) = {
+    (bytes.slice(position, position + length), position + length)
   }
 
   def parseByteArrayOption(bytes: Array[Byte], position: Int, length: Int): (Option[Array[Byte]], Int) = {
@@ -26,9 +30,14 @@ object Deser {
     } else (None, position + 1)
   }
 
-  def parseOption[T](bytes: Array[Byte], position: Int)(deser: Array[Byte] => T): (Option[T], Int) = {
+  def parseOption[T](bytes: Array[Byte], position: Int, length: Int = -1)(deser: Array[Byte] => T): (Option[T], Int) = {
     if (bytes.slice(position, position + 1).head == (1: Byte)) {
-      val (arr, arrPosEnd) = parseArraySize(bytes, position + 1)
+      val (arr, arrPosEnd) =
+        if (length < 0) {
+          parseArrayWithLength(bytes, position + 1)
+        } else {
+          parseArrayByLength(bytes, position + 1, length)
+        }
       (Some(deser(arr)), arrPosEnd)
     } else (None, position + 1)
   }
@@ -37,7 +46,7 @@ object Deser {
     val length = Shorts.fromByteArray(bytes.slice(0, 2))
     val r = (0 until length).foldLeft((Seq.empty[Array[Byte]], 2)) {
       case ((acc, pos), _) =>
-        val (arr, nextPos) = parseArraySize(bytes, pos)
+        val (arr, nextPos) = parseArrayWithLength(bytes, pos)
         (acc :+ arr, nextPos)
     }
     r._1
