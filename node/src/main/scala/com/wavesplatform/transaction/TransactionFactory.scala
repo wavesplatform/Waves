@@ -623,7 +623,7 @@ object TransactionFactory {
       tx <- InvokeScriptTransaction.signed(
         sender,
         contract,
-        InvokeScriptRequest.buildFunctionCall(request.call),
+        request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
@@ -635,11 +635,11 @@ object TransactionFactory {
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
       contract <- Address.fromString(request.dappAddress)
-      fc = InvokeScriptRequest.buildFunctionCall(request.call)
+      fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
       tx <- InvokeScriptTransaction.create(
         sender,
         contract,
-        fc,
+        fcOpt,
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
