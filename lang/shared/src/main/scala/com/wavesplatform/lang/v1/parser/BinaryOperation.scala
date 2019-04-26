@@ -15,10 +15,11 @@ object BinaryOperation {
 
   // No monadic notion here, Left and Right mean `left-assosiative and `right-assosiative`
   val opsByPriority: List[Either[List[BinaryOperation], List[BinaryOperation]]] = List(
-    Right(List(CONS_OP)),
-    Left(List(OR_OP, AND_OP)),
-    Left(List(EQ_OP, NE_OP)),
+    Left(List(OR_OP)),
+    Left(List(AND_OP)),
     Left(List(GT_OP, GE_OP, LT_OP, LE_OP)),
+    Left(List(EQ_OP, NE_OP)),
+    Right(List(CONS_OP)),
     Left(List(SUM_OP, SUB_OP)),
     Left(List(MUL_OP, DIV_OP, MOD_OP))
   )
@@ -41,7 +42,7 @@ object BinaryOperation {
     val func = ">="
   }
   case object GT_OP extends BinaryOperation {
-    val func = ">"
+    val func            = ">"
     override val parser = P(">" ~ !P("=")).map(_ => this)
   }
   case object SUM_OP extends BinaryOperation {
