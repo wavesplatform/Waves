@@ -12,7 +12,7 @@ class DeserializationTests extends FreeSpec with Matchers {
     }
     "IllegalArgumentException thrown with arrays > 32k" in {
       val byteArray = Array.fill(Short.MaxValue + 1)(0.toByte)
-      an[AssertionError] should be thrownBy Deser.serializeArray(byteArray)
+      an[IllegalArgumentException] should be thrownBy Deser.serializeArray(byteArray)
     }
   }
 }
