@@ -296,6 +296,7 @@ object WavesContext {
     }
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
+    val lastBlockCoeval: Coeval[Either[String, CaseObj]] = Coeval.evalOnce(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
     val thisCoeval: Coeval[Either[String, CaseObj]]      = Coeval.evalOnce(Right(Bindings.senderObject(env.tthis)))
 
     val anyTransactionType =
@@ -402,7 +403,8 @@ object WavesContext {
       3 -> {
         val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
           ("Sell", ((sellType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
+          ("lastBlock", ((blockInfo, "Last block info"), LazyVal(EitherT(lastBlockCoeval))))
         )
         val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
@@ -435,7 +437,7 @@ object WavesContext {
 
     CTX(
       types ++ (if (version == V3) {
-                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType)
+                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType, blockInfo)
                 } else List.empty),
       commonVars ++ vars(version.id),
       functions ++ (if (version == V3) {

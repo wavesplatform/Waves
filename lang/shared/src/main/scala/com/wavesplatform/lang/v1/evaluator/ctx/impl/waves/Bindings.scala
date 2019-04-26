@@ -280,4 +280,14 @@ object Bindings {
         "sponsored"   -> sAInfo.sponsored
       )
     )
+
+  def buildLastBlockInfo(blockInf: BlockInfo) =
+    CaseObj(
+      blockInfo,
+      Map(
+        "timestamp"   -> blockInf.timestamp,
+        "height" -> blockInf.height.toLong,
+        "generationSignature" -> blockInf.generationSignature
+      )
+    )
 }
