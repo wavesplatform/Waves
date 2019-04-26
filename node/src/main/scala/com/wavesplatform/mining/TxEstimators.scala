@@ -4,7 +4,6 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 
-//noinspection ScalaStyle
 object TxEstimators extends ScorexLogging {
   abstract class Fn extends ((Blockchain, Transaction, Diff) => Long) {
     val minEstimate: Long
