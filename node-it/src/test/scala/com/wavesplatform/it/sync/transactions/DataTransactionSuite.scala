@@ -250,7 +250,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightArise()
 
     val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => IntegerDataEntry("key", 88))
-    assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), TooBig)
+    assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, 1.waves), TooBig)
     nodes.waitForHeightArise()
   }
 

@@ -7,11 +7,8 @@ object Deser {
   def serializeBoolean(b: Boolean): Array[Byte] = if (b) Array(1: Byte) else Array(0: Byte)
 
   def serializeArray(b: Array[Byte]): Array[Byte] = {
-    val length = b.length
-    if (length.isValidShort)
-      Shorts.toByteArray(length.toShort) ++ b
-    else
-      throw new IllegalArgumentException(s"Attempting to serialize array with size, but the size($length) exceeds MaxShort(${Short.MaxValue})")
+    val lengthBytes = Shorts.toByteArray(b.length.ensuring(_.isValidShort).toShort)
+    Bytes.concat(lengthBytes, b)
   }
 
   def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
@@ -56,5 +53,10 @@ object Deser {
 
   def serializeOptionOfArray[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] = b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
 
-  def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = Shorts.toByteArray(bs.length.toShort) ++ Bytes.concat(bs.map(serializeArray): _*)
+  def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {
+    val countBytes  = Shorts.toByteArray(bs.length.ensuring(_.isValidShort).toShort)
+    val arraysBytes = Bytes.concat(bs.map(serializeArray): _*)
+
+    Bytes.concat(countBytes, arraysBytes)
+  }
 }

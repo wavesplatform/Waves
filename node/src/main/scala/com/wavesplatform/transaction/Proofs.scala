@@ -25,17 +25,28 @@ object Proofs {
 
   lazy val empty = new Proofs(Nil)
 
-  def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] =
+  protected def validate(proofs: Seq[ByteStr]): Either[ValidationError, Unit] = {
     for {
       _ <- Either.cond(proofs.lengthCompare(MaxProofs) <= 0, (), GenericError(s"Too many proofs, max $MaxProofs proofs"))
       _ <- Either.cond(!proofs.map(_.arr.length).exists(_ > MaxProofSize), (), GenericError(s"Too large proof, must be max $MaxProofSize bytes"))
-    } yield Proofs(proofs.toList)
+    } yield ()
+  }
+
+  def createWithBytes(proofs: Seq[ByteStr], parsedBytes: Array[Byte]): Either[ValidationError, Proofs] =
+    validate(proofs) map { _ =>
+      new Proofs(proofs.toList) {
+        override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(parsedBytes)
+      }
+    }
+
+  def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] =
+    validate(proofs).map(_ => Proofs(proofs.toList))
 
   def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
     for {
       _    <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
       arrs <- Try(Deser.parseArrays(ab.tail)).toEither.left.map(er => GenericError(er.toString))
-      r    <- create(arrs.map(ByteStr(_)).toList)
+      r    <- createWithBytes(arrs.map(ByteStr(_)), ab)
     } yield r
 
   implicit def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs.toList)
