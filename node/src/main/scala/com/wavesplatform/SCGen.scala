@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import java.io.{File, PrintStream}
+import java.io.{File, FileOutputStream, PrintStream}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -8,7 +8,6 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.openDB
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.{Merkle, ScorexLogging}
 import monix.execution.UncaughtExceptionReporter
@@ -16,13 +15,10 @@ import monix.reactive.Observer
 import play.api.libs.json.Json
 import scopt.OParser
 
-import scala.util.Try
-
 object SCGen extends App with ScorexLogging {
 
   final case class GenConfig(
-      from: Int = 0,
-      to: Int = Int.MaxValue,
+      length: Int = 1999,
       configFile: Option[File] = None,
       outputFile: Option[File] = None
   )
@@ -34,14 +30,10 @@ object SCGen extends App with ScorexLogging {
     OParser
       .sequence(
         programName("scgen"),
-        opt[Int]('f', "from")
-          .text("Starting block in generated chain")
+        opt[Int]('l', "length")
+          .text("Number of blocks")
           .required()
-          .action((v, conf) => conf.copy(from = v)),
-        opt[Int]('t', "to")
-          .text("Last block in generated chain")
-          .required()
-          .action((v, conf) => conf.copy(to = v)),
+          .action((v, conf) => conf.copy(length = v)),
         opt[File]('c', "config")
           .text("Path to node config file")
           .action((v, conf) => conf.copy(configFile = Some(v))),
@@ -72,19 +64,25 @@ object SCGen extends App with ScorexLogging {
     val db     = openDB(wavesSettings.dbSettings.directory)
     val reader = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
 
-    val out = config.outputFile match {
-      case None    => System.out
-      case Some(f) => new PrintStream(f)
+//    val out = config.outputFile match {
+//      case None    => System.out
+//      case Some(f) => new PrintStream(f)
+//    }
+
+    val out: PrintStream = config.outputFile match {
+      case Some(file) => new PrintStream(file)
+      case None       => Console.out
     }
 
-    def loop(n: Int): Unit = {
-      if (n < config.to) {
-        reader.blockAt(n) foreach { block =>
-          log.info(s"Processing block: $block")
+    val height = reader.height
 
+    out.write('[')
+
+    def loop(n: Int): Unit = {
+      if (n < height) {
+        reader.blockAt(n) foreach { block =>
           val (balances, effectiveBalances) = {
             val minerBalanceInfo = reader.minerBalancesAtHeight(Height @@ n)
-            log.info(s"${minerBalanceInfo.size} miners at $n")
             minerBalanceInfo.foldLeft((List.empty[(Address, Long)], List.empty[(Address, Long)])) {
               case ((_balances, _effectiveBalances), (address, balanceInfo)) =>
                 val nextBalances = (address, balanceInfo.currentBalance) :: _balances
@@ -95,20 +93,14 @@ object SCGen extends App with ScorexLogging {
             }
           }
 
-          log.info(s"${balances.length} balances and ${effectiveBalances.length} effective balances at $n")
-          log.info(s"TXS ${block.transactionData.size}")
-
           val txHash =
             if (block.transactionData.isEmpty) {
               Merkle.EMPTY_ROOT_HASH
             } else {
               Merkle.mkTxTree(block.transactionData).rootHash
             }
-          log.info(s"TX HASH: ${Base58.encode(txHash)} ")
           val balanceHash = Merkle.mkMinerBalanceTree(balances).rootHash
-          log.info(s"BALANCE HASH: ${Base58.encode(balanceHash)}")
           val effBalanceHash = Merkle.mkMinerBalanceTree(effectiveBalances).rootHash
-          log.info(s"EFF BALANCE HASH: ${Base58.encode(effBalanceHash)}")
 
           val json = block
             .copy(
@@ -117,13 +109,21 @@ object SCGen extends App with ScorexLogging {
               minerEffectiveBalancesTreeHash = effBalanceHash
             )
             .headerJson()
+
+          out.write(Json.prettyPrint(json).getBytes())
+          out.write(',')
         }
 
         loop(n + 1)
-      } else out.close()
+      } else {
+        out.write('\n')
+        out.write(']')
+        out.flush()
+        out.close()
+      }
     }
 
-    loop(config.from)
+    loop(height - config.length)
   }
 
   def loadChain(reader: LevelDBWriter, from: Int, to: Int): List[(Int, Block)] = {

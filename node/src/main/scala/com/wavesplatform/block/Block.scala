@@ -68,7 +68,10 @@ class BlockHeader(val timestamp: Long,
       referenceField.json() ++
       consensusField.json() ++
       supportedFeaturesField.json() ++
-      signerField.json())
+      signerField.json() ++
+      transactionTreeHashField.json() ++
+      balancesTreeHashField.json() ++
+      effectiveBalancesTreeHashField.json())
 }
 
 object BlockHeader extends ScorexLogging {
