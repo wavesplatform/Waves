@@ -31,7 +31,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       BlockchainFeatures.Ride4DApps.id     -> 0,
       BlockchainFeatures.DataTransaction.id     -> 0,
       BlockchainFeatures.MassTransfer.id     -> 0,
-      BlockchainFeatures.FeeSponsorship.id -> 0
+      BlockchainFeatures.FeeSponsorship.id -> 0,
+      BlockchainFeatures.Ride4DApps.id -> 0
     ))
 
   val allAllowed = ExprScript( TRUE ).explicitGet()

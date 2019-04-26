@@ -134,7 +134,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         .selfSigned(
           sender = caller,
           dappAddress = contract,
-          fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
+          fc = Some(FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty)),
           p = Seq(InvokeScriptTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,
@@ -160,7 +160,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         .selfSigned(
           sender = caller,
           dappAddress = contract,
-          fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
+          fc = Some(FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves)))),
           p = Seq(),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,
@@ -180,7 +180,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         .selfSigned(
           sender = caller,
           dappAddress = contract,
-          fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),
+          fc = Some(FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves)))),
           p = Seq(),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,

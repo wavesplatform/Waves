@@ -13,32 +13,42 @@ import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import cats.implicits._
 
 object ContractEvaluator {
-  case class Invocation(fc: FUNCTION_CALL,
+
+  val DEFAULT_FUNC_NAME = "defaultFunction"
+
+  case class Invocation(funcCallOpt: Option[FUNCTION_CALL],
                         caller: Recipient.Address,
                         callerPk: ByteStr,
                         payment: Option[(Long, Option[ByteStr])],
                         dappAddress: ByteStr)
 
   def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
-    val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
-    c.cfs.find(_.u.name == functionName) match {
+     val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
+
+    val contractFuncAndCall =
+      if (i.funcCallOpt.nonEmpty)
+        c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCallOpt.get))
+      else
+        c.defaultFuncOpt.map(defFunc => (defFunc, FUNCTION_CALL(FunctionHeader.User(defFunc.u.name), List.empty)))
+
+    contractFuncAndCall match {
       case None =>
-        val otherFuncs = c.dec.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
+        val otherFuncs = c.decs.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
         val message =
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
-      case Some(f) =>
+      case Some((f, fc)) =>
         withDecls(
-          c.dec,
+          c.decs,
           BLOCK(
             LET(
               f.annotation.invocationArgName,
               Bindings
                 .buildInvocation(i.caller, i.callerPk, i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress))
             ),
-            BLOCK(f.u, i.fc)
+            BLOCK(f.u, fc)
           )
         )
     }

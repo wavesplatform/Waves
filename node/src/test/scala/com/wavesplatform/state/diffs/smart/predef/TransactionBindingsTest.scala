@@ -266,8 +266,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("InvokeScriptTransaction binding") {
     forAll(invokeScriptGen) { t =>
-      val checkArgsScript = if (t.fc.args.nonEmpty) {
-        t.fc.args
+      val checkArgsScript = if (t.funcCallOpt.get.args.nonEmpty) {
+        t.funcCallOpt.get.args
       .collect {
         case CONST_LONG(i)    => i.toString
         case CONST_STRING(s)  => s""""$s""""
@@ -302,7 +302,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
             |      else isDefined(t.feeAssetId) == false
             |
-            |   let checkFunc = t.function == "${t.fc.function.funcName}"
+            |   let checkFunc = t.function == "${t.funcCallOpt.get.function.funcName}"
             |   $checkArgsScript
 
             |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId && checkFunc && checkArgs
