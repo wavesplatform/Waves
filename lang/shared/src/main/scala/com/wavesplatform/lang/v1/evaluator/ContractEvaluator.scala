@@ -20,7 +20,11 @@ object ContractEvaluator {
                         caller: Recipient.Address,
                         callerPk: ByteStr,
                         payment: Option[(Long, Option[ByteStr])],
-                        dappAddress: ByteStr)
+                        dappAddress: ByteStr,
+                        transactionId: ByteStr,
+                        fee: Long,
+                        feeAssetId: Option[ByteStr]
+                       )
 
   def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
      val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
@@ -45,8 +49,14 @@ object ContractEvaluator {
           BLOCK(
             LET(
               f.annotation.invocationArgName,
-              Bindings
-                .buildInvocation(i.caller, i.callerPk, i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress))
+              Bindings.buildInvocation(
+                  i.caller,
+                  i.callerPk,
+                  i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress),
+                  i.transactionId,
+                  i.fee,
+                  i.feeAssetId
+                )
             ),
             BLOCK(f.u, fc)
           )

@@ -93,13 +93,24 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, callerPk: ByteStr, payment: Option[Pmt], dappAddress: Recipient.Address) =
+  def buildInvocation(
+                       caller:        Recipient.Address,
+                       callerPk:      ByteStr,
+                       payment:       Option[Pmt],
+                       dappAddress:   Recipient.Address,
+                       transactionId: ByteStr,
+                       fee:           Long,
+                       feeAssetId:    Option[ByteStr]
+                     ) =
     CaseObj(
       invocationType,
       Map(
         "caller"          -> mapRecipient(caller)._2,
         "callerPublicKey" -> callerPk,
-        "payment"         -> buildPayment(payment)
+        "payment"         -> buildPayment(payment),
+        "id"              -> transactionId,
+        "fee"             -> fee,
+        "feeAssetId"      -> feeAssetId
       )
     )
 
