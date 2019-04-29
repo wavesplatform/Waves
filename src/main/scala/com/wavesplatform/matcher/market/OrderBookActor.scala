@@ -32,9 +32,9 @@ class OrderBookActor(owner: ActorRef,
 
   protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
-  private var savingSnapshot: Option[QueueEventWithMeta.Offset]  = None
-  private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = -1L
-  private var lastProcessedOffset: QueueEventWithMeta.Offset     = -1L
+  private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
+  private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
+  private var lastProcessedOffset     = Option.empty[QueueEventWithMeta.Offset]
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
@@ -46,18 +46,19 @@ class OrderBookActor(owner: ActorRef,
 
   private def executeCommands: Receive = {
     case request: QueueEventWithMeta =>
-      if (request.offset <= lastProcessedOffset) sender() ! AlreadyProcessed
-      else {
-        lastProcessedOffset = request.offset
-        request.event match {
-          case x: QueueEvent.Placed   => onAddOrder(request, x.order)
-          case x: QueueEvent.Canceled => onCancelOrder(request, x.orderId)
-          case _: QueueEvent.OrderBookDeleted =>
-            sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
-            updateSnapshot(OrderBook.AggregatedSnapshot())
-            processEvents(orderBook.cancelAll())
-            context.stop(self)
-        }
+      lastProcessedOffset match {
+        case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
+        case _ =>
+          lastProcessedOffset = Some(request.offset)
+          request.event match {
+            case x: QueueEvent.Placed   => onAddOrder(request, x.order)
+            case x: QueueEvent.Canceled => onCancelOrder(request, x.orderId)
+            case _: QueueEvent.OrderBookDeleted =>
+              sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
+              updateSnapshot(OrderBook.AggregatedSnapshot())
+              processEvents(orderBook.cancelAll())
+              context.stop(self)
+          }
       }
     case ForceStartOrderBook(p) if p == assetPair =>
       sender() ! OrderBookCreated(assetPair)
@@ -68,7 +69,7 @@ class OrderBookActor(owner: ActorRef,
       val snapshotOffsetId = savingSnapshot.getOrElse(throw new IllegalStateException("Impossible"))
       log.info(s"Snapshot has been saved at offset $snapshotOffsetId: $metadata")
       owner ! OrderBookSnapshotUpdated(assetPair, snapshotOffsetId)
-      lastSavedSnapshotOffset = snapshotOffsetId
+      lastSavedSnapshotOffset = Some(snapshotOffsetId)
       savingSnapshot = None
 
     case SaveSnapshotFailure(metadata, reason) =>
@@ -76,7 +77,7 @@ class OrderBookActor(owner: ActorRef,
       log.error(s"Failed to save snapshot: $metadata", reason)
 
     case SaveSnapshot(globalEventNr) =>
-      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset < globalEventNr) {
+      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-1L) < globalEventNr) {
         log.debug(s"About to save snapshot $orderBook")
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
@@ -126,17 +127,20 @@ class OrderBookActor(owner: ActorRef,
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
-      log.debug(s"Recovery completed at $lastProcessedOffset: $orderBook")
+      lastProcessedOffset match {
+        case None    => log.debug("Recovery completed")
+        case Some(x) => log.debug(s"Recovery completed at $x: $orderBook")
+      }
       processEvents(orderBook.allOrders.map(OrderAdded))
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
-      owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
+      owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
       orderBook = OrderBook(snapshot.orderBook)
-      lastProcessedOffset = snapshot.eventNr
-      lastSavedSnapshotOffset = lastProcessedOffset
+      lastSavedSnapshotOffset = snapshot.eventNr
+      lastProcessedOffset = lastSavedSnapshotOffset
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -146,7 +150,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit = {
     log.trace(s"Saving snapshot. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset")
-    saveSnapshot(Snapshot(globalEventNr, orderBook.snapshot))
+    saveSnapshot(Snapshot(Some(globalEventNr), orderBook.snapshot))
   }
 }
 
@@ -184,8 +188,9 @@ object OrderBookActor {
   }
 
   case class LastTrade(price: Long, amount: Long, side: OrderType)
-  case class Snapshot(eventNr: Long, orderBook: OrderBook.Snapshot)
+  case class Snapshot(eventNr: Option[Long], orderBook: OrderBook.Snapshot)
 
   // Internal messages
+  case class OrderBookRecovered(assetPair: AssetPair, eventNr: Option[Long])
   case class OrderBookSnapshotUpdated(assetPair: AssetPair, eventNr: Long)
 }

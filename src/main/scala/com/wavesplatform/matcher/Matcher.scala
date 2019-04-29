@@ -147,11 +147,11 @@ class Matcher(actorSystem: ActorSystem,
           log.error(s"Can't start matcher: $msg")
           forceStopApplication(ErrorStartingMatcher)
 
-        case Right((self, oldestSnapshotOffset)) =>
-          currentOffset = oldestSnapshotOffset
+        case Right((self, processedOffset)) =>
+          currentOffset = processedOffset
           snapshotsRestore.trySuccess(())
           matcherQueue.startConsume(
-            oldestSnapshotOffset + 1,
+            processedOffset + 1,
             eventWithMeta => {
               log.debug(s"Consumed $eventWithMeta")
 

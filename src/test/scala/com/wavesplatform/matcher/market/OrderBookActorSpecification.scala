@@ -32,7 +32,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
   private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = obcTestWithPrepare(_ => ()) { (pair, actor, probe) =>
-    probe.expectMsg(OrderBookSnapshotUpdated(pair, -1))
+    probe.expectMsg(OrderBookRecovered(pair, None))
     f(pair, actor, probe)
   }
 
@@ -62,22 +62,17 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
   }
 
   "OrderBookActor" should {
-    "recover from snapshot - 1" in obcTestWithPrepare { p =>
-      SnapshotUtils.provideSnapshot(
-        OrderBookActor.name(p),
-        Snapshot(OrderBookActor.Snapshot(-1, OrderBook.empty.snapshot))
-      )
-    } { (pair, _, tp) =>
-      tp.expectMsg(OrderBookSnapshotUpdated(pair, -1))
+    "recover from snapshot - 1" in obcTestWithPrepare(_ => ()) { (pair, _, tp) =>
+      tp.expectMsg(OrderBookRecovered(pair, None))
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { p =>
       SnapshotUtils.provideSnapshot(
         OrderBookActor.name(p),
-        Snapshot(OrderBookActor.Snapshot(50, OrderBook.empty.snapshot))
+        Snapshot(OrderBookActor.Snapshot(Some(50), OrderBook.empty.snapshot))
       )
     } { (pair, _, tp) =>
-      tp.expectMsg(OrderBookSnapshotUpdated(pair, 50))
+      tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, orderBook, tp) =>

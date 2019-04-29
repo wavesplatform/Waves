@@ -166,8 +166,11 @@ class MatcherActor(settings: MatcherSettings,
         childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
       }
 
-    case OrderBookSnapshotUpdated(assetPair, eventNr) =>
+    case OrderBookRecovered(assetPair, eventNr) =>
       snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, settings.snapshotsInterval)
+
+    case OrderBookSnapshotUpdated(assetPair, eventNr) =>
+      snapshotsState = snapshotsState.updated(assetPair, Some(eventNr), lastProcessedNr, settings.snapshotsInterval)
   }
 
   override def receiveRecover: Receive = {
@@ -185,29 +188,32 @@ class MatcherActor(settings: MatcherSettings,
     case RecoveryCompleted =>
       if (orderBooks.get().isEmpty) {
         log.info("Recovery completed!")
-        recoveryCompletedWithEventNr(Right((self, -1)))
+        recoveryCompletedWithEventNr(Right((self, -1L)))
       } else {
         val obs = orderBooks.get()
         log.info(s"Recovery completed, waiting order books to restore: ${obs.keys.mkString(", ")}")
-        context.become(collectOrderBooks(obs.size, Long.MaxValue, Long.MinValue, Map.empty))
+        context.become(collectOrderBooks(obs.size, None, -1L, Map.empty))
       }
   }
 
   private def collectOrderBooks(restOrderBooksNumber: Long,
-                                oldestEventNr: Long,
+                                oldestEventNr: Option[Long],
                                 newestEventNr: Long,
-                                currentOffsets: Map[AssetPair, EventOffset]): Receive = {
-    case OrderBookSnapshotUpdated(assetPair, snapshotEventNr) =>
-      log.info(s"Last snapshot for $assetPair did at $snapshotEventNr")
-
+                                currentOffsets: Map[AssetPair, Option[EventOffset]]): Receive = {
+    case OrderBookRecovered(assetPair, snapshotEventNr) =>
       val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
-      val updatedOldestEventNr        = if (snapshotEventNr > -1) math.min(oldestEventNr, snapshotEventNr) else oldestEventNr
-      val updatedNewestEventNr        = math.max(newestEventNr, snapshotEventNr)
-      val updatedCurrentOffsets       = if (snapshotEventNr > -1) currentOffsets.updated(assetPair, snapshotEventNr) else currentOffsets
+
+      val updatedOldestSnapshotOffset = (oldestEventNr, snapshotEventNr) match {
+        case (Some(oldestNr), Some(orderBookNr)) => Some(math.min(oldestNr, orderBookNr))
+        case (oldestNr, orderBookNr)             => oldestNr.orElse(orderBookNr)
+      }
+
+      val updatedNewestEventNr  = math.max(newestEventNr, snapshotEventNr.getOrElse(-1L))
+      val updatedCurrentOffsets = currentOffsets.updated(assetPair, snapshotEventNr)
 
       if (updatedRestOrderBooksNumber > 0)
-        context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))
-      else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
+        context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestSnapshotOffset, updatedNewestEventNr, updatedCurrentOffsets))
+      else becomeWorking(updatedOldestSnapshotOffset, updatedNewestEventNr, updatedCurrentOffsets)
 
     case Terminated(ref) =>
       context.stop(self)
@@ -221,8 +227,17 @@ class MatcherActor(settings: MatcherSettings,
     case _ => stash()
   }
 
-  private def becomeWorking(oldestEventNr: EventOffset, newestEventNr: EventOffset, currentOffsets: Map[AssetPair, EventOffset]): Unit = {
+  private def becomeWorking(oldestEventNr: Option[EventOffset],
+                            newestEventNr: EventOffset,
+                            currentOffsets: Map[AssetPair, Option[EventOffset]]): Unit = {
     context.become(receiveCommand)
+
+    // If oldestEventNr <= snapshotsInterval, there could be a situation:
+    // 1. There was an event with offset=N for order book X
+    // 2. A snapshot for X wasn't created at the moment of last event, but it was created for order book Y at offset=N+2
+    // 3. After restart we ignore the event with offset=N, starting from offset=N+1
+    // So we need to start from the nearest snapshot interval start point
+    val processedEventNr = oldestEventNr.fold(0L)(_ / settings.snapshotsInterval * settings.snapshotsInterval) - 1L
 
     snapshotsState = SnapshotsState(
       currentOffsets = currentOffsets,
@@ -230,11 +245,11 @@ class MatcherActor(settings: MatcherSettings,
       interval = settings.snapshotsInterval
     )
 
-    log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, newestEventNr: $newestEventNr")
+    log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, processedEventNr: $processedEventNr, newestEventNr: $newestEventNr")
     log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
     unstashAll()
-    recoveryCompletedWithEventNr(Right((self, oldestEventNr)))
+    recoveryCompletedWithEventNr(Right((self, processedEventNr)))
   }
 
   private def snapshotsCommands: Receive = {
@@ -329,7 +344,7 @@ object MatcherActor {
   case object GetMarkets
 
   case object GetSnapshotOffsets
-  case class SnapshotOffsetsResponse(offsets: Map[AssetPair, EventOffset])
+  case class SnapshotOffsetsResponse(offsets: Map[AssetPair, Option[EventOffset]])
 
   case class MatcherRecovered(oldestEventNr: Long)
 

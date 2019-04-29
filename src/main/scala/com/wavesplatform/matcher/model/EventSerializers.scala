@@ -80,8 +80,9 @@ object EventSerializers {
       JsSuccess(jv.as[Map[String, (Long, Long)]])
   }
 
+  // Remove nullable for "n" in the future. It's a hack for old snapshots
   implicit val snapshotFormat: Format[Snapshot] = Format(
-    ((JsPath \ "n").readNullable[Long].map(_.getOrElse(-1L)) and (JsPath \ "o").read[OrderBook.Snapshot])(Snapshot),
+    ((JsPath \ "n").readNullable[Long] and (JsPath \ "o").read[OrderBook.Snapshot])(Snapshot),
     Writes[Snapshot](s => Json.obj("n" -> s.eventNr, "o" -> s.orderBook))
   )
 }

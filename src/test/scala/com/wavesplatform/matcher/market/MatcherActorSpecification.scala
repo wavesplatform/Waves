@@ -10,7 +10,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
-import com.wavesplatform.matcher.market.OrderBookActor.OrderBookSnapshotUpdated
+import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdated}
 import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
@@ -137,11 +137,9 @@ class MatcherActorSpecification
     }
 
     "continue the work when recovery is successful" in {
-      val pair    = AssetPair(randomAssetId, randomAssetId)
       val ob      = emptyOrderBookRefs
       var working = false
 
-      matcherHadOrderBooksBefore(pair -> -1L)
       val actor = system.actorOf(
         Props(
           new MatcherActor(
@@ -167,7 +165,7 @@ class MatcherActorSpecification
         val ob      = emptyOrderBookRefs
         var stopped = false
 
-        matcherHadOrderBooksBefore(pair -> -1L)
+        matcherHadOrderBooksBefore(pair -> Some(1))
         val probe = TestProbe()
         val actor = probe.watch(
           system.actorOf(
@@ -191,7 +189,7 @@ class MatcherActorSpecification
         val ob      = emptyOrderBookRefs
         var stopped = false
 
-        matcherHadOrderBooksBefore(pair -> -1L)
+        matcherHadOrderBooksBefore(pair -> Some(1))
         val probe = TestProbe()
         val actor = probe.watch(
           system.actorOf(
@@ -277,20 +275,20 @@ class MatcherActorSpecification
         val pair1 = AssetPair(randomAssetId, randomAssetId)
         val pair2 = AssetPair(randomAssetId, randomAssetId)
 
-        matcherHadOrderBooksBefore(pair1 -> 9L)
+        matcherHadOrderBooksBefore(pair1 -> Some(9L))
         val ob    = emptyOrderBookRefs
         val actor = defaultActor(ob)
 
         val probe = TestProbe()
         probe.send(actor, MatcherActor.GetSnapshotOffsets)
-        probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> 9L)))
+        probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L))))
 
         val eventSender = TestProbe()
         sendBuyOrders(eventSender, actor, pair23, 10 to 12)
 
         probe.send(actor, wrap(buy(pair2, 2000, 1)))
         probe.send(actor, MatcherActor.GetSnapshotOffsets)
-        probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> 9L)))
+        probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L))))
       }
 
       "force request" in {
@@ -394,7 +392,7 @@ class MatcherActorSpecification
     r
   }
 
-  private def matcherHadOrderBooksBefore(pairs: (AssetPair, Long)*): Unit = {
+  private def matcherHadOrderBooksBefore(pairs: (AssetPair, Option[Long])*): Unit = {
     SnapshotUtils.provideSnapshot(MatcherActor.name, Snapshot(MatcherActor.Snapshot(pairs.map(_._1).toSet)))
     pairs.foreach {
       case (pair, offset) =>
@@ -410,8 +408,8 @@ class MatcherActorSpecification
 
 object MatcherActorSpecification {
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
-  private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Long = -1) extends Actor {
-    owner ! OrderBookSnapshotUpdated(assetPair, startOffset)
+  private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {
+    owner ! OrderBookRecovered(assetPair, startOffset)
     override def receive: Receive = {
       case ForceStartOrderBook(p) if p == assetPair => sender() ! MatcherActor.OrderBookCreated(assetPair)
       case _                                        =>

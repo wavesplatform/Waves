@@ -6,11 +6,12 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import scala.collection.immutable.SortedSet
 
 /**
-  * @param snapshotOffsets        Map of pair -> current snapshot offset
+  * @param snapshotOffsets        Map of pair -> [Some(current snapshot offset) | None if it doesn't exist]
   * @param nearestSnapshotOffsets Nearest (pair, offset) to do snapshot
   * @note nearestSnapshotOffsets should be a PriorityQueue
   */
-case class SnapshotsState private (snapshotOffsets: Map[AssetPair, EventOffset], nearestSnapshotOffsets: SortedSet[(AssetPair, EventOffset)]) {
+case class SnapshotsState private (snapshotOffsets: Map[AssetPair, Option[EventOffset]],
+                                   nearestSnapshotOffsets: SortedSet[(AssetPair, EventOffset)]) {
   import SnapshotsState._
 
   val nearestSnapshotOffset: Option[(AssetPair, EventOffset)] = nearestSnapshotOffsets.headOption // Caching log(N) operations
@@ -25,9 +26,12 @@ case class SnapshotsState private (snapshotOffsets: Map[AssetPair, EventOffset],
         assetPair -> copy(nearestSnapshotOffsets = this.nearestSnapshotOffsets.tail)
     }
 
-  def updated(assetPair: AssetPair, currSnapshotOffset: EventOffset, lastProcessedOffset: EventOffset, interval: EventOffset): SnapshotsState = {
-    val nextOffset         = nextSnapshotOffset(assetPair, currSnapshotOffset, lastProcessedOffset, interval)
-    val newSnapshotOffsets = if (currSnapshotOffset > -1) snapshotOffsets.updated(assetPair, currSnapshotOffset) else snapshotOffsets
+  def updated(assetPair: AssetPair,
+              currSnapshotOffset: Option[EventOffset],
+              lastProcessedOffset: EventOffset,
+              interval: EventOffset): SnapshotsState = {
+    val nextOffset         = nextSnapshotOffset(assetPair, currSnapshotOffset.getOrElse(-1L), lastProcessedOffset, interval)
+    val newSnapshotOffsets = snapshotOffsets.updated(assetPair, currSnapshotOffset)
     copy(
       snapshotOffsets = newSnapshotOffsets,
       nearestSnapshotOffsets = nearestSnapshotOffsets + (assetPair -> nextOffset)
@@ -43,12 +47,14 @@ object SnapshotsState {
     })
   )
 
-  def apply(currentOffsets: Map[AssetPair, EventOffset], lastProcessedOffset: EventOffset, interval: EventOffset): SnapshotsState = empty.copy(
-    snapshotOffsets = currentOffsets.filter { case (_, offset) => offset > -1 },
-    nearestSnapshotOffsets = empty.nearestSnapshotOffsets ++ currentOffsets.map { // ++ to preserve ordering
-      case (assetPair, currSnapshotOffset) => assetPair -> nextSnapshotOffset(assetPair, currSnapshotOffset, lastProcessedOffset, interval)
-    }
-  )
+  def apply(currentOffsets: Map[AssetPair, Option[EventOffset]], lastProcessedOffset: EventOffset, interval: EventOffset): SnapshotsState =
+    empty.copy(
+      snapshotOffsets = currentOffsets,
+      nearestSnapshotOffsets = empty.nearestSnapshotOffsets ++ currentOffsets.map { // ++ to preserve ordering
+        case (assetPair, currSnapshotOffset) =>
+          assetPair -> nextSnapshotOffset(assetPair, currSnapshotOffset.getOrElse(-1L), lastProcessedOffset, interval)
+      }
+    )
 
   private def nextSnapshotOffset(assetPair: AssetPair,
                                  currSnapshotOffset: EventOffset,

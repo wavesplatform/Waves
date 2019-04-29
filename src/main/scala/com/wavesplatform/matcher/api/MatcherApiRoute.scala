@@ -548,8 +548,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Get the oldest snapshot's offset in the queue", notes = "", httpMethod = "GET")
   def getOldestSnapshotOffset: Route = (path("debug" / "oldestSnapshotOffset") & get & withAuth) {
     complete {
-      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
-        StatusCodes.OK -> x.offsets.valuesIterator.min
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
+        StatusCodes.OK -> response.offsets.valuesIterator.collect { case Some(x) => x }.min
       }
     }
   }
@@ -560,9 +560,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
         val js = Json.obj(
-          x.offsets.map {
-            case (assetPair, offset) =>
-              assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
+          x.offsets.collect {
+            case (assetPair, Some(offset)) => assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
           }.toSeq: _*
         )
 
