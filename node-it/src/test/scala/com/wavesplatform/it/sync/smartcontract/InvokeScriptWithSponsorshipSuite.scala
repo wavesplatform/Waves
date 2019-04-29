@@ -164,7 +164,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         fee = smartFeeAmount - 1,
         feeAssetId = Some(dAppAsset)
       ),
-      s"does not exceed minimal value of 5300000 WAVES or"
+      s"does not exceed minimal value of 5300000 WAVES"
     )
 
     val invokeScript1TxId = sender
