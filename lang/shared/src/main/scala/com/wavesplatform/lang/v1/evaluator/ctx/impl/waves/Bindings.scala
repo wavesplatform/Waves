@@ -108,7 +108,7 @@ object Bindings {
         "caller"          -> mapRecipient(caller)._2,
         "callerPublicKey" -> callerPk,
         "payment"         -> buildPayment(payment),
-        "id"              -> transactionId,
+        "transactionId"   -> transactionId,
         "fee"             -> fee,
         "feeAssetId"      -> feeAssetId
       )
