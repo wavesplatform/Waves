@@ -9,6 +9,8 @@ import monix.eval.Coeval
 
 sealed trait LazyVal {
   val value: TrampolinedExecResult[EVALUATED]
+
+  def copyLogged(lc: LogCallback): LazyVal
 }
 
 object LazyVal {
@@ -20,6 +22,8 @@ object LazyVal {
           .apply()
       )
     )
+
+    def copyLogged(lc: LogCallback): LazyVal = LazyValImpl(this.v, lc)
   }
 
   def apply(v: TrampolinedExecResult[EVALUATED], lc: LogCallback = _ => ()): LazyVal = LazyValImpl(v, lc)

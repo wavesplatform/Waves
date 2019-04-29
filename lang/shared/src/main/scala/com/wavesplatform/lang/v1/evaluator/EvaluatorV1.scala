@@ -23,7 +23,10 @@ object EvaluatorV1 {
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       result <- let.value match {
-        case REF(key) => evalRefF(key, assign)
+        case REF(key) => evalRefF(key, lzy => {
+          val sameWithNewLog = lzy.copyLogged(ctx.l(let.name))
+          assign(sameWithNewLog)
+        })
         case _ =>
           val blockEvaluation = evalExpr(let.value)
           val lazyBlock = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
