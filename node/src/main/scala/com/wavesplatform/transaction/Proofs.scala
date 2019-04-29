@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
@@ -11,7 +12,7 @@ import monix.eval.Coeval
 import scala.util.Try
 
 case class Proofs(proofs: List[ByteStr]) {
-  val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Proofs.Version +: Deser.serializeArrays(proofs.map(_.arr)))
+  val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Bytes.concat(Array(Proofs.Version), Deser.serializeArrays(proofs.map(_.arr))))
   val base58: Coeval[Seq[String]] = Coeval.evalOnce(proofs.map(p => Base58.encode(p.arr)))
   def toSignature: ByteStr        = proofs.headOption.getOrElse(ByteStr.empty)
   override def toString: String   = s"Proofs(${proofs.mkString(", ")})"
@@ -35,7 +36,10 @@ object Proofs {
   def createWithBytes(proofs: Seq[ByteStr], parsedBytes: Array[Byte]): Either[ValidationError, Proofs] =
     validate(proofs) map { _ =>
       new Proofs(proofs.toList) {
-        override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(parsedBytes)
+        override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+          val proofsLength = 3 + proofs.map(_.length + 2).sum
+          if (parsedBytes.length == proofsLength) parsedBytes else parsedBytes.take(proofsLength)
+        }
       }
     }
 

@@ -14,7 +14,7 @@ object Constants extends ScorexLogging {
   val UnitsInWave = 100000000L
   val TotalWaves  = 100000000L
 
-  val TransactionNames: Map[Byte, String] =
+  lazy val TransactionNames: Map[Byte, String] =
     TransactionParsers.all.map {
       case ((typeId, _), builder) =>
         val txName =

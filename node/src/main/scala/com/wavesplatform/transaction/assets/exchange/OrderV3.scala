@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -34,20 +34,23 @@ case class OrderV3(senderPublicKey: PublicKey,
 
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
-      Array(version) ++
-        senderPublicKey.arr ++
-        matcherPublicKey.arr ++
-        assetPair.bytes ++
-        orderType.bytes ++
-        Longs.toByteArray(amount) ++
-        Longs.toByteArray(price) ++
-        Longs.toByteArray(timestamp) ++
-        Longs.toByteArray(expiration) ++
-        Longs.toByteArray(matcherFee) ++
+      Bytes.concat(
+        Array(version),
+        senderPublicKey,
+        matcherPublicKey,
+        assetPair.bytes,
+        orderType.bytes,
+        Longs.toByteArray(amount),
+        Longs.toByteArray(price),
+        Longs.toByteArray(timestamp),
+        Longs.toByteArray(expiration),
+        Longs.toByteArray(matcherFee),
         Order.assetIdBytes(matcherFeeAssetId)
+      )
     )
 
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
+  val bytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
