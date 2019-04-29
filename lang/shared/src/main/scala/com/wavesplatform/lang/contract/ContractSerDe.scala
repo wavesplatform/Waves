@@ -50,11 +50,11 @@ object ContractSerDe {
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
     for {
-      _    <- tryEi(bb.getInt())
-      decs <- deserializeList[DECLARATION](bb, deserializeDeclaration)
-      callableFuncs  <- deserializeList(bb, deserializeCallableFunction)
-      defaultFuncOpt   <- deserializeOption(bb, deserializeDefaultFunction)
-      verifierFuncOpt   <- deserializeOption(bb, deserializeVerifierFunction)
+      _               <- tryEi(bb.getInt())
+      decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
+      callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
+      defaultFuncOpt  <- deserializeOption(bb, deserializeDefaultFunction)
+      verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
     } yield DApp(decs, callableFuncs, defaultFuncOpt, verifierFuncOpt)
   }
 
@@ -83,7 +83,11 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
-      _  <- Either.cond(cf.name.getBytes().size <= ContractLimits.MaxAnnotatedFunctionNameInBytes, (), s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}")
+      _ <- Either.cond(
+        cf.name.getBytes().size <= ContractLimits.MaxAnnotatedFunctionNameInBytes,
+        (),
+        s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}"
+      )
     } yield CallableFunction(ca, cf)
   }
 
@@ -128,5 +132,7 @@ object ContractSerDe {
     } flatMap df
   }
 
-  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap(_.getMessage)
+  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap { e =>
+    if (e.getMessage != null) e.getMessage else e.toString
+  }
 }
