@@ -167,7 +167,8 @@ object InvokeScriptTransactionDiff {
                 .mapValues(l => Monoid.combineAll(l))
               val paymentFromContractMap = Map(tx.dappAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
               val transfers = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
-              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers)
+              val isr = InvokeScriptResult(payments = transfers.toVector.flatMap { case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf) })
+              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
             }
         }
       case _ => Left(GenericError(s"No contract at address ${tx.dappAddress}"))
@@ -206,12 +207,7 @@ object InvokeScriptTransactionDiff {
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
         val recordedData = InvokeScriptResult(
           dataEntries,
-          payablePart.toVector.flatMap {
-            case (addr, portfolio) =>
-              val waves  = InvokeScriptResult.Payment(addr, Waves, portfolio.balance)
-              val assets = portfolio.assets.map { case (assetId, amount) => InvokeScriptResult.Payment(addr, assetId, amount) }
-              (assets ++ Some(waves)).filter(_.amount != 0)
-          }
+          payablePart.toVector.flatMap { case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf) }
         )
 
         Right(

@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import play.api.libs.json.Json
 
 final case class InvokeScriptResult(dataEntries: Seq[DataEntry[_]] = Nil, payments: Seq[InvokeScriptResult.Payment] = Nil)
@@ -17,6 +18,12 @@ object InvokeScriptResult {
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
     implicit val jsonFormat = Json.format[Payment]
+  }
+
+  def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
+    val waves  = InvokeScriptResult.Payment(addr, Waves, portfolio.balance)
+    val assets = portfolio.assets.map { case (assetId, amount) => InvokeScriptResult.Payment(addr, assetId, amount) }
+    (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
   implicit val jsonFormat = Json.format[InvokeScriptResult]
