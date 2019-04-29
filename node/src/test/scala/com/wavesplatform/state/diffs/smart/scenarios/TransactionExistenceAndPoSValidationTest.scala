@@ -9,16 +9,18 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V4}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils.Merkle
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -134,6 +136,64 @@ class TransactionExistenceAndPoSValidationTest extends PropSpec with PropertyChe
             diffEi shouldBe an[Right[_, _]]
           }
         }
+    }
+  }
+
+  property("can parse transaction on invoke") {
+    forAll(accountGen) { acc =>
+      val scriptSrc =
+        s"""
+           |@Callable(i)
+           |func test(txBytes : ByteVector) = {
+           |  match transactionFromBytes(txBytes) {
+           |    case _: Transaction => WriteSet([])
+           |    case _ => throw("Can't parse")
+           |  }
+           |}
+           |
+         """.stripMargin
+
+      val untypedScript = Parser.parseContract(scriptSrc).get.value
+      val typedScript =
+        ContractCompiler(compilerContext(V4, Expression, isAssetScript = false), untypedScript).explicitGet()
+
+      val gtx = GenesisTransaction.create(acc, AMT, System.currentTimeMillis()).explicitGet()
+
+      val sstx = SetScriptTransaction
+        .selfSigned(
+          acc,
+          Some(ContractScript(V4, typedScript).explicitGet()),
+          1000000000,
+          System.currentTimeMillis()
+        )
+        .explicitGet()
+
+      forAll(randomTransactionGen) { tx =>
+        val istx = InvokeScriptTransaction
+          .selfSigned(
+            acc,
+            acc.toAddress,
+            Some(
+              FUNCTION_CALL(
+                FunctionHeader.User("test"),
+                List(CONST_BYTESTR(ByteStr(tx.bytes())))
+              )
+            ),
+            Nil,
+            5 * 10000000,
+            Waves,
+            System.currentTimeMillis()
+          )
+          .explicitGet()
+
+        val b1 = TestBlock.create(Seq(gtx))
+        val b2 = TestBlock.create(Seq(sstx))
+        val b3 = TestBlock.create(Seq(istx))
+
+        assertDiffEi(Seq(b1, b2), b3, fs) { diffEi =>
+          diffEi shouldBe an[Right[_, _]]
+        }
+      }
     }
   }
 

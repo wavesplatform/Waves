@@ -40,7 +40,7 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
     val accScript = blockchain.accountScript(tx.dappAddress)
 
-    def evalContract(contract: DApp): Either[ScriptExecutionError, ScriptResult] = {
+    def evalContract(version: StdLibVersion, contract: DApp): Either[ScriptExecutionError, ScriptResult] = {
       val environment = new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval(tx.asInstanceOf[In]),
@@ -52,12 +52,12 @@ object InvokeScriptTransactionDiff {
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
       val invocation                                    = ContractEvaluator.Invocation(tx.funcCallOpt, Recipient.Address(invoker), tx.sender, maybePayment, tx.dappAddress.bytes)
       val result = for {
-        directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
+        directives <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem]))
         evaluator <- ContractEvaluator(
           Monoid
             .combineAll(
               Seq(
-                PureContext.build(V3),
+                PureContext.build(version),
                 CryptoContext.build(Global),
                 WavesContext.build(directives, environment)
               )
@@ -72,7 +72,7 @@ object InvokeScriptTransactionDiff {
     }
 
     accScript match {
-      case Some(ContractScriptImpl(_, contract, _)) =>
+      case Some(ContractScriptImpl(version, contract, _)) =>
         val functionName = tx.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(ContractEvaluator.DEFAULT_FUNC_NAME)
 
         val contractFunc =
@@ -84,7 +84,7 @@ object InvokeScriptTransactionDiff {
         contractFunc match {
           case None => Left(GenericError(s"No function '$functionName' at address ${tx.dappAddress}"))
           case Some(funcCall) =>
-            val scriptResultE = evalContract(contract)
+            val scriptResultE = evalContract(version, contract)
             for {
               scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dappAddress, Some(funcCall), scriptResultE)))
               ScriptResult(ds, ps) = scriptResult
@@ -166,7 +166,7 @@ object InvokeScriptTransactionDiff {
                 .mapValues(mp => mp.toList.map(x => Portfolio.build(Asset.fromCompatId(x._1), x._2)))
                 .mapValues(l => Monoid.combineAll(l))
               val paymentFromContractMap = Map(tx.dappAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
-              val transfers = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
+              val transfers              = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
               dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers)
             }
         }
