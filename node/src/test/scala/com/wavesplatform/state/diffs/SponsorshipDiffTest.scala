@@ -128,7 +128,17 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           blockDiffEi should produce("unavailable funds")
         }
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("does not exceed minimal value of 100000 WAVES")
+          val minFee = Sponsorship
+            .fromWaves(
+              CommonValidation.FeeConstants(insufficientFee.builder.typeId) * CommonValidation.FeeUnit,
+              sponsor.minSponsoredAssetFee.get
+            )
+
+          val expectedError =
+            s"Fee for TransferTransaction (${insufficientFee.fee} in ${issue.assetId().base58})" ++
+              s" does not exceed minimal value of 100000 WAVES or $minFee ${issue.assetId().base58}"
+
+          blockDiffEi should produce(expectedError)
         }
         assertDiffEi(setupBlocks, block(Seq(wavesOverspend)), s) { blockDiffEi =>
           if (wavesOverspend.fee > issue.quantity)
@@ -215,7 +225,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           blockDiffEi should produce("Asset was issued by other address")
         }
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("does not exceed minimal value of 100000000 WAVES: 99999999")
+          blockDiffEi should produce("(99999999 in WAVES) does not exceed minimal value of 100000000 WAVES")
         }
     }
   }
@@ -247,7 +257,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           blockDiffEi should produce("Asset was issued by other address")
         }
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("does not exceed minimal value of 100000000 WAVES: 99999999")
+          blockDiffEi should produce("(99999999 in WAVES) does not exceed minimal value of 100000000 WAVES")
         }
     }
   }

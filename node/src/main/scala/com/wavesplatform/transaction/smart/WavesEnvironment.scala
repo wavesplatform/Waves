@@ -7,7 +7,7 @@ import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -129,15 +129,18 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
-    blockchain.assetDescription(IssuedAsset(id)).map{
-      assetDesc =>
-        ScriptAssetInfo(
-          totalAmount = assetDesc.totalVolume.toLong,
-          decimals = assetDesc.decimals,
-          issuer = assetDesc.issuer,
-          reissuable = assetDesc.reissuable,
-          scripted = assetDesc.script.nonEmpty,
-          sponsored = assetDesc.sponsorship != 0)
+    blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
+      ScriptAssetInfo(
+        totalAmount = assetDesc.totalVolume.toLong,
+        decimals = assetDesc.decimals,
+        issuer = assetDesc.issuer,
+        reissuable = assetDesc.reissuable,
+        scripted = assetDesc.script.nonEmpty,
+        sponsored = assetDesc.sponsorship != 0
+      )
     }
   }
+
+  override def lastBlockOpt(): Option[BlockInfo] =
+    blockchain.lastBlock.map(lBlock => BlockInfo(lBlock.timestamp, blockchain.height, lBlock.consensusData.generationSignature))
 }

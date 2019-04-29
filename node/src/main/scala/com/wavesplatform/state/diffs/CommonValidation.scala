@@ -9,7 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
@@ -312,7 +312,10 @@ object CommonValidation {
           minFee <= tx.assetFee._2,
           (),
           GenericError(
-            s"Fee in ${feeAssetId.fold("WAVES")(_.id.base58)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+            s"Fee for ${Constants.TransactionNames(tx.builder.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.id.base58)})" ++
+              " does not exceed minimal value of " ++
+              s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.id.base58}")}"
+          )
         )
       } yield ()
     } else {

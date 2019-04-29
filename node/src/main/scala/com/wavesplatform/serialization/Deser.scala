@@ -11,7 +11,7 @@ object Deser {
   def serializeArray(b: Array[Byte]): Array[Byte] = {
     val length = b.length
     if (length.isValidShort)
-      Shorts.toByteArray(length.toShort) ++ b
+      Bytes.concat(Shorts.toByteArray(length.toShort), b)
     else
       throw new IllegalArgumentException(s"Attempting to serialize array with size, but the size($length) exceeds MaxShort(${Short.MaxValue})")
   }
@@ -66,9 +66,15 @@ object Deser {
     r._1
   }
 
-  def serializeOption[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] = b.map(a => (1: Byte) +: ser(a)).getOrElse(Array(0: Byte))
+  def serializeOption[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
+    b.map(a => (1: Byte) +: ser(a)).getOrElse(Array(0: Byte))
 
-  def serializeOptionOfArray[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] = b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
+  def serializeOptionOfArray[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
+    b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
 
-  def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = Shorts.toByteArray(bs.length.toShort) ++ Bytes.concat(bs.map(serializeArray): _*)
+  def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {
+    require(bs.length.isValidShort, s"Attempting to serialize array with size, but the size(${bs.length}) exceeds MaxShort(${Short.MaxValue})")
+    val countBytes = Shorts.toByteArray(bs.length.toShort)
+    Bytes.concat(Seq(countBytes) ++ bs.map(serializeArray): _*)
+  }
 }

@@ -40,10 +40,11 @@ object AssetTransactionsDiff {
             assetScripts = Map(tx.asset          -> tx.script),
             scriptsRun =
               // Asset script doesn't count before Ride4DApps activation
-              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
-                Some(tx.sender.toAddress).count(blockchain.hasScript)
-              else
+              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)) {
                 countScriptRuns(blockchain, tx)
+              } else {
+                Some(tx.sender.toAddress).count(blockchain.hasScript)
+              }
           ))
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
