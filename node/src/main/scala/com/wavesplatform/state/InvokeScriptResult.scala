@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import play.api.libs.json.Json
 
-final case class InvokeScriptResult(dataEntries: Seq[DataEntry[_]] = Nil, payments: Seq[InvokeScriptResult.Payment] = Nil)
+final case class InvokeScriptResult(data: Seq[DataEntry[_]] = Nil, transfers: Seq[InvokeScriptResult.Payment] = Nil)
 
 //noinspection TypeAnnotation
 object InvokeScriptResult {
@@ -33,13 +33,13 @@ object InvokeScriptResult {
       InvokeScriptResult.this.empty
 
     override def combine(x: InvokeScriptResult, y: InvokeScriptResult): InvokeScriptResult =
-      InvokeScriptResult(x.dataEntries ++ y.dataEntries, x.payments ++ y.payments)
+      InvokeScriptResult(x.data ++ y.data, x.transfers ++ y.transfers)
   }
 
   def toBytes(isr: InvokeScriptResult): Array[Byte] = {
     val pbValue = PBInvokeScriptResult(
-      isr.dataEntries.map(PBTransactions.toPBDataEntry),
-      isr.payments.map(
+      isr.data.map(PBTransactions.toPBDataEntry),
+      isr.transfers.map(
         payment =>
           PBInvokeScriptResult.Payment(
             ByteString.copyFrom(payment.address.bytes),

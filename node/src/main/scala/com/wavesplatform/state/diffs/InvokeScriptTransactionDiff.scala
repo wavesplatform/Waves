@@ -167,7 +167,7 @@ object InvokeScriptTransactionDiff {
                 .mapValues(l => Monoid.combineAll(l))
               val paymentFromContractMap = Map(tx.dappAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
               val transfers = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
-              val isr = InvokeScriptResult(payments = transfers.toVector.flatMap { case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf) })
+              val isr = InvokeScriptResult(transfers = paymentReceiversMap.toVector.flatMap { case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf) })
               dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
             }
         }
@@ -205,18 +205,12 @@ object InvokeScriptTransactionDiff {
         .foldLeft(Map[Address, Portfolio]())(_ combine _)
 
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
-        val recordedData = InvokeScriptResult(
-          dataEntries,
-          payablePart.toVector.flatMap { case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf) }
-        )
-
         Right(
           Diff(
             height = height,
             tx = tx,
             portfolios = feePart combine payablePart,
-            accountData = Map(tx.dappAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap)),
-            scriptResults = Map(tx.id()      -> recordedData)
+            accountData = Map(tx.dappAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap))
           )
         )
       } else
