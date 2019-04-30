@@ -83,7 +83,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[Array[Byte]] = load("transactionById", benchSettings.restTxsFile)(x => Base58.decode(x).get)
+    val allTxs: Vector[Array[Byte]] = load("transactionById", benchSettings.restTxsFile)(x => Base58.tryDecodeWithLimit(x).get)
   }
 
   @State(Scope.Benchmark)
@@ -96,7 +96,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class AccountBalanceOfAssetSt extends AccountBalanceOfWavesSt {
-    val assets: Vector[Array[Byte]] = load("assets", benchSettings.assetsFile)(x => Base58.decode(x).get)
+    val assets: Vector[Array[Byte]] = load("assets", benchSettings.assetsFile)(x => Base58.tryDecodeWithLimit(x).get)
   }
 
   @State(Scope.Benchmark)
@@ -111,7 +111,7 @@ object WavesEnvironmentBenchmark {
     protected val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
     private val wavesSettings: WavesSettings = {
       val config = loadConfig(ConfigFactory.parseFile(new File(benchSettings.networkConfigFile)))
-      WavesSettings.fromConfig(config)
+      WavesSettings.fromRootConfig(config)
     }
 
     AddressScheme.current = new AddressScheme {
@@ -119,19 +119,20 @@ object WavesEnvironmentBenchmark {
     }
 
     private val db: DB = {
-      val dir = new File(wavesSettings.dataDirectory)
-      if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dataDirectory}'")
+      val dir = new File(wavesSettings.dbSettings.directory)
+      if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
       LevelDBFactory.factory.open(dir, new Options)
     }
 
     val environment: Environment = {
       val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-      val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
+      val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
       new WavesEnvironment(
         AddressScheme.current.chainId,
-        Coeval.raiseError(new NotImplementedError("tx is not implemented")),
+        Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
         Coeval(state.height),
-        state
+        state,
+        Coeval.raiseError(new NotImplementedError("`this` is not implemented"))
       )
     }
 

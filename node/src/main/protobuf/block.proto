@@ -1,0 +1,21 @@
+// Transactions
+syntax = "proto3";
+option java_package = "com.wavesplatform.protobuf.block";
+import "transaction.proto";
+
+message Block {
+    message Header {
+        int32 chain_id = 1;
+        bytes reference = 2;
+        int64 base_target = 3;
+        bytes generation_signature = 4;
+        repeated uint32 feature_votes = 5;
+        int64 timestamp = 6;
+        int32 version = 7;
+        bytes generator = 8;
+    }
+
+    Header header = 1;
+    bytes signature = 2;
+    repeated SignedTransaction transactions = 3;
+}

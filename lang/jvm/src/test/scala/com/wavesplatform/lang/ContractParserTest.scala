@@ -7,12 +7,12 @@ import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  private def parse(x: String): CONTRACT = Parser.parseContract(x) match {
+  private def parse(x: String): DAPP = Parser.parseContract(x) match {
     case Success(r, _)            => r
     case e: Failure[Char, String] => catchParseError(x, e)
   }
@@ -68,7 +68,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List.empty,
       List(
@@ -101,7 +101,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List(
         FUNC(
@@ -145,7 +145,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         | }
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List(
         FUNC(
@@ -185,4 +185,93 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |""".stripMargin
     parse(code)
   }
+
+  property("parse directives as comments (ignore)") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        |
+        |""".stripMargin
+    parse(code) shouldBe DAPP(
+      AnyPos,
+      List.empty,
+      List(
+        ANNOTATEDFUNC(
+          AnyPos,
+          List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
+          Expressions.FUNC(
+            AnyPos,
+            PART.VALID(AnyPos, "bar"),
+            List((PART.VALID(AnyPos, "arg"), List(PART.VALID(AnyPos, "Baz")))),
+            CONST_LONG(AnyPos, 3)
+          )
+        )
+      )
+    )
+  }
+
+  property("functions with comment after first body bracket") {
+    val code =
+      """
+        |
+        | #@Callable(i)
+        | func foo() = 42 + 42 - 1
+        |
+        | @Ann(x)
+        | func bar(arg:ArgType) = { # more comments
+        |   foo() # comment
+        | }
+        |
+        |""".stripMargin
+    parse(code)
+  }
+
+  property("disallow function declarations after annotated funcions.") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        | func baz(arg:Int) = {
+        |    4
+        | }
+        |""".stripMargin
+    Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
+  }
+
+  property("disallow value declarations after annotated funcions.") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        | let baz = 4
+        |
+        |""".stripMargin
+    Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
+  }
+
 }

@@ -11,7 +11,7 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject
 import org.iq80.leveldb.{DB, Options}
@@ -61,7 +61,7 @@ object LevelDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.decode(x).get))
+    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
@@ -71,7 +71,7 @@ object LevelDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
-    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.decode(x).get))
+    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
@@ -79,7 +79,7 @@ object LevelDBWriterBenchmark {
     protected val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
     private val wavesSettings: WavesSettings = {
       val config = loadConfig(ConfigFactory.parseFile(new File(benchSettings.networkConfigFile)))
-      WavesSettings.fromConfig(config)
+      WavesSettings.fromRootConfig(config)
     }
 
     AddressScheme.current = new AddressScheme {
@@ -87,15 +87,14 @@ object LevelDBWriterBenchmark {
     }
 
     private val rawDB: DB = {
-      val dir = new File(wavesSettings.dataDirectory)
-      if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dataDirectory}'")
+      val dir = new File(wavesSettings.dbSettings.directory)
+      if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Option[AssetId])]
+    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
-    val db =
-      new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
+    val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
 
     @TearDown
     def close(): Unit = {

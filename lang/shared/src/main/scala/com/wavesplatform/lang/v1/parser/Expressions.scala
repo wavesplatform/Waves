@@ -40,6 +40,16 @@ object Expressions {
   object PART {
     case class VALID[T](position: Pos, v: T)           extends PART[T]
     case class INVALID(position: Pos, message: String) extends PART[Nothing]
+
+    def toEither[T](part: PART[T]): Either[String, T] = part match {
+      case Expressions.PART.VALID(_, x)         => Right(x)
+      case Expressions.PART.INVALID(p, message) => Left(message)
+    }
+
+    def toOption[T](part: PART[T]): Option[T] = part match {
+      case Expressions.PART.VALID(_, x)         => Some(x)
+      case Expressions.PART.INVALID(p, message) => None
+    }
   }
 
   sealed trait Declaration extends Positioned {
@@ -74,7 +84,7 @@ object Expressions {
 
   case class INVALID(position: Pos, message: String) extends EXPR
 
-  case class CONTRACT(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
+  case class DAPP(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
 
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {

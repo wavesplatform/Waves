@@ -35,15 +35,15 @@ object Bindings {
     if (proofsEnabled) combine(commonPart, Map(proofsPart(tx.proofs)))
     else commonPart
   }
-  private def mapRecipient(r: Recipient) =
+  def mapRecipient(r: Recipient) =
     "recipient" -> (r match {
-      case Recipient.Alias(name) => CaseObj(aliasType.typeRef, Map("alias" -> name))
+      case Recipient.Alias(name) => CaseObj(aliasType, Map("alias" -> name))
       case x: Recipient.Address  => senderObject(x)
     })
 
   def assetPair(ap: APair): CaseObj =
     CaseObj(
-      assetPairType.typeRef,
+      assetPairType,
       Map(
         "amountAsset" -> fromOptionBV(ap.amountAsset),
         "priceAsset"  -> ap.priceAsset
@@ -54,16 +54,16 @@ object Bindings {
     CaseObj((o match {
       case OrdType.Buy  => buyType
       case OrdType.Sell => sellType
-    }).typeRef, Map.empty)
+    }), Map.empty)
 
   def buildPayment(mpmt: Option[Tx.Pmt]): CaseObj = mpmt match {
     case None => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
     case Some(pmt) =>
       CaseObj(
-        paymentType.typeRef,
+        paymentType,
         Map(
           "amount" -> CONST_LONG(pmt.amount),
-          "asset" -> (pmt.asset match {
+          "assetId" -> (pmt.asset match {
             case None                 => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
             case Some(asset: ByteStr) => CONST_BYTESTR(asset)
           })
@@ -74,7 +74,7 @@ object Bindings {
 
   def orderObject(ord: Ord, proofsEnabled: Boolean): CaseObj =
     CaseObj(
-      buildOrderType(proofsEnabled).typeRef,
+      buildOrderType(proofsEnabled),
       Map(
         "id"                -> ord.id,
         "sender"            -> senderObject(ord.sender),
@@ -93,19 +93,30 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress: Recipient.Address) =
+  def buildInvocation(
+                       caller:        Recipient.Address,
+                       callerPk:      ByteStr,
+                       payment:       Option[Pmt],
+                       dappAddress:   Recipient.Address,
+                       transactionId: ByteStr,
+                       fee:           Long,
+                       feeAssetId:    Option[ByteStr]
+                     ) =
     CaseObj(
-      invocationType.typeRef,
+      invocationType,
       Map(
         "caller"          -> mapRecipient(caller)._2,
-        "contractAddress" -> mapRecipient(contractAddress)._2,
-        "payment"         -> buildPayment(payment)
+        "callerPublicKey" -> callerPk,
+        "payment"         -> buildPayment(payment),
+        "transactionId"   -> transactionId,
+        "fee"             -> fee,
+        "feeAssetId"      -> feeAssetId
       )
     )
 
-  def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
+  def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType, Map("bytes" -> sender.bytes))
 
-  def contractTransfer(ct: ContractTransfer): CaseObj =
+  def scriptTransfer(ct: ScriptTransfer): CaseObj =
     transactionObject(
       Transfer(
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
@@ -125,13 +136,13 @@ object Bindings {
   def transactionObject(tx: Tx, proofsEnabled: Boolean): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
-        CaseObj(genesisTransactionType.typeRef, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
+        CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
       case Tx.Payment(p, amount, recipient) =>
-        CaseObj(buildPaymentTransactionType(proofsEnabled).typeRef,
+        CaseObj(buildPaymentTransactionType(proofsEnabled),
                 Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
       case Tx.Transfer(p, feeAssetId, assetId, amount, recipient, attachment) =>
         CaseObj(
-          buildTransferTransactionType(proofsEnabled).typeRef,
+          buildTransferTransactionType(proofsEnabled),
           combine(
             Map(
               "amount"     -> amount,
@@ -144,7 +155,7 @@ object Bindings {
         )
       case Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
-          buildIssueTransactionType(proofsEnabled).typeRef,
+          buildIssueTransactionType(proofsEnabled),
           combine(
             Map(
               "quantity"    -> quantity,
@@ -159,7 +170,7 @@ object Bindings {
         )
       case ReIssue(p, quantity, assetId, reissuable) =>
         CaseObj(
-          buildReissueTransactionType(proofsEnabled).typeRef,
+          buildReissueTransactionType(proofsEnabled),
           combine(Map(
                     "quantity"   -> quantity,
                     "assetId"    -> assetId,
@@ -169,49 +180,54 @@ object Bindings {
         )
       case Burn(p, quantity, assetId) =>
         CaseObj(
-          buildBurnTransactionType(proofsEnabled).typeRef,
+          buildBurnTransactionType(proofsEnabled),
           combine(Map(
                     "quantity" -> quantity,
                     "assetId"  -> assetId
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment) =>
+      case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
-          buildContractInvokationTransactionType(proofsEnabled).typeRef,
-          combine(Map(
-                    "contractAddress" -> mapRecipient(address)._2,
-                    "paymentInfo"     -> buildPayment(maybePayment)
-                  ),
-                  provenTxPart(p, proofsEnabled))
+          buildInvokeScriptTransactionType(proofsEnabled),
+          combine(
+            Map(
+              "dappAddress" -> mapRecipient(address)._2,
+              "payment"     -> buildPayment(maybePayment),
+              "feeAssetId"  -> feeAssetId,
+              "function"    -> funcName,
+              "args"        -> funcArgs
+            ),
+            provenTxPart(p, proofsEnabled)
+          )
         )
 
       case Lease(p, amount, recipient) =>
         CaseObj(
-          buildLeaseTransactionType(proofsEnabled).typeRef,
+          buildLeaseTransactionType(proofsEnabled),
           combine(Map("amount" -> amount), provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
         )
       case LeaseCancel(p, leaseId) =>
         CaseObj(
-          buildLeaseCancelTransactionType(proofsEnabled).typeRef,
+          buildLeaseCancelTransactionType(proofsEnabled),
           combine(Map(
                     "leaseId" -> leaseId,
                   ),
                   provenTxPart(p, proofsEnabled))
         )
       case CreateAlias(p, alias) =>
-        CaseObj(buildCreateAliasTransactionType(proofsEnabled).typeRef,
+        CaseObj(buildCreateAliasTransactionType(proofsEnabled),
                 combine(Map(
                           "alias" -> alias,
                         ),
                         provenTxPart(p, proofsEnabled)))
       case MassTransfer(p, assetId, transferCount, totalAmount, transfers, attachment) =>
         CaseObj(
-          buildMassTransferTransactionType(proofsEnabled).typeRef,
+          buildMassTransferTransactionType(proofsEnabled),
           combine(
             Map(
               "transfers" -> transfers
-                .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount))),
+                .map(bv => CaseObj(transfer, Map(mapRecipient(bv.recipient), "amount" -> bv.amount))),
               "assetId"       -> assetId,
               "transferCount" -> transferCount,
               "totalAmount"   -> totalAmount,
@@ -221,15 +237,15 @@ object Bindings {
           )
         )
       case SetScript(p, scriptOpt) =>
-        CaseObj(buildSetScriptTransactionType(proofsEnabled).typeRef, Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled))
+        CaseObj(buildSetScriptTransactionType(proofsEnabled), Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled))
       case SetAssetScript(p, assetId, scriptOpt) =>
         CaseObj(
-          buildSetAssetScriptTransactionType(proofsEnabled).typeRef,
+          buildSetAssetScriptTransactionType(proofsEnabled),
           combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled))
         )
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
-          buildSponsorFeeTransactionType(proofsEnabled).typeRef,
+          buildSponsorFeeTransactionType(proofsEnabled),
           combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled))
         )
       case Data(p, data) =>
@@ -242,13 +258,13 @@ object Bindings {
         }
 
         CaseObj(
-          buildDataTransactionType(proofsEnabled).typeRef,
-          combine(Map("data" -> data.map(e => CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING(e.key), "value" -> mapValue(e.value))))),
+          buildDataTransactionType(proofsEnabled),
+          combine(Map("data" -> data.map(e => CaseObj(dataEntryType, Map("key" -> CONST_STRING(e.key), "value" -> mapValue(e.value))))),
                   provenTxPart(p, proofsEnabled))
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(
-          buildExchangeTransactionType(proofsEnabled).typeRef,
+          buildExchangeTransactionType(proofsEnabled),
           combine(
             Map(
               "buyOrder"       -> orderObject(buyOrder, proofsEnabled),
@@ -263,4 +279,26 @@ object Bindings {
         )
     }
 
+  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
+    CaseObj(
+      assetType,
+      Map(
+        "totalAmount" -> sAInfo.totalAmount,
+        "decimals"    -> sAInfo.decimals.toLong,
+        "issuer"      -> sAInfo.issuer,
+        "reissuable"  -> sAInfo.reissuable,
+        "scripted"    -> sAInfo.scripted,
+        "sponsored"   -> sAInfo.sponsored
+      )
+    )
+
+  def buildLastBlockInfo(blockInf: BlockInfo) =
+    CaseObj(
+      blockInfo,
+      Map(
+        "timestamp"   -> blockInf.timestamp,
+        "height" -> blockInf.height.toLong,
+        "generationSignature" -> blockInf.generationSignature
+      )
+    )
 }

@@ -37,7 +37,7 @@ object ExtractInfo extends App with ScorexLogging {
   val benchSettings = Settings.fromConfig(ConfigFactory.load())
   val wavesSettings = {
     val config = loadConfig(ConfigFactory.parseFile(new File(args.head)))
-    WavesSettings.fromConfig(config)
+    WavesSettings.fromRootConfig(config)
   }
 
   AddressScheme.current = new AddressScheme {
@@ -45,20 +45,13 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   val db: DB = {
-    val dir = new File(wavesSettings.dataDirectory)
-    if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dataDirectory}'")
+    val dir = new File(wavesSettings.dbSettings.directory)
+    if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
     LevelDBFactory.factory.open(dir, new Options)
   }
 
   try {
-    val state = new LevelDBWriter(
-      db,
-      Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr),
-      wavesSettings.blockchainSettings.functionalitySettings,
-      100000,
-      2000,
-      120 * 60 * 1000
-    )
+    val state = new LevelDBWriter(db, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {

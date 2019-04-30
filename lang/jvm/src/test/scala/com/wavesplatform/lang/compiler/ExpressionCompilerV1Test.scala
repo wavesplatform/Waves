@@ -7,15 +7,15 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -50,9 +50,8 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
   }
 
   treeTypeTest("GETTER")(
-    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType),
-                          varDefs = Map("p"                -> (pointType.typeRef -> "Test variable")),
-                          functionDefs = Map.empty),
+    ctx =
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> (pointType -> "Test variable")), functionDefs = Map.empty),
     expr = Expressions.GETTER(
       AnyPos,
       ref = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
@@ -62,19 +61,17 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
   )
 
   treeTypeTest("REF(OBJECT)")(
-    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType),
-                          varDefs = Map("p"                -> (pointType.typeRef -> "Test variable")),
-                          functionDefs = Map.empty),
+    ctx =
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> (pointType -> "Test variable")), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
-    expectedResult = Right((REF("p"), pointType.typeRef))
+    expectedResult = Right((REF("p"), pointType))
   )
 
   treeTypeTest("REF x = y")(
-    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType),
-                          varDefs = Map("p"                -> (pointType.typeRef -> "Test variable")),
-                          functionDefs = Map.empty),
+    ctx =
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> (pointType -> "Test variable")), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
-    expectedResult = Right((REF("p"), pointType.typeRef))
+    expectedResult = Right((REF("p"), pointType))
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
@@ -104,7 +101,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.PART.VALID(AnyPos, getElement.name),
       List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "lpa")), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = Right((FUNCTION_CALL(getElement.header, List(REF("lpa"), CONST_LONG(1))), Common.pointTypeA.typeRef))
+    expectedResult = Right((FUNCTION_CALL(getElement.header, List(REF("lpa"), CONST_LONG(1))), Common.pointTypeA))
   )
 
   treeTypeTest("union getElement")(

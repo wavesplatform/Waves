@@ -6,7 +6,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.pureEvalContext
 import com.wavesplatform.lang.v1.compiler.Terms._

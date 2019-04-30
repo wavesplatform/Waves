@@ -4,6 +4,7 @@ import cats.Monad
 import cats.implicits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
@@ -53,9 +54,10 @@ object EvaluatorV1 {
 
   private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] = {
     evalExpr(expr).flatMap { exprResult =>
-      exprResult.asInstanceOf[CaseObj].fields.get(field) match {
+      val fields = exprResult.asInstanceOf[CaseObj].fields
+fields.get(field) match {
         case Some(f) => f.pure[EvalM]
-        case None    => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$field' not found")
+        case None    => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$field' not found amongst ${fields.keys}")
       }
     }
   }
@@ -72,7 +74,7 @@ object EvaluatorV1 {
               .traverse[EvalM, EVALUATED](evalExpr)
               .flatMap { args =>
                 val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
-                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l("(arg)" + argName)))
+                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l(s"$argName")))
                 }
                 local {
                   set(LoggedEvaluationContext.Lenses.lets.set(ctx)(letDefsWithArgs)).flatMap(_ => evalExpr(func.ev))
@@ -91,10 +93,10 @@ object EvaluatorV1 {
           header match {
             case FunctionHeader.User(typeName) =>
               types.get(ctx).get(typeName).collect {
-                case t @ CaseType(_, fields) =>
+                case t @ CASETYPEREF(_, fields) =>
                   args
                     .traverse[EvalM, EVALUATED](a => evalExpr(a))
-                    .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
+                    .map(argValues => CaseObj(t, fields.map(_._1).zip(argValues).toMap))
               }
             case _ => None
           }
@@ -116,9 +118,18 @@ object EvaluatorV1 {
     case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
   }
 
-  def applywithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
+  def applyWithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
     val log = ListBuffer[LogItem]()
     val r   = ap(c, expr, (str: String) => (v: LetExecResult) => log.append((str, v)))
+    (log.toList, r)
+  }
+
+  def applyWithLogging[A <: EVALUATED](
+    c:    Either[ExecutionError, EvaluationContext],
+    expr: EXPR
+  ): (Log, Either[ExecutionError, A]) = {
+    val log = ListBuffer[LogItem]()
+    val r = c.flatMap(ap(_, expr, (str: String) => (v: LetExecResult) => log.append((str, v))))
     (log.toList, r)
   }
 
@@ -131,6 +142,18 @@ object EvaluatorV1 {
     val res = evalC.run(lec).value._2
     (log.toList, res)
   }
+
+  def evalWithLogging(
+    ctx:   Either[ExecutionError, EvaluationContext],
+    evalC: EvalM[EVALUATED]
+  ): (Log, Either[ExecutionError, EVALUATED]) = {
+    val log = ListBuffer[LogItem]()
+    val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
+    val res = ctx.map(LoggedEvaluationContext(llc, _))
+      .flatMap(evalC.run(_).value._2)
+    (log.toList, res)
+  }
+
   private def ap[A <: EVALUATED](c: EvaluationContext, expr: EXPR, llc: LetLogCallback): Either[ExecutionError, A] = {
     val lec = LoggedEvaluationContext(llc, c)
     evalExpr(expr)

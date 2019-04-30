@@ -49,11 +49,11 @@ object CompilationError {
   }
 
   final case class BadFunctionSignatureSameArgNames(start: Int, end: Int, name: String) extends CompilationError {
-    val message = s"Function'$name' declared with duplicating argument names"
+    val message = s"Function '$name' declared with duplicating argument names"
   }
 
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
-    val message = s"Can't find a function '$name'(${argTypes.mkString(", ")})"
+    val message = s"Can't find a function '$name'(${argTypes.mkString(", ")}) or it is @Callable"
   }
 
   final case class OverloadNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
