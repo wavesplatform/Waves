@@ -21,10 +21,10 @@ private[mining] object ScriptRunsLegacy extends ScorexLogging {
       blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)
     }
 
-    lazy val oldRulesRuns: Int = calculateForTransaction(blockchain, tx)
+    val oldRulesRuns: Int = calculateForTransaction(blockchain, tx)
     if (diff.scriptsRun != oldRulesRuns) {
       lazy val message = s"$tx script runs ${diff.scriptsRun} not equals to legacy $oldRulesRuns, ride4dapps = $ride4Dapps"
-      if (ride4Dapps) log.warn(message)
+      if (ride4Dapps) log.trace(message)
       else throw new AssertionError(message)
     }
   }
