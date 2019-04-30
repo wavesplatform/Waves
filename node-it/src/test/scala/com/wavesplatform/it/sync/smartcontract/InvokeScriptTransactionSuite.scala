@@ -1,11 +1,12 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.state._
@@ -23,45 +24,29 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   private val caller   = pkByAddress(secondAddress)
 
   test("setup contract account with waves") {
-    val tx =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = sender.privateKey,
-          recipient = contract,
-          amount = 5.waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-
-    val transferId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
+    sender
+      .transfer(
+        sender.address,
+        recipient = contract.address,
+        assetId = None,
+        amount = 5.waves,
+        fee = minFee,
+        waitForTx = true
+      )
       .id
-    nodes.waitForHeightAriseAndTxPresent(transferId)
   }
 
   test("setup caller account with waves") {
-    val tx =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = sender.privateKey,
-          recipient = caller,
-          amount = 5.waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-
-    val transferId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
+    sender
+      .transfer(
+        sender.address,
+        recipient = contract.address,
+        assetId = None,
+        amount = 5.waves,
+        fee = minFee,
+        waitForTx = true
+      )
       .id
-    nodes.waitForHeightAriseAndTxPresent(transferId)
   }
 
   test("set contract to contract account") {
@@ -87,17 +72,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         |
         """.stripMargin
-
-    val script = ScriptCompiler.compile(scriptText).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(contract, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
-
-    val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+    val script = ScriptCompiler.compile(scriptText).explicitGet()._1.bytes().base64
+    val setScriptId = sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true).id
 
     val acc0ScriptInfo = sender.addressScriptInfo(contract.address)
 
@@ -105,32 +81,21 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
     acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    val json = Json.parse(sender.get(s"/transactions/info/$setScriptId").getResponseBody)
-    (json \ "script").as[String].startsWith("base64:") shouldBe true
+    sender.transactionInfo(setScriptId).script.get.startsWith("base64:") shouldBe true
   }
 
   test("contract caller invokes a function on a contract") {
     val arg               = ByteStr(Array(42: Byte))
-    val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTESTR(arg)))
 
-    val tx =
-      InvokeScriptTransaction
-        .selfSigned(
-          sender = caller,
-          dappAddress = contract,
-          fc = Some(fc),
-          p = Seq(),
-          timestamp = System.currentTimeMillis(),
-          fee = 1.waves,
-          feeAssetId = Waves
-        )
-        .explicitGet()
-
-    val invokeScriptId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
+    val invokeScriptId = sender.invokeScript(
+      caller.address,
+      contract.address,
+      func = Some("foo"),
+      args = List(CONST_BYTESTR(arg)),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
 
     sender.getData(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
     sender.getData(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
@@ -138,25 +103,15 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
   test("contract caller invokes a default function on a contract") {
 
-    val tx =
-      InvokeScriptTransaction
-        .selfSigned(
-          sender = caller,
-          dappAddress = contract,
-          fc = None,
-          p = Seq(),
-          timestamp = System.currentTimeMillis(),
-          fee = 1.waves,
-          feeAssetId = Waves
-        )
-        .explicitGet()
 
-    val invokeScriptId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
-
+    val invokeScriptId = sender.invokeScript(
+      caller.address,
+      contract.address,
+      func = None,
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
     sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "b")
     sender.getData(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
   }

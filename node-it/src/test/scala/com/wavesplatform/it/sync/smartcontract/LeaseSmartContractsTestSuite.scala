@@ -23,8 +23,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val (balance1, eff1) = miner.accountBalances(acc0.address)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
+    val txId = sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee, waitForTx = true).id
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
@@ -40,16 +39,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         }
         """.stripMargin
 
-    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(acc0, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
-
-    val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json())
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
+    val setScriptId = sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
       LeaseTransactionV2
@@ -70,9 +61,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
     val leasingId =
-      sender.signedBroadcast(signedLeasing.json()).id
-
-    nodes.waitForHeightAriseAndTxPresent(leasingId)
+      sender.signedBroadcast(signedLeasing.json(), waitForTx = true).id
 
     miner.assertBalances(firstAddress,
                          balance1 + 10 * transferAmount - (minFee + setScriptFee + 0.2.waves),
@@ -98,9 +87,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
 
     val leasingCancelId =
-      sender.signedBroadcast(signedLeasingCancel.json()).id
-
-    nodes.waitForHeightAriseAndTxPresent(leasingCancelId)
+      sender.signedBroadcast(signedLeasingCancel.json(), waitForTx = true).id
 
     miner.assertBalances(firstAddress,
                          balance1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves),
