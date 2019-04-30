@@ -61,7 +61,7 @@ case class InvokeScriptRequest(sender: String,
                                  example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
                                  required = false
                                ) feeAssetId: Option[String],
-                               @(ApiModelProperty @field)(required = true) call: InvokeScriptRequest.FunctionCallPart,
+                               @(ApiModelProperty @field)(required = false) call: Option[InvokeScriptRequest.FunctionCallPart],
                                @(ApiModelProperty @field)(required = true) payment: Seq[InvokeScriptTransaction.Payment],
                                @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dappAddress: String,
                                timestamp: Option[Long] = None)
@@ -76,7 +76,7 @@ case class SignedInvokeScriptRequest(
       required = false
     ) feeAssetId: Option[String],
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dappAddress: String,
-    @(ApiModelProperty @field)(required = true) call: InvokeScriptRequest.FunctionCallPart,
+    @(ApiModelProperty @field)(required = false) call: Option[InvokeScriptRequest.FunctionCallPart],
     @(ApiModelProperty @field)(required = true) payment: Option[Seq[InvokeScriptTransaction.Payment]],
     @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
     @(ApiModelProperty @field)(required = true) proofs: List[String])
@@ -91,7 +91,7 @@ case class SignedInvokeScriptRequest(
       t <- InvokeScriptTransaction.create(
         _sender,
         _dappAddress,
-        InvokeScriptRequest.buildFunctionCall(call),
+        call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,

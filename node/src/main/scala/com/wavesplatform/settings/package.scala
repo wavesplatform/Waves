@@ -43,7 +43,7 @@ package object settings {
     loadConfig(Some(userConfig))
   }
 
-  def loadConfig(maybeUserConfig: Option[Config]) = {
+  def loadConfig(maybeUserConfig: Option[Config]): Config = {
     val directoryDefaults = ConfigFactory
       .parseString(s"waves.directory = $defaultDirectory")
 

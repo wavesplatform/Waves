@@ -11,10 +11,11 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.utils.CloseableIterator
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
 
@@ -93,8 +94,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    addressTransactionsFromDiff(inner, maybeDiff)(address, types, count, fromId)
+  override def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
+    addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -102,16 +103,14 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = {
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keys
-      .map { id =>
-        diff.transactions(id)._2
-      }
-      .collect { case lt: LeaseTransaction if predicate(lt) => lt }
-      .toSet
-    val fromInner = inner.allActiveLeases(predicate).filterNot(ltx => canceled.keySet.contains(ltx.id()))
-    fromDiff ++ fromInner
+    val fromDiff = active.keysIterator
+      .map(id => diff.transactions(id)._2)
+      .collect { case lt: LeaseTransaction => lt }
+
+    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+    CloseableIterator.seq(fromDiff, fromInner)
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
@@ -122,6 +121,21 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
     inner.collectLposPortfolios(pf) ++ b.result()
   }
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = {
+    diff.scriptResults
+      .get(txId)
+      .toRight(GenericError("InvokeScript result not found"))
+      .orElse(inner.invokeScriptResult(txId))
+  }
+
+  /* override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
+    val typeSet = ofTypes.toSet
+    val diffTransactions = diff.transactions.valuesIterator
+      .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
+
+    CloseableIterator.seq(diffTransactions, inner.transactionsIterator(ofTypes, reverse))
+  } */
 
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 

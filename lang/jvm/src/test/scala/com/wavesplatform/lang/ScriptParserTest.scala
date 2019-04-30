@@ -1267,11 +1267,15 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
                                       BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), DIV_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
                                       MUL_OP,
                                       REF(AnyPos, PART.VALID(AnyPos, "c")))
+
     parse("a<b==c>=d") shouldBe BINARY_OP(
       AnyPos,
-      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), LT_OP, REF(AnyPos, PART.VALID(AnyPos, "a"))),
-      EQ_OP,
-      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "c")), GE_OP, REF(AnyPos, PART.VALID(AnyPos, "d")))
+      BINARY_OP(AnyPos,
+                BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), EQ_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))),
+                LT_OP,
+                REF(AnyPos, PART.VALID(AnyPos, "a"))),
+      GE_OP,
+      REF(AnyPos, PART.VALID(AnyPos, "d"))
     )
   }
 

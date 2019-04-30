@@ -3,14 +3,14 @@ package com.wavesplatform.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.script.v1.ExprScript
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.state.diffs._
+import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
@@ -119,6 +119,65 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
            |  case _ => false
            |}""".stripMargin,
       ) shouldBe 'right
+  }
+
+  property("binary operations priority && ||") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        | let a = true
+        | let b = true
+        | let c = false
+        | let d = true
+        |
+        | a && b || c && d
+      """.stripMargin
+
+    val resultExpr = LET_BLOCK(
+      LET("a", TRUE),
+      LET_BLOCK(
+        LET("b", TRUE),
+        LET_BLOCK(
+          LET("c", FALSE),
+          LET_BLOCK(
+            LET("d", TRUE),
+            IF(
+              IF(
+                REF("a"),
+                REF("b"),
+                FALSE
+              ),
+              TRUE,
+              IF(
+                REF("c"),
+                REF("d"),
+                FALSE
+              )
+            )
+          )
+        )
+      )
+    )
+    ScriptCompiler.compile(script) shouldBe Right((ExprScript(V3, resultExpr).explicitGet(), 35))
+  }
+
+  property("binary operations priority == > <") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        | let a = 1
+        | let b = 2
+        |
+        | a > b == true
+      """.stripMargin
+
+    ScriptCompiler.compile(script) shouldBe 'left
   }
 
   private val expectedExpr = LET_BLOCK(

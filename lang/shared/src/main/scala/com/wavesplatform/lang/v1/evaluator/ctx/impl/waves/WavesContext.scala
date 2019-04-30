@@ -296,6 +296,7 @@ object WavesContext {
     }
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
+    val lastBlockCoeval: Coeval[Either[String, CaseObj]] = Coeval.evalOnce(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
     val thisCoeval: Coeval[Either[String, CaseObj]]      = Coeval.evalOnce(Right(Bindings.senderObject(env.tthis)))
 
     val anyTransactionType =
@@ -338,6 +339,23 @@ object WavesContext {
         case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
           env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(CONST_LONG)
 
+        case _ => ???
+      }
+
+    val assetInfoF: BaseFunction =
+      NativeFunction(
+        "assetInfo",
+        100,
+        GETASSETINFOBYID,
+        optionAsset,
+        "get asset info by id",
+        ("id", BYTESTR, "asset Id")
+      ) {
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          env.assetInfoById(id.arr).map(buildAssetInfo(_)) match {
+            case Some(result) => Right(result)
+            case _            => Right(unit)
+          }
         case _ => ???
       }
 
@@ -385,7 +403,8 @@ object WavesContext {
       3 -> {
         val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
           ("Sell", ((sellType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
+          ("lastBlock", ((blockInfo, "Last block info"), LazyVal(EitherT(lastBlockCoeval))))
         )
         val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
@@ -418,7 +437,7 @@ object WavesContext {
 
     CTX(
       types ++ (if (version == V3) {
-                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType)
+                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType, blockInfo)
                 } else List.empty),
       commonVars ++ vars(version.id),
       functions ++ (if (version == V3) {
@@ -436,7 +455,7 @@ object WavesContext {
                         getBinaryByIndexF,
                         getStringByIndexF,
                         addressFromStringF
-                      ).map(withExtract)
+                      ).map(withExtract) :+ assetInfoF
                     } else {
                       List()
                     })

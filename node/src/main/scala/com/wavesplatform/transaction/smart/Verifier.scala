@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.metrics._
@@ -200,7 +201,11 @@ object Verifier extends ScorexLogging {
     val (execLog, execResult) = result
     log.debug(s"Script for $id evaluated to $execResult")
     execLog.foreach {
-      case (k, Right(v))  => log.debug(s"Evaluated `$k` to $v")
+      case (k, Right(v))  => log.debug(s"Evaluated `$k` to ")
+        v match {
+          case obj: EVALUATED => TermPrinter.print(s => log.debug(s), obj)
+          case a              => log.debug(a.toString)
+        }
       case (k, Left(err)) => log.debug(s"Failed to evaluate `$k`: $err")
     }
     result

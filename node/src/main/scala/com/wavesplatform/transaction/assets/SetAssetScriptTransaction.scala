@@ -50,13 +50,13 @@ case class SetAssetScriptTransaction private (chainId: Byte,
         asset.id.arr,
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp),
-        Deser.serializeOption(script)(s => s.bytes().arr)
+        Deser.serializeOptionOfArray(script)(s => s.bytes().arr)
       )
     )
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def checkedAssets(): Seq[Asset] = Seq(asset)
+  override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
   override def version: Byte               = 1
 }
 

@@ -278,15 +278,17 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case lease: LeaseTransaction =>
         import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
       case t => t.json()
     }
   }
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = (concurrent.blocking(blockchain.aliasesOfAddress(address) :+ address)).toSet
+      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 
       /**
         * Produces compact representation for large transactions by stripping unnecessary data.
