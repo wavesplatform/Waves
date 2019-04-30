@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
@@ -9,10 +8,8 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
-import com.wavesplatform.transaction.{Asset, DataTransaction}
+import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import scorex.crypto.encode.Base64
 
@@ -208,7 +205,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     val buyer   = acc0
     val seller  = acc1
     val matcher = acc2
-    sender.transfer(buyer.address, seller.address, someAssetAmount / 2, minFee + smartFee, Some(exchAsset), waitForTx = true)
+    sender.transfer(buyer.address, seller.address, someAssetAmount / 2, minFee + smartFee, Some(exchAsset),version = 2, waitForTx = true)
 
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc1)
@@ -219,53 +216,21 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         (mcontr, matcher),
       )
 
-      val assetDescription = "my asset description"
-
-      val IssueTx: IssueTransactionV2 = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          sender = buyer,
-          name = "myasset".getBytes(),
-          description = assetDescription.getBytes(),
+      val smartAssetId: ByteStr = ByteStr.decodeBase58(
+        sender.issue(
+          sourceAddress = buyer.address,
+          name = "ScriptedAsset",
+          description = "asset with script = \"true\"",
           quantity = someAssetAmount,
           decimals = 8,
           reissuable = true,
+          script = Some(scriptBase64),
           fee = issueFee + smartFee,
-          script = None,
-          timestamp = System.currentTimeMillis()
-        )
-        .right
+          waitForTx = true)
+          .id)
         .get
 
-      val scriptV2 = ScriptCompiler.compile("""
-                                              |func isTrue() = true
-                                              |isTrue()
-                                            """.stripMargin).explicitGet()._1
-
-      val IssueTxV2: IssueTransactionV2 = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          sender = buyer,
-          name = "scriptedasset".getBytes,
-          description = assetDescription.getBytes,
-          quantity = someAssetAmount,
-          decimals = 8,
-          reissuable = true,
-          script = Some(scriptV2),
-          fee = issueFee + smartFee,
-          timestamp = System.currentTimeMillis()
-        )
-        .right
-        .get
-
-      val assetId      = IssueTx.id()
-      val smartAssetId = IssueTxV2.id()
-
-      sender.postJson("/transactions/broadcast", IssueTx.json())
-      sender.postJson("/transactions/broadcast", IssueTxV2.json())
-
-      nodes.waitForHeightAriseAndTxPresent(assetId.base58)
-      nodes.waitForHeightAriseAndTxPresent(smartAssetId.base58)
+      val assetId = ByteStr.decodeBase58(exchAsset).get
 
       val sellPrice = (0.50 * Order.PriceConstant).toLong
       for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
@@ -278,15 +243,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
         var assetBalanceBefore: Long = 0l
 
-        if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(assetId)) {
-          assetBalanceBefore = sender.assetBalance(seller.address, assetId.base58).balance
-          sender.transfer(buyer.address, seller.address, 300000, minFee + smartFee, Some(assetId.base58), waitForTx = true)
-        } else if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(smartAssetId)) {
-          assetBalanceBefore = sender.assetBalance(seller.address, smartAssetId.base58).balance
-          sender.transfer(buyer.address, seller.address, 300000, minFee + 2 * smartFee, Some(smartAssetId.base58), waitForTx = true)
+        (matcherFeeOrder1, matcherFeeOrder2) match {
+          case (Waves, IssuedAsset(issuedAssetId)) =>
+            assetBalanceBefore = sender.assetBalance(seller.address, issuedAssetId.base58).balance
+            sender.transfer(buyer.address, seller.address, 300000, minFee + 2*smartFee, Some(issuedAssetId.base58), version = 2, waitForTx = true)
+          case _ =>
         }
 
-        val (buy, sell) = orders(pair, o1ver, o2ver, matcherFee, ntpTime, matcherFeeOrder1, matcherFeeOrder2, buyer, seller, matcher)
+        val (buy, sell) = orders(pair, o1ver, o2ver, matcherFee, ntpTime, buyer, seller, matcher, matcherFeeOrder1, matcherFeeOrder2)
 
         val amount         = math.min(buy.amount, sell.amount)
         val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount).toLong
@@ -306,13 +270,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
           .explicitGet()
           .json()
 
-        val txId = sender.signedBroadcast(tx).id
-        nodes.waitForHeightAriseAndTxPresent(txId)
+        sender.signedBroadcast(tx,waitForTx = true)
 
-        if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(assetId)) {
-          sender.assetBalance(seller.address, assetId.base58).balance shouldBe buyMatcherFee - sellMatcherFee
-        } else if (matcherFeeOrder1 == Waves && matcherFeeOrder2 == IssuedAsset(smartAssetId)) {
-          sender.assetBalance(seller.address, smartAssetId.base58).balance shouldBe buyMatcherFee - sellMatcherFee
+        (matcherFeeOrder1, matcherFeeOrder2) match {
+          case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == assetId =>
+            sender.assetBalance(seller.address, issuedAssetId.base58).balance shouldBe assetBalanceBefore + (buyMatcherFee - sellMatcherFee) - amount
+          case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == smartAssetId =>
+            sender.assetBalance(seller.address, issuedAssetId.base58).balance shouldBe assetBalanceBefore + (buyMatcherFee - sellMatcherFee)
+          case _ =>
         }
       }
     }
