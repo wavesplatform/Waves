@@ -16,7 +16,7 @@ import com.wavesplatform.db._
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
-import com.wavesplatform.matcher.history.OrderHistoryActor
+import com.wavesplatform.matcher.history.HistoryRouter
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, MatcherModel, OrderBook, OrderValidator}
@@ -193,7 +193,9 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private lazy val orderDb = OrderDB(settings, db)
 
-  private lazy val orderHistoryActor = context.actorSystem.actorOf(OrderHistoryActor.props(context.blockchain, settings.postgresConnection), "orderHistory")
+  private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
+    context.actorSystem.actorOf(HistoryRouter.props(context.blockchain, settings.postgresConnection, orderHistorySettings), "history-router")
+  }
 
   private lazy val addressActors =
     context.actorSystem.actorOf(
@@ -211,7 +213,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
               matcherQueue.storeEvent
             )),
-          orderHistoryActor
+          historyRouter
         )),
       "addresses"
     )

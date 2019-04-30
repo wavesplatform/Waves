@@ -11,7 +11,9 @@ import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.matcher.settings.DeviationsSettings._
 import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{OrderFeeSettings, _}
+import com.wavesplatform.matcher.settings.OrderHistorySettings._
 import com.wavesplatform.matcher.settings.OrderRestrictionsSettings._
+import com.wavesplatform.matcher.settings.PostgresConnection._
 import com.wavesplatform.settings.utils.ConfigOps._
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
@@ -49,7 +51,8 @@ case class MatcherSettings(account: String,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            allowedAssetPairs: Set[AssetPair],
                            allowOrderV3: Boolean,
-                           postgresConnection: PostgresConnection)
+                           postgresConnection: PostgresConnection,
+                           orderHistory: Option[OrderHistorySettings])
 
 object MatcherSettings {
 
@@ -78,6 +81,7 @@ object MatcherSettings {
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
       errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
     )
+
     val actorResponseTimeout         = config.as[FiniteDuration]("actor-response-timeout")
     val dataDirectory                = config.as[String]("data-directory")
     val journalDirectory             = config.as[String]("journal-directory")
@@ -107,7 +111,8 @@ object MatcherSettings {
 
     val allowOrderV3 = config.as[Boolean]("allow-order-v3")
 
-    val postgresConnection = PostgresConnection("localhost", 5435, "postgres", "docker", "org.postgresql.ds.PGSimpleDataSource")
+    val postgresConnection = config.as[PostgresConnection]("postgres")
+    val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
       account,
@@ -136,7 +141,8 @@ object MatcherSettings {
       orderRestrictions,
       allowedAssetPairs,
       allowOrderV3,
-      postgresConnection
+      postgresConnection,
+      orderHistory
     )
   }
 }

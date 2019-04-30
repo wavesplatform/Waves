@@ -19,13 +19,21 @@ object MatcherModel {
     (BigDecimal.valueOf(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
   }
 
-  def toNormalized(value: Double, blockchain: Blockchain, pair: AssetPair): Long = {
-    val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
-    toNormalized(value, amountAssetDecimals, priceAssetDecimals)
-  }
-
   def fromNormalized(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double = {
     (BigDecimal.valueOf(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+  }
+
+  def denormalizeAmountAndFee(value: Long, blockchain: Blockchain, pair: AssetPair): Double = {
+    fromNormalized(value, -getAssetDecimals(blockchain, pair.amountAsset), -8)
+  }
+
+  def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Byte): Double = {
+    fromNormalized(value, -amountAssetDecimals, -8)
+  }
+
+  def denormalizePrice(value: Long, blockchain: Blockchain, pair: AssetPair): Double = {
+    val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
+    fromNormalized(value, amountAssetDecimals, priceAssetDecimals)
   }
 
   def getAssetDecimals(blockchain: Blockchain, asset: Asset): Int = {

@@ -2,6 +2,8 @@ package com.wavesplatform.matcher.history
 
 object DBRecords {
 
+  sealed trait Record
+
   case class OrderRecord(id: String,
                          sender: String,
                          senderPublicKey: String,
@@ -14,7 +16,9 @@ object DBRecords {
                          expiration: Long,
                          fee: Double,
                          created: Long)
+      extends Record
 
-  case class OrderEventRecord(orderId: String, eventType: Byte, timestamp: Long, price: Double, filled: Double, totalFilled: Double, status: Byte)
+  case class EventRecord(orderId: String, eventType: Byte, timestamp: Long, price: Double, filled: Double, totalFilled: Double, status: Byte)
+      extends Record
 
 }

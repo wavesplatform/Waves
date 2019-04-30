@@ -3,7 +3,7 @@ package com.wavesplatform.matcher
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.history.OrderHistoryActor
+import com.wavesplatform.matcher.history.HistoryRouter
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.transaction.Asset
@@ -16,7 +16,7 @@ import scala.collection.mutable
 class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
                        settings: MatcherSettings,
                        addressActorProps: Address => Props,
-                       orderHistoryActor: ActorRef)
+                       historyRouter: Option[ActorRef])
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
@@ -48,29 +48,28 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
     handler.forward(msg)
   }
 
+  import HistoryRouter._
+
   override def receive: Receive = {
+
     case Envelope(address, cmd) =>
       forward(address, cmd)
 
     case e @ Events.OrderAdded(lo, timestamp) =>
       forward(lo.order.sender, e)
-      orderHistoryActor ! OrderHistoryActor.SaveOrder(lo, timestamp)
+      historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
 
     case e @ Events.OrderExecuted(submitted, counter, timestamp) =>
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) {
         forward(counter.order.sender, e)
       }
+      if (e.submittedRemainingAmount == 0) historyRouter foreach { _ ! SaveOrder(submitted, timestamp) } // handle the case when the order is filled right after placing
+      historyRouter foreach { _ ! SaveEvent(e) }
 
-      // handle the case when the order is filled right after placing
-      if (e.executedAmount == e.submitted.order.amount)
-        orderHistoryActor ! OrderHistoryActor.SaveOrder(submitted, timestamp)
-
-      orderHistoryActor ! OrderHistoryActor.SaveEvent(e, submitted, timestamp)
-
-    case e @ Events.OrderCanceled(lo, _, timestamp) =>
+    case e @ Events.OrderCanceled(lo, _, _) =>
       forward(lo.order.sender, e)
-      orderHistoryActor ! OrderHistoryActor.SaveEvent(e, lo, timestamp)
+      historyRouter foreach { _ ! SaveEvent(e) }
 
     case Terminated(child) =>
       val addressString = child.path.name

@@ -96,7 +96,7 @@ class ReservedBalanceSpecification
               _ => Future.failed(new IllegalStateException("Should not be used in the test"))
             )
         ),
-        system.actorOf(Props.empty)
+        None
       )
     ))
 
