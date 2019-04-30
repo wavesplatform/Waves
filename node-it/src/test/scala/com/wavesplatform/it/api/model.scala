@@ -121,30 +121,25 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
-case class StateChangeResponse(data: Seq[DataResponse], transfers: Seq[TransfersInfoRresponse])
-object StateChangeResponse{
-
-  implicit  val dataResponse: Format[DataResponse] = Json.format[DataResponse]
-  implicit  val transfersInfoRresponse: Format[TransfersInfoRresponse] = Json.format[TransfersInfoRresponse]
-  implicit val stateChangeResponse = Json.reads[StateChangeResponse]
+case class StateChangeResponse(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
+object StateChangeResponse {
+  implicit val stateChangeResponseFormat = Json.format[StateChangeResponse]
 }
 
 case class DataResponse(`type`: String, value: Long, key: String)
-object dataResponse{
-  implicit  val dataResponse: Format[DataResponse] = Json.format
+object DataResponse {
+  implicit val dataResponseFormat: Format[DataResponse] = Json.format
 }
 
-case class TransfersInfoRresponse(address: String, asset: Option[String], amount: Long)
-object transfersInfoRresponse{
-
+case class TransfersInfoResponse(address: String, asset: Option[String], amount: Long)
+object TransfersInfoResponse {
   implicit val assetIdReads: Reads[Option[String]] = Reads {
     case JsString(str) => JsSuccess(Some(str))
-    case JsNull         => JsSuccess(None)
-    case _              => JsError("Unexpected value")
+    case JsNull        => JsSuccess(None)
+    case _             => JsError("Unexpected value")
   }
 
-  implicit  val transfersInfoRresponse: Format[TransfersInfoRresponse] = Json.format
-
+  implicit val transfersInfoResponseFormat: Format[TransfersInfoResponse] = Json.format
 }
 
 case class ExchangeTransaction(`type`: Int,
@@ -232,8 +227,6 @@ case class MessageMatcherResponse(message: String)
 object MessageMatcherResponse {
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 }
-
-
 
 case class OrderbookHistory(id: String,
                             `type`: String,
