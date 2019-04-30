@@ -32,6 +32,7 @@ object MatcherDefaultConfig {
                                      |  order-match-tx-fee = 300000
                                      |  blacklisted-assets = ["$ForbiddenAssetId"]
                                      |  balance-watching.enable = yes
+                                     |  snapshots-interval = 10
                                      |  rest-order-limit=$orderLimit
                                      |}""".stripMargin)
 

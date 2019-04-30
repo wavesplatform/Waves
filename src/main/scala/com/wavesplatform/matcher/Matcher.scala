@@ -147,11 +147,11 @@ class Matcher(actorSystem: ActorSystem,
           log.error(s"Can't start matcher: $msg")
           forceStopApplication(ErrorStartingMatcher)
 
-        case Right((self, oldestSnapshotOffset)) =>
-          currentOffset = oldestSnapshotOffset
+        case Right((self, processedOffset)) =>
+          currentOffset = processedOffset
           snapshotsRestore.trySuccess(())
           matcherQueue.startConsume(
-            oldestSnapshotOffset + 1,
+            processedOffset + 1,
             eventWithMeta => {
               log.debug(s"Consumed $eventWithMeta")
 
@@ -273,7 +273,7 @@ class Matcher(actorSystem: ActorSystem,
   private def waitSnapshotsRestored(timeout: FiniteDuration): Future[Unit] = {
     val failure = Promise[Unit]()
     actorSystem.scheduler.scheduleOnce(timeout) {
-      failure.failure(new TimeoutException("Can't restore snapshots in time"))
+      failure.failure(new TimeoutException(s"Can't restore snapshots in ${timeout.toSeconds} seconds"))
     }
 
     Future.firstCompletedOf[Unit](List(snapshotsRestore.future, failure.future))
@@ -290,7 +290,8 @@ class Matcher(actorSystem: ActorSystem,
 
     def loop(): Unit = {
       if (currentOffset >= lastQueueOffset) p.trySuccess(())
-      else if (deadline.isOverdue()) p.tryFailure(new TimeoutException("Can't process all events in time"))
+      else if (deadline.isOverdue())
+        p.tryFailure(new TimeoutException(s"Can't process all events in ${settings.matcherSettings.startEventsProcessingTimeout.toMinutes} minutes"))
       else actorSystem.scheduler.scheduleOnce(1.second)(loop())
     }
 
@@ -321,7 +322,7 @@ object Matcher extends ScorexLogging {
       Some(matcher)
     } catch {
       case NonFatal(e) =>
-        log.warn("Error starting matcher", e)
+        log.warn("Can't start matcher", e)
         forceStopApplication(ErrorStartingMatcher)
         None
     }
