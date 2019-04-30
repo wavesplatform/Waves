@@ -344,6 +344,12 @@ object AsyncHttpApi extends Assertions {
                  "version"  -> version))
     }
 
+    def debugStateChange(invokeScriptTransactionId: String): Future[StateChangeResponse] = {
+      val result = get(s"/debug/stateChanges?transactionId=$invokeScriptTransactionId")
+      result foreach (println)
+      result.as[StateChangeResponse]
+    }
+
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
 

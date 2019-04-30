@@ -96,9 +96,9 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |			then throw("Can't withdraw negative amount")
         |  else if (newAmount < 0)
         |			then throw("Not enough balance")
-        |			else ScriptResult(
-        |					WriteSet([DataEntry(currentKey, newAmount)]),
-        |					TransferSet([ScriptTransfer(i.caller, amount, unit)])
+        |			else  ScriptResult(
+        |					WriteSet([DataEntry(currentKey, newAmount)])
+        |					,TransferSet([ScriptTransfer(i.caller, amount, unit)])
         |				)
         |	}
         |
@@ -193,6 +193,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       .id
 
     nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
+
+    val x = sender.debugStateChange(invokeScriptId)
+
+    x.data.isEmpty shouldBe false
+    x.transfers.isEmpty shouldBe false
 
     val balanceAfter = sender.accountBalances(contract.address)._1
 
