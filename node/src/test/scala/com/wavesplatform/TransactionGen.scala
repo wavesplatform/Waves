@@ -74,6 +74,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     str <- validAliasStringGen
   } yield Alias.create(str.mkString).explicitGet()
 
+  val funcNameGen: Gen[String] = for {
+    length <- Gen.chooseNum(1, ContractLimits.MaxAnnotatedFunctionNameInBytes)
+    funcNameChars <- Gen.listOfN(length, alphaLowerChar)
+  } yield funcNameChars.mkString
+
   val invalidAliasStringGen: Gen[String] = for {
     length     <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
     aliasChars <- Gen.listOfN(length, invalidAliasAlphabetGen)
