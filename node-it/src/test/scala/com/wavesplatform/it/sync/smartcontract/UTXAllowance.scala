@@ -23,17 +23,17 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
   private def nodeB = nodes.last
 
   "create two nodes with scripted accounts and check UTX" in {
-    val accounts = List(nodeA, nodeB).map(sender => {
+    val accounts = List(nodeA, nodeB).map(i => {
 
-      val nodeAddress = sender.createAddress()
-      val acc         = KeyPair.fromSeed(sender.seed(nodeAddress)).right.get
+      val nodeAddress = i.createAddress()
+      val acc         = KeyPair.fromSeed(i.seed(nodeAddress)).right.get
 
-      val tx = sender.transfer(sender.address, nodeAddress, 10.waves, 0.005.waves, None, waitForTx = true).id
+      val tx = i.transfer(i.address, nodeAddress, 10.waves, 0.005.waves, None, waitForTx = true).id
 
       val scriptText = s"""true""".stripMargin
 
       val script               = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-      val setScriptTransaction = sender.setScript(acc.address, Some(script), setScriptFee, true)
+      val setScriptTransaction = i.setScript(acc.address, Some(script), setScriptFee, waitForTx = true)
 
       acc
     })
@@ -46,6 +46,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
           assetId = None,
           amount = 1.waves,
           fee = minFee + 0.004.waves,
+          version = 2
         ),
       "transactions from scripted accounts are denied from UTX pool"
     )
@@ -56,9 +57,9 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
           accounts(1).address,
           recipient = accounts(1).address,
           assetId = None,
-          amount = 1.waves,
+          amount = 1.01.waves,
           fee = minFee + 0.004.waves,
-          waitForTx = true
+          version = 2
         )
         .id
 
