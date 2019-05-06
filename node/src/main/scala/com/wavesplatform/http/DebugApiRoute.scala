@@ -22,7 +22,7 @@ import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
-import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -369,16 +369,19 @@ case class DebugApiRoute(ws: WavesSettings,
     }
   }
 
+  def stateChanges = stateChangesById ~ stateChangesByAddress
+
   @Path("/stateChanges/{transactionId}")
   @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "path")
     ))
-  def stateChanges: Route = (get & path("stateChanges" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
+  def stateChangesById: Route = (get & path("stateChanges" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
     blockchain.transactionInfo(transactionId) match {
       case Some((_, tx: InvokeScriptTransaction)) =>
         val resultE = blockchain.invokeScriptResult(TransactionId(tx.id()))
+          .map(isr => Json.obj("transaction" -> tx, "stateChanges" -> isr))
         complete(resultE)
 
       case None =>
@@ -386,6 +389,28 @@ case class DebugApiRoute(ws: WavesSettings,
 
       case _ =>
         complete(StatusCodes.NotImplemented)
+    }
+  }
+
+  @Path("/stateChanges/address/{address}/limit/{limit}")
+  @ApiOperation(value = "Transactions by address state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Limit", required = true, dataType = "integer", paramType = "path")
+    ))
+  def stateChangesByAddress: Route = (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & handleExceptions(jsonExceptionHandler)) { (address, limit) =>
+    validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
+      import cats.implicits._
+      val resultE = for {
+        txs <- concurrent.blocking(blockchain.addressTransactions(address, Set(InvokeScriptTransaction.typeId), limit, None)).left.map(GenericError(_))
+        jsons <- txs.map { case (height, tx) =>
+          blockchain.invokeScriptResult(TransactionId(tx.id()))
+            .map(isr => Json.obj("height" -> JsNumber(height), "transaction" -> tx, "stateChanges" -> isr))
+        }.toList.sequence
+      } yield jsons
+
+      complete(resultE)
     }
   }
 }

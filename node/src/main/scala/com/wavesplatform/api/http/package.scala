@@ -2,7 +2,7 @@ package com.wavesplatform.api
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{PathMatcher, PathMatcher1}
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
@@ -93,4 +93,6 @@ package object http extends ApiMarshallers {
 
   val B58Segment: PathMatcher1[ByteStr] = PathMatcher("[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+".r)
     .flatMap(str => Base58.tryDecodeWithLimit(str).toOption.map(ByteStr(_)))
+
+  val AddrSegment: PathMatcher1[Address] = B58Segment.flatMap(Address.fromBytes(_).toOption)
 }
