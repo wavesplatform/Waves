@@ -369,7 +369,7 @@ case class DebugApiRoute(ws: WavesSettings,
     }
   }
 
-  def stateChanges = stateChangesById ~ stateChangesByAddress
+  def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
   @Path("/stateChanges/{transactionId}")
   @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
@@ -405,7 +405,7 @@ case class DebugApiRoute(ws: WavesSettings,
       (address, limit, afterOpt) =>
         validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
           import cats.implicits._
-          val resultE = for {
+          val resultE: Either[ValidationError, Seq[JsObject]] = for {
             txs <- concurrent
               .blocking(
                 blockchain.addressTransactions(address,
@@ -413,7 +413,7 @@ case class DebugApiRoute(ws: WavesSettings,
                                                limit,
                                                afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption)))
               .left
-              .map(GenericError(_))
+              .map(GenericError(_): ValidationError)
             jsons <- txs
               .map {
                 case (height, tx: InvokeScriptTransaction) =>
