@@ -40,8 +40,8 @@ object Importer extends ScorexLogging {
 
     val format = Try(argi.next)
       .map(_.toUpperCase)
-      .collect { case custom @ "BINARY_OLD" => custom }
-      .getOrElse("BINARY")
+      .collect { case custom @ "BINARY" => custom }
+      .getOrElse("BINARY_OLD")
       .intern()
 
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
