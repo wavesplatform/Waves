@@ -8,18 +8,14 @@ import com.wavesplatform.lang.v1.evaluator.LogCallback
 
 sealed trait LazyVal {
   val value: Eval[Either[ExecutionError,EVALUATED]]
-
-  def copyLogged(lc: LogCallback): LazyVal
 }
 
 object LazyVal {
   private case class LazyValImpl(v: Eval[Either[ExecutionError,EVALUATED]], lc: LogCallback) extends LazyVal {
     override val value: Eval[Either[ExecutionError,EVALUATED]] =
-        v.flatTap(a => Eval.later(lc(a)))
-
-    def copyLogged(lc: LogCallback): LazyVal = LazyValImpl(this.v, lc)
+        v.flatTap(a => Eval.now(lc(a))).memoize
   }
 
   def apply(v: TrampolinedExecResult[EVALUATED], lc: LogCallback = _ => ()): LazyVal =
-    LazyValImpl(v.value.memoize, lc)
+    LazyValImpl(v.value, lc)
 }
