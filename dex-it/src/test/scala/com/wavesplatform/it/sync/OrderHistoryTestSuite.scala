@@ -128,7 +128,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   import ctx._
 
-  def getOrderIds: List[OrderRecord]       = ctx.run(querySchema[OrderRecord]("orders", _.id           -> "id"))
+  def getOrderIds: List[OrderRecord]  = ctx.run(querySchema[OrderRecord]("orders", _.id      -> "id"))
   def getEventsIds: List[EventRecord] = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id"))
 
   def getEventsByOrderId(orderId: String): List[EventRecord] =
@@ -184,7 +184,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   }
 
   val (amount, price)            = (1000L, PriceConstant)
-  val denormalizedAmount: Double = MatcherModel.fromNormalized(amount, -Decimals, -8)
+  val denormalizedAmount: Double = MatcherModel.denormalizeAmountAndFee(amount, Decimals)
   val denormalizedPrice: Double  = MatcherModel.fromNormalized(price, Decimals, Decimals)
 
   "Order history should save all orders and events" in {

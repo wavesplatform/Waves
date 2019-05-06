@@ -6,15 +6,16 @@ import com.wavesplatform.matcher.history.HistoryRouter.{HistoryMsg, StopAccumula
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
-trait HistoryMessagesBatchSender[M <: HistoryMsg] extends Actor {
+abstract class HistoryMessagesBatchSender[M <: HistoryMsg: ClassTag] extends Actor {
 
   val batchLinger: Long
   val batchEntries: Long
 
   def createAndSendBatch(batchBuffer: Iterable[M]): Unit
 
-  private var batchBuffer: mutable.Set[M] = mutable.Set.empty[M]
+  private val batchBuffer: mutable.Set[M] = mutable.Set.empty[M]
 
   private def startAccumulating: Cancellable = context.system.scheduler.scheduleOnce(batchLinger.millis, self, StopAccumulate)
 

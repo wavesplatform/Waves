@@ -9,7 +9,12 @@ import com.wavesplatform.it.DockerContainerLauncher.{ContainerIsNotStartedYetErr
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class DockerContainerLauncher(imageName: String, containerName: String, env: String, containerPort: String, hostPort: Option[String] = None) {
+class DockerContainerLauncher(imageName: String,
+                              containerName: String,
+                              env: String,
+                              containerPort: String,
+                              hostPort: Option[String] = None,
+                              imageTag: String = "latest") {
 
   val dockerClient: DefaultDockerClient = DefaultDockerClient.fromEnv().build()
 
@@ -24,7 +29,8 @@ class DockerContainerLauncher(imageName: String, containerName: String, env: Str
       .build()
   }
 
-  private val containerConfig =
+  private val containerConfig = {
+    dockerClient.pull(s"$imageName:$imageTag")
     ContainerConfig
       .builder()
       .hostConfig(hostConfig)
@@ -32,6 +38,7 @@ class DockerContainerLauncher(imageName: String, containerName: String, env: Str
       .image(imageName)
       .env(env)
       .build()
+  }
 
   private val creation    = dockerClient.createContainer(containerConfig, containerName)
   val containerId: String = creation.id()
