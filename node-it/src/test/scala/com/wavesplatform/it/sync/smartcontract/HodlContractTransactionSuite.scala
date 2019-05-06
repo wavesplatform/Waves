@@ -85,9 +85,8 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |	}
         """.stripMargin
 
-    val script = ScriptCompiler.compile(scriptText).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(
-      contract.address, Some(script), setScriptFee, waitForTx = true).id
+    val script      = ScriptCompiler.compile(scriptText).explicitGet()._1.bytes().base64
+    val setScriptId = sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true).id
 
     val acc0ScriptInfo = sender.addressScriptInfo(contract.address)
 
@@ -121,14 +120,17 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("caller can't withdraw more than owns") {
-    assertBadRequestAndMessage(sender.invokeScript(
-                                 caller.address,
-                                 contract.address,
-                                 func = Some("withdraw"),
-                                 payment = Seq(),
-                                 fee = 1.waves
-                               ),
-                               "Not enough balance")
+    assertBadRequestAndMessage(
+      sender.invokeScript(
+        caller.address,
+        contract.address,
+        func = Some("withdraw"),
+        args = List(CONST_LONG(1.51.waves)),
+        payment = Seq(),
+        fee = 1.waves
+      ),
+      "Not enough balance"
+    )
   }
 
   test("caller can withdraw less than he owns") {

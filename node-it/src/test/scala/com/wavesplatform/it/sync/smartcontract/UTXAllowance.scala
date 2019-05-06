@@ -23,65 +23,45 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
   private def nodeB = nodes.last
 
   "create two nodes with scripted accounts and check UTX" in {
-    val accounts = List(nodeA, nodeB).map(i => {
+    val accounts = List(nodeA, nodeB).map(sender => {
 
-      val nodeAddress = i.createAddress()
-      val acc         = KeyPair.fromSeed(i.seed(nodeAddress)).right.get
+      val nodeAddress = sender.createAddress()
+      val acc         = KeyPair.fromSeed(sender.seed(nodeAddress)).right.get
 
-      val tx = i.transfer(i.address, nodeAddress, 10.waves, 0.005.waves).id
-      nodes.waitForHeightAriseAndTxPresent(tx)
+      val tx = sender.transfer(sender.address, nodeAddress, 10.waves, 0.005.waves, None, waitForTx = true).id
 
       val scriptText = s"""true""".stripMargin
 
-      val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
-      val setScriptTransaction = SetScriptTransaction
-        .selfSigned(acc, Some(script), setScriptFee, System.currentTimeMillis())
-        .right
-        .get
+      val script               = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
+      val setScriptTransaction = sender.setScript(acc.address, Some(script), setScriptFee, true)
 
-      val setScriptId = i
-        .signedBroadcast(setScriptTransaction.json())
-        .id
-
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
       acc
     })
 
-    val txA =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = accounts(0),
-          recipient = accounts(0),
-          amount = 1.waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee + 0.004.waves,
-          attachment = Array.emptyByteArray
-        )
-        .right
-        .get
     assertBadRequestAndMessage(
-      nodeA.signedBroadcast(txA.json()),
+      nodeA
+        .transfer(
+          accounts.head.address,
+          recipient = accounts.head.address,
+          assetId = None,
+          amount = 1.waves,
+          fee = minFee + 0.004.waves,
+        ),
       "transactions from scripted accounts are denied from UTX pool"
     )
 
-    val txB =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = accounts(1),
-          recipient = accounts(1),
+    val txBId =
+      nodeB
+        .transfer(
+          accounts(1).address,
+          recipient = accounts(1).address,
+          assetId = None,
           amount = 1.waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee + 0.004.waves,
-          attachment = Array.emptyByteArray
+          fee = minFee + 0.004.waves,
+          waitForTx = true
         )
-        .right
-        .get
+        .id
 
-    val txBId = nodeB.signedBroadcast(txB.json()).id
     nodes.waitForHeightArise()
     nodeA.findTransactionInfo(txBId) shouldBe None
   }
