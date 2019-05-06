@@ -145,42 +145,42 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       ).filter(_.orderId == lift(orderId))
     )
 
-  def getOrderById(orderId: String): List[OrderRecord] =
-    ctx.run(
-      querySchema[OrderRecord](
-        "orders",
-        _.id              -> "id",
-        _.sender          -> "sender",
-        _.senderPublicKey -> "sender_public_key",
-        _.amountAssetId   -> "amount_asset_id",
-        _.priceAssetId    -> "price_asset_id",
-        _.side            -> "side",
-        _.price           -> "price",
-        _.amount          -> "amount",
-        _.timestamp       -> "timestamp",
-        _.expiration      -> "expiration",
-        _.fee             -> "fee",
-        _.created         -> "created"
-      ).filter(_.id == lift(orderId))
-    )
+  def getOrderInfoById(orderId: String): Option[OrderShortenedInfo] =
+    ctx
+      .run(
+        querySchema[OrderRecord](
+          "orders",
+          _.id              -> "id",
+          _.sender          -> "sender",
+          _.senderPublicKey -> "sender_public_key",
+          _.amountAssetId   -> "amount_asset_id",
+          _.priceAssetId    -> "price_asset_id",
+          _.side            -> "side",
+          _.price           -> "price",
+          _.amount          -> "amount",
+          _.timestamp       -> "timestamp",
+          _.expiration      -> "expiration",
+          _.fee             -> "fee",
+          _.created         -> "created"
+        ).filter(_.id == lift(orderId))
+      )
+      .map { r =>
+        OrderShortenedInfo(r.id, r.senderPublicKey, r.side, r.price, r.amount)
+      }
+      .headOption
 
   case class EventShortenedInfo(eventType: Double, filled: Double, totalFilled: Double, status: Byte)
   case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: Double, amount: Double)
 
   def getEventsInfoByOrderId(orderId: String): List[EventShortenedInfo] = {
-    getEventsByOrderId(orderId).sortBy(_.timestamp).map {
-      case EventRecord(_, eventType, _, _, filled, totalFilled, status) =>
-        EventShortenedInfo(
-          eventType, // 0 - trade, 1 - cancel
-          filled, // filled in this trade
-          totalFilled,
-          status // 0 - accepted, 1 - partiallyFilled, 2 - filled, 3 - cancelled
-        )
+    getEventsByOrderId(orderId).sortBy(_.timestamp).map { r =>
+      EventShortenedInfo(
+        r.eventType, // 0 - trade, 1 - cancel
+        r.filled, // filled in this trade
+        r.totalFilled,
+        r.status // 0 - accepted, 1 - partiallyFilled, 2 - filled, 3 - cancelled
+      )
     }
-  }
-
-  def getOrderInfoById(orderId: String): List[OrderShortenedInfo] = getOrderById(orderId).map {
-    case OrderRecord(id, _, senderPublicKey, _, _, side, prc, amt, _, _, _, _) => OrderShortenedInfo(id, senderPublicKey, side, prc, amt)
   }
 
   val (amount, price)            = (1000L, PriceConstant)
@@ -238,10 +238,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     retry(10, batchLingerMs) {
 
       getOrderInfoById(smallBuyOrder) shouldBe
-        List(OrderShortenedInfo(smallBuyOrder, alice.publicKey.toString, 0, denormalizedPrice, denormalizedAmount))
+        Some(OrderShortenedInfo(smallBuyOrder, alice.publicKey.toString, 0, denormalizedPrice, denormalizedAmount))
 
       getOrderInfoById(bigSellOrder) shouldBe
-        List(OrderShortenedInfo(bigSellOrder, bob.publicKey.toString, 1, denormalizedPrice, 5 * denormalizedAmount))
+        Some(OrderShortenedInfo(bigSellOrder, bob.publicKey.toString, 1, denormalizedPrice, 5 * denormalizedAmount))
 
       getEventsInfoByOrderId(smallBuyOrder) shouldBe List(EventShortenedInfo(0, denormalizedAmount, denormalizedAmount, 2))
       getEventsInfoByOrderId(bigSellOrder) shouldBe List(EventShortenedInfo(0, denormalizedAmount, denormalizedAmount, 1))
