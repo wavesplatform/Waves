@@ -1,18 +1,18 @@
 package com.wavesplatform.lang.v1.task
 
+import cats.Eval
 import cats.data.Kleisli
-import monix.eval.Coeval
 import cats.implicits._
 
 trait TaskMFunctions {
 
-  def pure[S, E, R](x: R): TaskM[S, E, R] = TaskM(_ => Coeval.pure(x.asRight))
+  def pure[S, E, R](x: R): TaskM[S, E, R] = TaskM(_ => Eval.now(x.asRight))
 
-  def raiseError[S, E, R](e: E): TaskM[S, E, R] = TaskM(_ => Coeval.pure(e.asLeft))
+  def raiseError[S, E, R](e: E): TaskM[S, E, R] = TaskM(_ => Eval.now(e.asLeft))
 
   def liftEither[S, E, R](ei: Either[E, R]): TaskM[S, E, R] = TaskM.fromKleisli(Kleisli.pure(ei))
 
-  def get[S, E]: TaskM[S, E, S] = TaskM(s => Coeval.pure(s.asRight))
+  def get[S, E]: TaskM[S, E, S] = TaskM(s => Eval.now(s.asRight))
 
   def set[S, E](s: S): TaskM[S, E, Unit] =
     TaskM.fromKleisli(Kleisli(ref => {
@@ -20,7 +20,7 @@ trait TaskMFunctions {
     }))
 
   def local[S, E, A](fa: TaskM[S, E, A]): TaskM[S, E, A] = {
-    TaskM.fromKleisli(Kleisli((ref: CoevalRef[S]) => {
+    TaskM.fromKleisli(Kleisli((ref: EvalRef[S]) => {
       val newRef = ref.copy()
       fa.inner.run(newRef)
     }))

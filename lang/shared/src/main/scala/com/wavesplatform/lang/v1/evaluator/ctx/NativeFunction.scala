@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
+import cats.Eval
 import cats.data.EitherT
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -7,7 +8,6 @@ import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
-import monix.eval.Coeval
 
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
@@ -37,7 +37,7 @@ case class NativeFunction(@(JSExport @field) name: String,
                           @(JSExport @field) docString: String,
                           @(JSExport @field) argsDoc: Array[(String, String)])
     extends BaseFunction {
-  def eval(args: List[EVALUATED]): TrampolinedExecResult[EVALUATED] = EitherT.fromEither[Coeval](ev(args))
+  def eval(args: List[EVALUATED]): TrampolinedExecResult[EVALUATED] = EitherT.fromEither[Eval](ev(args))
 }
 
 object NativeFunction {

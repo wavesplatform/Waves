@@ -14,26 +14,16 @@ import scala.collection.mutable.ListBuffer
 
 object EvaluatorV1 {
 
-  private def evalLetBlock(let: LET, inner: EXPR): EvalM[EVALUATED] = {
-    def assign(lazyBlock: LazyVal) = local {
-      modify[LoggedEvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
-        .flatMap(_ => evalExpr(inner))
-    }
-
+  private def evalLetBlock(let: LET, inner: EXPR): EvalM[EVALUATED] =
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
-      result <- let.value match {
-        case REF(key) => evalRefF(key, lzy => {
-          val sameWithNewLog = lzy.copyLogged(ctx.l(let.name))
-          assign(sameWithNewLog)
-        })
-        case _ =>
-          val blockEvaluation = evalExpr(let.value)
-          val lazyBlock = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
-          assign(lazyBlock)
+      blockEvaluation = evalExpr(let.value)
+      lazyBlock       = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
+      result <- local {
+        modify[LoggedEvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
+          .flatMap(_ => evalExpr(inner))
       }
     } yield result
-  }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[EVALUATED] = {
     val funcHeader = FunctionHeader.User(func.name)
@@ -48,12 +38,9 @@ object EvaluatorV1 {
   }
 
   private def evalRef(key: String): EvalM[EVALUATED] =
-    evalRefF(key, lzy => liftTER[EVALUATED](lzy.value.value))
-
-  private def evalRefF(key: String, f: LazyVal => EvalM[EVALUATED]) =
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {
-        case Some(lzy) => f(lzy)
+        case Some(lzy) => liftTER[EVALUATED](lzy.value)
         case None      => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
       }
     }
