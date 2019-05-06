@@ -422,7 +422,7 @@ object SyncHttpApi extends Assertions {
 
     def invokeScript(caller: String,
                      dappAddress: String,
-                     func: String,
+                     func: Option[String],
                      args: List[Terms.EXPR] = List.empty,
                      payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
                      fee: Long = 500000,

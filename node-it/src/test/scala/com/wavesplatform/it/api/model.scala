@@ -93,7 +93,8 @@ case class TransactionInfo(`type`: Int,
                            sender: Option[String],
                            height: Int,
                            minSponsoredAssetFee: Option[Long],
-                           recipient: Option[String])
+                           recipient: Option[String],
+                           script: Option[String])
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
@@ -123,7 +124,7 @@ object AssetPairResponse {
 
 case class StateChangeResponse(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
 object StateChangeResponse {
-  implicit val stateChangeResponseFormat = Json.format[StateChangeResponse]
+  implicit val stateChangeResponseFormat: Format[StateChangeResponse] = Json.format[StateChangeResponse]
 }
 
 case class DataResponse(`type`: String, value: Long, key: String)

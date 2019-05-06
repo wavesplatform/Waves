@@ -30,7 +30,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   private val smartAcc  = pkByAddress(firstAddress)
   private val callerAcc = pkByAddress(secondAddress)
 
-  val scriptV3 = ScriptCompiler.compile("""
+  private val scriptV3 = ScriptCompiler.compile("""
                                             |{-# STDLIB_VERSION 3 #-}
                                             |{-# CONTENT_TYPE DAPP #-}
                                             |
@@ -39,122 +39,76 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
                                             |
                                             |@Verifier(i)
                                             |func verify() = { true }
-                                          """.stripMargin).explicitGet()._1
-  val scriptV2 = ScriptCompiler.compile("""
+                                          """.stripMargin).explicitGet()._1.bytes().base64
+  private val scriptV2 = ScriptCompiler.compile("""
                                           |func isTrue() = true
                                           |isTrue()
-                                        """.stripMargin).explicitGet()._1
+                                        """.stripMargin).explicitGet()._1.bytes().base64
 
   test("send waves to accounts") {
-    val scriptTransfer =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = sender.privateKey,
-          recipient = smartAcc,
-          amount = 5.waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-    val scriptTransferId = sender
-      .signedBroadcast(scriptTransfer.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
+    sender
+      .transfer(
+        sender.address,
+        recipient = smartAcc.address,
+        assetId = None,
+        amount = 5.waves,
+        fee = minFee,
+        waitForTx = true
+      )
       .id
 
-    val callerTransfer =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = sender.privateKey,
-          recipient = callerAcc,
-          amount = 5.waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-    val callerTransferId = sender
-      .signedBroadcast(callerTransfer.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
+    sender
+      .transfer(
+        sender.address,
+        recipient = callerAcc.address,
+        assetId = None,
+        amount = 5.waves,
+        fee = minFee,
+        waitForTx = true
+      )
       .id
-
-    nodes.waitForHeightAriseAndTxPresent(callerTransferId)
-    nodes.waitForTransaction(scriptTransferId)
   }
 
   test("can't set contract to account before Ride4DApps activation") {
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(smartAcc, Some(scriptV3), setScriptFee + smartFee, System.currentTimeMillis())
-      .explicitGet()
-    assertBadRequestAndMessage(
-      sender
-        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))),
-      "RIDE 4 DAPPS feature has not been activated yet"
-    )
+    assertBadRequestAndMessage(sender.setScript(smartAcc.address, Some(scriptV3), setScriptFee + smartFee),
+                               "RIDE 4 DAPPS feature has not been activated yet")
   }
 
   test("can't set script with user function to account before Ride4DApps activation") {
-    val setFuncScriptTransaction = SetScriptTransaction
-      .selfSigned(smartAcc, Some(scriptV2), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
-    assertBadRequestAndMessage(
-      sender
-        .signedBroadcast(setFuncScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))),
-      "RIDE 4 DAPPS feature has not been activated yet"
-    )
+    assertBadRequestAndMessage(sender.setScript(smartAcc.address, Some(scriptV2), setScriptFee), "RIDE 4 DAPPS feature has not been activated yet")
   }
 
   test("can't invoke script before Ride4DApps activation") {
-    val invokeScriptTransaction = InvokeScriptTransaction
-      .selfSigned(callerAcc,
-                  smartAcc.toAddress,
-                  Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),
-                  Seq.empty,
-                  smartMinFee,
-                  Waves,
-                  System.currentTimeMillis())
-      .explicitGet()
     assertBadRequestAndMessage(
-      sender.signedBroadcast(invokeScriptTransaction.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt))),
+      sender.invokeScript(callerAcc.address, smartAcc.address, Some("foo"), List.empty, Seq.empty, smartMinFee, None),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
   test("can't issue asset with user function in script before Ride4DApps activation") {
-    val issueTransaction = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        smartAcc,
-        "Test".getBytes,
-        "Test asset".getBytes,
-        1000,
-        0,
-        reissuable = true,
-        Some(scriptV2),
-        issueFee,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
+
     assertBadRequestAndMessage(
-      sender.signedBroadcast(issueTransaction.json() + ("type" -> JsNumber(IssueTransactionV2.typeId.toInt))),
+      sender.issue(
+        smartAcc.address,
+        "Test",
+        "Test asset",
+        1000,
+        8,
+        fee = issueFee,
+        script = Some(scriptV2)
+      ),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
   test("can't set script with user function to asset before Ride4DApps activation") {
-    val setAssetScriptTransaction = SetAssetScriptTransaction
-      .signed(AddressScheme.current.chainId,
-              smartAcc,
-              Asset.IssuedAsset("Test".getBytes),
-              Some(scriptV2),
-              issueFee,
-              System.currentTimeMillis(),
-              smartAcc)
-      .explicitGet()
     assertBadRequestAndMessage(
-      sender.signedBroadcast(setAssetScriptTransaction.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))),
+      sender.setAssetScript(
+        Asset.IssuedAsset("Test".getBytes).id.base58,
+        smartAcc.address,
+        issueFee,
+        Some(scriptV2),
+      ),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
@@ -164,72 +118,50 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can issue asset and set script with user function after Ride4DApps activation") {
-    val issueTransaction = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        smartAcc,
-        "Test".getBytes,
-        "Test asset".getBytes,
+    val issueTxId = sender
+      .issue(
+        smartAcc.address,
+        "Test",
+        "Test asset",
         1000,
         0,
-        reissuable = true,
-        Some(scriptV2),
-        issueFee,
-        System.currentTimeMillis()
+        script = Some(scriptV2),
+        fee = issueFee,
+        waitForTx = true
       )
-      .explicitGet()
-    val issueTxId = sender.signedBroadcast(issueTransaction.json() + ("type" -> JsNumber(IssueTransactionV2.typeId.toInt))).id
-    sender.waitForTransaction(issueTxId)
+      .id
 
-    val setAssetScriptTransaction = SetAssetScriptTransaction
-      .signed(
-        AddressScheme.current.chainId,
-        smartAcc,
-        Asset.IssuedAsset(ByteStr.decodeBase58(issueTxId).get),
-        Some(scriptV2),
+    sender
+      .setAssetScript(
+        issueTxId,
+        smartAcc.address,
         issueFee,
-        System.currentTimeMillis(),
-        smartAcc
+        Some(scriptV2),
+        waitForTx = true
       )
-      .explicitGet()
-    val txId = sender.signedBroadcast(setAssetScriptTransaction.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))).id
-    sender.waitForTransaction(txId)
+      .id
+
   }
 
   test("can set contract and invoke script after Ride4DApps activation") {
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(smartAcc, Some(scriptV3), setScriptFee + smartFee, System.currentTimeMillis())
-      .explicitGet()
-    val setScriptTxId = sender.signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))).id
-    sender.waitForTransaction(setScriptTxId)
+  sender.setScript(smartAcc.address, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
 
-    val invokeScriptTransaction = InvokeScriptTransaction
-      .selfSigned(
-        callerAcc,
-        smartAcc.toAddress,
-        Some(Terms.FUNCTION_CALL(FunctionHeader.User("doAction"), List.empty)),
+    sender.invokeScript(
+        callerAcc.address,
+        smartAcc.address,
+        Some("doAction"),
+        List.empty,
         Seq.empty,
         smartMinFee,
-        Waves,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
-    val invokeTxId = sender.signedBroadcast(invokeScriptTransaction.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt))).id
-    sender.waitForTransaction(invokeTxId)
+        None,
+        waitForTx = true
+      ).id
 
-    val setFuncScriptTransaction = SetScriptTransaction
-      .selfSigned(smartAcc, Some(scriptV2), setScriptFee + smartFee, System.currentTimeMillis())
-      .explicitGet()
-    val setFuncScriptTxId = sender.signedBroadcast(setFuncScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))).id
-    sender.waitForTransaction(setFuncScriptTxId)
+    sender.setScript(smartAcc.address, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
 
   test("can add user function to account script after Ride4DApps activation") {
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(smartAcc, Some(scriptV2), setScriptFee + smartFee, System.currentTimeMillis())
-      .explicitGet()
-    val txId = sender.signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))).id
-    sender.waitForTransaction(txId)
+    sender.setScript(smartAcc.address, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
 }
 
