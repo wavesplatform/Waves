@@ -64,6 +64,6 @@ object LeaseTransactionsDiff {
             s"LeaseTransaction was leased by other sender " +
               s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
 
-    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.leaseId -> false))
+    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.leaseId -> false), scriptsRun = (if(blockchain.hasScript(tx.sender)) { 1 } else { 0 }))
   }
 }

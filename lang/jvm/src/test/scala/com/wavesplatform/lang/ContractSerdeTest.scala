@@ -19,7 +19,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
   "roundtrip" - {
 
-    "empty" in roundTrip(DApp(Nil, Nil, None))
+    "empty" in roundTrip(DApp(Nil, Nil, None, None))
 
 //    "empty" in {
 //      val cf = ContractFunction(
@@ -36,6 +36,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           LET("letName", CONST_BOOLEAN(true))
         ),
         List.empty,
+        None,
         None
       ))
 
@@ -46,6 +47,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
         ),
         List.empty,
+        None,
         None
       ))
 
@@ -58,13 +60,24 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             FUNC("foo", List("a"), REF("a"))
           )
         ),
+        None,
         None
       ))
+
+    "default function" in roundTrip(
+      DApp(
+        List(),
+        List(),
+        Some(DefaultFunction(DefaultFuncAnnotation("t"), FUNC("default", List(), TRUE))),
+        None,
+      )
+    )
 
     "verifier function" in roundTrip(
       DApp(
         List(),
         List(),
+        None,
         Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
       )
     )
@@ -79,6 +92,12 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           CallableFunction(
             CallableAnnotation("whoooo"),
             FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
+          )
+        ),
+        Some(
+          DefaultFunction(
+            DefaultFuncAnnotation("hah"),
+            FUNC("secondFunc", List(), CONST_BOOLEAN(false))
           )
         ),
         Some(

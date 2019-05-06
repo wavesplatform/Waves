@@ -74,6 +74,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     str <- validAliasStringGen
   } yield Alias.create(str.mkString).explicitGet()
 
+  val funcNameGen: Gen[String] = for {
+    length <- Gen.chooseNum(1, ContractLimits.MaxAnnotatedFunctionNameInBytes)
+    funcNameChars <- Gen.listOfN(length, alphaLowerChar)
+  } yield funcNameChars.mkString
+
   val invalidAliasStringGen: Gen[String] = for {
     length     <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
     aliasChars <- Gen.listOfN(length, invalidAliasAlphabetGen)
@@ -522,7 +527,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     chainId = AddressScheme.current.chainId
     fee       <- smallFeeGen
     timestamp <- timestampGen
-  } yield InvokeScriptTransaction.selfSigned(sender, dappAddress.toAddress, fc, po.toSeq, fee, Waves, timestamp).explicitGet()
+  } yield InvokeScriptTransaction.selfSigned(sender, dappAddress.toAddress, Some(fc), po.toSeq, fee, Waves, timestamp).explicitGet()
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)
