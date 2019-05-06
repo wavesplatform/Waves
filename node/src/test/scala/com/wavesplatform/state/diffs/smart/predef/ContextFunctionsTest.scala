@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
@@ -316,6 +318,41 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             ._1
 
           val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("last block info check") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let lastBlockHeight = lastBlock.height == 5
+                 | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
+                   Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                 |
+                 | lastBlockHeight && lastBlockGenerationSignature
+                 |
+              |
+              """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()

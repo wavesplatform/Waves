@@ -28,7 +28,7 @@ object AddressOrAlias {
         val addressBytes = bytes.slice(position, addressEnd)
         Address.fromBytes(addressBytes).map((_, addressEnd))
       case Alias.AddressVersion =>
-        val (_, aliasEnd) = Deser.parseArraySize(bytes, position + 2)
+        val (_, aliasEnd) = Deser.parseArrayWithLength(bytes, position + 2)
         Alias.fromBytes(bytes.slice(position, aliasEnd)).map((_, aliasEnd))
       case _ => Left(InvalidAddress("Unknown address/alias version"))
     }

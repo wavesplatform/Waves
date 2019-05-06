@@ -110,7 +110,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     val invokeScriptTransaction = InvokeScriptTransaction
       .selfSigned(callerAcc,
                   smartAcc.toAddress,
-                  Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty),
+                  Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),
                   Seq.empty,
                   smartMinFee,
                   Waves,
@@ -204,13 +204,15 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     sender.waitForTransaction(setScriptTxId)
 
     val invokeScriptTransaction = InvokeScriptTransaction
-      .selfSigned(callerAcc,
-                  smartAcc.toAddress,
-                  Terms.FUNCTION_CALL(FunctionHeader.User("doAction"), List.empty),
-                  Seq.empty,
-                  smartMinFee,
-                  Waves,
-                  System.currentTimeMillis())
+      .selfSigned(
+        callerAcc,
+        smartAcc.toAddress,
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User("doAction"), List.empty)),
+        Seq.empty,
+        smartMinFee,
+        Waves,
+        System.currentTimeMillis()
+      )
       .explicitGet()
     val invokeTxId = sender.signedBroadcast(invokeScriptTransaction.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt))).id
     sender.waitForTransaction(invokeTxId)

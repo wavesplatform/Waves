@@ -176,7 +176,7 @@ object Diff {
             scriptsRun: Int = 0,
             scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
     Diff(
-      transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
+      transactions = Map((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,

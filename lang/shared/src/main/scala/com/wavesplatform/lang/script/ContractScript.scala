@@ -40,12 +40,14 @@ object ContractScript {
     import cats.implicits._
     type E[A] = Either[String, A]
     val funcsWithComplexity: Seq[E[(String, Long)]] =
-      (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
+      (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
+        contract.defaultFuncOpt.map(func => (func.annotation.invocationArgName, func.u)) ++
+        contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
             ScriptEstimator(varNames(version, DAppType),
                             functionCosts(version),
-                            constructExprFromFuncAndContext(contract.dec, annotationArgName, funcExpr))
+                            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
         }
     val funcsWithComplexityEi: E[Vector[(String, Long)]] = funcsWithComplexity.toVector.sequence
