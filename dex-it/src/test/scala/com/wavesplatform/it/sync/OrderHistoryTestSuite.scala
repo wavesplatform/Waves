@@ -161,6 +161,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       )
       .toSet
 
+  val (buySide, sellSide)                                    = (0: Byte, 1: Byte)
+  val (tradeEventType, cancelEventType)                      = (0: Byte, 1: Byte)
+  val (statusPartiallyFilled, statusFilled, statusCancelled) = (1: Byte, 2: Byte, 3: Byte)
+
   val (amount, price)            = (1000L, PriceConstant)
   val denormalizedAmount: Double = MatcherModel.denormalizeAmountAndFee(amount, Decimals)
   val denormalizedPrice: Double  = MatcherModel.fromNormalized(price, Decimals, Decimals)
@@ -198,9 +202,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     retry(10, batchLingerMs) {
       getEventsInfoByOrderId(buyOrder) shouldBe
         Set(
-          EventShortenedInfo(buyOrder, 0, denormalizedAmount, denormalizedAmount, 1),
-          EventShortenedInfo(buyOrder, 0, denormalizedAmount, 2 * denormalizedAmount, 1),
-          EventShortenedInfo(buyOrder, 1, 0, 2 * denormalizedAmount, 3)
+          EventShortenedInfo(buyOrder, tradeEventType, denormalizedAmount, denormalizedAmount, statusPartiallyFilled),
+          EventShortenedInfo(buyOrder, tradeEventType, denormalizedAmount, 2 * denormalizedAmount, statusPartiallyFilled),
+          EventShortenedInfo(buyOrder, cancelEventType, 0, 2 * denormalizedAmount, statusCancelled)
         )
     }
   }
@@ -213,16 +217,19 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, smallBuyOrder, "Filled")
     node.waitOrderStatus(wctUsdPair, bigSellOrder, "PartiallyFilled")
 
-    retry(10, batchLingerMs) {
+    retry(15, batchLingerMs) {
 
       getOrderInfoById(smallBuyOrder) shouldBe
-        Some(OrderShortenedInfo(smallBuyOrder, alice.publicKey.toString, 0, denormalizedPrice, denormalizedAmount))
+        Some(OrderShortenedInfo(smallBuyOrder, alice.publicKey.toString, buySide, denormalizedPrice, denormalizedAmount))
 
       getOrderInfoById(bigSellOrder) shouldBe
-        Some(OrderShortenedInfo(bigSellOrder, bob.publicKey.toString, 1, denormalizedPrice, 5 * denormalizedAmount))
+        Some(OrderShortenedInfo(bigSellOrder, bob.publicKey.toString, sellSide, denormalizedPrice, 5 * denormalizedAmount))
 
-      getEventsInfoByOrderId(smallBuyOrder) shouldBe Set(EventShortenedInfo(smallBuyOrder, 0, denormalizedAmount, denormalizedAmount, 2))
-      getEventsInfoByOrderId(bigSellOrder) shouldBe Set(EventShortenedInfo(bigSellOrder, 0, denormalizedAmount, denormalizedAmount, 1))
+      getEventsInfoByOrderId(smallBuyOrder).head shouldBe
+        EventShortenedInfo(smallBuyOrder, tradeEventType, denormalizedAmount, denormalizedAmount, statusFilled)
+
+      getEventsInfoByOrderId(bigSellOrder).head shouldBe
+        EventShortenedInfo(bigSellOrder, tradeEventType, denormalizedAmount, denormalizedAmount, statusPartiallyFilled)
     }
   }
 }
