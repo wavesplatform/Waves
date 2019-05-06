@@ -413,7 +413,7 @@ case class DebugApiRoute(ws: WavesSettings,
                                                limit,
                                                afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption)))
               .left
-              .map(GenericError(_): ValidationError)
+              .map(GenericError(_))
             jsons <- txs
               .map {
                 case (height, tx: InvokeScriptTransaction) =>
@@ -422,7 +422,7 @@ case class DebugApiRoute(ws: WavesSettings,
                     .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
 
                 case (height, tx) =>
-                  tx.json() ++ Json.obj("height" -> JsNumber(height))
+                  Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
               }
               .toList
               .sequence
