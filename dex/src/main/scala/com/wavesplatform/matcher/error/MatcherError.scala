@@ -41,6 +41,7 @@ object MatcherError {
   case object MatcherIsStopping     extends MatcherError(commonEntity, commonEntity, stopping, e"System is shutting down")
   case object OperationTimedOut     extends MatcherError(commonEntity, commonEntity, timedOut, e"Operation is timed out, please try later")
   case object FeatureNotImplemented extends MatcherError(commonEntity, feature, unsupported, e"This feature is not implemented")
+  case object FeatureDisabled       extends MatcherError(commonEntity, feature, disabled, e"This feature is disabled, contact with the administrator")
 
   case class OrderBookUnavailable(assetPair: AssetPair)
       extends MatcherError(orderBook,
@@ -288,6 +289,7 @@ object MatcherError {
     object starting     extends Class(13)
     object stopping     extends Class(14)
     object outOfBound   extends Class(15)
+    object disabled     extends Class(16)
   }
 
   private def formatBalance(b: Map[Asset, Long]): String =
