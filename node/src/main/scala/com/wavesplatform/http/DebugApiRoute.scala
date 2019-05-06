@@ -22,7 +22,7 @@ import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -369,25 +369,20 @@ case class DebugApiRoute(ws: WavesSettings,
     }
   }
 
-  @Path("/stateChanges")
+  @Path("/stateChanges/{transactionId}")
   @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "query")
+      new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "path")
     ))
-  def stateChanges: Route = (get & path("stateChanges") & parameter("transactionId") & handleExceptions(jsonExceptionHandler)) { transactionId =>
-    val txEither = for {
-      txId <- Base58.tryDecodeWithLimit(transactionId).toEither.left.map(err => GenericError(s"Invalid Base58: ${err.getMessage}"))
-      tx <- blockchain.transactionInfo(txId).toRight(GenericError("Transaction not found"))
-    } yield tx._2
+  def stateChanges: Route = (get & path("stateChanges" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
+    blockchain.transactionInfo(transactionId) match {
+      case Some((_, tx: InvokeScriptTransaction)) =>
+        val resultE = blockchain.invokeScriptResult(TransactionId(tx.id()))
+        complete(resultE)
 
-    txEither match {
-      case Right(tx: InvokeScriptTransaction) =>
-        val result = blockchain.invokeScriptResult(TransactionId(tx.id()))
-        complete(result)
-
-      case Left(error) =>
-        complete(error)
+      case None =>
+        complete(StatusCodes.NotFound)
 
       case _ =>
         complete(StatusCodes.NotImplemented)
