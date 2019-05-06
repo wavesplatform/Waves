@@ -270,7 +270,7 @@ class MatcherActorSpecification
       }
     }
 
-    "creates an order book" when {
+    "create an order book" when {
       "place order - new order book" in {
         val pair1 = AssetPair(randomAssetId, randomAssetId)
         val pair2 = AssetPair(randomAssetId, randomAssetId)
@@ -283,12 +283,11 @@ class MatcherActorSpecification
         probe.send(actor, MatcherActor.GetSnapshotOffsets)
         probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L))))
 
-        val eventSender = TestProbe()
-        sendBuyOrders(eventSender, actor, pair23, 10 to 12)
-
         probe.send(actor, wrap(buy(pair2, 2000, 1)))
-        probe.send(actor, MatcherActor.GetSnapshotOffsets)
-        probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L))))
+        eventually {
+          probe.send(actor, MatcherActor.GetSnapshotOffsets)
+          probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L), pair2 -> None)))
+        }
       }
 
       "force request" in {
