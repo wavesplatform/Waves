@@ -57,7 +57,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
     (post & entity(as[String]) & withExecutionContext(decompilerExecutionContext)) { code =>
-      Script.fromBase64String(code, checkComplexity = false) match {
+      Script.fromBase64String(code.trim, checkComplexity = false) match {
         case Left(err) => complete(err)
         case Right(script) =>
           val (scriptText, meta) = Script.decompile(script)
