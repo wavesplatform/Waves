@@ -1,9 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -16,7 +14,7 @@ class SponsorshipForContactsSuite extends BaseTransactionSuite with CancelAfterF
     sender.transfer(firstAddress, secondAddress, someAssetAmount / 2, minFee, Some(assetId), None, waitForTx = true)
 
     val script = ScriptCompiler(s"""false""".stripMargin, isAssetScript = false).right.get._1.bytes().base64
-    val setScriptTransaction = sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true)
+    val _ = sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true)
 
     val firstAddressBalance       = sender.accountBalances(firstAddress)._1
     val secondAddressBalance      = sender.accountBalances(secondAddress)._1
