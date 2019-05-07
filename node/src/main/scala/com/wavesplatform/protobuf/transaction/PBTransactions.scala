@@ -536,7 +536,7 @@ object PBTransactions {
           sender,
           Address.fromBytes(dappAddress.toByteArray).explicitGet(),
           Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
-          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
+          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
           feeAmount,
           feeAssetId,
           timestamp,
