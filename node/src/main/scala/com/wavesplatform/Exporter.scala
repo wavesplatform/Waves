@@ -113,7 +113,7 @@ object Exporter extends ScorexLogging {
   private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
                                                  outputFileNamePrefix: String = "blockchain",
                                                  exportHeight: Option[Int] = None,
-                                                 format: String = "BINARY")
+                                                 format: String = "BINARY_OLD")
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -133,6 +133,7 @@ object Exporter extends ScorexLogging {
         .action((p, c) => c.copy(outputFileNamePrefix = p)),
       opt[String]('f', "format")
         .text("Output file format")
+        .valueName("<BINARY|BINARY_OLD|JSON>")
         .action((f, c) => c.copy(format = f))
         .validate {
           case f if Set("BINARY", "BINARY_OLD", "JSON").contains(f.toUpperCase) => success

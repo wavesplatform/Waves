@@ -117,7 +117,7 @@ object Importer extends ScorexLogging {
   private[this] final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
                                                blockchainFile: File = new File("blockchain"),
                                                importHeight: Int = Int.MaxValue,
-                                               format: String = "BINARY",
+                                               format: String = "BINARY_OLD",
                                                verify: Boolean = true)
 
   private[this] lazy val commandParser = {
@@ -142,6 +142,7 @@ object Importer extends ScorexLogging {
       opt[String]('f', "format")
         .text("Blockchain data file format")
         .action((f, c) => c.copy(format = f))
+        .valueName("<BINARY|BINARY_OLD>")
         .validate {
           case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
           case f                                                        => failure(s"Unsupported format: $f")
