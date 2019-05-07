@@ -9,7 +9,7 @@ import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.matcher.settings.DeviationsSettings._
-import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
+import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.matcher.settings.OrderHistorySettings._
 import com.wavesplatform.matcher.settings.OrderRestrictionsSettings._
@@ -51,6 +51,7 @@ case class MatcherSettings(account: String,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            allowedAssetPairs: Set[AssetPair],
                            allowOrderV3: Boolean,
+                           exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings])
 
@@ -111,6 +112,8 @@ object MatcherSettings {
 
     val allowOrderV3 = config.as[Boolean]("allow-order-v3")
 
+    val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+
     val postgresConnection = config.as[PostgresConnection]("postgres")
     val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
@@ -141,8 +144,11 @@ object MatcherSettings {
       orderRestrictions,
       allowedAssetPairs,
       allowOrderV3,
+      broadcastUntilConfirmed,
       postgresConnection,
       orderHistory
     )
   }
+
+  case class ExchangeTransactionBroadcastSettings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
 }

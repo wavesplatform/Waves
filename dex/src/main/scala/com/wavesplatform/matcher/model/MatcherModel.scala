@@ -70,7 +70,7 @@ sealed trait LimitOrder {
 
   def requiredBalance: Map[Asset, Long] = Monoid.combine(
     Map(spentAsset -> rawSpendAmount),
-    Map(feeAsset   -> (if (feeAsset != rcvAsset) fee else (fee - receiveAmount).max(0L)))
+    Map(feeAsset   -> (if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee))
   )
 
   def amountOfPriceAsset: Long                           = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong

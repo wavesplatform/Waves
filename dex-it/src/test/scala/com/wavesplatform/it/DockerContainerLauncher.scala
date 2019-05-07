@@ -18,13 +18,11 @@ class DockerContainerLauncher(imageName: String,
 
   val dockerClient: DefaultDockerClient = DefaultDockerClient.fromEnv().build()
 
-  private val localhost: String = "0.0.0.0"
-
   private val hostConfig = {
     val hostConfigBuilder = HostConfig.builder()
     hostPort
       .fold(hostConfigBuilder.publishAllPorts(true)) { port =>
-        hostConfigBuilder.portBindings(Map(containerPort -> List(PortBinding.of(localhost, port)).asJava).asJava)
+        hostConfigBuilder.portBindings(Map(containerPort -> List(PortBinding.of("0.0.0.0", port)).asJava).asJava)
       }
       .build()
   }

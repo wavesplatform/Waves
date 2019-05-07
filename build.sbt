@@ -167,6 +167,7 @@ packageAll := Def.sequential(
     (dex / Compile / compile).value
   },
   Def.task {
+    (node / assembly).value
     (node / Debian / packageBin).value
     (dex / Universal / packageZipTarball).value
   }

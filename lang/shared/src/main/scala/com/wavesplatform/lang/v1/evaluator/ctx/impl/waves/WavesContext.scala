@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import cats.Eval
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -13,7 +14,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureC
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import monix.eval.Coeval
 
 object WavesContext {
 
@@ -280,8 +280,8 @@ object WavesContext {
         case _ => ???
       }
 
-    val inputEntityCoeval: Coeval[Either[String, CaseObj]] = {
-      Coeval.evalOnce(
+    val inputEntityCoeval: Eval[Either[String, CaseObj]] = {
+      Eval.later(
         env.inputEntity
           .eliminate(
             tx => transactionObject(tx, proofsEnabled).asRight[String],
@@ -295,9 +295,9 @@ object WavesContext {
           ))
     }
 
-    val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
-    val lastBlockCoeval: Coeval[Either[String, CaseObj]] = Coeval.evalOnce(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
-    val thisCoeval: Coeval[Either[String, CaseObj]]      = Coeval.evalOnce(Right(Bindings.senderObject(env.tthis)))
+    val heightCoeval:    Eval[Either[String, CONST_LONG]] = Eval.later(Right(CONST_LONG(env.height)))
+    val thisCoeval:      Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.senderObject(env.tthis)))
+    val lastBlockCoeval: Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
 
     val anyTransactionType =
       UNION(
@@ -377,8 +377,20 @@ object WavesContext {
       case _                                 => ???
     }
 
-    val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
-    val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
+    val blockInfoByHeightF: BaseFunction = NativeFunction(
+      "blockInfoByHeight",
+      100,
+      BLOCKINFOBYHEIGHT,
+      UNION(UNIT, blockInfo),
+      "lookup block by height and return info if it exists",
+      ("height", LONG, "block height")
+    ) {
+      case CONST_LONG(height: Long) :: Nil => Right(env.blockInfoByHeight(height.toInt).map(Bindings.buildLastBlockInfo))
+      case _                               => ???
+    }
+
+    val sellOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Sell)))
+    val buyOrdTypeCoeval:  Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Buy)))
 
     val scriptInputType =
       if (isTokenContext)
@@ -414,6 +426,7 @@ object WavesContext {
     lazy val functions = Array(
       txByIdF,
       txHeightByIdF,
+      blockInfoByHeightF,
       getIntegerFromStateF,
       getBooleanFromStateF,
       getBinaryFromStateF,
