@@ -26,7 +26,9 @@ class CommonAccountApi(blockchain: Blockchain) {
       portfolio.balance,
       blockchain.generatingBalance(address),
       portfolio.balance - portfolio.lease.out,
-      portfolio.effectiveBalance
+      portfolio.effectiveBalance,
+      portfolio.lease.in,
+      portfolio.lease.out
     )
   }
 
@@ -73,6 +75,6 @@ class CommonAccountApi(blockchain: Blockchain) {
 }
 
 object CommonAccountApi {
-  final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long)
+  final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
   final case class AddressScriptInfo(script: Option[ByteStr], scriptText: Option[String], complexity: Long, extraFee: Long)
 }

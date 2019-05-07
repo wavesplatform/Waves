@@ -30,12 +30,16 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
+import com.wavesplatform.metrics._
 import monix.eval.Coeval
 import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
 object InvokeScriptTransactionDiff {
+
+  private val stats = TxProcessingStats
+  import stats.TxTimerExt
 
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
     val accScript = blockchain.accountScript(tx.dappAddress)
@@ -93,7 +97,8 @@ object InvokeScriptTransactionDiff {
         contractFunc match {
           case None => Left(GenericError(s"No function '$functionName' at address ${tx.dappAddress}"))
           case Some(funcCall) =>
-            val scriptResultE = evalContract(contract)
+            val scriptResultE =
+              stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)(evalContract(contract))
             for {
               scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dappAddress, Some(funcCall), scriptResultE)))
               ScriptResult(ds, ps) = scriptResult
@@ -191,7 +196,7 @@ object InvokeScriptTransactionDiff {
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
     if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
-      Left(GenericError(s"WriteSec can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
+      Left(GenericError(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
     } else if (dataEntries.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
       Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
     } else {
@@ -289,21 +294,23 @@ object InvokeScriptTransactionDiff {
       nextDiff: Diff,
       script: Script): Either[ValidationError, Diff] = {
     Try {
-      ScriptRunner(
-        blockchain.height,
-        Coproduct[TxOrd](
-          ScriptTransfer(
-            asset,
-            Recipient.Address(tx.dappAddress.bytes),
-            Recipient.Address(addressRepr.bytes),
-            amount,
-            tx.timestamp,
-            tx.id()
+      stats.assetScriptExecution.measureForType(InvokeScriptTransaction.typeId)(
+        ScriptRunner(
+          blockchain.height,
+          Coproduct[TxOrd](
+            ScriptTransfer(
+              asset,
+              Recipient.Address(tx.dappAddress.bytes),
+              Recipient.Address(addressRepr.bytes),
+              amount,
+              tx.timestamp,
+              tx.id()
           )),
-        CompositeBlockchain.composite(blockchain, totalDiff),
-        script,
-        isAssetScript = true,
-        tx.dappAddress.bytes
+          CompositeBlockchain.composite(blockchain, totalDiff),
+          script,
+          isAssetScript = true,
+          tx.dappAddress.bytes
+        )
       ) match {
         case (log, Left(error))  => Left(ScriptExecutionError(error, log, isAssetScript = true))
         case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript(log, isAssetScript = true))

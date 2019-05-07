@@ -4,8 +4,8 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 private[protobuf] object PBInternalImplicits {
   import com.google.protobuf.{ByteString => PBByteString}
@@ -24,28 +24,24 @@ private[protobuf] object PBInternalImplicits {
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {
     case (IssuedAsset(assetId), amount) =>
-      Amount.defaultInstance.withAssetAmount(AssetAmount(assetId, amount))
+      Amount()
+        .withAssetId(AssetId().withIssuedAsset(assetId))
+        .withAmount(amount)
 
     case (Waves, amount) =>
-      Amount.defaultInstance.withWavesAmount(amount)
+      Amount()
+        .withAssetId(AssetId().withWaves(com.google.protobuf.empty.Empty()))
+        .withAmount(amount)
   }
 
   implicit class AmountImplicitConversions(a: Amount) {
-    def longAmount: Long = a.amount match {
-      case Amount.Amount.Empty              => 0L
-      case Amount.Amount.WavesAmount(value) => value
-      case Amount.Amount.AssetAmount(value) => value.amount
-    }
-
-    def assetId: Asset = a.amount match {
-      case Amount.Amount.WavesAmount(_) | Amount.Amount.Empty => Waves
-      case Amount.Amount.AssetAmount(AssetAmount(assetId, _)) => IssuedAsset(assetId)
-    }
+    def longAmount: Long = a.amount
+    def vanillaAssetId: Asset = PBAmounts.toVanillaAssetId(a.getAssetId)
   }
 
   implicit class PBByteStringOps(bs: PBByteString) {
-    def byteStr          = ByteStr(bs.toByteArray)
-    def publicKeyAccount = PublicKey(bs.toByteArray)
+    def byteStr: ByteStr            = ByteStr(bs.toByteArray)
+    def publicKeyAccount: PublicKey = PublicKey(bs.toByteArray)
   }
 
   implicit def byteStringToByte(bytes: ByteString): Byte =
