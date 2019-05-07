@@ -130,7 +130,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(1, Waves))),
-      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
@@ -177,7 +177,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(0, Waves))),
-      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
@@ -193,7 +193,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(-1, Waves))),
-      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )

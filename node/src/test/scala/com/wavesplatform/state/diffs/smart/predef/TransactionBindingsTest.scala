@@ -286,7 +286,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |match tx {
             | case t : InvokeScriptTransaction  =>
             |   ${provenPart(t)}
-            |   let dappAddress = t.dappAddress.bytes == base58'${t.dAppAddressOrAlias.bytes.base58}'
+            |   let dAppAddressBytes = match t.dApp {
+            |     case ad : Address => ad.bytes
+            |     case al : Alias => base58''
+            |   }
+            |   let dappAddress = dAppAddressBytes == base58'${t.dAppAddressOrAlias.bytes.base58}'
             |
             |   let paymentAmount = if(${t.payment.nonEmpty})
             |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}

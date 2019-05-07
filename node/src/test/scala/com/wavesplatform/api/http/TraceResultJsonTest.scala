@@ -81,10 +81,10 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |      } ]
         |    }
         |  } ],
+        |  "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
         |  "sender" : "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
         |  "feeAssetId" : null,
         |  "proofs" : [ "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ" ],
-        |  "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
         |  "payment" : [ {
         |    "amount" : 1,
         |    "assetId" : null
@@ -143,11 +143,11 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       |        "value" : 1
       |      } ]
       |    },
+      |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
       |    "sender" : "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
       |    "feeAssetId" : null,
       |    "proofs" : [ "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ" ],
       |    "fee" : 10000000,
-      |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
       |    "payment" : [ {
       |      "amount" : 1,
       |      "assetId" : null
