@@ -4,14 +4,23 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object PBAmounts {
-  def fromAssetAndAmount(asset: Asset, amount: Long): Amount = asset match {
-    case Asset.IssuedAsset(id) => Amount().withAssetAmount(AssetAmount(ByteString.copyFrom(id), amount))
-    case Asset.Waves           => Amount().withWavesAmount(amount)
+  def toPBAssetId(asset: Asset): AssetId = asset match {
+    case Asset.IssuedAsset(id) =>
+      AssetId().withIssuedAsset(ByteString.copyFrom(id))
+
+    case Asset.Waves =>
+      AssetId().withWaves(com.google.protobuf.empty.Empty())
   }
 
-  def toAssetAndAmount(value: Amount): (Asset, Long) = value.amount match {
-    case Amount.Amount.WavesAmount(amount)                       => (Waves, amount)
-    case Amount.Amount.AssetAmount(AssetAmount(assetId, amount)) => (IssuedAsset(assetId.toByteArray), amount)
-    case Amount.Amount.Empty                                     => throw new IllegalArgumentException("Empty amount not supported")
+  def toVanillaAssetId(assetId: AssetId): Asset = assetId.asset match {
+    case AssetId.Asset.Waves(_)             => Waves
+    case AssetId.Asset.IssuedAsset(assetId) => IssuedAsset(assetId.toByteArray)
+    case _ => throw new IllegalArgumentException
   }
+
+  def fromAssetAndAmount(asset: Asset, amount: Long): Amount =
+    Amount(Some(toPBAssetId(asset)), amount)
+
+  def toAssetAndAmount(value: Amount): (Asset, Long) =
+    (toVanillaAssetId(value.getAssetId), value.amount)
 }

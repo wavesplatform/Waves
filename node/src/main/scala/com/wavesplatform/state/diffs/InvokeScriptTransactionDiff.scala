@@ -30,12 +30,16 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
+import com.wavesplatform.metrics._
 import monix.eval.Coeval
 import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
 object InvokeScriptTransactionDiff {
+
+  private val stats = TxProcessingStats
+  import stats.TxTimerExt
 
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
     val accScriptEi = (
@@ -55,7 +59,16 @@ object InvokeScriptTransactionDiff {
       )
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-      val invocation                                    = ContractEvaluator.Invocation(tx.funcCallOpt, Recipient.Address(invoker), tx.sender, maybePayment, tx.dAppAddressOrAlias.bytes)
+      val invocation                                    = ContractEvaluator.Invocation(
+        tx.funcCallOpt,
+        Recipient.Address(invoker),
+        tx.sender,
+        maybePayment,
+        tx.dappAddress.bytes,
+        tx.id.value,
+        tx.fee,
+        tx.feeAssetId.compatId
+      )
       val result = for {
         directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
         evaluator <- ContractEvaluator(
@@ -89,7 +102,8 @@ object InvokeScriptTransactionDiff {
         contractFunc match {
           case None => Left(GenericError(s"No function '$functionName' at address ${tx.dAppAddressOrAlias}"))
           case Some(funcCall) =>
-            val scriptResultE = evalContract(contract)
+            val scriptResultE =
+              stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)(evalContract(contract))
             for {
               scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dAppAddressOrAlias, Some(funcCall), scriptResultE)))
               ScriptResult(ds, ps) = scriptResult
@@ -193,7 +207,7 @@ object InvokeScriptTransactionDiff {
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
     if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
-      Left(GenericError(s"WriteSec can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
+      Left(GenericError(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
     } else if (dataEntries.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
       Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
     } else {

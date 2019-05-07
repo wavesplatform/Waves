@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.smart
 
+import cats.Eval
 import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
@@ -18,20 +19,19 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.RealTransactionWrapper
-import monix.eval.Coeval
 
 object MatcherContext {
 
-  def build(version: StdLibVersion, nByte: Byte, in: Coeval[Order], proofsEnabled: Boolean): EvaluationContext = {
+  def build(version: StdLibVersion, nByte: Byte, in: Eval[Order], proofsEnabled: Boolean): EvaluationContext = {
     val baseContext = Monoid.combine(PureContext.build(version), CryptoContext.build(Global)).evaluationContext
 
-    val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
-      Coeval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled))))
+    val inputEntityCoeval: Eval[Either[String, CaseObj]] =
+      Eval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled))))
 
-    val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
-    val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
+    val sellOrdTypeCoeval: Eval[Either[String, CaseObj]] = Eval.now(Right(ordType(OrdType.Sell)))
+    val buyOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.now(Right(ordType(OrdType.Buy)))
 
-    val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Left("height is inaccessible when running script on matcher"))
+    val heightCoeval: Eval[Either[String, CONST_LONG]] = Eval.now(Left("height is inaccessible when running script on matcher"))
 
     val orderType: CASETYPEREF = buildOrderType(proofsEnabled)
     val matcherTypes           = Seq(addressType, orderType, assetPairType)

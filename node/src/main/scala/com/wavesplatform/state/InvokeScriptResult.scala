@@ -30,21 +30,28 @@ object InvokeScriptResult {
   }
 
   def toBytes(isr: InvokeScriptResult): Array[Byte] = {
-    val pbValue = PBInvokeScriptResult(
+    val pbValue = this.toPB(isr)
+    PBUtils.encodeDeterministic(pbValue)
+  }
+
+  def fromBytes(bs: Array[Byte]): InvokeScriptResult = {
+    val pbValue = PBInvokeScriptResult.parseFrom(bs)
+    fromPB(pbValue)
+  }
+
+  def toPB(isr: InvokeScriptResult): PBInvokeScriptResult = {
+    PBInvokeScriptResult(
       isr.dataEntries.map(PBTransactions.toPBDataEntry),
       isr.payments.map(
         payment =>
           PBInvokeScriptResult.Payment(
             ByteString.copyFrom(payment.address.bytes),
             Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
-        ))
+          ))
     )
-
-    PBUtils.encodeDeterministic(pbValue)
   }
 
-  def fromBytes(bs: Array[Byte]): InvokeScriptResult = {
-    val pbValue = PBInvokeScriptResult.parseFrom(bs)
+  def fromPB(pbValue: PBInvokeScriptResult): InvokeScriptResult = {
     InvokeScriptResult(
       pbValue.dataEntries.map(PBTransactions.toVanillaDataEntry),
       pbValue.payments.map { p =>

@@ -19,8 +19,9 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
@@ -221,6 +222,74 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compiler.ContractCompiler(ctx.compilerContext, expr)
   }
 
+  def writeSet(funcName: String, count: Int): DApp = {
+    val DataEntries = Array.tabulate(count)(i => s"""DataEntry("$i", $i)""").mkString(",")
+
+    val expr = {
+      val script =
+        s"""
+           |
+           | {-#STDLIB_VERSION 3 #-}
+           | {-#CONTENT_TYPE DAPP#-}
+           | {-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           | @Callable(i)
+           | func $funcName() = {
+           |    WriteSet([
+           |      $DataEntries
+           |        ])
+           |}
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr)
+  }
+
+  def writeSetWithKeyLength(funcName: String, length: Int=1): DApp = {
+    val keyName = Array.fill(length)("a").mkString
+
+    val expr = {
+      val script =
+        s"""
+           |
+           | {-#STDLIB_VERSION 3 #-}
+           | {-#CONTENT_TYPE DAPP#-}
+           | {-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           | @Callable(i)
+           | func $funcName() = {
+           |    WriteSet([
+           |      DataEntry("$keyName", 0)
+           |        ])
+           |}
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr)
+  }
+
+  def compileContractFromExpr(expr: Expressions.DAPP): DApp = {
+    val ctx = {
+      utils.functionCosts(V3)
+      Monoid
+        .combineAll(
+          Seq(
+            PureContext.build(V3),
+            CryptoContext.build(Global),
+            WavesContext.build(
+              DirectiveSet(V3, Account, DAppType).explicitGet(),
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+            )
+          ))
+    }
+
+    compiler.ContractCompiler(ctx.compilerContext, expr).right.get
+  }
+
   def simplePreconditionsAndSetContract(invokerGen: Gen[KeyPair] = accountGen,
                                         masterGen: Gen[KeyPair] = accountGen,
                                         payment: Option[Payment] = None,
@@ -298,7 +367,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
       fee         <- feeGen
       arg         <- genBoundedString(1, 32)
-      funcBinding <- validAliasStringGen
+      funcBinding <- funcNameGen
       contract    <- senderBindingToContract(funcBinding)
       masterAlias = Alias.create("alias").explicitGet()
       notAlias    = Alias.create("notalias").explicitGet()
@@ -871,6 +940,50 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           _ should produce("Passed argument with wrong type")
+        }
+    }
+  }
+
+  property("can't write more than 100 entries") {
+    forAll(for {
+      r <- preconditionsAndSetContract(s => writeSet(s, ContractLimits.MaxWriteSetSize + 1))
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce("can't contain more than")
+        }
+    }
+  }
+
+  property("can write 100 entries") {
+    forAll(for {
+      r <- preconditionsAndSetContract(s => writeSet(s, ContractLimits.MaxWriteSetSize))
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ shouldBe 'right
+        }
+    }
+  }
+
+  property("can't write entry with key size > 100") {
+    forAll(for {
+      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytes + 1))
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce("Key size must be less than")
+        }
+    }
+  }
+
+  property("can write entry with key <= 100") {
+    forAll(for {
+      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytes))
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ shouldBe 'right
         }
     }
   }
