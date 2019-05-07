@@ -20,6 +20,16 @@ object Types {
       "sponsored"   -> BOOLEAN
     )
   )
+
+  val blockInfo = CASETYPEREF(
+    "BlockInfo",
+    List(
+      "timestamp"           -> LONG,
+      "height"              -> LONG,
+      "generationSignature" -> BYTESTR
+    )
+  )
+
   val optionAsset = UNION(assetType, UNIT)
 
   val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
@@ -31,7 +41,17 @@ object Types {
   val optionPayment = UNION(paymentType, UNIT)
 
   val invocationType =
-    CASETYPEREF("Invocation", List("caller" -> addressType, "callerPublicKey" -> BYTESTR, "payment" -> optionPayment))
+    CASETYPEREF(
+      "Invocation",
+      List(
+        "caller"          -> addressType,
+        "callerPublicKey" -> BYTESTR,
+        "payment"         -> optionPayment,
+        "transactionId"   -> BYTESTR,
+        "fee"             -> LONG,
+        "feeAssetId"      -> optionByteVector
+      )
+    )
 
   private val header = List(
     "id"        -> BYTESTR,

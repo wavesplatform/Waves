@@ -23,12 +23,20 @@ object ContractSerDe {
     val out = new ByteArrayOutputStream()
 
     out.writeInt(0)
-    out.writeInt(c.dec.size)
-    c.dec.foreach(dec => serializeDeclaration(out, dec))
-    out.writeInt(c.cfs.size)
-    c.cfs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
+    out.writeInt(c.decs.size)
+    c.decs.foreach(dec => serializeDeclaration(out, dec))
+    out.writeInt(c.callableFuncs.size)
+    c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
-    c.vf match {
+    c.defaultFuncOpt match {
+      case None =>
+        out.writeInt(0)
+      case Some(df) =>
+        out.writeInt(1)
+        serializeAnnotatedFunction(out, df.u, df.annotation.invocationArgName)
+    }
+
+    c.verifierFuncOpt match {
       case None =>
         out.writeInt(0)
       case Some(vf) =>
@@ -42,11 +50,12 @@ object ContractSerDe {
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
     for {
-      _    <- tryEi(bb.getInt())
-      decs <- deserializeList[DECLARATION](bb, deserializeDeclaration)
-      cfs  <- deserializeList(bb, deserializeCallableFunction)
-      vf   <- deserializeOption(bb, deserializeVerifierFunction)
-    } yield DApp(decs, cfs, vf)
+      _               <- tryEi(bb.getInt())
+      decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
+      callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
+      defaultFuncOpt  <- deserializeOption(bb, deserializeDefaultFunction)
+      verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
+    } yield DApp(decs, callableFuncs, defaultFuncOpt, verifierFuncOpt)
   }
 
   private def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
@@ -74,8 +83,22 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
-      _  <- Either.cond(cf.name.getBytes().size <= ContractLimits.MaxCallableFunctionNameInBytes, (), s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxCallableFunctionNameInBytes}")
+      _ <- Either.cond(
+        cf.name.getBytes().size <= ContractLimits.MaxAnnotatedFunctionNameInBytes,
+        (),
+        s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}"
+      )
     } yield CallableFunction(ca, cf)
+  }
+
+  private[lang] def deserializeDefaultFuncAnnotation(bb: ByteBuffer): Either[String, DefaultFuncAnnotation] =
+    tryEi(DefaultFuncAnnotation(bb.getString))
+
+  private def deserializeDefaultFunction(bb: ByteBuffer): Either[String, DefaultFunction] = {
+    for {
+      a <- deserializeDefaultFuncAnnotation(bb)
+      f <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
+    } yield DefaultFunction(a, f)
   }
 
   private[lang] def deserializeVerifiableAnnotation(bb: ByteBuffer): Either[String, VerifierAnnotation] =
@@ -109,5 +132,7 @@ object ContractSerDe {
     } flatMap df
   }
 
-  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap(_.getMessage)
+  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap { e =>
+    if (e.getMessage != null) e.getMessage else e.toString
+  }
 }

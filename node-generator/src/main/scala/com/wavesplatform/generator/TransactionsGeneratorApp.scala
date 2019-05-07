@@ -5,17 +5,20 @@ import java.util.concurrent.Executors
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
-import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{LoggerFacade, NTP}
+import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
+import org.asynchttpclient.Dsl.asyncHttpClient
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
 
@@ -28,6 +31,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   // IDEA bugs
   implicit val inetSocketAddressReader        = com.wavesplatform.settings.inetSocketAddressReader
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val httpClient                     = asyncHttpClient()
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
@@ -138,15 +142,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
-  val preconditions =
-    ConfigFactory
-      .load("preconditions.conf")
-      .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
-
   val defaultConfig =
     ConfigFactory
       .load()
       .as[GeneratorSettings]("generator")
+
+  val wavesSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
 
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
@@ -156,6 +157,20 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       AddressScheme.current = new AddressScheme {
         override val chainId: Byte = finalConfig.addressScheme.toByte
       }
+
+      val time = new NTP("pool.ntp.org")
+
+      val preconditions =
+        ConfigFactory
+          .load("preconditions.conf")
+          .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
+
+      val (universe, initialTransactions) = preconditions
+        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
+
+      Universe.Accounts = universe.accounts
+      Universe.IssuedAssets = universe.issuedAssets
+      Universe.Leases = universe.leases
 
       val generator: TransactionGenerator = finalConfig.mode match {
         case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
@@ -169,21 +184,42 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
-      val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
+      val sender = new NetworkSender(wavesSettings.networkSettings.trafficLogger, finalConfig.addressScheme, "generator", nonce = Random.nextLong())
 
       sys.addShutdownHook(sender.close())
 
-      val time = new NTP("pool.ntp.org")
-      val (universe, initialTransactions) = preconditions
-        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
+      @volatile
+      var canContinue = true
 
-      Universe.AccountsWithBalances = universe.accountsWithBalances
-      Universe.IssuedAssets = universe.issuedAssets
-      Universe.Leases = universe.leases
+      sys.addShutdownHook {
+        log.error("Stopping generator")
+        canContinue = false
+      }
 
-      val workers = finalConfig.sendTo.map { node =>
-        log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
-        new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
+      if (finalConfig.worker.workingTime > Duration.Zero) {
+        log.info(s"Generator will be stopped after ${finalConfig.worker.workingTime}")
+
+        Scheduler.global.scheduleOnce(finalConfig.worker.workingTime) {
+          log.warn(s"Stopping generator after: ${finalConfig.worker.workingTime}")
+          canContinue = false
+        }
+      }
+
+      log.info(s"Preconditions: $initialTransactions")
+
+      val workers = finalConfig.sendTo.map {
+        case NodeAddress(node, nodeRestUrl) =>
+          log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
+          // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
+          new NewWorker(
+            finalConfig.worker,
+            Iterator.continually(generator.next()).flatten,
+            sender,
+            node,
+            nodeRestUrl,
+            () => canContinue,
+            initialTransactions
+          )
       }
 
       def close(status: Int): Unit = {

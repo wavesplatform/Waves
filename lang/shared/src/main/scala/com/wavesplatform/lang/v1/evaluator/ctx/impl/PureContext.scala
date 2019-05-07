@@ -15,7 +15,8 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 
 import scala.collection.mutable.ArrayBuffer
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.ByteBuffer
+import java.nio.charset.MalformedInputException
+import java.nio.{BufferUnderflowException, ByteBuffer}
 
 import com.wavesplatform.lang.directives.values._
 
@@ -307,20 +308,29 @@ object PureContext {
 
   lazy val toUtf8String: BaseFunction =
     NativeFunction("toUtf8String", 20, UTF8STRING, STRING, "Convert UTF8 bytes to string", ("u", BYTESTR, "utf8")) {
-      case CONST_BYTESTR(u) :: Nil => Try(CONST_STRING(UTF8Decoder.decode(ByteBuffer.wrap(u.arr)).toString)).toEither.left.map(_.toString)
+      case CONST_BYTESTR(u) :: Nil => Try(CONST_STRING(UTF8Decoder.decode(ByteBuffer.wrap(u.arr)).toString)).toEither.left.map {
+        case _:MalformedInputException => "Input contents invalid UTD8 sequence"
+        case e => e.toString
+      }
       case xs                      => notImplemented("toUtf8String(u: byte[])", xs)
     }
 
   lazy val toLong: BaseFunction =
     NativeFunction("toInt", 10, BININT, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries")) {
-      case CONST_BYTESTR(u) :: Nil => Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong())).toEither.left.map(_.toString)
+      case CONST_BYTESTR(u) :: Nil => Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong())).toEither.left.map {
+        case _:BufferUnderflowException => "Buffer underflow"
+        case e => e.toString
+      }
       case xs                      => notImplemented("toInt(u: byte[])", xs)
     }
 
   lazy val toLongOffset: BaseFunction =
     NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offet", LONG, "bytes offset")) {
       case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil => if( o >= 0 && o <= u.size - 8) {
-          Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map(_.toString)
+          Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map {
+             case _:BufferUnderflowException => "Buffer underflow"
+             case e => e.toString
+           }
       } else {
         Left("IndexOutOfBounds")
       }

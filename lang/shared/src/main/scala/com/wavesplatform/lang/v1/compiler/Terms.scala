@@ -28,29 +28,12 @@ object Terms {
   lazy val FALSE = CONST_BOOLEAN(false)
 
   case class CaseObj(caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
-    override def toString: String = prettyString()
+    override def toString: String = TermPrinter.string(this)
 
-    def prettyString(depth: Int = 0): String =
-      if (fields.isEmpty) caseType.name
-      else {
-        def text(v: EVALUATED) = {
-          v match {
-            case co: CaseObj => co.prettyString(depth + 1)
-            case a           => val str = a.toString; if (str.isEmpty) "<empty>" else str
-          }
-        }
-        val parenthesisIndent = "\t" * depth
-        val fieldsIndent      = "\t" * (depth + 1)
-
-        val fieldsText = fields
-          .map { case (name, value) => s"$fieldsIndent$name = ${text(value)}" }
-          .mkString("(\n", "\n", s"\n$parenthesisIndent)")
-
-        caseType.name + fieldsText
-      }
+    def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
   }
 
   case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED {
-    override def toString: String = xs.mkString("[", ", ", "]")
+    override def toString: String = TermPrinter.string(this)
   }
 }

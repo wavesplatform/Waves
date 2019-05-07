@@ -34,7 +34,7 @@ object Tx {
       dappAddress:  Recipient,
       maybePayment: Option[Pmt],
       feeAssetId:   Option[ByteStr],
-      funcName:     String,
+      funcName:     Option[String],
       funcArgs:     List[EVALUATED]
   ) extends Tx
 
