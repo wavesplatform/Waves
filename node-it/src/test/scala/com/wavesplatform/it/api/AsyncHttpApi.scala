@@ -345,7 +345,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def debugStateChange(invokeScriptTransactionId: String): Future[StateChangeResponse] =
-      get(s"/debug/stateChanges?transactionId=$invokeScriptTransactionId").as[StateChangeResponse]
+      get(s"/debug/stateChanges/$invokeScriptTransactionId").as[StateChangeResponse]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
