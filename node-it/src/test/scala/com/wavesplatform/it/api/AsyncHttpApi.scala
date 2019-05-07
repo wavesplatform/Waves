@@ -318,14 +318,14 @@ object AsyncHttpApi extends Assertions {
                      version: Byte = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
-          "type"        -> InvokeScriptTransaction.typeId,
-          "version"     -> version,
-          "sender"      -> caller,
-          "dappAddress" -> dappAddress,
-          "call"        -> { if (func.isDefined) InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull },
-          "payment"     -> payment,
-          "fee"         -> fee,
-          "feeAssetId"  -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
+          "type"       -> InvokeScriptTransaction.typeId,
+          "version"    -> version,
+          "sender"     -> caller,
+          "dApp"       -> dappAddress,
+          "call"       -> { if (func.isDefined) InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull },
+          "payment"    -> payment,
+          "fee"        -> fee,
+          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
         ))
     }
 

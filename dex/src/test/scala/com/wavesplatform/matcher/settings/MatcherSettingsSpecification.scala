@@ -5,7 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
+import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, FixedWavesSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
@@ -93,6 +93,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |      type = "kafka"
       |
       |      local {
+      |        enable-storing = no
       |        polling-interval = 1d
       |        max-elements-per-poll = 99
       |        clean-before-consume = no
@@ -107,7 +108,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |          max-backoff = 2d
       |        }
       |
-      |        producer.buffer-size = 200
+      |        producer {
+      |          enable = no
+      |          buffer-size = 200
+      |        }
       |      }
       |    }
       |    $orderFeeStr
@@ -115,6 +119,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    $allowedAssetPairsStr
       |    allow-order-v3 = no
       |    $orderRestrictionsStr
+      |    exchange-transaction-broadcast {
+      |      broadcast-until-confirmed = yes
+      |      interval = 1 day
+      |      max-pending-time = 30 days
+      |    }
       |  }
       |}""".stripMargin
 
@@ -149,11 +158,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.balanceWatchingBufferInterval should be(33.seconds)
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
-      local = LocalMatcherQueue.Settings(1.day, 99, cleanBeforeConsume = false),
+      local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),
       kafka = KafkaMatcherQueue.Settings(
         "some-events",
         KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
-        KafkaMatcherQueue.ProducerSettings(200)
+        KafkaMatcherQueue.ProducerSettings(enable = false, 200)
       )
     )
 
@@ -172,6 +181,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowOrderV3 shouldBe false
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
+    settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
+      broadcastUntilConfirmed = true,
+      interval = 1.day,
+      maxPendingTime = 30.days
+    )
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {
