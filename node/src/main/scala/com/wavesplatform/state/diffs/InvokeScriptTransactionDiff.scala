@@ -187,8 +187,8 @@ object InvokeScriptTransactionDiff {
               dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers)
             }
         }
-      case Right(None) => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
-      case Left(l)     => TracedResult(Left(l))
+      case Left(l) => TracedResult(Left(l))
+      case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
     }
   }
 

@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http
 
 import cats.implicits._
-import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
