@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
-import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang._
@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptRe
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -30,7 +31,6 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
-import com.wavesplatform.metrics._
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -42,12 +42,9 @@ object InvokeScriptTransactionDiff {
   import stats.TxTimerExt
 
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
-    val accScriptEi = (
-      tx.dAppAddressOrAlias match {
-        case a: Alias   => blockchain.resolveAlias(a)
-        case a: Address => Right(a)
-      }
-    ).map(blockchain.accountScript)
+
+    val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
+    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
 
     def evalContract(contract: DApp): Either[ScriptExecutionError, ScriptResult] = {
       val environment = new WavesEnvironment(
@@ -59,12 +56,12 @@ object InvokeScriptTransactionDiff {
       )
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-      val invocation                                    = ContractEvaluator.Invocation(
+      val invocation = ContractEvaluator.Invocation(
         tx.funcCallOpt,
         Recipient.Address(invoker),
         tx.sender,
         maybePayment,
-        tx.dappAddress.bytes,
+        tx.dAppAddressOrAlias.bytes,
         tx.id.value,
         tx.fee,
         tx.feeAssetId.compatId
@@ -133,7 +130,7 @@ object InvokeScriptTransactionDiff {
                      ))
                   }
               })
-              dAppAddress <- TracedResult(blockchain.resolveAlias(tx.dAppAddressOrAlias))
+              dAppAddress <- TracedResult(dAppAddressEi)
               wavesFee = feeInfo._1
               dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, dAppAddress, ds, feeInfo._2))
               _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
