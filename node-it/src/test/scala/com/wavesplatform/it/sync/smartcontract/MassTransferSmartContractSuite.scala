@@ -58,7 +58,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     // set script
     val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-    sender.setScript(notMiner.address, Some(script), setScriptFee, waitForTx = true).id
+    notMiner.setScript(notMiner.address, Some(script), setScriptFee, waitForTx = true).id
 
     notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false
 
