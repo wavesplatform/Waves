@@ -154,7 +154,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         fee = feeAmount - 1,
         feeAssetId = Some(dAppAsset)
       ),
-      s"does not exceed minimal value of 900000 WAVES: ${feeAmount - 1}"
+      s"does not exceed minimal value of 900000 WAVES or $feeAmount"
     )
     assertBadRequestAndMessage(
       sender.invokeScript(
@@ -165,7 +165,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         fee = smartFeeAmount - 1,
         feeAssetId = Some(dAppAsset)
       ),
-      s"does not exceed minimal value of 5300000 WAVES: ${smartFeeAmount - 1}"
+      s"does not exceed minimal value of 5300000 WAVES"
     )
 
     val invokeScript1TxId = sender

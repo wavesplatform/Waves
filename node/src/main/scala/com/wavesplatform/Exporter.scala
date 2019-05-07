@@ -26,8 +26,8 @@ object Exporter extends ScorexLogging {
 
     val format = Try(args(3)).toOption
       .map(_.toUpperCase)
-      .collect { case custom @ ("JSON" | "BINARY_OLD") => custom }
-      .getOrElse("BINARY")
+      .collect { case custom @ ("JSON" | "BINARY") => custom }
+      .getOrElse("BINARY_OLD")
       .intern()
 
     val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
