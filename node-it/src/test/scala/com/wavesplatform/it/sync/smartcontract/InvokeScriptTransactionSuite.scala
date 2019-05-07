@@ -82,7 +82,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("contract caller invokes a function on a contract") {
     val arg               = ByteStr(Array(42: Byte))
 
-    sender.invokeScript(
+    val _ = sender.invokeScript(
       caller.address,
       contract.address,
       func = Some("foo"),
@@ -99,7 +99,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("contract caller invokes a default function on a contract") {
 
 
-    sender.invokeScript(
+    val _ = sender.invokeScript(
       caller.address,
       contract.address,
       func = None,
