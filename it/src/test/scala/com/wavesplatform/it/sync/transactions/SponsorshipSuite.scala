@@ -255,9 +255,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       "transfer tx sponsored fee is less then new minimal" in {
         assertBadRequestAndResponse(
           sponsor
-            .transfer(sponsor.address, alice.address, 10 * Token, fee = SmallFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
+            .transfer(sponsor.address, alice.address, 11 * Token, fee = SmallFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
             .id,
-          "does not exceed minimal value"
+          s"Fee for TransferTransaction \\($SmallFee in ${Some(sponsorAssetId).get}\\) does not exceed minimal value of 100000 WAVES or $LargeFee ${Some(sponsorAssetId).get}"
         )
       }
 
@@ -304,7 +304,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       assetInfo.minSponsoredAssetFee shouldBe Some(Token)
       assetInfo.quantity shouldBe sponsorAssetTotal / 2
 
-      val sponsorAssetId2Reissue = sponsor.reissue(sponsor.address, sponsorAssetId2, sponsorAssetTotal, true, issueFee).id
+      val sponsorAssetId2Reissue = sponsor.reissue(sponsor.address, sponsorAssetId2, sponsorAssetTotal, reissuable = true, issueFee).id
       nodes.waitForHeightAriseAndTxPresent(sponsorAssetId2Reissue)
 
       val assetInfoAfterReissue = sponsor.assetsDetails(sponsorAssetId2)
