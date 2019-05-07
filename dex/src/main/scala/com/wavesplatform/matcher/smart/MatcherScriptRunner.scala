@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.smart
 
+import cats.Eval
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.contract.DApp
@@ -10,20 +11,19 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.{Authorized, Proven}
-import monix.eval.Coeval
 
 object MatcherScriptRunner {
 
   def apply(script: Script, order: Order, isTokenScript: Boolean): (Log, Either[String, EVALUATED]) = script match {
     case s: ExprScript =>
-      val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
+      val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Eval.later(order), !isTokenScript)
       EvaluatorV1.applyWithLogging(ctx, s.expr)
 
     case ContractScript.ContractScriptImpl(_, DApp(decls, _, _, Some(vf)), _) =>
       val ctx = MatcherContext.build(
         script.stdLibVersion,
         AddressScheme.current.chainId,
-        Coeval.evalOnce(???) /*order not used in global context where @Verifier annotation is used */,
+        Eval.later(???) /*order not used in global context where @Verifier annotation is used */,
         proofsEnabled = true
       )
       val evalContract = ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(order))

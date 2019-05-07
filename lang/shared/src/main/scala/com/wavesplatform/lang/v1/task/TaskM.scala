@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.task
 
+import cats.Eval
 import cats.data.Kleisli
 import cats.implicits._
-import monix.eval.Coeval
 import monix.execution.atomic.{Atomic, AtomicBuilder}
 
 /**
@@ -13,10 +13,10 @@ import monix.execution.atomic.{Atomic, AtomicBuilder}
   * @tparam R - Result type
   */
 trait TaskM[S, E, R] {
-  protected[task] val inner: Kleisli[Coeval, CoevalRef[S], Either[E, R]]
+  protected[task] val inner: Kleisli[Eval, EvalRef[S], Either[E, R]]
 
-  def run[RS <: Atomic[S]](initial: S)(implicit b: AtomicBuilder[S, RS]): Coeval[(S, Either[E, R])] = {
-    val stateRef = CoevalRef.of(initial)
+  def run[RS <: Atomic[S]](initial: S)(implicit b: AtomicBuilder[S, RS]): Eval[(S, Either[E, R])] = {
+    val stateRef = EvalRef.of(initial)
 
     for {
       result     <- inner.run(stateRef)
@@ -47,11 +47,11 @@ trait TaskM[S, E, R] {
 
 object TaskM {
 
-  private[task] def fromKleisli[S, E, R](in: Kleisli[Coeval, CoevalRef[S], Either[E, R]]): TaskM[S, E, R] = new TaskM[S, E, R] {
-    override protected[task] val inner: Kleisli[Coeval, CoevalRef[S], Either[E, R]] = in
+  private[task] def fromKleisli[S, E, R](in: Kleisli[Eval, EvalRef[S], Either[E, R]]): TaskM[S, E, R] = new TaskM[S, E, R] {
+    override protected[task] val inner: Kleisli[Eval, EvalRef[S], Either[E, R]] = in
   }
 
-  def apply[S, E, R](f: S => Coeval[Either[E, R]]): TaskM[S, E, R] = new TaskM[S, E, R] {
-    override protected[task] val inner: Kleisli[Coeval, CoevalRef[S], Either[E, R]] = Kleisli(_.read >>= f)
+  def apply[S, E, R](f: S => Eval[Either[E, R]]): TaskM[S, E, R] = new TaskM[S, E, R] {
+    override protected[task] val inner: Kleisli[Eval, EvalRef[S], Either[E, R]] = Kleisli(_.read >>= f)
   }
 }

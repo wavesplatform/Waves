@@ -40,7 +40,7 @@ object EvaluatorV1 {
   private def evalRef(key: String): EvalM[EVALUATED] =
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {
-        case Some(lzy) => liftTER[EVALUATED](lzy.value.value)
+        case Some(lzy) => liftTER[EVALUATED](lzy.value)
         case None      => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
       }
     }
