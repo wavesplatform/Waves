@@ -187,16 +187,16 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
+      case CI(p, addressOrAlias, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled),
           combine(
             Map(
-              "dappAddress" -> mapRecipient(address)._2,
-              "payment"     -> buildPayment(maybePayment),
-              "feeAssetId"  -> feeAssetId,
-              "function"    -> funcName,
-              "args"        -> funcArgs
+              "dApp"       -> mapRecipient(addressOrAlias)._2,
+              "payment"    -> buildPayment(maybePayment),
+              "feeAssetId" -> feeAssetId,
+              "function"   -> funcName,
+              "args"       -> funcArgs
             ),
             provenTxPart(p, proofsEnabled)
           )
@@ -296,8 +296,8 @@ object Bindings {
     CaseObj(
       blockInfo,
       Map(
-        "timestamp"   -> blockInf.timestamp,
-        "height" -> blockInf.height.toLong,
+        "timestamp"           -> blockInf.timestamp,
+        "height"              -> blockInf.height.toLong,
         "generationSignature" -> blockInf.generationSignature
       )
     )

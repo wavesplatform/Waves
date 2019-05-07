@@ -83,7 +83,8 @@ object EnvironmentFunctionsBenchmark {
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
-    override def lastBlockOpt(): Option[BlockInfo]                                                                  = ???
+    override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
+    override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def tthis: Recipient.Address                                                                        = ???
   }
