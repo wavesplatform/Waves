@@ -359,4 +359,42 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         }
     }
   }
+
+  property("block info by height") {
+    val generatorSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
+
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let unexistingHeight = 999
+                 | let checkUnexistingBlock = !isDefined(blockInfoByHeight(unexistingHeight))
+                 |
+                 | let block = extract(blockInfoByHeight(4))
+                 | let checkSignature = block.generationSignature == base58'$generatorSignature'
+                 |
+                 | checkUnexistingBlock && checkSignature
+                 |
+              """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
 }
