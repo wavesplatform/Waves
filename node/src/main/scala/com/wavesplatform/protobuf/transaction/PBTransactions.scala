@@ -36,26 +36,20 @@ object PBTransactions {
   }
 
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
-    def toAmountAndAssetId(amount: Amount): Either[ValidationError, (Long, VanillaAssetId)] = amount.amount match {
-      case Amount.Amount.WavesAmount(value)                        => Right((value, Waves))
-      case Amount.Amount.AssetAmount(AssetAmount(assetId, amount)) => Right((amount, IssuedAsset(assetId.toByteArray)))
-      case Amount.Amount.Empty                                     => Left(GenericError("Empty amount"))
-    }
-
     for {
-      parsedTx  <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
-      fee       <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
-      _         <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
-      feeAmount <- toAmountAndAssetId(fee)
-      sender = PublicKey(parsedTx.senderPublicKey.toByteArray)
+      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
+      fee      <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
+      _        <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
+      feeAmount = PBAmounts.toAssetAndAmount(fee)
+      sender    = PublicKey(parsedTx.senderPublicKey.toByteArray)
       tx <- if (unsafe)
         Right(
           createVanillaUnsafe(
             parsedTx.version,
             parsedTx.chainId.toByte,
             sender,
-            feeAmount._1,
             feeAmount._2,
+            feeAmount._1,
             parsedTx.timestamp,
             Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
             parsedTx.data
@@ -65,8 +59,8 @@ object PBTransactions {
           parsedTx.version,
           parsedTx.chainId.toByte,
           sender,
-          feeAmount._1,
           feeAmount._2,
+          feeAmount._1,
           parsedTx.timestamp,
           Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
           parsedTx.data
@@ -97,7 +91,7 @@ object PBTransactions {
             for {
               address <- recipient.toAddressOrAlias
               tx <- vt.transfer.TransferTransactionV1.create(
-                amount.assetId,
+                amount.vanillaAssetId,
                 sender,
                 address,
                 amount.longAmount,
@@ -113,7 +107,7 @@ object PBTransactions {
             for {
               address <- recipient.toAddressOrAlias
               tx <- vt.transfer.TransferTransactionV2.create(
-                amount.assetId,
+                amount.vanillaAssetId,
                 sender,
                 address,
                 amount.longAmount,
@@ -348,7 +342,7 @@ object PBTransactions {
         version match {
           case 1 =>
             vt.transfer.TransferTransactionV1(
-              amount.assetId,
+              amount.vanillaAssetId,
               sender,
               recipient.toAddressOrAlias.explicitGet(),
               amount.longAmount,
@@ -363,7 +357,7 @@ object PBTransactions {
             vt.transfer.TransferTransactionV2(
               sender,
               recipient.toAddressOrAlias.explicitGet(),
-              amount.assetId,
+              amount.vanillaAssetId,
               amount.longAmount,
               timestamp,
               feeAssetId,
