@@ -161,11 +161,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       )
       .toSet
 
-  val (buySide, sellSide)                                    = (0: Byte, 1: Byte)
-  val (tradeEventType, cancelEventType)                      = (0: Byte, 1: Byte)
-  val (statusPartiallyFilled, statusFilled, statusCancelled) = (1: Byte, 2: Byte, 3: Byte)
+  import com.wavesplatform.matcher.history.HistoryRouter._
 
-  val (amount, price)            = (1000L, PriceConstant)
+  val (buySide, sellSide) = (0: Byte, 1: Byte)
+  val (amount, price)     = (1000L, PriceConstant)
+
   val denormalizedAmount: Double = MatcherModel.denormalizeAmountAndFee(amount, Decimals)
   val denormalizedPrice: Double  = MatcherModel.fromNormalized(price, Decimals, Decimals)
 
@@ -202,9 +202,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     retry(10, batchLingerMs) {
       getEventsInfoByOrderId(buyOrder) shouldBe
         Set(
-          EventShortenedInfo(buyOrder, tradeEventType, denormalizedAmount, denormalizedAmount, statusPartiallyFilled),
-          EventShortenedInfo(buyOrder, tradeEventType, denormalizedAmount, 2 * denormalizedAmount, statusPartiallyFilled),
-          EventShortenedInfo(buyOrder, cancelEventType, 0, 2 * denormalizedAmount, statusCancelled)
+          EventShortenedInfo(buyOrder, eventTrade, denormalizedAmount, denormalizedAmount, statusPartiallyFilled),
+          EventShortenedInfo(buyOrder, eventTrade, denormalizedAmount, 2 * denormalizedAmount, statusPartiallyFilled),
+          EventShortenedInfo(buyOrder, eventCancel, 0, 2 * denormalizedAmount, statusCancelled)
         )
     }
   }
@@ -226,10 +226,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
         Some(OrderShortenedInfo(bigSellOrder, bob.publicKey.toString, sellSide, denormalizedPrice, 5 * denormalizedAmount))
 
       getEventsInfoByOrderId(smallBuyOrder).head shouldBe
-        EventShortenedInfo(smallBuyOrder, tradeEventType, denormalizedAmount, denormalizedAmount, statusFilled)
+        EventShortenedInfo(smallBuyOrder, eventTrade, denormalizedAmount, denormalizedAmount, statusFilled)
 
       getEventsInfoByOrderId(bigSellOrder).head shouldBe
-        EventShortenedInfo(bigSellOrder, tradeEventType, denormalizedAmount, denormalizedAmount, statusPartiallyFilled)
+        EventShortenedInfo(bigSellOrder, eventTrade, denormalizedAmount, denormalizedAmount, statusPartiallyFilled)
     }
   }
 }
