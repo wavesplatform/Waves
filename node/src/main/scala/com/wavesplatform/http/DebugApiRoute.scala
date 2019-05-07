@@ -371,13 +371,13 @@ case class DebugApiRoute(ws: WavesSettings,
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
-  @Path("/stateChanges/{transactionId}")
+  @Path("/stateChanges/info/{transactionId}")
   @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "path")
     ))
-  def stateChangesById: Route = (get & path("stateChanges" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
+  def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
     blockchain.transactionInfo(transactionId) match {
       case Some((_, tx: InvokeScriptTransaction)) =>
         val resultE = blockchain
