@@ -1,10 +1,9 @@
-
-
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
-
+import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
+
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -35,7 +34,7 @@ val versionSource = Def.task {
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
   Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases"),
+  Resolver.sbtPluginRepo("releases")
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -85,9 +84,6 @@ inTask(assembly)(
       case other                                                => (assemblyMergeStrategy in assembly).value(other)
     }
   ))
-
-val network = SettingKey[Network]("network")
-network := Network(sys.props.get("network"))
 
 name := "waves"
 normalizedName := s"${name.value}${network.value.packageSuffix}"
@@ -171,4 +167,3 @@ inConfig(Debian)(
     serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
   ))
-
