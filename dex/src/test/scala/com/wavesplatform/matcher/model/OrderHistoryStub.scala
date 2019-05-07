@@ -27,7 +27,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             time,
             new TestOrderDB(100),
             _ => false,
-            e => Future.successful(QueueEventWithMeta(0, 0, e)),
+            e => Future.successful(Some(QueueEventWithMeta(0, 0, e))),
           )))
     )
 
