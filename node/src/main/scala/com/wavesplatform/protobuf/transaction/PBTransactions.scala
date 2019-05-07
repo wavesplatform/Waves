@@ -305,7 +305,7 @@ object PBTransactions {
             sender,
             address,
             fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
-            payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
+            payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
             feeAmount,
             feeAssetId,
             timestamp,
