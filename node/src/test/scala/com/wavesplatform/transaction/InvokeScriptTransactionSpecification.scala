@@ -24,7 +24,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       val bytes = transaction.bytes()
       val deser = InvokeScriptTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
-      deser.dappAddress shouldEqual transaction.dappAddress
+      deser.dAppAddressOrAlias shouldEqual transaction.dAppAddressOrAlias
       deser.funcCallOpt shouldEqual transaction.funcCallOpt
       deser.payment shouldEqual transaction.payment
       deser.fee shouldEqual transaction.fee
@@ -48,7 +48,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "dappAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
                          "call": {
                             "function" : "foo",
                              "args" : [
@@ -95,7 +95,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
                          "timestamp": 1526910778245,
                          "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
                          "version": 1,
-                         "dappAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
                          "payment" : [{
                             "amount" : 7,
                             "assetId" : "$publicKey"

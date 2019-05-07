@@ -618,7 +618,7 @@ object TransactionFactory {
     for {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      contract <- Address.fromString(request.dappAddress)
+      contract <- AddressOrAlias.fromString(request.dappAddress)
 
       tx <- InvokeScriptTransaction.signed(
         sender,
@@ -634,11 +634,11 @@ object TransactionFactory {
 
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
-      contract <- Address.fromString(request.dappAddress)
+      addressOrAlias <- AddressOrAlias.fromString(request.dappAddress)
       fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
       tx <- InvokeScriptTransaction.create(
         sender,
-        contract,
+        addressOrAlias,
         fcOpt,
         request.payment,
         request.fee,

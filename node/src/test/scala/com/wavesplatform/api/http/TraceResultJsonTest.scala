@@ -9,10 +9,10 @@ import com.wavesplatform.lang.v1.evaluator.ScriptResult
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
 
@@ -22,28 +22,30 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       publicKey <- PublicKey.fromBase58String("9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT")
       address   <- Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU")
       proof     <- ByteStr.decodeBase58("4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ").toEither
-      tx        <- InvokeScriptTransaction.create(
-        sender      = publicKey,
+      tx <- InvokeScriptTransaction.create(
+        sender = publicKey,
         dappAddress = address,
-        fc          = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param"), CONST_LONG(1)))),
-        p           = List(Payment(1, Waves)),
-        fee         = 10000000,
-        feeAssetId  = Waves,
-        timestamp   = 1111,
-        proofs      = Proofs(List(proof))
+        fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param"), CONST_LONG(1)))),
+        p = List(Payment(1, Waves)),
+        fee = 10000000,
+        feeAssetId = Waves,
+        timestamp = 1111,
+        proofs = Proofs(List(proof))
       )
-   } yield tx
+    } yield tx
   ).explicitGet()
 
   property("suitable TracedResult json") {
-    val trace = List(InvokeScriptTrace(
-      tx.dappAddress,
-      tx.funcCallOpt,
-      Right(ScriptResult(
-        List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",700000000)),
-        List((Recipient.Address(tx.dappAddress.bytes), 1, None))
+    val trace = List(
+      InvokeScriptTrace(
+        tx.dAppAddressOrAlias,
+        tx.funcCallOpt,
+        Right(
+          ScriptResult(
+            List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
+            List((Recipient.Address(tx.dAppAddressOrAlias.bytes), 1, None))
+          ))
       ))
-    ))
 
     val result = TracedResult(Right(tx), trace)
 
@@ -64,7 +66,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    } ]
         |  },
         |  "trace" : [ {
-        |    "dAppAddress" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+        |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
         |    "function" : "func",
         |    "args" : [ "param", "1" ],
         |    "result" : {
@@ -82,7 +84,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |  "sender" : "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
         |  "feeAssetId" : null,
         |  "proofs" : [ "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ" ],
-        |  "dappAddress" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+        |  "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
         |  "payment" : [ {
         |    "amount" : 1,
         |    "assetId" : null
@@ -99,19 +101,20 @@ class TraceResultJsonTest extends PropSpec with Matchers {
     )
     val reason = "error reason"
 
-    val trace = List(InvokeScriptTrace(
-      tx.dappAddress,
-      tx.funcCallOpt,
-      Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false))
-    ))
+    val trace = List(
+      InvokeScriptTrace(
+        tx.dAppAddressOrAlias,
+        tx.funcCallOpt,
+        Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false))
+      ))
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)
 
     val result = TracedResult(Left(scriptExecutionError), trace)
 
     Json.prettyPrint(result.json) shouldBe
-    """{
+      """{
       |  "trace" : [ {
-      |    "dAppAddress" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+      |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
       |    "function" : "func",
       |    "args" : [ "param", "1" ],
       |    "error" : {
@@ -144,7 +147,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       |    "feeAssetId" : null,
       |    "proofs" : [ "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ" ],
       |    "fee" : 10000000,
-      |    "dappAddress" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+      |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
       |    "payment" : [ {
       |      "amount" : 1,
       |      "assetId" : null
