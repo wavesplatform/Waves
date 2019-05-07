@@ -1,6 +1,7 @@
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Compat._
+import com.typesafe.sbt.packager.Keys.packageName
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
 import sbt._
@@ -13,6 +14,7 @@ object ExtensionPackaging extends AutoPlugin {
   override def requires: Plugins = UniversalDeployPlugin && CommonSettings
 
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
+    packageName := s"${name.value}${network.value.packageSuffix}",
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
     javaOptions in Universal := Nil,
