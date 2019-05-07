@@ -12,6 +12,8 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -22,33 +24,37 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   val scriptSrc: String =
     s"""
-      |let self = Address(base58'$firstAddress')
-      |
+       |let self = Address(base58'$firstAddress')
+       |
       |match tx {
-      |	case dtx: DataTransaction =>
-      |		let v00 = extract(getBinary(self, "k0"))
-      |		let v01 = extract(getBinary(self, "k1"))
-      |		let v02 = extract(getBinary(self, "k2"))
-      |		let v03 = extract(getBinary(self, "k3"))
-      |
-      |		let pk = extract(getBinary(dtx.data, "pk"))
-      |   let msgPart1 = v00 + v01
-      |   let msgPart2 = v00 + v02
-      |   let msgPart3 = v00 + v03
-      |   let msgPart4 = v01 + v02
-      |   let msgPart5 = v01 + v03
-      |   let msgPart6 = v02 + v03
-      |		let sig = extract(getBinary(dtx.data, "sig"))
-      |
-      |		sigVerify(msgPart1, sig, pk) &&
-      |   sigVerify(msgPart2, sig, pk) &&
-      |   sigVerify(msgPart3, sig, pk) &&
-      |   sigVerify(msgPart4, sig, pk) &&
-      |   sigVerify(msgPart5, sig, pk) &&
-      |   sigVerify(msgPart6, sig, pk)
-      |
-      |	case _ => false
-      |}
+       |	case dtx: DataTransaction =>
+       |		let v00 = extract(getBinary(self, "k0"))
+       |		let v01 = extract(getBinary(self, "k1"))
+       |		let v02 = extract(getBinary(self, "k2"))
+       |		let v03 = extract(getBinary(self, "k3"))
+       |
+       |		let pk = extract(getBinary(dtx.data, "pk"))
+       |		let sig = extract(getBinary(dtx.data, "sig"))
+       |   # let msgPart1 = v00 + v01
+       |   # let msgPart2 = v00 + v02
+       |   # let msgPart3 = v00 + v03
+       |   # let msgPart4 = v01 + v02
+       |   # let msgPart5 = v01 + v03
+       |   # let msgPart6 = v02 + v03
+       |
+       |	 # sigVerify(msgPart1, sig, pk) &&
+       |   # sigVerify(msgPart2, sig, pk) &&
+       |   # sigVerify(msgPart3, sig, pk) &&
+       |   # sigVerify(msgPart4, sig, pk) &&
+       |   # sigVerify(msgPart5, sig, pk) &&
+       |   # sigVerify(msgPart6, sig, pk)
+       |   sigVerify(v00, sig, pk) &&
+       |   sigVerify(v01, sig, pk) &&
+       |   sigVerify(v02, sig, pk) &&
+       |   sigVerify(v03, sig, pk)
+       |
+       |	case _ => false
+       |}
     """.stripMargin
 
   test("set contract, put a lot of data, invoke test") {
@@ -101,8 +107,20 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequest(sender.signedBroadcast(mkInvData().json()))
 
-    (0 to 10).toList.par foreach { _ =>
-      sender.expectSignedBroadcastRejected(mkInvData().json()) shouldBe TransactionNotAllowedByAccountScript.ErrorCode
-    }
+    def async = com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi _
+
+    val requests =
+      (0 to 100)
+        .map { _ =>
+          async(sender).expectSignedBroadcastRejected(mkInvData().json())
+        }
+
+    val result = Future
+      .sequence(requests)
+      .map {
+        _.forall(_ == TransactionNotAllowedByAccountScript.ErrorCode)
+      }
+
+    Await.result(result, 1.minute) shouldBe true
   }
 }
