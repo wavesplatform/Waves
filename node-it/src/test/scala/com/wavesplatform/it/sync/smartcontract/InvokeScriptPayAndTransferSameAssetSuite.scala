@@ -33,9 +33,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
 
     val scriptText  = "match tx {case t:TransferTransaction => false case _ => true}"
     val smartScript = Some(ScriptCompiler.compile(scriptText).explicitGet()._1.bytes.value.base64)
-    rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript).id
-
-    nodes.waitForHeightAriseAndTxPresent(rejAssetId)
+    rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript, waitForTx = true).id
   }
 
   test("_set script to dApp account and transfer out all waves") {
@@ -56,9 +54,8 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
           |  else throw("need payment in WAVES or any Asset")
           |}
         """.stripMargin).explicitGet()._1
-    val dAppSetScriptTxId = sender.setScript(dApp, Some(dAppScript.bytes().base64)).id
+    sender.setScript(dApp, Some(dAppScript.bytes().base64), waitForTx = true).id
 
-    nodes.waitForHeightAriseAndTxPresent(dAppSetScriptTxId)
   }
 
   test("dApp can transfer payed asset if its own balance is 0") {
@@ -68,9 +65,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
 
     val paymentAmount = 10
 
-    val invokeScriptTxId = invoke("resendPayment", paymentAmount, issued(assetId))
-
-    nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
+    invoke("resendPayment", paymentAmount, issued(assetId))
 
     sender.accountBalances(dApp)._1 shouldBe dAppInitBalance
     sender.accountBalances(caller)._1 shouldBe callerInitBalance - smartMinFee
@@ -89,9 +84,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
-    val invokeScriptTxId = invoke("resendPayment", paymentAmount, issued(smartAssetId), fee)
-
-    nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
+    invoke("resendPayment", paymentAmount, issued(smartAssetId), fee)
 
     sender.accountBalances(dApp)._1 shouldBe dAppInitBalance
     sender.accountBalances(caller)._1 shouldBe callerInitBalance - fee
@@ -124,9 +117,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     dAppInitBalance shouldBe 0
 
     val paymentAmount    = 10
-    val invokeScriptTxId = invoke("resendPayment", paymentAmount)
-
-    nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
+    invoke("resendPayment", paymentAmount)
 
     sender.accountBalances(dApp)._1 shouldBe dAppInitBalance + paymentAmount - 1
     sender.accountBalances(caller)._1 shouldBe callerInitBalance - paymentAmount - smartMinFee
@@ -140,9 +131,10 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
       .invokeScript(
         caller,
         dApp,
-        func,
+        Some(func),
         payment = Seq(Payment(amount, asset)),
-        fee = fee
+        fee = fee,
+        waitForTx = true
       )
       .id
   }

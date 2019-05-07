@@ -1,8 +1,10 @@
+
+
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
+
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
-
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -33,7 +35,7 @@ val versionSource = Def.task {
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
   Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases")
+  Resolver.sbtPluginRepo("releases"),
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -169,3 +171,4 @@ inConfig(Debian)(
     serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
   ))
+
