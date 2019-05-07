@@ -71,8 +71,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "true"
     }
 
-    val dappVerBytes = ContractScript(V3, dappVer).explicitGet().bytes().base64
-    Post(routePath("/script/decompile"), dappVerBytes) ~> route ~> check {
+    val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
+
+    testdAppDirective(dappVerBytesStr)
+    testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
+  }
+
+  private def testdAppDirective(str: String) =
+    Post(routePath("/script/decompile"), str) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
@@ -82,7 +88,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "{-# STDLIB_VERSION 3 #-}\n{-# SCRIPT_TYPE ACCOUNT #-}\n{-# CONTENT_TYPE DAPP #-}\n\n\n\n@Verifier(tx)\nfunc verify () = true\n"
       (json \ "script").as[String] shouldBe expectedResult
     }
-  }
 
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {
