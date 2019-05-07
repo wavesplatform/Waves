@@ -60,8 +60,8 @@ object InvokeScriptResult {
 
   def fromPB(pbValue: PBInvokeScriptResult): InvokeScriptResult = {
     InvokeScriptResult(
-      pbValue.dataEntries.map(PBTransactions.toVanillaDataEntry),
-      pbValue.payments.map { p =>
+      pbValue.data.map(PBTransactions.toVanillaDataEntry),
+      pbValue.transfers.map { p =>
         val (asset, amount) = PBAmounts.toAssetAndAmount(p.getAmount)
         InvokeScriptResult.Payment(Address.fromBytes(p.address.toByteArray).explicitGet(), asset, amount)
       }
