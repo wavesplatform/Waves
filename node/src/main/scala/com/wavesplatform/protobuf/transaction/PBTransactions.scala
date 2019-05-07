@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Proofs, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
@@ -260,23 +260,23 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.DataTransaction(DataTransactionData(data)) =>
+      case Data.DataTransaction(dt) =>
         vt.DataTransaction.create(
           sender,
-          data.toList.map(toVanillaDataEntry),
+          dt.data.toList.map(toVanillaDataEntry),
           feeAmount,
           timestamp,
           proofs
         )
 
-      case Data.MassTransfer(MassTransferTransactionData(assetId, transfers, attachment)) =>
+      case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
-          Asset.fromCompatId(Option(assetId.toByteArray: ByteStr).filterNot(_.isEmpty)),
+          PBAmounts.toVanillaAssetId(mt.getAssetId),
           sender,
-          transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
           feeAmount,
-          attachment.toByteArray,
+          mt.attachment.toByteArray,
           proofs
         )
 
@@ -504,23 +504,23 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.DataTransaction(DataTransactionData(data)) =>
+      case Data.DataTransaction(dt) =>
         vt.DataTransaction(
           sender,
-          data.toList.map(toVanillaDataEntry),
+          dt.data.toList.map(toVanillaDataEntry),
           feeAmount,
           timestamp,
           proofs
         )
 
-      case Data.MassTransfer(MassTransferTransactionData(assetId, transfers, attachment)) =>
+      case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
-          Asset.fromProtoId(assetId),
+          PBAmounts.toVanillaAssetId(mt.getAssetId),
           sender,
-          transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
           feeAmount,
-          attachment.toByteArray,
+          mt.attachment.toByteArray,
           proofs
         )
 
@@ -543,8 +543,8 @@ object PBTransactions {
           proofs
         )
 
-      case data =>
-        throw new IllegalArgumentException(s"Unsupported transaction data: $data")
+      case other =>
+        throw new IllegalArgumentException(s"Unsupported transaction data: $other")
     }
   }
 
@@ -553,7 +553,7 @@ object PBTransactions {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)
-        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, data = Data.Genesis(data))
+        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, proofsArray = Seq(signature), data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
         val data = PaymentTransactionData(ByteString.copyFrom(recipient.bytes), amount)
@@ -646,7 +646,7 @@ object PBTransactions {
 
       case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
         val data = MassTransferTransactionData(
-          ByteString.copyFrom(assetId.compatId.getOrElse(ByteStr.empty)),
+          Some(PBAmounts.toPBAssetId(assetId)),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
           attachment: ByteStr
         )
