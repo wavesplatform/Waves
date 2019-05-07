@@ -8,10 +8,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
@@ -28,12 +25,11 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
       val nodeAddress = i.createAddress()
       val acc         = KeyPair.fromSeed(i.seed(nodeAddress)).right.get
 
-      val tx = i.transfer(i.address, nodeAddress, 10.waves, 0.005.waves, None, waitForTx = true).id
+      i.transfer(i.address, nodeAddress, 10.waves, 0.005.waves, None, waitForTx = true)
 
       val scriptText = s"""true""".stripMargin
-
       val script               = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-      val setScriptTransaction = i.setScript(acc.address, Some(script), setScriptFee, waitForTx = true)
+      i.setScript(acc.address, Some(script), setScriptFee, waitForTx = true)
 
       acc
     })

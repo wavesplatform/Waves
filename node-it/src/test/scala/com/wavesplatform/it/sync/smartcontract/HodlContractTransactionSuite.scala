@@ -8,10 +8,9 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsNumber, Json}
 
 class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 

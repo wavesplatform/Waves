@@ -10,7 +10,6 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -23,7 +22,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val (balance1, eff1) = miner.accountBalances(acc0.address)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee, waitForTx = true).id
+    sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee, waitForTx = true).id
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
@@ -40,7 +39,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
       LeaseTransactionV2
@@ -86,8 +85,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val signedLeasingCancel =
       unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
 
-    val leasingCancelId =
-      sender.signedBroadcast(signedLeasingCancel.json(), waitForTx = true).id
+    sender.signedBroadcast(signedLeasingCancel.json(), waitForTx = true).id
 
     miner.assertBalances(firstAddress,
                          balance1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves),
