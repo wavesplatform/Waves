@@ -27,7 +27,7 @@ object TxEstimators extends ScorexLogging {
 
   object scriptRunNumber extends Fn {
     override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = {
-      ScriptRunsLegacy.assertEquals(blockchain, tx, diff)
+      // ScriptRunsLegacy.assertEquals(blockchain, tx, diff)
       diff.scriptsRun
     }
 
