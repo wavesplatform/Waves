@@ -19,6 +19,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     super.beforeAll()
     val xs = Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(node.signedIssue)
     xs.foreach(tx => node.waitForTransaction(tx.id))
+    node.waitForHeight(node.height + 1)
   }
 
   "When blacklists are empty" in {

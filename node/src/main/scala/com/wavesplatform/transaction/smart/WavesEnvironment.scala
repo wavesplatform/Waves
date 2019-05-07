@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
@@ -97,6 +98,11 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     }
   }
 
-  override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock.map(lBlock => BlockInfo(lBlock.timestamp, blockchain.height, lBlock.consensusData.generationSignature))
+  override def lastBlockOpt(): Option[BlockInfo] = blockchain.lastBlock.map(toBlockInfo)
+
+  override def blockInfoByHeight(height: Int): Option[BlockInfo] = blockchain.blockAt(height).map(toBlockInfo)
+
+  private def toBlockInfo(block: Block) = {
+    BlockInfo(block.timestamp, blockchain.height, block.consensusData.generationSignature)
+  }
 }
