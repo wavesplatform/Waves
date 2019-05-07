@@ -1,22 +1,17 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsNumber, Json}
+import play.api.libs.json.JsNumber
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -87,7 +82,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("contract caller invokes a function on a contract") {
     val arg               = ByteStr(Array(42: Byte))
 
-    val invokeScriptId = sender.invokeScript(
+    sender.invokeScript(
       caller.address,
       contract.address,
       func = Some("foo"),
@@ -104,7 +99,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("contract caller invokes a default function on a contract") {
 
 
-    val invokeScriptId = sender.invokeScript(
+    sender.invokeScript(
       caller.address,
       contract.address,
       func = None,

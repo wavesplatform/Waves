@@ -122,9 +122,16 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
-case class StateChangeResponse(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
-object StateChangeResponse {
-  implicit val stateChangeResponseFormat: Format[StateChangeResponse] = Json.format[StateChangeResponse]
+
+
+case class StateChangesDetails(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
+object StateChangesDetails {
+  implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
+}
+
+case class DebugStateChanges(stateChanges: StateChangesDetails)
+object DebugStateChanges{
+  implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
 }
 
 case class DataResponse(`type`: String, value: Long, key: String)
