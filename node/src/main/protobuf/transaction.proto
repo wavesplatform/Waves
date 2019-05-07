@@ -94,7 +94,7 @@ message MassTransferTransactionData {
         int64 amount = 2;
     };
 
-    bytes asset_id = 1;
+    AssetId asset_id = 1;
     repeated Transfer transfers = 2;
     bytes attachment = 3;
 };
