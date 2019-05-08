@@ -13,6 +13,7 @@ object Global extends Object {
   def base64Decode(input: String): UndefOr[ArrayBuffer] = native
 
   def curve25519verify(message: ArrayBuffer, sig: ArrayBuffer, pub: ArrayBuffer): Boolean = native
+  def rsaVerify(message: ArrayBuffer, sig: ArrayBuffer, pub: ArrayBuffer): Boolean        = native
   def keccak256(message: ArrayBuffer): ArrayBuffer                                        = native
   def blake2b256(message: ArrayBuffer): ArrayBuffer                                       = native
   def sha256(message: ArrayBuffer): ArrayBuffer                                           = native

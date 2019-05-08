@@ -14,7 +14,7 @@ object CryptoContext {
     def hashFunction(name: String, internalName: Short, cost: Long, docString: String)(h: Array[Byte] => Array[Byte]): BaseFunction =
       NativeFunction(name, cost, internalName, BYTESTR, docString, ("bytes", BYTESTR, "value")) {
         case CONST_BYTESTR(m: ByteStr) :: Nil => Right(CONST_BYTESTR(ByteStr(h(m.arr))))
-        case _                                      => ???
+        case _                                => ???
       }
 
     val keccak256F: BaseFunction  = hashFunction("keccak256", KECCAK256, 10, "256 bit Keccak/SHA-3/TIPS-202")(global.keccak256)
@@ -35,9 +35,23 @@ object CryptoContext {
         case _ => ???
       }
 
+    val rsaVerifyF: BaseFunction =
+      NativeFunction("rsaVerify",
+                     100,
+                     RSAVERIFY,
+                     BOOLEAN,
+                     "check RSA signature",
+                     ("message", BYTESTR, "value"),
+                     ("sig", BYTESTR, "signature"),
+                     ("pub", BYTESTR, "public key")) {
+        case CONST_BYTESTR(m: ByteStr) :: CONST_BYTESTR(s: ByteStr) :: CONST_BYTESTR(p: ByteStr) :: Nil =>
+          Right(CONST_BOOLEAN(global.rsaVerify(m.arr, s.arr, p.arr)))
+        case _ => ???
+      }
+
     def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "Base58 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).map(CONST_STRING)
-      case xs                                         => notImplemented("toBase58String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase58String(bytes: byte[])", xs)
     }
 
     def fromBase58StringF: BaseFunction =
@@ -48,7 +62,7 @@ object CryptoContext {
 
     def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "Base64 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).map(CONST_STRING)
-      case xs                                         => notImplemented("toBase64String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase64String(bytes: byte[])", xs)
     }
 
     def fromBase64StringF: BaseFunction =
@@ -60,7 +74,7 @@ object CryptoContext {
     CTX(
       Seq.empty,
       Map.empty,
-      Array(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
+      Array(keccak256F, blake2b256F, sha256F, sigVerifyF, rsaVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
     )
   }
 

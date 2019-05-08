@@ -49,6 +49,7 @@ object FunctionIds {
   val KECCAK256: Short = 501
   val BLAKE256: Short  = 502
   val SHA256: Short    = 503
+  val RSAVERIFY: Short = 504
 
   val TOBASE58: Short   = 600
   val FROMBASE58: Short = 601
