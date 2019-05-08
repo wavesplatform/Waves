@@ -43,8 +43,8 @@ object HistoryRouter {
       Set(
         OrderRecord(
           id = order.id().base58,
-          senderAddress = order.sender.toAddress.toString,
-          senderPublicKey = order.senderPublicKey.toString,
+          senderAddress = order.sender.address,
+          senderPublicKey = order.senderPublicKey.base58,
           amountAssetId = order.assetPair.amountAssetStr,
           priceAssetId = order.assetPair.priceAssetStr,
           side = if (order.orderType == OrderType.BUY) buySide else sellSide,
