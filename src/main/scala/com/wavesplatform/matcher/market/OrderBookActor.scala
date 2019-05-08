@@ -30,7 +30,7 @@ class OrderBookActor(owner: ActorRef,
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
+  protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
   private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]

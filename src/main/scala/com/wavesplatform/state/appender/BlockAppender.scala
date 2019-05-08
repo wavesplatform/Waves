@@ -52,7 +52,7 @@ object BlockAppender extends ScorexLogging {
     metrics.blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
 
     (for {
-      _                <- EitherT(Task.now(newBlock.signaturesValid()))
+      _                <- EitherT(Task(metrics.blockSignaturesValidation.measureSuccessful(newBlock.signaturesValid())))
       validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, settings, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) => // block already appended
@@ -71,7 +71,8 @@ object BlockAppender extends ScorexLogging {
   }
 
   private[this] object metrics {
-    val blockReceivingLag        = Kamon.histogram("block-appender.receiving-lag")
-    val blockProcessingTimeStats = Kamon.timer("block-appender.processing-time")
+    val blockSignaturesValidation = Kamon.timer("block-appender.block-signatures-validation")
+    val blockReceivingLag         = Kamon.histogram("block-appender.receiving-lag")
+    val blockProcessingTimeStats  = Kamon.timer("block-appender.processing-time")
   }
 }
