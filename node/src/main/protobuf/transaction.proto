@@ -196,6 +196,6 @@ message InvokeScriptResult {
         Amount amount = 2;
     }
 
-    repeated DataTransactionData.DataEntry data_entries = 1;
-    repeated Payment payments = 2;
+    repeated DataTransactionData.DataEntry data = 1;
+    repeated Payment transfers = 2;
 }

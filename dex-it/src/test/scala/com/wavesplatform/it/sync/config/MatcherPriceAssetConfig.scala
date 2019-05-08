@@ -166,6 +166,7 @@ object MatcherPriceAssetConfig {
                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                             |  rest-order-limit = $orderLimit
+                                            |  snapshots-interval = 10
                                             |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(

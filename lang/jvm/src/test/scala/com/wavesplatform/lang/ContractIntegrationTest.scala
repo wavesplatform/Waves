@@ -218,7 +218,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         senderPk = ByteStr.empty,
         proofs = IndexedSeq.empty
       ),
-      dappAddress = Recipient.Address(ByteStr.empty),
+      dAppAddressOrAlias = Recipient.Address(ByteStr.empty),
       maybePayment = None,
       feeAssetId = None,
       funcName = Some("foo"),

@@ -377,6 +377,18 @@ object WavesContext {
       case _                                 => ???
     }
 
+    val blockInfoByHeightF: BaseFunction = NativeFunction(
+      "blockInfoByHeight",
+      100,
+      BLOCKINFOBYHEIGHT,
+      UNION(UNIT, blockInfo),
+      "lookup block by height and return info if it exists",
+      ("height", LONG, "block height")
+    ) {
+      case CONST_LONG(height: Long) :: Nil => Right(env.blockInfoByHeight(height.toInt).map(Bindings.buildLastBlockInfo))
+      case _                               => ???
+    }
+
     val sellOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval:  Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Buy)))
 
@@ -414,6 +426,7 @@ object WavesContext {
     lazy val functions = Array(
       txByIdF,
       txHeightByIdF,
+      blockInfoByHeightF,
       getIntegerFromStateF,
       getBooleanFromStateF,
       getBinaryFromStateF,
