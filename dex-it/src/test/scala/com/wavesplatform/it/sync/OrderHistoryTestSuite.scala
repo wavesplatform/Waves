@@ -1,9 +1,10 @@
 package com.wavesplatform.it.sync
 
+import java.net.InetAddress
 import java.sql.{Connection, DriverManager}
 
-import cats.implicits._
-import com.spotify.docker.client.DefaultDockerClient
+import com.google.common.primitives.Ints
+import com.spotify.docker.client.messages.Network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -11,7 +12,8 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
 import com.wavesplatform.matcher.history.DBRecords.{EventRecord, OrderRecord}
-import com.wavesplatform.matcher.model.{MatcherModel, OrderValidator}
+import com.wavesplatform.matcher.model.MatcherModel.Denormalization
+import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.matcher.settings.PostgresConnection._
 import com.wavesplatform.matcher.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
@@ -19,22 +21,41 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
 
-import scala.collection.JavaConverters._
 import scala.io.Source
 import scala.util.{Failure, Try}
 
 class OrderHistoryTestSuite extends MatcherSuiteBase {
+
+  // scenario:
+  //  1. create node network
+  //  2. create postgres container (pgc)
+  //  3. connect pgc to node network
+  //  4. up pgc
+  //  5. up node (during start node checks connection to postgres)
+  //  6. send messages from node to pgc
+
+  val wavesNetwork: Network = dockerSingleton().createNetwork
 
   val postgresImageName, postgresUser = "postgres"
   val postgresContainerName           = "pgc"
   val postgresPassword                = "docker"
   val postgresEnv                     = s"POSTGRES_PASSWORD=$postgresPassword"
   val postgresContainerPort           = "5432"
+  val postgresContainerIp: String     = InetAddress.getByAddress(Ints.toByteArray(10 & 0xF | dockerSingleton().networkSeed)).getHostAddress
 
-  val postgresContainerLauncher         = new DockerContainerLauncher(postgresImageName, postgresContainerName, postgresEnv, postgresContainerPort)
-  val dockerClient: DefaultDockerClient = postgresContainerLauncher.dockerClient
+  val postgresContainerLauncher =
+    new DockerContainerLauncher(
+      postgresImageName,
+      postgresContainerName,
+      postgresEnv,
+      postgresContainerIp,
+      postgresContainerPort,
+      wavesNetwork.name
+    )
 
   val batchLingerMs: Int = OrderHistorySettings.defaultBatchLingerMs
+
+  def getPostgresContainerHostPort: String = postgresContainerLauncher.getHostPort.explicitGet()
 
   @annotation.tailrec
   private def retry[T](attemptsCount: Int, delayInMs: Int = 0)(fn: => T): Try[T] = {
@@ -47,7 +68,6 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   def createTables(postgresAddress: String): Unit = {
 
-    val driver                  = "org.postgresql.Driver"
     val url                     = s"jdbc:postgresql://$postgresAddress/$postgresImageName"
     val orderHistoryDDLFileName = "/order-history/order-history-ddl.sql"
 
@@ -61,9 +81,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       createTablesStatement.close()
     }
 
-    Try { Class.forName(driver) } *> retry(10, 2000) { DriverManager.getConnection(url, postgresUser, postgresPassword) } >>= { sqlConnection =>
+    retry(10, 2000) { DriverManager.getConnection(url, postgresUser, postgresPassword) } flatMap { sqlConnection =>
       executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
-    }
+    } get
   }
 
   def getPostgresConnectionCfgString(serverName: String, port: String): String =
@@ -101,13 +121,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
-    // connect postgres container to the nodes network
-    val nodeNetworkId = dockerClient.inspectContainer(node.containerId).networkSettings().networks().asScala.head._2.networkId()
-    dockerClient.connectToNetwork(postgresContainerLauncher.containerId, nodeNetworkId)
-
-    // start postgres container and create tables
     postgresContainerLauncher.startContainer()
-    createTables(s"localhost:${postgresContainerLauncher.getHostPort.explicitGet()}")
+    createTables(s"localhost:$getPostgresContainerHostPort")
 
     Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach(tx => node.waitForTransaction(tx.id))
   }
@@ -121,7 +136,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     new PostgresJdbcContext(
       SnakeCase,
       ConfigFactory
-        .parseString(getPostgresConnectionCfgString("localhost", postgresContainerLauncher.getHostPort.explicitGet()))
+        .parseString(getPostgresConnectionCfgString("localhost", getPostgresContainerHostPort))
         .as[PostgresConnection]("postgres")
         .getConfig
     )
@@ -131,8 +146,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   def getOrdersCount: Long = ctx.run(querySchema[OrderRecord]("orders", _.id      -> "id").size)
   def getEventsCount: Long = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id").size)
 
-  case class EventShortenedInfo(orderId: String, eventType: Double, filled: Double, totalFilled: Double, status: Byte)
   case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: Double, amount: Double)
+  case class EventShortenedInfo(orderId: String, eventType: Byte, filled: Double, totalFilled: Double, status: Byte)
 
   def getOrderInfoById(orderId: String): Option[OrderShortenedInfo] =
     ctx
@@ -163,11 +178,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   import com.wavesplatform.matcher.history.HistoryRouter._
 
-  val (buySide, sellSide) = (0: Byte, 1: Byte)
-  val (amount, price)     = (1000L, PriceConstant)
-
-  val denormalizedAmount: Double = MatcherModel.denormalizeAmountAndFee(amount, Decimals)
-  val denormalizedPrice: Double  = MatcherModel.fromNormalized(price, Decimals, Decimals)
+  val (amount, price)            = (1000L, PriceConstant)
+  val denormalizedAmount: Double = Denormalization.denormalizeAmountAndFee(amount, Decimals)
+  val denormalizedPrice: Double  = Denormalization.denormalizePrice(price, Decimals, Decimals)
 
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders

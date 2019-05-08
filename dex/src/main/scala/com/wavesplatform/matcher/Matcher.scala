@@ -19,7 +19,8 @@ import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCach
 import com.wavesplatform.matcher.history.HistoryRouter
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, MatcherModel, OrderBook, OrderValidator}
+import com.wavesplatform.matcher.model.MatcherModel.Normalization
+import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.state.VolumeAndFee
@@ -82,12 +83,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = {
 
-    import MatcherModel.{getAssetDecimals, toNormalized}
-
     val normalizedTickSize = settings.orderRestrictions.get(pair).withFilter(_.mergeSmallPrices).map { restrictions =>
-      toNormalized(restrictions.tickSize,
-                   getAssetDecimals(context.blockchain, pair.priceAsset),
-                   getAssetDecimals(context.blockchain, pair.priceAsset)).max(1)
+      Normalization.normalizePrice(restrictions.tickSize, context.blockchain, pair).max(1)
     }
 
     OrderBookActor.props(

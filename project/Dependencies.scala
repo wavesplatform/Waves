@@ -152,7 +152,7 @@ object Dependencies {
   ) ++ Seq(
     akkaModule("testkit"),
     akkaModule("persistence-tck"),
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1",
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
   ).map(_ % Test) ++ test ++ quill
 
   lazy val protobuf = Def.setting {

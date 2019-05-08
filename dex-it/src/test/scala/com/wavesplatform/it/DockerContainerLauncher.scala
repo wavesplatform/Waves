@@ -3,7 +3,8 @@ package com.wavesplatform.it
 import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
-import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
+import com.spotify.docker.client.messages.{ContainerConfig, EndpointConfig, HostConfig, PortBinding}
 import com.wavesplatform.it.DockerContainerLauncher.{ContainerIsNotStartedYetError, DockerError}
 
 import scala.collection.JavaConverters._
@@ -12,7 +13,9 @@ import scala.util.Try
 class DockerContainerLauncher(imageName: String,
                               containerName: String,
                               env: String,
+                              containerIp: String,
                               containerPort: String,
+                              networkName: String,
                               hostPort: Option[String] = None,
                               imageTag: String = "latest") {
 
@@ -27,11 +30,20 @@ class DockerContainerLauncher(imageName: String,
       .build()
   }
 
+  private def endpointConfig: EndpointConfig = {
+    EndpointConfig
+      .builder()
+      .ipAddress(containerIp)
+      .ipamConfig(EndpointIpamConfig.builder().ipv4Address(containerIp).build())
+      .build()
+  }
+
   private val containerConfig = {
     dockerClient.pull(s"$imageName:$imageTag")
     ContainerConfig
       .builder()
       .hostConfig(hostConfig)
+      .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(networkName -> endpointConfig).asJava))
       .exposedPorts(containerPort)
       .image(imageName)
       .env(env)

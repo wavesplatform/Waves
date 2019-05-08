@@ -13,28 +13,8 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scala.math.BigDecimal.RoundingMode
 
 object MatcherModel {
+
   type Price = Long
-
-  def toNormalized(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long = {
-    (BigDecimal.valueOf(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
-  }
-
-  def fromNormalized(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double = {
-    (BigDecimal.valueOf(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
-  }
-
-  def denormalizeAmountAndFee(value: Long, blockchain: Blockchain, pair: AssetPair): Double = {
-    fromNormalized(value, -getAssetDecimals(blockchain, pair.amountAsset), -8)
-  }
-
-  def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Byte): Double = {
-    fromNormalized(value, -amountAssetDecimals, -8)
-  }
-
-  def denormalizePrice(value: Long, blockchain: Blockchain, pair: AssetPair): Double = {
-    val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
-    fromNormalized(value, amountAssetDecimals, priceAssetDecimals)
-  }
 
   def getAssetDecimals(blockchain: Blockchain, asset: Asset): Int = {
     asset.fold(8) { issuedAsset =>
@@ -45,8 +25,38 @@ object MatcherModel {
     }
   }
 
-  def getPairDecimals(blockchain: Blockchain, pair: AssetPair): (Int, Int) = {
+  def getPairDecimals(blockchain: Blockchain, pair: AssetPair): (Int, Int) =
     getAssetDecimals(blockchain, pair.amountAsset) -> getAssetDecimals(blockchain, pair.priceAsset)
+
+  object Normalization {
+
+    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Long =
+      (BigDecimal(value) * BigDecimal(10).pow(amountAssetDecimals)).toLong
+
+    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long =
+      (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
+
+    def normalizePrice(value: Double, blockchain: Blockchain, pair: AssetPair): Long = {
+      val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
+      normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+    }
+  }
+
+  object Denormalization {
+
+    def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
+
+    def denormalizeAmountAndFee(value: Long, blockchain: Blockchain, pair: AssetPair): Double =
+      denormalizeAmountAndFee(value, getAssetDecimals(blockchain, pair.amountAsset))
+
+    def denormalizePrice(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+
+    def denormalizePrice(value: Long, blockchain: Blockchain, pair: AssetPair): Double = {
+      val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
+      denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+    }
   }
 }
 
