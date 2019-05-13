@@ -48,14 +48,14 @@ class UtxPoolImpl(time: Time,
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+  override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     val knownTx = pessimisticPortfolios.contains(tx.id())
 
     if (knownTx) TracedResult.wrapValue(utxSettings.allowRebroadcasting)
-    else putNewTx(tx)
+    else putNewTx(tx, verify)
   }
 
-  protected def putNewTx(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+  protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     def canReissue(blockchain: Blockchain, tx: Transaction): Either[GenericError, Unit] =
       PoolMetrics.checkCanReissue.measure(tx match {
         case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
@@ -119,6 +119,11 @@ class UtxPoolImpl(time: Time,
     }
 
     PoolMetrics.putRequestStats.increment()
+
+    if (!verify) {
+      transactions.put(tx.id(), tx)
+      return TracedResult.wrapValue(true)
+    }
 
     val tracedResult = PoolMetrics.putTimeStats.measure {
       val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
@@ -278,18 +283,29 @@ class UtxPoolImpl(time: Time,
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
-      UtxPoolImpl.this.transactions
-        .values()
-        .removeIf(tx =>
-          TxCheck.validate(tx) match {
-            case Left(error) =>
-              log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
-              UtxPoolImpl.this.afterRemove(tx)
-              true
+      val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
+      val (invalidTxs, _) = PoolMetrics.cleanupTimeStats.measure {
+        transactions.values.asScala.toSeq
+          .sorted(TransactionsOrdering.InUTXPool)
+          .iterator
+          .foldLeft((Seq.empty[Transaction], Monoid[Diff].empty)) {
+            case ((invalid, diff), tx) =>
+              val updatedBlockchain = composite(blockchain, diff)
+              if (TxCheck.isExpired(tx)) {
+                (invalid :+ tx, diff)
+              } else {
+                differ(updatedBlockchain, tx).resultE match {
+                  case Right(newDiff) =>
+                    (invalid, Monoid.combine(diff, newDiff))
+                  case Left(error) =>
+                    log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
+                    (invalid :+ tx, diff)
+                }
+              }
+          }
+      }
 
-            case Right(_) =>
-              false
-        })
+      invalidTxs.map(_.id()).foreach(UtxPoolImpl.this.transactions.remove)
     }
   }
 
@@ -303,6 +319,7 @@ class UtxPoolImpl(time: Time,
     val putTimeStats             = Kamon.timer("utx.put-if-new")
     val putRequestStats          = Kamon.counter("utx.put-if-new.requests")
     val packTimeStats            = Kamon.timer("utx.pack-unconfirmed")
+    val cleanupTimeStats            = Kamon.timer("utx.cleanup")
 
     val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable")
     val checkAlias            = Kamon.timer("utx.check.alias")
