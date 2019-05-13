@@ -319,7 +319,7 @@ class UtxPoolImpl(time: Time,
     val putTimeStats             = Kamon.timer("utx.put-if-new")
     val putRequestStats          = Kamon.counter("utx.put-if-new.requests")
     val packTimeStats            = Kamon.timer("utx.pack-unconfirmed")
-    val cleanupTimeStats            = Kamon.timer("utx.cleanup")
+    val cleanupTimeStats         = Kamon.timer("utx.cleanup")
 
     val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable")
     val checkAlias            = Kamon.timer("utx.check.alias")
