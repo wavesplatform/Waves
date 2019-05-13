@@ -467,8 +467,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   }
 
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
-    val p = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
-    blockchain.portfolio(a).combine(p)
+    val diffPf = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
+    val lease = blockchain.leaseBalance(a)
+    val balance = blockchain.balance(a)
+    Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
