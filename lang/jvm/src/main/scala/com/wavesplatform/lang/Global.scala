@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.common.crypto.RSA
+import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
@@ -26,7 +27,7 @@ object Global extends BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = Curve25519.verify(Signature(sig), message, PublicKey(pub))
 
-  override def rsaVerify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = RSA.verify(message, sig, pub)
+  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = RSA.verify(alg, message, sig, pub)
 
   def keccak256(message: Array[Byte]): Array[Byte]  = Keccak256.hash(message)
   def blake2b256(message: Array[Byte]): Array[Byte] = Blake2b256.hash(message)
