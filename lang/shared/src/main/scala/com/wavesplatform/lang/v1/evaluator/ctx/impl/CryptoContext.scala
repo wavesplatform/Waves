@@ -20,13 +20,9 @@ object CryptoContext {
   private val sha256   = CASETYPEREF("SHA256", List.empty)
   private val sha384   = CASETYPEREF("SHA384", List.empty)
   private val sha512   = CASETYPEREF("SHA512", List.empty)
-  private val sha3_224 = CASETYPEREF("SHA3_224", List.empty)
-  private val sha3_256 = CASETYPEREF("SHA3_256", List.empty)
-  private val sha3_384 = CASETYPEREF("SHA3_384", List.empty)
-  private val sha3_512 = CASETYPEREF("SHA3_512", List.empty)
 
   private val digestAlgorithmType =
-    UNION(sha1, sha224, sha256, sha384, sha512, sha3_224, sha3_256, sha3_384, sha3_512)
+    UNION(sha1, sha224, sha256, sha384, sha512)
 
   private def algFromCO(obj: Terms.CaseObj): Either[String, DigestAlgorithm] = {
     import com.wavesplatform.common.crypto.RSA._
@@ -36,10 +32,6 @@ object CryptoContext {
       case CaseObj(`sha256`, _)   => Right(SHA256)
       case CaseObj(`sha384`, _)   => Right(SHA384)
       case CaseObj(`sha512`, _)   => Right(SHA512)
-      case CaseObj(`sha3_224`, _) => Right(SHA3_224)
-      case CaseObj(`sha3_256`, _) => Right(SHA3_256)
-      case CaseObj(`sha3_384`, _) => Right(SHA3_384)
-      case CaseObj(`sha3_512`, _) => Right(SHA3_512)
       case _                      => Left("Unknown digest type")
     }
   }
@@ -118,7 +110,6 @@ object CryptoContext {
         blake2b256F,
         sha256F,
         sigVerifyF,
-        rsaVerifyF,
         toBase58StringF,
         fromBase58StringF,
         toBase64StringF,
@@ -131,10 +122,6 @@ object CryptoContext {
       sha256,
       sha384,
       sha512,
-      sha3_224,
-      sha3_256,
-      sha3_384,
-      sha3_512,
       digestAlgorithmType
     )
 
@@ -144,10 +131,6 @@ object CryptoContext {
       ("SHA256", ((sha256, "SHA256 digest algorithm"), digestAlgValue(sha256))),
       ("SHA384", ((sha384, "SHA384 digest algorithm"), digestAlgValue(sha384))),
       ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512))),
-      ("SHA3_224", ((sha3_224, "SHA3-224 digest algorithm"), digestAlgValue(sha3_224))),
-      ("SHA3_256", ((sha3_256, "SHA3-256 digest algorithm"), digestAlgValue(sha3_256))),
-      ("SHA3_384", ((sha3_384, "SHA3-384 digest algorithm"), digestAlgValue(sha3_384))),
-      ("SHA3_512", ((sha3_512, "SHA3-512 digest algorithm"), digestAlgValue(sha3_512)))
     )
 
     val v3Functions = Array(rsaVerifyF)

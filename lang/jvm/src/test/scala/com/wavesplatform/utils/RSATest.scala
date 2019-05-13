@@ -3,6 +3,8 @@ package com.wavesplatform.utils
 import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 
 import cats.syntax.monoid._
+import com.wavesplatform.common.crypto.RSA
+import com.wavesplatform.common.crypto.RSA._
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.V3
@@ -31,42 +33,55 @@ class RSATest extends PropSpec with PropertyChecks with Matchers {
     Gen.asciiPrintableStr
       .map(_.getBytes("UTF-8"))
 
-  def scriptSrc(msg: Array[Byte], sig: Array[Byte], pub: Array[Byte]): String = {
+  val algGenerator: Gen[DigestAlgorithm] =
+    Gen.oneOf(SHA1, SHA224, SHA256, SHA384, SHA512)
+
+  def scriptSrc(alg: DigestAlgorithm, msg: Array[Byte], sig: Array[Byte], pub: Array[Byte]): String = {
+    val algStr = alg match {
+      case SHA1   => "SHA1"
+      case SHA224 => "SHA224"
+      case SHA256 => "SHA256"
+      case SHA384 => "SHA384"
+      case SHA512 => "SHA512"
+    }
+
     s"""
        |
        |let msg = base64'${Base64.encode(msg)}'
        |let sig = base64'${Base64.encode(sig)}'
        |let pub = base64'${Base64.encode(pub)}'
        |
-       |rsaVerify(msg, sig, pub)
+       |rsaVerify($algStr, msg, sig, pub)
        |
         """.stripMargin
   }
 
   property("true on correct signature") {
-    forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
+    forAll(keyPairGenerator, messageGenerator, algGenerator) { (keyPair, message, alg) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
 
-      val privateSignature = Signature.getInstance("SHA256withRSA")
+      val prefix = RSA.digestAlgorithmPrefix(alg)
+
+      val privateSignature = Signature.getInstance(s"${prefix}withRSA")
 
       privateSignature.initSign(xprv)
       privateSignature.update(message)
 
       val signature = privateSignature.sign
 
-      eval(scriptSrc(message, signature, xpub.getEncoded)) shouldBe Right(CONST_BOOLEAN(true))
+      eval(scriptSrc(alg, message, signature, xpub.getEncoded)) shouldBe Right(CONST_BOOLEAN(true))
     }
   }
 
   property("false on incorrect signature") {
-    forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
+    forAll(keyPairGenerator, messageGenerator, algGenerator) { (keyPair, message, alg) =>
       val xpub = keyPair.getPublic
 
       val signature = new Array[Byte](256)
 
       Random.nextBytes(signature)
-      eval(scriptSrc(message, signature, xpub.getEncoded)) shouldBe Right(CONST_BOOLEAN(false))
+      eval(scriptSrc(alg, message, signature, xpub.getEncoded)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
