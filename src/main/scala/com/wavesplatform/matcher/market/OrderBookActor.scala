@@ -24,7 +24,8 @@ class OrderBookActor(owner: ActorRef,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
-                     time: Time)
+                     time: Time,
+                     var notifyAddresses: Boolean)
     extends PersistentActor
     with ScorexLogging {
 
@@ -32,7 +33,6 @@ class OrderBookActor(owner: ActorRef,
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
-  private var notifyAddresses         = false
   private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
   private var lastProcessedOffset     = Option.empty[QueueEventWithMeta.Offset]
@@ -63,8 +63,10 @@ class OrderBookActor(owner: ActorRef,
       }
 
     case MatcherActor.StartNotifyAddresses =>
-      notifyAddresses = true
-      processEvents(orderBook.allOrders.map(OrderAdded))
+      if (!notifyAddresses) {
+        notifyAddresses = true
+        processEvents(orderBook.allOrders.map(OrderAdded))
+      }
       sender() ! MatcherActor.AddressesNotified
 
     case ForceStartOrderBook(p) if p == assetPair =>
@@ -141,6 +143,7 @@ class OrderBookActor(owner: ActorRef,
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
+      if (notifyAddresses) processEvents(orderBook.allOrders.map(OrderAdded))
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
@@ -168,8 +171,9 @@ object OrderBookActor {
             updateMarketStatus: MarketStatus => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
-            time: Time): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time))
+            time: Time,
+            notifyAddresses: Boolean): Props =
+    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, notifyAddresses))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

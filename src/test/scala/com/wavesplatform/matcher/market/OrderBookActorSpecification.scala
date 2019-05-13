@@ -2,13 +2,11 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{ActorRef, Props}
 import akka.persistence.serialization.Snapshot
-import akka.testkit.{ImplicitSender, TestProbe}
+import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.matcher.api.AlreadyProcessed
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -16,6 +14,7 @@ import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
@@ -31,14 +30,14 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
   private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
-  private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = obcTestWithPrepare(_ => ()) { (pair, actor, probe) =>
-    probe.expectMsg(OrderBookRecovered(pair, None))
-    probe.send(actor, MatcherActor.StartNotifyAddresses)
-    probe.expectMsg(MatcherActor.AddressesNotified)
-    f(pair, actor, probe)
-  }
+  private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
+    obcTestWithPrepare(_ => (), notifyAtStart = true) { (pair, actor, probe) =>
+      probe.expectMsg(OrderBookRecovered(pair, None))
+      f(pair, actor, probe)
+    }
 
-  private def obcTestWithPrepare(prepare: AssetPair => Unit)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
+  private def obcTestWithPrepare(prepare: AssetPair => Unit, notifyAtStart: Boolean = false)(
+      f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
     val b = ByteStr(new Array[Byte](32))
@@ -48,17 +47,17 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     val pair = AssetPair(Some(b), None)
     prepare(pair)
 
-    val actor = system.actorOf(
-      Props(
-        new OrderBookActor(
-          tp.ref,
-          tp.ref,
-          pair,
-          update(pair),
-          p => Option(md.get(p)),
-          txFactory,
-          ntpTime
-        ) with RestartableActor))
+    val actor = TestActorRef(
+      new OrderBookActor(
+        tp.ref,
+        tp.ref,
+        pair,
+        update(pair),
+        p => Option(md.get(p)),
+        txFactory,
+        ntpTime,
+        notifyAtStart
+      ) with RestartableActor)
 
     f(pair, actor, tp)
     system.stop(actor)
@@ -76,6 +75,22 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       )
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
+    }
+
+    "recovery - notify address actor about orders if notifyAtStart=true" in obcTestWithPrepare(
+      { p =>
+        val ord = buy(p, 10 * Order.PriceConstant, 100)
+        val ob  = OrderBook.empty
+        ob.add(ord, ord.timestamp)
+        SnapshotUtils.provideSnapshot(
+          OrderBookActor.name(p),
+          Snapshot(OrderBookActor.Snapshot(Some(50), ob.snapshot))
+        )
+      },
+      notifyAtStart = true
+    ) { (pair, _, tp) =>
+      tp.expectMsg(OrderBookRecovered(pair, Some(50)))
+      tp.expectMsgType[OrderAdded]
     }
 
     "recovery - don't notify address actor about orders until receive StartNotifyAddresses" in obcTestWithPrepare { p =>
@@ -119,8 +134,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, orderBook, tp) =>
-      val p = TestProbe()
-
       val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
       val ord2 = sell(pair, 15 * Order.PriceConstant, 150)
 
@@ -132,8 +145,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       orderBook ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
-
-      p.send(orderBook, MatcherActor.StartNotifyAddresses)
 
       tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o)))
     }
@@ -151,9 +162,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
-
-      val p = TestProbe()
-      p.send(actor, MatcherActor.StartNotifyAddresses)
 
       tp.expectMsg(
         OrderAdded(
@@ -178,9 +186,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
-
-      val p = TestProbe()
-      p.send(actor, MatcherActor.StartNotifyAddresses)
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
@@ -209,9 +214,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
 
-      val p = TestProbe()
-      p.send(actor, MatcherActor.StartNotifyAddresses)
-
       val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
       tp.expectMsg(
         OrderAdded(
@@ -238,9 +240,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
-
-      val p = TestProbe()
-      p.send(actor, MatcherActor.StartNotifyAddresses)
 
       within(10.seconds) {
         tp.receiveN(100)

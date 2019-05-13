@@ -72,7 +72,7 @@ class Matcher(actorSystem: ActorSystem,
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
+  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef, notifyAddresses: Boolean): Props = OrderBookActor.props(
     matcherActor,
     addressActors,
     pair,
@@ -80,7 +80,8 @@ class Matcher(actorSystem: ActorSystem,
     marketStatuses.put(pair, _),
     matcherSettings,
     transactionCreator.createTransaction,
-    time
+    time,
+    notifyAddresses
   )
 
   private val matcherQueue: MatcherQueue = settings.matcherSettings.eventsQueue.tpe match {

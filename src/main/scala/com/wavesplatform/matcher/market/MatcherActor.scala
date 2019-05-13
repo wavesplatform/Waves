@@ -21,7 +21,7 @@ import scorex.utils._
 class MatcherActor(settings: MatcherSettings,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-                   orderBookActorProps: (AssetPair, ActorRef) => Props,
+                   orderBookActorProps: (AssetPair, ActorRef, Boolean) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
     extends PersistentActor
     with ScorexLogging {
@@ -71,11 +71,10 @@ class MatcherActor(settings: MatcherSettings,
 
   private def createOrderBook(pair: AssetPair): ActorRef = {
     log.info(s"Creating order book for $pair")
-    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
+    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self, notifyAddresses), OrderBookActor.name(pair)))
     childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
-    if (notifyAddresses) orderBook ! StartNotifyAddresses
     orderBook
   }
 
@@ -321,7 +320,7 @@ object MatcherActor {
   def props(matcherSettings: MatcherSettings,
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            orderBookProps: (AssetPair, ActorRef) => Props,
+            orderBookProps: (AssetPair, ActorRef, Boolean) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
