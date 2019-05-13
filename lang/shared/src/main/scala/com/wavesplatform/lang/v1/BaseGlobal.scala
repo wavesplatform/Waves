@@ -26,6 +26,9 @@ trait BaseGlobal {
   def base64Encode(input: Array[Byte]): Either[String, String]
   def base64Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
+  def base16Encode(input: Array[Byte]): Either[String, String]
+  def base16Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
+
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
   def keccak256(message: Array[Byte]): Array[Byte]

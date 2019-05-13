@@ -7,10 +7,11 @@ import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, STRING}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.directives.values._
 
 object CryptoContext {
 
-  def build(global: BaseGlobal): CTX = {
+  def build(global: BaseGlobal, version: StdLibVersion): CTX = {
     def hashFunction(name: String, internalName: Short, cost: Long, docString: String)(h: Array[Byte] => Array[Byte]): BaseFunction =
       NativeFunction(name, cost, internalName, BYTESTR, docString, ("bytes", BYTESTR, "value")) {
         case CONST_BYTESTR(m: ByteStr) :: Nil => Right(CONST_BYTESTR(ByteStr(h(m.arr))))
@@ -57,13 +58,28 @@ object CryptoContext {
         case xs                               => notImplemented("fromBase64String(str: String)", xs)
       }
 
+    def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
+      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).map(CONST_STRING)
+      case xs                                         => notImplemented("toBase16String(bytes: byte[])", xs)
+    }
+
+    def fromBase16StringF: BaseFunction =
+      NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, "Base16 decode", ("str", STRING, "base16 encoded string")) {
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, global.MaxBase64String).map(x => CONST_BYTESTR(ByteStr(x)))
+        case xs                               => notImplemented("fromBase16String(str: String)", xs)
+      }
+ 
     CTX(
       Seq.empty,
       Map.empty,
-      Array(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
+      Array(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF) ++
+          (version match {
+            case V1 | V2 => Array[BaseFunction]()
+            case V3 => Array(toBase16StringF, fromBase16StringF)
+          })
     )
   }
 
-  def evalContext(global: BaseGlobal): EvaluationContext   = build(global).evaluationContext
-  def compilerContext(global: BaseGlobal): CompilerContext = build(global).compilerContext
+  def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext   = build(global, version).evaluationContext
+  def compilerContext(global: BaseGlobal, version: StdLibVersion): CompilerContext = build(global, version).compilerContext
 }

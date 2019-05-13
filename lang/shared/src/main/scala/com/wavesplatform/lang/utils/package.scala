@@ -49,7 +49,7 @@ package object utils {
           Monoid.combineAll(
             Seq(
               PureContext.build(ds.stdLibVersion),
-              CryptoContext.build(Global),
+              CryptoContext.build(Global, ds.stdLibVersion),
               WavesContext.build(ds, environment)
             )
           )
