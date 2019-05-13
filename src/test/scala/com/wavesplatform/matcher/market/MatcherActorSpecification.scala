@@ -146,7 +146,7 @@ class MatcherActorSpecification
             matcherSettings,
             startResult => working = startResult.isRight,
             ob,
-            (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
+            (_, _) => Props(new FailAtStartActor()),
             blockchain.assetDescription
           )
         )
@@ -204,7 +204,7 @@ class MatcherActorSpecification
             )
           )
         )
-        actor ! MatcherActor.Shutdown
+        probe.send(actor, MatcherActor.Shutdown)
 
         probe.expectTerminated(actor)
         stopped shouldBe true
@@ -301,17 +301,14 @@ class MatcherActorSpecification
               matcherSettings,
               _ => {},
               ob,
-              (pair, matcherActor) => {
-                probe.ref ! "attempt"
-                Props(new RecoveringActor(matcherActor, pair))
-              },
+              (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
               blockchain.assetDescription
             )
           )
         )
 
         probe.send(actor, MatcherActor.ForceStartOrderBook(pair))
-        probe.expectMsg("attempt")
+        probe.expectMsg(MatcherActor.OrderBookCreated(pair))
       }
     }
   }
@@ -408,14 +405,19 @@ class MatcherActorSpecification
 object MatcherActorSpecification {
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
   private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {
-    owner ! OrderBookRecovered(assetPair, startOffset)
+    import context.dispatcher
+    context.system.scheduler.scheduleOnce(100.millis, owner, OrderBookRecovered(assetPair, startOffset)) // emulates recovering
     override def receive: Receive = {
       case ForceStartOrderBook(p) if p == assetPair => sender() ! MatcherActor.OrderBookCreated(assetPair)
       case _                                        =>
     }
   }
   private class FailAtStartActor extends Actor {
-    throw new RuntimeException("I don't want to work today")
     override def receive: Receive = Actor.emptyBehavior
+    override def preStart(): Unit = {
+      super.preStart()
+      Thread.sleep(100)
+      throw new RuntimeException("I don't want to work today")
+    }
   }
 }
