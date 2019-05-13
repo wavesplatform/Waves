@@ -7,9 +7,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -35,7 +35,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   private val pureContext = PureContext.build(V1)
 
-  private val defaultCryptoContext = CryptoContext.build(Global)
+  private val defaultCryptoContext = CryptoContext.build(Global, V1)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) (BLOCK.apply _) else (LET_BLOCK.apply _))
 
