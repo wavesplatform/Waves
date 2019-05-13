@@ -34,6 +34,7 @@ trait Blockchain {
   def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]]
 
   def parent(block: Block, back: Int = 1): Option[Block]
+  def parentHeader(block: Block, back: Int = 1): Option[BlockHeader]
 
   def totalFee(height: Int): Option[Long]
 

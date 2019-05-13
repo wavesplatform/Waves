@@ -447,6 +447,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
+  override def parentHeader(block: Block, back: Int): Option[BlockHeader] = readLock {
+    ngState match {
+      case Some(ng) if ng.contains(block.reference) =>
+        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
+      case _ =>
+        blockchain.parent(block, back)
+    }
+  }
+
   override def totalFee(height: Int): Option[Long] = readLock {
     if (height == this.height)
       ngState.map(_.bestLiquidDiffAndFees._3)

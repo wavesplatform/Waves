@@ -42,6 +42,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def parent(block: Block, back: Int): Option[Block] = None
 
+  override def parentHeader(block: Block, back: Int): Option[Block] = None
+
   override def totalFee(height: Int): Option[Long] = None
 
   /** Features related */
