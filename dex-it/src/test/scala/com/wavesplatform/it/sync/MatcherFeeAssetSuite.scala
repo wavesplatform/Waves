@@ -14,6 +14,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json.Json.parse
+import com.wavesplatform.it.util._
 
 import scala.concurrent.duration._
 
@@ -26,26 +27,29 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
   val price = 100000000L
 
   val aliceAssetBase58: String = node
-    .issue(
-      sourceAddress = alice.address,
+    .broadcastIssue(
+      alice,
       name = "AliceCoin",
       description = "AliceCoin for matcher's tests",
       quantity = someAssetAmount,
       decimals = 0,
       reissuable = false,
-      fee = smartIssueFee)
+      fee = smartIssueFee,
+      script = None,
+      waitForTx = true)
     .id
   val aliceAsset = IssuedAsset(ByteStr.decodeBase58(aliceAssetBase58).get)
   val aliceScriptedAssetBase58: String = node
-    .issue(
-      sourceAddress = alice.address,
+    .broadcastIssue(
+      alice,
       name = "AliceSmartAsset",
       description = "AliceSmartAsset for matcher's tests",
       quantity = someAssetAmount,
       decimals = 0,
       reissuable = false,
       fee = smartIssueFee,
-      script = Some(scriptBase64))
+      script = Some(scriptBase64),
+      waitForTx = true)
     .id
   val aliceScriptedAsset = IssuedAsset(ByteStr.decodeBase58(aliceScriptedAssetBase58).get)
   Seq(aliceAssetBase58, aliceScriptedAssetBase58).foreach(node.waitForTransaction(_))
@@ -114,6 +118,8 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
 
           node.assetBalance(alice.address, fixedAssetBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + amount
           node.assetBalance(bob.address, fixedAssetBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - amount
+          node.balanceDetails(alice.address).available - 0.000000001.waves
+          node.balanceDetails(bob.address).available + 0.000000001.waves
 
         }
       }
@@ -129,6 +135,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
           .placeOrder(buy), f"Required $aliceScriptedAssetBase58 as asset fee, but given WAVES")
       }
     }
+
     "when has percent-mode for fee in config and orders placed" - {
       "should accept orders with amount/price/spending/receiving assets as matcherFeeAsset" in {
         val minFeePercent = 0.1
@@ -210,9 +217,12 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
               case (IssuedAsset(_), IssuedAsset(_)) =>
                 node.assetBalance(alice.address, assetInPairBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + amount
                 node.assetBalance(bob.address, assetInPairBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - amount
+                node.balanceDetails(alice.address).available - 0.0000001.waves
+                node.balanceDetails(bob.address).available + 0.0000001.waves
               case (Waves, Waves) =>
                 node.balanceDetails(alice.address).available shouldBe aliceWavesBalanceBefore - matcherFee - amount
                 node.balanceDetails(bob.address).available shouldBe bobWavesBalanceBefore - matcherFee + amount
+
               case (Waves, IssuedAsset(_)) =>
                 node.balanceDetails(alice.address).available shouldBe aliceWavesBalanceBefore - matcherFee - amount
                 node.assetBalance(bob.address, assetInPairBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - amount
