@@ -15,24 +15,30 @@ import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object CryptoContext {
 
-  private val sha1     = CASETYPEREF("SHA1", List.empty)
-  private val sha224   = CASETYPEREF("SHA224", List.empty)
-  private val sha256   = CASETYPEREF("SHA256", List.empty)
-  private val sha384   = CASETYPEREF("SHA384", List.empty)
-  private val sha512   = CASETYPEREF("SHA512", List.empty)
+  private val none   = CASETYPEREF("NOALG", List.empty)
+  private val md2    = CASETYPEREF("MD2", List.empty)
+  private val md5    = CASETYPEREF("MD5", List.empty)
+  private val sha1   = CASETYPEREF("SHA1", List.empty)
+  private val sha224 = CASETYPEREF("SHA224", List.empty)
+  private val sha256 = CASETYPEREF("SHA256", List.empty)
+  private val sha384 = CASETYPEREF("SHA384", List.empty)
+  private val sha512 = CASETYPEREF("SHA512", List.empty)
 
   private val digestAlgorithmType =
-    UNION(sha1, sha224, sha256, sha384, sha512)
+    UNION(none, md2, md5, sha1, sha224, sha256, sha384, sha512)
 
   private def algFromCO(obj: Terms.CaseObj): Either[String, DigestAlgorithm] = {
     import com.wavesplatform.common.crypto.RSA._
     obj match {
-      case CaseObj(`sha1`, _)     => Right(SHA1)
-      case CaseObj(`sha224`, _)   => Right(SHA224)
-      case CaseObj(`sha256`, _)   => Right(SHA256)
-      case CaseObj(`sha384`, _)   => Right(SHA384)
-      case CaseObj(`sha512`, _)   => Right(SHA512)
-      case _                      => Left("Unknown digest type")
+      case CaseObj(`none`, _)   => Right(NONE)
+      case CaseObj(`md2`, _)    => Right(MD2)
+      case CaseObj(`md5`, _)    => Right(MD5)
+      case CaseObj(`sha1`, _)   => Right(SHA1)
+      case CaseObj(`sha224`, _) => Right(SHA224)
+      case CaseObj(`sha256`, _) => Right(SHA256)
+      case CaseObj(`sha384`, _) => Right(SHA384)
+      case CaseObj(`sha512`, _) => Right(SHA512)
+      case _                    => Left("Unknown digest type")
     }
   }
 
@@ -126,11 +132,14 @@ object CryptoContext {
     )
 
     val v3Vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+      ("NOALG", ((none, "NONE digest algorithm"), digestAlgValue(none))),
+      ("MD2", ((md2, "MD2 digest algorithm"), digestAlgValue(md2))),
+      ("MD5", ((md5, "MD5 digest algorithm"), digestAlgValue(md5))),
       ("SHA1", ((sha1, "SHA1 digest algorithm"), digestAlgValue(sha1))),
       ("SHA224", ((sha224, "SHA224 digest algorithm"), digestAlgValue(sha224))),
       ("SHA256", ((sha256, "SHA256 digest algorithm"), digestAlgValue(sha256))),
       ("SHA384", ((sha384, "SHA384 digest algorithm"), digestAlgValue(sha384))),
-      ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512))),
+      ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512)))
     )
 
     val v3Functions = Array(rsaVerifyF)

@@ -34,10 +34,13 @@ class RSATest extends PropSpec with PropertyChecks with Matchers {
       .map(_.getBytes("UTF-8"))
 
   val algGenerator: Gen[DigestAlgorithm] =
-    Gen.oneOf(SHA1, SHA224, SHA256, SHA384, SHA512)
+    Gen.oneOf(NONE, MD2, MD5, SHA1, SHA224, SHA256, SHA384, SHA512)
 
   def scriptSrc(alg: DigestAlgorithm, msg: Array[Byte], sig: Array[Byte], pub: Array[Byte]): String = {
     val algStr = alg match {
+      case NONE   => "NOALG"
+      case MD2    => "MD2"
+      case MD5    => "MD5"
       case SHA1   => "SHA1"
       case SHA224 => "SHA224"
       case SHA256 => "SHA256"
