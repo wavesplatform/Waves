@@ -150,10 +150,11 @@ class AddressActor(
         Future.successful(error)
       case Success(r) =>
         r match {
-          case None    => promisedResponse.tryComplete(Success(SavingEventsDisabled))
-          case Some(x) => log.info(s"Stored $x")
+          case None => Future.successful(SavingEventsDisabled)
+          case Some(x) =>
+            log.info(s"Stored $x")
+            promisedResponse.future
         }
-        promisedResponse.future
     }
   }
 
