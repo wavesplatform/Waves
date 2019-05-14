@@ -148,7 +148,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
-      val bs = BalanceSnapshot(height, portfolio(address))
+      val balance = this.balance(address)
+      val lease = this.leaseBalance(address)
+      val bs = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
       if (inner.height > 0 && from < this.height) bs +: inner.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
@@ -236,7 +238,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = inner.blockIdsAfter(parentSignature, howMany)
 
-  override def parent(block: Block, back: Int): Option[Block] = inner.parent(block, back)
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
 
   override def totalFee(height: Int): Option[Long] = inner.totalFee(height)
 

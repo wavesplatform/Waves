@@ -46,6 +46,11 @@ object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
 }
 
+case class DecompiledScript(script: String)
+object DecompiledScript {
+  implicit val decompiledScriptFormat: Format[DecompiledScript] = Json.format
+}
+
 case class FullAssetInfo(assetId: String,
                          balance: Long,
                          reissuable: Boolean,

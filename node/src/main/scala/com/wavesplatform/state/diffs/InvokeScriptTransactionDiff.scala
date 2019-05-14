@@ -73,7 +73,7 @@ object InvokeScriptTransactionDiff {
             .combineAll(
               Seq(
                 PureContext.build(V3),
-                CryptoContext.build(Global),
+                CryptoContext.build(Global, V3),
                 WavesContext.build(directives, environment)
               )
             )
