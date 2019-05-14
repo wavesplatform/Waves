@@ -49,4 +49,7 @@ object Global extends BaseGlobal {
   }
 
   private def toArray(xs: ArrayBuffer): Array[Byte] = new Int8Array(xs).toArray
+
+  override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
+    impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
 }

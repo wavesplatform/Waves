@@ -76,4 +76,6 @@ trait BaseGlobal {
       scriptText
     }
   }
+
+  def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
 }

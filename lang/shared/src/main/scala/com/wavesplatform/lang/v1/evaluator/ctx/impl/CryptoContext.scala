@@ -110,6 +110,22 @@ object CryptoContext {
         case xs                               => notImplemented("fromBase64String(str: String)", xs)
       }
 
+    val checkMerkleProofF: BaseFunction =
+      NativeFunction(
+        "checkMerkleProof",
+        100,
+        CHECK_MERKLE_PROOF,
+        BOOLEAN,
+        "Check validity of merkle tree proof",
+        ("merkleRoot", BYTESTR, "root hash of merkle tree"),
+        ("merkleProof", BYTESTR, "proof bytes"),
+        ("valueBytes", BYTESTR, "bytes of value to be prooven")
+      ) {
+        case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
+          Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
+        case _ => ???
+      }
+
     val v1Functions =
       Array(
         keccak256F,
@@ -142,7 +158,11 @@ object CryptoContext {
       ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512)))
     )
 
-    val v3Functions = Array(rsaVerifyF)
+    val v3Functions =
+      Array(
+        rsaVerifyF,
+        checkMerkleProofF
+      )
 
     version match {
       case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)

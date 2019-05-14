@@ -19,4 +19,6 @@ object Global extends Object {
   def keccak256(message: ArrayBuffer): ArrayBuffer                                                       = native
   def blake2b256(message: ArrayBuffer): ArrayBuffer                                                      = native
   def sha256(message: ArrayBuffer): ArrayBuffer                                                          = native
+
+  def merkleVerify(root: ArrayBuffer, proof: ArrayBuffer, data: ArrayBuffer): Boolean = native
 }
