@@ -527,7 +527,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("parseIntValue") {
     val src =
-      """ "42".parseInt() """
+      """ "42".parseIntValue() """
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
   }
 
