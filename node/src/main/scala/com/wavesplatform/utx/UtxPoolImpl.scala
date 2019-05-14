@@ -192,15 +192,16 @@ class UtxPoolImpl(time: Time,
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
-    val (invalidTxs, reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
+    val (reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
-        .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
-          case ((invalid, valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
+        .scanLeft((Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
+          case ((valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
             val updatedBlockchain = composite(blockchain, diff)
             if (TxCheck.isExpired(tx)) {
-              (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+              log.trace(s"Transaction [${tx.id()}] is expired")
+              (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
             } else {
               differ(updatedBlockchain, tx).resultE match {
                 case Right(newDiff) =>
@@ -210,22 +211,19 @@ class UtxPoolImpl(time: Time,
                       log.trace(
                         s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
                     }
-                    (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
+                    (valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
                   } else {
-                    (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                    (tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
                   }
-                case Left(_) =>
-                  (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                case Left(error) =>
+                  log.trace(s"Transaction [${tx.id()}] is removed: $error")
+                  transactions.remove(tx.id())
+                  (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
               }
             }
         }
-        .takeWhile(!_._5) // !currRest.isEmpty
+        .takeWhile(!_._4) // !currRest.isEmpty
         .reduce((_, right) => right)
-    }
-
-    if (invalidTxs.nonEmpty) {
-      log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
-      invalidTxs.foreach(remove)
     }
 
     val txs = reversedValidTxs.reverse
@@ -283,29 +281,7 @@ class UtxPoolImpl(time: Time,
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
-      val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
-      val (invalidTxs, _) = PoolMetrics.cleanupTimeStats.measure {
-        transactions.values.asScala.toSeq
-          .sorted(TransactionsOrdering.InUTXPool)
-          .iterator
-          .foldLeft((Seq.empty[Transaction], Monoid[Diff].empty)) {
-            case ((invalid, diff), tx) =>
-              val updatedBlockchain = composite(blockchain, diff)
-              if (TxCheck.isExpired(tx)) {
-                (invalid :+ tx, diff)
-              } else {
-                differ(updatedBlockchain, tx).resultE match {
-                  case Right(newDiff) =>
-                    (invalid, Monoid.combine(diff, newDiff))
-                  case Left(error) =>
-                    log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
-                    (invalid :+ tx, diff)
-                }
-              }
-          }
-      }
-
-      invalidTxs.map(_.id()).foreach(UtxPoolImpl.this.transactions.remove)
+      UtxPoolImpl.this.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)
     }
   }
 
