@@ -29,6 +29,7 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsInterval: Int,
                            snapshotsLoadingTimeout: FiniteDuration,
                            startEventsProcessingTimeout: FiniteDuration,
+                           orderBooksRecoveringTimeout: FiniteDuration,
                            makeSnapshotsAtStart: Boolean,
                            priceAssets: Seq[String],
                            blacklistedAssets: Set[String],
@@ -75,6 +76,7 @@ object MatcherSettings {
     val snapshotsInterval            = config.as[Int]("snapshots-interval")
     val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
     val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
+    val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
     val makeSnapshotsAtStart         = config.as[Boolean]("make-snapshots-at-start")
     val maxOrdersPerRequest          = config.as[Int]("rest-order-limit")
     val baseAssets                   = config.as[List[String]]("price-assets")
@@ -117,6 +119,7 @@ object MatcherSettings {
       snapshotsInterval,
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
+      orderBooksRecoveringTimeout,
       makeSnapshotsAtStart,
       baseAssets,
       blacklistedAssets.toSet,

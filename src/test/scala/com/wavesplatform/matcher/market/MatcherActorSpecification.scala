@@ -64,7 +64,7 @@ class MatcherActorSpecification
       }
     }
 
-    "successfully routes the first place to the new order book" in {
+    "successfully route the first place to the new order book" in {
       val addressActor = TestProbe()
       val actor        = defaultActor(addressActor = addressActor.ref)
       val probe        = TestProbe()
@@ -94,7 +94,7 @@ class MatcherActorSpecification
               matcherSettings,
               doNothingOnRecovery,
               ob,
-              (_, _) => Props(new FailAtStartActor),
+              (_, _, _) => Props(new FailAtStartActor),
               blockchain.assetDescription
             )
           ))
@@ -146,7 +146,7 @@ class MatcherActorSpecification
             matcherSettings,
             startResult => working = startResult.isRight,
             ob,
-            (_, _) => Props(new FailAtStartActor()),
+            (_, _, _) => Props(new FailAtStartActor()),
             blockchain.assetDescription
           )
         )
@@ -174,7 +174,7 @@ class MatcherActorSpecification
                 matcherSettings,
                 startResult => stopped = startResult.isLeft,
                 ob,
-                (_, _) => Props(new FailAtStartActor),
+                (_, _, _) => Props(new FailAtStartActor),
                 blockchain.assetDescription
               )
             )
@@ -198,7 +198,7 @@ class MatcherActorSpecification
                 matcherSettings,
                 startResult => stopped = startResult.isLeft,
                 ob,
-                (_, _) => Props(new NothingDoActor),
+                (_, _, _) => Props(new NothingDoActor),
                 blockchain.assetDescription
               )
             )
@@ -301,7 +301,7 @@ class MatcherActorSpecification
               matcherSettings,
               _ => {},
               ob,
-              (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
+              (pair, matcherActor, _) => Props(new RecoveringActor(matcherActor, pair)),
               blockchain.assetDescription
             )
           )
@@ -331,7 +331,7 @@ class MatcherActorSpecification
           matcherSettings.copy(snapshotsInterval = 17),
           doNothingOnRecovery,
           emptyOrderBookRefs,
-          (assetPair, _) => {
+          (assetPair, _, _) => {
             val idx = assetPairs.indexOf(assetPair)
             if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
             r(idx)._1
@@ -367,16 +367,20 @@ class MatcherActorSpecification
   private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
                            addressActor: ActorRef = TestProbe().ref): TestActorRef[MatcherActor] = {
     val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
-    waitInitialization(
+    val r = waitInitialization(
       TestActorRef(
         new MatcherActor(
           matcherSettings,
           doNothingOnRecovery,
           ob,
-          (assetPair, matcher) => OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
+          (assetPair, matcher, notify) =>
+            OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, notify),
           blockchain.assetDescription
         )
       ))
+    val probe = TestProbe()
+    probe.send(r, MatcherActor.StartNotifyAddresses)
+    r
   }
 
   private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = {

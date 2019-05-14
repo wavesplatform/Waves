@@ -24,7 +24,8 @@ class OrderBookActor(owner: ActorRef,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
-                     time: Time)
+                     time: Time,
+                     var notifyAddresses: Boolean)
     extends PersistentActor
     with ScorexLogging {
 
@@ -60,6 +61,14 @@ class OrderBookActor(owner: ActorRef,
               context.stop(self)
           }
       }
+
+    case MatcherActor.StartNotifyAddresses =>
+      if (!notifyAddresses) {
+        notifyAddresses = true
+        processEvents(orderBook.allOrders.map(OrderAdded))
+      }
+      sender() ! MatcherActor.AddressesNotified
+
     case ForceStartOrderBook(p) if p == assetPair =>
       sender() ! OrderBookCreated(assetPair)
   }
@@ -96,14 +105,14 @@ class OrderBookActor(owner: ActorRef,
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
-                          |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-                          |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
+                   |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
+                   |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
           }
         case Events.OrderCanceled(order, unmatchable) =>
           log.info(s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)")
       }
 
-      addressActor ! e
+      if (notifyAddresses) addressActor ! e
     }
 
     updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
@@ -131,10 +140,10 @@ class OrderBookActor(owner: ActorRef,
         case None    => log.debug("Recovery completed")
         case Some(x) => log.debug(s"Recovery completed at $x: $orderBook")
       }
-      processEvents(orderBook.allOrders.map(OrderAdded))
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
+      if (notifyAddresses) processEvents(orderBook.allOrders.map(OrderAdded))
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
@@ -162,8 +171,9 @@ object OrderBookActor {
             updateMarketStatus: MarketStatus => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
-            time: Time): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time))
+            time: Time,
+            notifyAddresses: Boolean): Props =
+    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, notifyAddresses))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
