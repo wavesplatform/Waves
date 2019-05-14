@@ -86,7 +86,14 @@ class SplitFunctionTest
          |                 strs3[2] == ""     &&
          |                 strs3[3] == ";"
          |
-         |   result1 && result2 && result3
+         |   let strs4 = split("q;Q;someQ;Q;;", "Q;")
+         |   let result4 = strs4.size() == 4  &&
+         |                 strs4[0] == "q;"   &&
+         |                 strs4[1] == "some" &&
+         |                 strs4[2] == ""     &&
+         |                 strs4[3] == ";"
+         |
+         |   result1 && result2 && result3 && result4
          |
       """.stripMargin
 
@@ -128,11 +135,29 @@ class SplitFunctionTest
   property("split separator around separator") {
     val script =
       s"""
-         |   let strs = split(",", ",")
+         |   let strs1 = split(",", ",")
+         |   let strs2 = split(",x,", ",x,")
          |
-         |   strs.size() == 2 &&
-         |   strs[0] == ""    &&
-         |   strs[1] == ""
+         |   strs1.size() == 2 &&
+         |   strs1[0] == ""    &&
+         |   strs1[1] == ""    &&
+         |   strs2.size() == 2 &&
+         |   strs2[0] == ""    &&
+         |   strs2[1] == ""
+         |
+      """.stripMargin
+
+    eval(script) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("split string containing only separators") {
+    val sep = ";;;"
+    val count = 10
+    val script =
+      s"""
+         |  let strs = "${sep * count}".split("$sep")
+         |  strs.size() == ${count + 1} &&
+         |  ${(0 to count).map(i => s"""strs[$i] == "" """).mkString(" && ")}
          |
       """.stripMargin
 

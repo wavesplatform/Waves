@@ -367,14 +367,14 @@ object PureContext {
       case xs                                            => notImplemented("split(STRING, STRING)", xs)
     }
 
-  def split(str: String, sep: String) =
+  private def split(str: String, sep: String) =
     if (str == "") seqWithEmptyStr
     else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1)))
     else splitRec(str, sep).reverse.toIndexedSeq
 
   private val seqWithEmptyStr = IndexedSeq("")
 
-  def splitRec(
+  private def splitRec(
                 str: String,
                 sep: String,
                 offset: Int = 0,
