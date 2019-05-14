@@ -426,7 +426,6 @@ object WavesContext {
     lazy val functions = Array(
       txByIdF,
       txHeightByIdF,
-      blockInfoByHeightF,
       getIntegerFromStateF,
       getBooleanFromStateF,
       getBinaryFromStateF,
@@ -468,7 +467,7 @@ object WavesContext {
                         getBinaryByIndexF,
                         getStringByIndexF,
                         addressFromStringF
-                      ).map(withExtract) :+ assetInfoF
+                      ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF)
                     } else {
                       List()
                     })
