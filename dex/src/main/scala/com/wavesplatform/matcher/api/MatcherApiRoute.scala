@@ -20,7 +20,7 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher}
+import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher, RateCache}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -55,7 +55,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long,
-                           apiKeyHash: Option[Array[Byte]])
+                           apiKeyHash: Option[Array[Byte]],
+                           rateCache: RateCache)
     extends ApiRoute
     with ScorexLogging {
 
@@ -140,7 +141,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete(
       StatusCodes.OK -> Json.obj(
         "priceAssets" -> matcherSettings.priceAssets,
-        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee).value
+        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getAllRates).value
       )
     )
   }

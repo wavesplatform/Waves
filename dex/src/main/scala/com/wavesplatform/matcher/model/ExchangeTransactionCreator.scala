@@ -81,6 +81,11 @@ object ExchangeTransactionCreator {
   type CreateTransaction = (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction]
 
   /**
+    * This function is used for the following purposes:
+    *
+    *   1. Calculate transaction fee that matcher pays to issue Exchange transaction (ExchangeTransactionCreator, base fee = matcherSettings.exchangeTxBaseFee)
+    *   2. Calculate matcher fee that client pays for the order placement and covering matcher expenses (OrderValidator blockchain aware, base fee depends on order fee settings)
+    *
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
   def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair, baseFee: Long): Long = {
@@ -88,7 +93,7 @@ object ExchangeTransactionCreator {
     def assetFee(assetId: Asset): Long = assetId match {
       case Waves => 0L
       case asset: IssuedAsset =>
-        if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
+        if (blockchain hasAssetScript asset) CommonValidation.ScriptExtraFee
         else 0L
     }
 

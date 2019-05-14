@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, FixedWavesSettings, PercentSettings}
+import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, DynamicSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -25,7 +25,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     s"""
        |order-fee {
        |  mode = percent
-       |  waves {
+       |  dynamic {
        |    base-fee = 300000
        |  }
        |  fixed {
@@ -167,7 +167,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     )
 
     settings.orderFee match {
-      case FixedWavesSettings(baseFee) =>
+      case DynamicSettings(baseFee) =>
         baseFee shouldBe 300000
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
@@ -242,7 +242,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = invalid
-         |  waves {
+         |  dynamic {
          |    base-fee = 300000
          |  }
          |  fixed {
@@ -260,7 +260,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = percent
-         |  waves {
+         |  dynamic {
          |    base-fee = 300000
          |  }
          |  fixed {
@@ -278,7 +278,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = fixed
-         |  waves {
+         |  dynamic {
          |    base-fee = 300000
          |  }
          |  fixed {
@@ -295,8 +295,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val invalidFeeInWaves =
       s"""
          |order-fee {
-         |  mode = waves
-         |  waves {
+         |  mode = dynamic
+         |  dynamic {
          |    base-fee = -350000
          |  }
          |  fixed {
@@ -329,7 +329,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
           "Invalid setting order-fee.fixed.min-fee value: -300000 (required 0 < fee)")
 
     settingsInvalidFeeInWaves shouldBe Left(
-      s"Invalid setting order-fee.waves.base-fee value: -350000 (required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount})"
+      s"Invalid setting order-fee.dynamic.base-fee value: -350000 (required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount})"
     )
   }
 
