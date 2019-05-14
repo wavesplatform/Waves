@@ -334,7 +334,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       .combineAll(
         Seq(
           PureContext.build(V3),
-          CryptoContext.build(com.wavesplatform.lang.Global),
+          CryptoContext.build(com.wavesplatform.lang.Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet(),
             Common.emptyBlockchainEnvironment()

@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.BaseGlobal
 
 import scala.scalajs.js.JSConverters._
@@ -30,6 +31,10 @@ object Global extends BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
     impl.Global.curve25519verify(toBuffer(message), toBuffer(sig), toBuffer(pub))
+
+
+  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
+    impl.Global.rsaVerify(alg, toBuffer(message), toBuffer(sig), toBuffer(pub))
 
   def keccak256(message: Array[Byte]): Array[Byte]  = hash(message)(impl.Global.keccak256)
   def blake2b256(message: Array[Byte]): Array[Byte] = hash(message)(impl.Global.blake2b256)

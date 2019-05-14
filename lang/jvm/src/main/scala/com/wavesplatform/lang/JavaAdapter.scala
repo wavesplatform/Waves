@@ -13,7 +13,7 @@ object JavaAdapter {
   lazy val ctx =
     Monoid.combineAll(
       Seq(
-        CryptoContext.compilerContext(com.wavesplatform.lang.Global),
+        CryptoContext.compilerContext(com.wavesplatform.lang.Global, version),
         WavesContext.build(???, null).compilerContext,
         PureContext.build(version).compilerContext
       ))
