@@ -74,7 +74,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       val json =
         Json.obj(
           "type"            -> TransferTransaction.typeId,
-          "senderPublicKey" -> PublicKey.toString(sender.publicKey),
+          "senderPublicKey" -> sender.publicKey.toString,
           "recipient"       -> secondAddress,
           "fee"             -> 100000,
           "amount"          -> 1,
@@ -422,7 +422,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: Byte): String = {
-    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> PublicKey.toString(sender.publicKey))
+    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> sender.publicKey.toString)
     val jsWithFee = jsWithPK ++ Json.obj("fee" -> sender.calculateFee(jsWithPK).feeAmount)
     val js        = if (Option(version).isDefined) jsWithFee ++ Json.obj("version" -> version) else jsWithFee
     val rs        = sender.postJsonWithApiKey("/transactions/sign", js)
