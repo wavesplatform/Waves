@@ -1,20 +1,18 @@
 package com.wavesplatform.it.sync
 
-import java.nio.charset.StandardCharsets
-
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.{MatcherSuiteBase, NTPTime}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{ExchangeTransaction, SyncMatcherHttpApi}
+import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.util._
+import com.wavesplatform.it.{MatcherSuiteBase, NTPTime}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import play.api.libs.json.Json.parse
-import com.wavesplatform.it.util._
 
 import scala.concurrent.duration._
 
@@ -23,7 +21,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
   import MatcherFeeAssetSuite._
 
   override protected def nodeConfigs: Seq[Config] =
-    Seq(configWithOrderFeeFixed().withFallback(Configs.head)) //Configs.map(configWithOrderFeeFixed().withFallback(_))
+    Seq(configWithOrderFeeFixed().withFallback(Configs.head))
 
   val price = 100000000L
 
@@ -55,32 +53,33 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
     )
     .id
   val aliceScriptedAsset = IssuedAsset(ByteStr.decodeBase58(aliceScriptedAssetBase58).get)
-//  Seq(aliceAssetBase58, aliceScriptedAssetBase58).foreach(node.waitForTransaction(_))
 
-  val matcherPublicKey = matcher.publicKey
+  val matcherPublicKey: PublicKey = matcher.publicKey
 
   "Matcher" - {
+
+    node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceAssetBase58), None, waitForTx = true).id
+    node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceScriptedAssetBase58), None, waitForTx = true).id
+
     "when has some asset as fixed fee in config and orders placed" - {
       "should accept orders if orders' matcherFeeAsset equal to specified in config" in {
-        for (fixedAsset <- Seq(
+        for (fixedAssetMatcherFee <- Seq(
                aliceAsset,
                aliceScriptedAsset
              )) {
-          val fixedAssetBase58 = fixedAsset.id.base58
+          val fixedAssetMatcherFeeBase58 = fixedAssetMatcherFee.id.base58
           docker.restartNode(node,
                              configWithOrderFeeFixed(
-                               matcherFeeAssetId = fixedAssetBase58
+                               matcherFeeAssetId = fixedAssetMatcherFeeBase58
                              ))
 
-          val aliceWavesPair = AssetPair(fixedAsset, Waves)
+          val someWavesPair = AssetPair(fixedAssetMatcherFee, Waves)
 
-          val transfer1ToBobId =
-            node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(fixedAssetBase58), None, waitForTx = true).id
           val ts                      = ntpTime.correctedTime()
           val expirationTimestamp     = ts + Order.MaxLiveTime - 10000
-          val amount                  = 1
-          val aliceAssetBalanceBefore = node.assetBalance(alice.address, fixedAssetBase58).balance
-          val bobAssetBalanceBefore   = node.assetBalance(bob.address, fixedAssetBase58).balance
+          val orderAmount             = 1
+          val aliceAssetBalanceBefore = node.assetBalance(alice.address, fixedAssetMatcherFeeBase58).balance
+          val bobAssetBalanceBefore   = node.assetBalance(bob.address, fixedAssetMatcherFeeBase58).balance
 
           val aliceOrderIdFill = node
             .placeOrder(
@@ -88,14 +87,14 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
                 .buy(
                   sender = alice,
                   matcher = matcherPublicKey,
-                  pair = aliceWavesPair,
-                  amount = amount,
+                  pair = someWavesPair,
+                  amount = orderAmount,
                   price = price,
                   timestamp = ts,
                   expiration = expirationTimestamp,
                   matcherFee = matcherFee,
                   version = 3,
-                  matcherFeeAssetId = fixedAsset
+                  matcherFeeAssetId = fixedAssetMatcherFee
                 ))
             .message
             .id
@@ -105,25 +104,25 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
                 .sell(
                   sender = bob,
                   matcher = matcherPublicKey,
-                  pair = aliceWavesPair,
-                  amount = amount,
+                  pair = someWavesPair,
+                  amount = orderAmount,
                   price = price,
                   timestamp = ts,
                   expiration = expirationTimestamp,
                   matcherFee = matcherFee,
                   version = 3,
-                  matcherFeeAssetId = fixedAsset
+                  matcherFeeAssetId = fixedAssetMatcherFee
                 ))
             .message
             .id
 
-          orderStatus(alice, aliceWavesPair, aliceOrderIdFill, "Filled")
-          orderStatus(bob, aliceWavesPair, bobSellOrderId, "Filled")
+          orderStatus(alice, someWavesPair, aliceOrderIdFill, "Filled")
+          orderStatus(bob, someWavesPair, bobSellOrderId, "Filled")
 
           node.waitOrderInBlockchain(aliceOrderIdFill)
 
-          node.assetBalance(alice.address, fixedAssetBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + amount
-          node.assetBalance(bob.address, fixedAssetBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - amount
+          node.assetBalance(alice.address, fixedAssetMatcherFeeBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + orderAmount
+          node.assetBalance(bob.address, fixedAssetMatcherFeeBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - orderAmount
           node.balanceDetails(alice.address).available - 0.000000001.waves
           node.balanceDetails(bob.address).available + 0.000000001.waves
 
@@ -145,7 +144,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
 
     "when has percent-mode for fee in config and orders placed" - {
       "should accept orders with amount/price/spending/receiving assets as matcherFeeAsset" in {
-        val minFeePercent = 0.1
+        val minFeePercent = 10
         for (percentAssetType <- Seq(
                "amount",
                "price",
@@ -157,149 +156,74 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
                                assetType = percentAssetType,
                                minFeePercent = minFeePercent
                              ))
-          for (assetInPair <- Seq(
+          for (amountAsset <- Seq(
                  aliceAsset,
                  aliceScriptedAsset
                )) {
-            val assetInPairBase58   = assetInPair.id.base58
-            val aliceWavesPair      = AssetPair(assetInPair, Waves)
+            val amountAssetBase58   = amountAsset.id.base58
+            val someWavesPair       = AssetPair(amountAsset, Waves)
             val ts                  = ntpTime.correctedTime()
             val expirationTimestamp = ts + Order.MaxLiveTime - 10000
-            val amount              = 100
+            val amount              = 100L
+            val priceAssetSpending  = 0.000001.waves
 
-            val (buy, sell, buyMatcherFeeAsset, sellMatcherFeeAsset) = percentAssetType match {
+            val (buyFeeAssetId, sellFeeAssetId, buyMatcherFee, sellMatcherFee) = percentAssetType match {
               case "amount" =>
-                val buyMatcherFeeAsset  = assetInPair
-                val sellMatcherFeeAsset = assetInPair
-                val buy = Order.buy(alice,
-                                    matcherPublicKey,
-                                    aliceWavesPair,
-                                    amount,
-                                    price,
-                                    ts,
-                                    expirationTimestamp,
-                                    matcherFee,
-                                    version = 3,
-                                    buyMatcherFeeAsset)
-                val sell = Order.sell(bob,
-                                      matcherPublicKey,
-                                      aliceWavesPair,
-                                      amount,
-                                      price,
-                                      ts,
-                                      expirationTimestamp,
-                                      matcherFee,
-                                      version = 3,
-                                      sellMatcherFeeAsset)
-                (buy, sell, buyMatcherFeeAsset, sellMatcherFeeAsset)
+                (amountAsset, amountAsset, amount * minFeePercent / 100, amount * minFeePercent / 100)
               case "price" =>
-                val buyMatcherFeeAsset  = Waves
-                val sellMatcherFeeAsset = Waves
-                val buy = Order.buy(alice,
-                                    matcherPublicKey,
-                                    aliceWavesPair,
-                                    amount,
-                                    price,
-                                    ts,
-                                    expirationTimestamp,
-                                    matcherFee,
-                                    version = 3,
-                                    buyMatcherFeeAsset)
-                val sell = Order.sell(bob,
-                                      matcherPublicKey,
-                                      aliceWavesPair,
-                                      amount,
-                                      price,
-                                      ts,
-                                      expirationTimestamp,
-                                      matcherFee,
-                                      version = 3,
-                                      sellMatcherFeeAsset)
-                (buy, sell, buyMatcherFeeAsset, sellMatcherFeeAsset)
+                (Waves, Waves, priceAssetSpending * minFeePercent / 100, priceAssetSpending * minFeePercent / 100)
               case "spending" =>
-                val buyMatcherFeeAsset  = Waves
-                val sellMatcherFeeAsset = assetInPair
-                val buy = Order.buy(alice,
-                                    matcherPublicKey,
-                                    aliceWavesPair,
-                                    amount,
-                                    price,
-                                    ts,
-                                    expirationTimestamp,
-                                    matcherFee,
-                                    version = 3,
-                                    buyMatcherFeeAsset)
-                val sell = Order.sell(bob,
-                                      matcherPublicKey,
-                                      aliceWavesPair,
-                                      amount,
-                                      price,
-                                      ts,
-                                      expirationTimestamp,
-                                      matcherFee,
-                                      version = 3,
-                                      sellMatcherFeeAsset)
-                (buy, sell, buyMatcherFeeAsset, sellMatcherFeeAsset)
+                (Waves, amountAsset, priceAssetSpending * minFeePercent / 100, amount * minFeePercent / 100)
               case "receiving" =>
-                val buyMatcherFeeAsset  = assetInPair
-                val sellMatcherFeeAsset = Waves
-                val buy = Order.buy(alice,
-                                    matcherPublicKey,
-                                    aliceWavesPair,
-                                    amount,
-                                    price,
-                                    ts,
-                                    expirationTimestamp,
-                                    matcherFee,
-                                    version = 3,
-                                    buyMatcherFeeAsset)
-                val sell = Order.sell(bob,
-                                      matcherPublicKey,
-                                      aliceWavesPair,
-                                      amount,
-                                      price,
-                                      ts,
-                                      expirationTimestamp,
-                                      matcherFee,
-                                      version = 3,
-                                      sellMatcherFeeAsset)
-                (buy, sell, buyMatcherFeeAsset, sellMatcherFeeAsset)
+                (amountAsset, Waves, amount * minFeePercent / 100, priceAssetSpending * minFeePercent / 100)
             }
+
+            val buy =
+              Order.buy(alice, matcherPublicKey, someWavesPair, amount, price, ts, expirationTimestamp, buyMatcherFee, version = 3, buyFeeAssetId)
+            val sell =
+              Order.sell(bob, matcherPublicKey, someWavesPair, amount, price, ts, expirationTimestamp, sellMatcherFee, version = 3, sellFeeAssetId)
+
             val aliceWavesBalanceBefore = node.balanceDetails(alice.address).available
             val bobWavesBalanceBefore   = node.balanceDetails(bob.address).available
-            val aliceAssetBalanceBefore = node.assetBalance(alice.address, assetInPairBase58).balance
-            val bobAssetBalanceBefore   = node.assetBalance(bob.address, assetInPairBase58).balance
+            val aliceAssetBalanceBefore = node.assetBalance(alice.address, amountAssetBase58).balance
+            val bobAssetBalanceBefore   = node.assetBalance(bob.address, amountAssetBase58).balance
 
-            val aliceOrderIdFill = node
+            val aliceOrderId = node
               .placeOrder(buy)
               .message
               .id
-            val bobOrderIdFill = node
+            val bobOrderId = node
               .placeOrder(sell)
               .message
               .id
 
-            orderStatus(alice, aliceWavesPair, aliceOrderIdFill, "Filled")
-            orderStatus(bob, aliceWavesPair, bobOrderIdFill, "Filled")
+            orderStatus(alice, someWavesPair, aliceOrderId, "Filled")
+            orderStatus(bob, someWavesPair, bobOrderId, "Filled")
 
-            node.waitOrderInBlockchain(aliceOrderIdFill)
+            node.waitOrderInBlockchain(aliceOrderId)
 
-            (buyMatcherFeeAsset, sellMatcherFeeAsset) match {
-              case (IssuedAsset(_), IssuedAsset(_)) =>
-                node.assetBalance(alice.address, assetInPairBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + amount
-                node.assetBalance(bob.address, assetInPairBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - amount
-                node.balanceDetails(alice.address).available - 0.0000001.waves
-                node.balanceDetails(bob.address).available + 0.0000001.waves
-              case (Waves, Waves) =>
-                node.balanceDetails(alice.address).available shouldBe aliceWavesBalanceBefore - matcherFee - amount
-                node.balanceDetails(bob.address).available shouldBe bobWavesBalanceBefore - matcherFee + amount
+            percentAssetType match {
+              case "amount" =>
+                node.assetBalance(alice.address, amountAssetBase58).balance shouldBe aliceAssetBalanceBefore - buyMatcherFee + amount
+                node.assetBalance(bob.address, amountAssetBase58).balance shouldBe bobAssetBalanceBefore - sellMatcherFee - amount
+                node.balanceDetails(alice.address).available - priceAssetSpending
+                node.balanceDetails(bob.address).available + priceAssetSpending
+              case "price" =>
+                node.balanceDetails(alice.address).available shouldBe aliceWavesBalanceBefore - buyMatcherFee - priceAssetSpending
+                node.balanceDetails(bob.address).available shouldBe bobWavesBalanceBefore - sellMatcherFee + priceAssetSpending
+                node.assetBalance(alice.address, amountAssetBase58).balance shouldBe aliceAssetBalanceBefore + amount
+                node.assetBalance(bob.address, amountAssetBase58).balance shouldBe bobAssetBalanceBefore - amount
+              case "spending" =>
+                node.balanceDetails(alice.address).available shouldBe aliceWavesBalanceBefore - buyMatcherFee - priceAssetSpending
+                node.balanceDetails(bob.address).available + priceAssetSpending
+                node.assetBalance(alice.address, amountAssetBase58).balance shouldBe aliceAssetBalanceBefore + amount
+                node.assetBalance(bob.address, amountAssetBase58).balance shouldBe bobAssetBalanceBefore - sellMatcherFee - amount
+              case "receiving" =>
+                node.balanceDetails(alice.address).available - priceAssetSpending
+                node.balanceDetails(bob.address).available shouldBe bobWavesBalanceBefore - sellMatcherFee + amount
+                node.assetBalance(alice.address, amountAssetBase58).balance shouldBe aliceAssetBalanceBefore - buyMatcherFee + amount
+                node.assetBalance(bob.address, amountAssetBase58).balance shouldBe bobAssetBalanceBefore - amount
 
-              case (Waves, IssuedAsset(_)) =>
-                node.balanceDetails(alice.address).available shouldBe aliceWavesBalanceBefore - matcherFee - amount
-                node.assetBalance(bob.address, assetInPairBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - amount
-              case (IssuedAsset(_), Waves) =>
-                node.assetBalance(alice.address, assetInPairBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + amount
-                node.balanceDetails(bob.address).available shouldBe bobWavesBalanceBefore - matcherFee + amount
             }
           }
         }
@@ -315,7 +239,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
           docker.restartNode(node,
                              configWithOrderFeePercent(
                                assetType = percentAssetType,
-                               minFeePercent = 0.1
+                               minFeePercent = 10
                              ))
           val ts                  = ntpTime.correctedTime()
           val expirationTimestamp = ts + Order.MaxLiveTime - 10000
@@ -363,45 +287,21 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
         }
       }
     }
-    "when has insufficient amount of WAVES to pay ExchangeTransaction fee and place orders" - {
-      "generated ExchangeTransaction should not appears in blockchain" in {
-        docker.restartNode(node, configWithOrderFeeFixed(matcherFeeAssetId = aliceAssetBase58))
-        val matcherWavesBalance = node.balanceDetails(matcher.address).available
-        node.broadcastTransfer(matcher,
-                               alice.address,
-                               matcherWavesBalance - minFee,
-                               assetId = None,
-                               fee = minFee,
-                               feeAssetId = None,
-                               waitForTx = true)
+    "when has insufficient funds in WAVES to pay ExchangeTx fee" in {
+      docker.restartNode(node, configWithOrderFeeFixed(matcherFeeAssetId = aliceAssetBase58))
+      val matcherWavesBalance = node.balanceDetails(matcher.address).available
+      node.broadcastTransfer(matcher, alice.address, matcherWavesBalance - minFee, assetId = None, fee = minFee, feeAssetId = None, waitForTx = true)
 
-        val ts                  = ntpTime.correctedTime()
-        val expirationTimestamp = ts + Order.MaxLiveTime - 10000
-        val amount              = 100
-        val aliceWavesPair      = AssetPair(aliceAsset, Waves)
+      val ts                  = ntpTime.correctedTime()
+      val expirationTimestamp = ts + Order.MaxLiveTime - 10000
+      val amount              = 100
+      val aliceWavesPair      = AssetPair(aliceAsset, Waves)
 
-        val aliceOrderIdFill = node
-          .placeOrder(
-            Order
-              .buy(
-                sender = alice,
-                matcher = matcherPublicKey,
-                pair = aliceWavesPair,
-                amount = amount,
-                price = price,
-                timestamp = ts,
-                expiration = expirationTimestamp,
-                matcherFee = matcherFee,
-                version = 3,
-                matcherFeeAssetId = aliceAsset
-              ))
-          .message
-          .id
-
-        node.placeOrder(
+      val aliceOrderIdFill = node
+        .placeOrder(
           Order
-            .sell(
-              sender = bob,
+            .buy(
+              sender = alice,
               matcher = matcherPublicKey,
               pair = aliceWavesPair,
               amount = amount,
@@ -412,15 +312,30 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
               version = 3,
               matcherFeeAssetId = aliceAsset
             ))
+        .message
+        .id
 
-        nodes.waitForHeightArise()
+      node.placeOrder(
+        Order
+          .sell(
+            sender = bob,
+            matcher = matcherPublicKey,
+            pair = aliceWavesPair,
+            amount = amount,
+            price = price,
+            timestamp = ts,
+            expiration = expirationTimestamp,
+            matcherFee = matcherFee,
+            version = 3,
+            matcherFeeAssetId = aliceAsset
+          ))
 
-        val transactionByOrderResponse = node.matcherGet(s"/matcher/transactions/$aliceOrderIdFill")
-        val exchangeTxId               = parse(transactionByOrderResponse.getResponseBody(StandardCharsets.UTF_8)).as[ExchangeTransaction].id
+      nodes.waitForHeightArise()
 
-        SyncMatcherHttpApi.assertNotFoundAndMessage(node.transactionInfo(exchangeTxId), "Transaction is not in blockchain")
-      }
+      val exchangeTxId = node.transactionsByOrder(aliceOrderIdFill).head.id
+      SyncMatcherHttpApi.assertNotFoundAndMessage(node.transactionInfo(exchangeTxId), "Transaction is not in blockchain")
     }
+
   }
 
   private def orderStatus(sender: KeyPair, assetPair: AssetPair, orderId: String, expectedStatus: String) =
