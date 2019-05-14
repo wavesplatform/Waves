@@ -60,7 +60,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
   property("data keys should not be duplicated") {
     forAll(Preconditions.duplicateDataKeys()) {
       case (genesisBlock, block1, microBlocks, address) =>
-        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+        withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
           Seq(genesisBlock, block1).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
           d.blockchainUpdater.accountDataKeys(address) shouldBe Seq("test")
 
