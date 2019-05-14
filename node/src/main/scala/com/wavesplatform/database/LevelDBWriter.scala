@@ -882,15 +882,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  override def parent(block: Block, back: Int): Option[Block] = readOnly { db =>
-    for {
-      h <- db.get(Keys.heightOf(block.reference))
-      height = Height(h - back + 1)
-      block <- loadBlock(height, db)
-    } yield block
-  }
-
-  override def parentHeader(block: Block, back: Int): Option[BlockHeader] = readOnly { db =>
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readOnly { db =>
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)

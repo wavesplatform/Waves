@@ -438,21 +438,12 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def parent(block: Block, back: Int): Option[Block] = readLock {
-    ngState match {
-      case Some(ng) if ng.contains(block.reference) =>
-        if (back == 1) Some(ng.base) else blockchain.parent(ng.base, back - 1)
-      case _ =>
-        blockchain.parent(block, back)
-    }
-  }
-
-  override def parentHeader(block: Block, back: Int): Option[BlockHeader] = readLock {
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
         if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
       case _ =>
-        blockchain.parent(block, back)
+        blockchain.parentHeader(block, back)
     }
   }
 
