@@ -129,12 +129,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def accountDataKeys(address: Address): Seq[String] = readOnly { db =>
-    (for {
+    for {
       addressId <- addressId(address).toVector
       keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
       chunkNo <- Range(0, keyChunkCount)
       key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
-    } yield key).distinct
+    } yield key
   }
 
   override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
