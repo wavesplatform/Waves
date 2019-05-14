@@ -201,6 +201,7 @@ class UtxPoolImpl(time: Time,
             val updatedBlockchain = composite(blockchain, diff)
             if (TxCheck.isExpired(tx)) {
               log.trace(s"Transaction [${tx.id()}] is expired")
+              remove(tx.id())
               (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
             } else {
               differ(updatedBlockchain, tx).resultE match {
