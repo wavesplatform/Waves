@@ -35,7 +35,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   private val pureContext = PureContext.build(V1)
 
-  private val defaultCryptoContext = CryptoContext.build(Global)
+  private val defaultCryptoContext = CryptoContext.build(Global, V1)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) (BLOCK.apply _) else (LET_BLOCK.apply _))
 

@@ -27,7 +27,7 @@ object BlockchainContext {
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
     ).map(WavesContext.build(_, new WavesEnvironment(nByte, in, h, blockchain, address)))
-      .map(Seq(PureContext.build(version), CryptoContext.build(Global), _))
+      .map(Seq(PureContext.build(version), CryptoContext.build(Global, version), _))
       .map(Monoid.combineAll(_))
       .map(_.evaluationContext)
 }
