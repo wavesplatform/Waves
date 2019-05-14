@@ -217,7 +217,7 @@ class UtxPoolImpl(time: Time,
                   }
                 case Left(error) =>
                   log.trace(s"Transaction [${tx.id()}] is removed: $error")
-                  transactions.remove(tx.id())
+                  remove(tx.id())
                   (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
               }
             }
