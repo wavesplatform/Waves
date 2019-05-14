@@ -110,12 +110,15 @@ class SplitFunctionTest
     val script =
       s"""
          |   let strs1 = split("", ",")
-         |   let strs2 = split("", "")
+         |   let strs2 = split("", ",,,")
+         |   let strs3 = split("", "")
          |
          |   strs1.size() == 1 &&
          |   strs2.size() == 1 &&
+         |   strs3.size() == 1 &&
          |   strs1[0] == ""    &&
-         |   strs2[0] == ""
+         |   strs2[0] == ""    &&
+         |   strs3[0] == ""
          |
       """.stripMargin
 

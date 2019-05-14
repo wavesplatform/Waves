@@ -12,14 +12,10 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.MalformedInputException
 import java.nio.{BufferUnderflowException, ByteBuffer}
-
-import com.google.common.base.Splitter
 import com.wavesplatform.lang.directives.values._
-
 import scala.util.{Success, Try}
 
 object PureContext {
@@ -365,27 +361,34 @@ object PureContext {
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
-  private val seqWithEmptyStr = IndexedSeq("")
-
-  private def split(str: String, sep: String) =
-    if (str == "") seqWithEmptyStr
-    else if (sep == "") {
-      (1 to str.length).map(i => String.valueOf(str.charAt(i - 1)))
-    }
-    else {
-      import scala.collection.JavaConverters._
-
-      Splitter
-        .on(sep).split(str)
-        .asScala
-        .toIndexedSeq
-    }
-
   lazy val splitStr: BaseFunction =
     NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil => Right(ARR(split(str, sep).map(CONST_STRING)))
       case xs                                            => notImplemented("split(STRING, STRING)", xs)
     }
+
+  def split(str: String, sep: String) =
+    if (str == "") seqWithEmptyStr
+    else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1)))
+    else splitRec(str, sep).reverse.toIndexedSeq
+
+  private val seqWithEmptyStr = IndexedSeq("")
+
+  def splitRec(
+                str: String,
+                sep: String,
+                offset: Int = 0,
+                splitted: List[String] = Nil
+              ): List[String] = {
+    val index = str.indexOf(sep, offset)
+    if (index == -1) str.substring(offset, str.length) :: splitted
+    else splitRec(
+      str,
+      sep,
+      index + sep.length,
+      str.substring(offset, index) :: splitted
+    )
+  }
 
   lazy val parseInt: BaseFunction =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
