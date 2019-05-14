@@ -170,6 +170,11 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
           0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xAB, 0xCD, 0xEF, 0xfa, 0xbc, 0xde).map(_.toByte))))
   }
 
+  property("invalid base16 definition") {
+    parse("base16'mid-size'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "m isn't base16/hex digit"))
+    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "Need integnal bytes number"))
+  }
+
   property("literal too long") {
     import Global.MaxLiteralLength
     val longLiteral = "A" * (MaxLiteralLength + 1)

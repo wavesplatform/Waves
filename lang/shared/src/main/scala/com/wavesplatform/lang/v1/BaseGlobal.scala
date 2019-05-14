@@ -30,7 +30,7 @@ trait BaseGlobal {
   def base16Encode(input: Array[Byte]): Either[String, String] = {
     val output = new StringBuilder(input.size * 2)
     for (b <- input) {
-       output.append(hex(b >> 4))
+       output.append(hex((b >> 4) & 0xf))
        output.append(hex(b & 0xf))
     }
     Right(output.result)
