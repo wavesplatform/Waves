@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform._
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -53,6 +53,19 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, leaseBlock.uniqueId) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
+        }
+    }
+  }
+
+  property("data keys should not be duplicated") {
+    forAll(Preconditions.duplicateDataKeys()) {
+      case (genesisBlock, block1, microBlocks, address) =>
+        withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
+          Seq(genesisBlock, block1).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
+          d.blockchainUpdater.accountDataKeys(address) shouldBe Seq("test")
+
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
+          d.blockchainUpdater.accountDataKeys(address) shouldBe Seq("test")
         }
     }
   }
@@ -186,6 +199,34 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount)
+      }
+    }
+
+    def duplicateDataKeys(): Gen[(Block, Block, Seq[MicroBlock], Address)] = {
+      for {
+        richAccount   <- accountGen
+        tsAmount = FeeAmount * 10
+        data1 <- QuickTX.data(richAccount, "test")
+        data2 <- QuickTX.data(richAccount, "test")
+      } yield {
+        val genesisBlock = unsafeBlock(
+          reference = randomSig,
+          txs = Seq(GenesisTransaction.create(richAccount, FeeAmount * 100, 0).explicitGet()),
+          signer = TestBlock.defaultSigner,
+          version = 3,
+          timestamp = 0
+        )
+
+        val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
+          totalRefTo = genesisBlock.signerData.signature,
+          base = Seq(data1),
+          micros = Seq(Seq(data2)),
+          signer = richAccount,
+          version = 3,
+          timestamp = System.currentTimeMillis()
+        )
+
+        (genesisBlock, keyBlock, microBlocks, richAccount.toAddress)
       }
     }
   }

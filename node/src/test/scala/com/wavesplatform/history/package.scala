@@ -28,12 +28,17 @@ package object history {
   val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
 
+  val DataAndMicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)))
+
   val TransfersV2ActivatedAt0BlockchainSettings: BlockchainSettings =
     DefaultBlockchainSettings.copy(
       functionalitySettings =
         DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)))
 
   val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
+
+  val DataAndMicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = DataAndMicroblocksActivatedAt0BlockchainSettings)
 
   val TransfersV2ActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = TransfersV2ActivatedAt0BlockchainSettings)
 
