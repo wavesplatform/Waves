@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1
 
+import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
@@ -68,6 +69,8 @@ trait BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
+  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
+
   def keccak256(message: Array[Byte]): Array[Byte]
   def blake2b256(message: Array[Byte]): Array[Byte]
   def sha256(message: Array[Byte]): Array[Byte]
@@ -108,10 +111,9 @@ trait BaseGlobal {
     } yield (serializeContract(dapp, stdLibVersion), dapp, complexity._2)
 
   def decompile(compiledCode: String): Either[ScriptParseError, String] = {
-    Script.fromBase64String(compiledCode, checkComplexity = false).right.map{
-      script =>
-        val (scriptText, _) = Script.decompile(script)
-        scriptText
+    Script.fromBase64String(compiledCode, checkComplexity = false).right.map { script =>
+      val (scriptText, _) = Script.decompile(script)
+      scriptText
     }
   }
 }

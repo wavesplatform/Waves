@@ -4,8 +4,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -45,11 +45,12 @@ package object utils {
       .filter(_.isRight)
       .map(_.explicitGet())
       .map(ds => {
+        val version = ds.stdLibVersion
         val ctx = Coeval.evalOnce(
           Monoid.combineAll(
             Seq(
-              PureContext.build(ds.stdLibVersion),
-              CryptoContext.build(Global, ds.stdLibVersion),
+              PureContext.build(version),
+              CryptoContext.build(Global, version),
               WavesContext.build(ds, environment)
             )
           )

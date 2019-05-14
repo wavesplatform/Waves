@@ -5,7 +5,6 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -13,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -69,8 +69,8 @@ object JsAPI {
       }
     )
 
-  private def cryptoContext(v: StdLibVersion)      = CryptoContext.build(Global, v)
-  private val letBLockVersions: Set[StdLibVersion] = Set(V1, V2)
+  private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version)
+  private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
   private def typeRepr(t: TYPE): js.Any = t match {
     case UNION(l, _) => l.map(typeRepr).toJSArray
@@ -194,9 +194,8 @@ object JsAPI {
 
   @JSExportTopLevel("decompile")
   def decompile(input: String): js.Dynamic = {
-    val decompiled = Global.decompile(input).right.map{
-      scriptText =>
-        js.Dynamic.literal("result" -> scriptText)
+    val decompiled = Global.decompile(input).right.map { scriptText =>
+      js.Dynamic.literal("result" -> scriptText)
     }
     decompiled.fold(
       err => js.Dynamic.literal("error" -> err.m),
