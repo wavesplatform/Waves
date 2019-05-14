@@ -3,8 +3,8 @@ package com.wavesplatform.utils
 import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 
 import cats.syntax.monoid._
-import com.wavesplatform.common.crypto.RSA
-import com.wavesplatform.common.crypto.RSA._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.V3

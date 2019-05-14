@@ -1,4 +1,4 @@
-package com.wavesplatform.common.crypto
+package com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto
 
 import java.security.spec.X509EncodedKeySpec
 import java.security.{KeyFactory, Signature}

@@ -71,8 +71,6 @@ object Dependencies {
 
   val common = Def.setting(
     Seq(
-      bouncyCastle("bcpkix"),
-      bouncyCastle("bcprov"),
       scalaTest
     )
   )
