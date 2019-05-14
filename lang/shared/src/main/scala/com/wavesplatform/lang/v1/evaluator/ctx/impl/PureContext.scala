@@ -13,12 +13,11 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 
-import scala.collection.mutable.ArrayBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.MalformedInputException
 import java.nio.{BufferUnderflowException, ByteBuffer}
-import java.util.regex.Pattern
 
+import com.google.common.base.Splitter
 import com.wavesplatform.lang.directives.values._
 
 import scala.util.{Success, Try}
@@ -366,15 +365,26 @@ object PureContext {
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
+  private val seqWithEmptyStr = IndexedSeq("")
+
+  private def split(str: String, sep: String) =
+    if (str == "") seqWithEmptyStr
+    else if (sep == "") {
+      (1 to str.length).map(i => String.valueOf(str.charAt(i - 1)))
+    }
+    else {
+      import scala.collection.JavaConverters._
+
+      Splitter
+        .on(sep).split(str)
+        .asScala
+        .toIndexedSeq
+    }
+
   lazy val splitStr: BaseFunction =
     NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
-      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil =>
-        val regexIgnoredSep = Pattern.quote(sep)
-        val limit = if (sep == "") 0 else -1
-        val splitted = m.split(regexIgnoredSep, limit)
-        val strings  = splitted.map(CONST_STRING)
-        Right(ARR(strings))
-      case xs => notImplemented("split(STRING, STRING)", xs)
+      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil => Right(ARR(split(str, sep).map(CONST_STRING)))
+      case xs                                            => notImplemented("split(STRING, STRING)", xs)
     }
 
   lazy val parseInt: BaseFunction =
