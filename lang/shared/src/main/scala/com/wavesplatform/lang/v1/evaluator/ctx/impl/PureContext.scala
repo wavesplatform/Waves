@@ -17,6 +17,7 @@ import scala.collection.mutable.ArrayBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.MalformedInputException
 import java.nio.{BufferUnderflowException, ByteBuffer}
+import java.util.regex.Pattern
 
 import com.wavesplatform.lang.directives.values._
 
@@ -365,21 +366,15 @@ object PureContext {
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
-  def split(m: String, sep: String, buffer: ArrayBuffer[CONST_STRING] =  ArrayBuffer[CONST_STRING](), start: Int = 0): IndexedSeq[CONST_STRING] = {
-    m.indexOf(sep, start) match {
-      case -1 =>
-        buffer += CONST_STRING(m.substring(start))
-        buffer.result
-      case n =>
-        buffer += CONST_STRING(m.substring(0, n))
-        split(m, sep, buffer, n + sep.length)
-    }
-  }
-
   lazy val splitStr: BaseFunction =
     NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
-      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil => Right( ARR(split(m, sep)))
-      case xs                      => notImplemented("split(STRING, STRING)", xs)
+      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil =>
+        val regexIgnoredSep = Pattern.quote(sep)
+        val limit = if (sep == "") 0 else -1
+        val splitted = m.split(regexIgnoredSep, limit)
+        val strings  = splitted.map(CONST_STRING)
+        Right(ARR(strings))
+      case xs => notImplemented("split(STRING, STRING)", xs)
     }
 
   lazy val parseInt: BaseFunction =
