@@ -48,13 +48,13 @@ trait BaseGlobal {
     }
   }
 
-  def base16Decode(input: String, limit: Int): Either[String, Array[Byte]] = {
+  def base16Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]] = {
     val size = input.size
     if(size % 2 == 1) {
       Left("Need integnal bytes number")
     } else {
       val bytes = new Array[Byte](size / 2)
-      for( i <- 0 to size ) {
+      for( i <- 0 to size/2-1 ) {
         (base16Dig(input(i*2)), base16Dig(input(i*2 + 1))) match {
           case (Right(h), Right(l)) => bytes(i) = ((16:Byte)*h + l).toByte
           case (Left(e),_) => return Left(e)
