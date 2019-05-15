@@ -172,7 +172,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("invalid base16 definition") {
     parse("base16'mid-size'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "m isn't base16/hex digit"))
-    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "Need integnal bytes number"))
+    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "Need internal bytes number"))
   }
 
   property("literal too long") {
