@@ -1,10 +1,10 @@
-
-
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
-
+import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
+import com.typesafe.sbt.packager.Keys.executableScriptName
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
+
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -35,13 +35,11 @@ val versionSource = Def.task {
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
   Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases"),
+  Resolver.sbtPluginRepo("releases")
 )
 
 libraryDependencies ++= Dependencies.node.value
 coverageExcludedPackages := ""
-
-scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
 
 inConfig(Compile)(
   Seq(
@@ -86,20 +84,17 @@ inTask(assembly)(
     }
   ))
 
-val network = SettingKey[Network]("network")
-network := Network(sys.props.get("network"))
-
-name := "waves"
-normalizedName := s"${name.value}${network.value.packageSuffix}"
-
-val linuxScriptPattern = "bin/(.+)".r
-val batScriptPattern   = "bin/([^.]+)\\.bat".r
+scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
+// Logback creates a "waves.directory_UNDEFINED" without this option.
+bashScriptExtraDefines += s"""addJava "-Dwaves.directory=/var/lib/${(Universal / normalizedName).value}""""
 
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
     mappings := {
-      val scriptSuffix = network.value.packageSuffix
+      val linuxScriptPattern = "bin/(.+)".r
+      val batScriptPattern   = "bin/([^.]+)\\.bat".r
+      val scriptSuffix       = network.value.packageSuffix
       mappings.value.map {
         case m @ (file, batScriptPattern(script)) =>
           if (script.endsWith(scriptSuffix)) m else (file, s"bin/$script$scriptSuffix.bat")
@@ -136,39 +131,51 @@ inConfig(Linux)(
     packageDescription := "Waves node"
   ))
 
-bashScriptExtraDefines += s"""addJava "-Dwaves.directory=/var/lib/${normalizedName.value}""""
-
-val packageSource = Def.setting {
-  sourceDirectory.value / "package"
-}
-
-val upstartScript = Def.task {
-  val src    = packageSource.value / "upstart.conf"
-  val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
-  val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
-  IO.write(dest, result)
-  dest
-}
-
-linuxPackageMappings ++= Seq(
-  (upstartScript.value, s"/etc/init/${packageName.value}.conf")
-).map(packageMapping(_).withConfig().withPerms("644"))
-
-linuxScriptReplacements += "detect-loader" ->
-  """is_systemd() {
-    |    which systemctl >/dev/null 2>&1 && \
-    |    systemctl | grep -- -\.mount >/dev/null 2>&1
-    |}
-    |is_upstart() {
-    |    /sbin/init --version | grep upstart >/dev/null 2>&1
-    |}
-    |""".stripMargin
-
+val packageSource = Def.settingKey[File]("Additional files for DEB")
 inConfig(Debian)(
   Seq(
+    packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
     serviceAutostart := false,
-    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
-  ))
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
+    linuxPackageMappings ++= {
+      val upstartScript = {
+        val src    = packageSource.value / "upstart.conf"
+        val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+        val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
+        IO.write(dest, result)
+        dest
+      }
 
+      Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
+    },
+    linuxScriptReplacements += "detect-loader" ->
+      """is_systemd() {
+        |    which systemctl >/dev/null 2>&1 && \
+        |    systemctl | grep -- -\.mount >/dev/null 2>&1
+        |}
+        |is_upstart() {
+        |    /sbin/init --version | grep upstart >/dev/null 2>&1
+        |}
+        |""".stripMargin
+  ) ++ nameFix)
+
+// Hack for https://youtrack.jetbrains.com/issue/SCL-15210
+
+moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
+executableScriptName := moduleName.value // bin/waves instead of bin/node
+
+// Variable options are used in different tasks and configs, so we will specify all of them
+val nameFix = Seq(
+  name := "waves",
+  packageName := s"${name.value}${network.value.packageSuffix}",
+  normalizedName := s"${name.value}${network.value.packageSuffix}"
+)
+
+inConfig(Universal)(nameFix)
+inConfig(Linux)(nameFix)
+inConfig(Debian)(nameFix)
+
+inTask(packageBin)(nameFix)
+inTask(assembly)(nameFix)
