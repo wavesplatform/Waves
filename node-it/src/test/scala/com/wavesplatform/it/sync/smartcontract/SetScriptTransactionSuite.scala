@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
@@ -128,5 +128,90 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       version = 2,
       waitForTx = true
     )
+  }
+
+  test("correct script parse") {
+    val scriptText =
+      """
+        |  {-# STDLIB_VERSION 3 #-}
+        |  {-# CONTENT_TYPE DAPP #-}
+        |  {-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |  @Callable(i)
+        |  func deposit() = {
+        |     let pmt = extract(i.payment)
+        |     if (isDefined(pmt.assetId)) then throw("can hodl waves only at the moment")
+        |     else {
+        |          let currentKey = toBase58String(i.caller.bytes)
+        |          let currentAmount = match getInteger(this, currentKey) {
+        |              case a:Int => a
+        |              case _ => 0
+        |          }
+        |          let newAmount = currentAmount + pmt.amount
+        |          WriteSet([DataEntry(currentKey, newAmount)])
+        |     }
+        |  }
+        |
+        |  @Callable(i)
+        |  func js() = {
+        |          WriteSet([DataEntry("just state", "value")])
+        |  }
+        |
+        |  @Callable(i)
+        |  func jse() = {
+        |          WriteSet([])
+        |  }
+        |
+        |  @Callable(i)
+        |  func ts() = {
+        |          TransferSet([ScriptTransfer(i.caller, 1, unit)])
+        |  }
+        |
+        |  @Callable(i)
+        |  func tse() = {
+        |          TransferSet([])
+        |  }
+        |
+        |  @Callable(i)
+        |  func withdraw(amount: Int) = {
+        |          let currentKey = toBase58String(i.caller.bytes)
+        |          let currentAmount = match getInteger(this, currentKey) {
+        |              case a:Int => a
+        |              case _ => 0
+        |          }
+        |          let newAmount = currentAmount - amount
+        |       if (amount < 0)
+        |              then throw("Can't withdraw negative amount")
+        |      else if (newAmount < 0)
+        |              then throw("Not enough balance")
+        |              else ScriptResult(
+        |                      WriteSet([DataEntry(currentKey, newAmount)]),
+        |                      TransferSet([ScriptTransfer(i.caller, amount, unit)])
+        |                  )
+        |      }
+        |
+        |
+        |  @Verifier(tx)
+        |  func verify() = {
+        |      true
+        |  }
+      """.stripMargin
+
+    val script = ScriptCompiler.compile(scriptText).explicitGet()._1
+
+    val setScriptTx = SetScriptTransaction.selfSigned(
+        sender = acc0,
+        script = Some(script),
+        fee = setScriptFee + 0.004.waves,
+        timestamp = System.currentTimeMillis()
+      )
+      .explicitGet()
+
+    val scriptId = sender.signedBroadcast(
+      setScriptTx.json.value,
+      waitForTx = true
+    ).id
+
+    sender.transactionInfo(scriptId).script shouldBe Some(script.bytes.value.base64)
   }
 }
