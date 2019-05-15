@@ -255,7 +255,7 @@ class MatcherActorSpecification
         }
       }
 
-      "received a lot of messages and tries to maintain a snapshot's offset" in snapshotTest(pair23) { (matcherActor, probes) =>
+      "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (matcherActor, probes) =>
         val eventSender = TestProbe()
         val probe       = probes.head
         sendBuyOrders(eventSender, matcherActor, pair23, 0 to 30)
@@ -265,7 +265,7 @@ class MatcherActorSpecification
         probe.expectNoMessage(200.millis)
 
         sendBuyOrders(eventSender, matcherActor, pair23, 31 to 45)
-        probe.expectMsg(OrderBookSnapshotUpdated(pair23, 31))
+        probe.expectMsg(OrderBookSnapshotUpdated(pair23, 43))
         probe.expectNoMessage(200.millis)
       }
     }
@@ -358,7 +358,7 @@ class MatcherActorSpecification
             probe.ref ! event
           }
       }
-      context.parent ! OrderBookSnapshotUpdated(assetPair, -1)
+      context.parent ! OrderBookRecovered(assetPair, None)
     })
 
     (props, probe)

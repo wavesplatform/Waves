@@ -75,11 +75,12 @@ class OrderBookActor(owner: ActorRef,
 
   private def snapshotsCommands: Receive = {
     case SaveSnapshotSuccess(metadata) =>
-      val snapshotOffsetId = savingSnapshot.getOrElse(throw new IllegalStateException("Impossible"))
-      log.info(s"Snapshot has been saved at offset $snapshotOffsetId: $metadata")
-      owner ! OrderBookSnapshotUpdated(assetPair, snapshotOffsetId)
-      lastSavedSnapshotOffset = Some(snapshotOffsetId)
+      val snapshotOffset = savingSnapshot.getOrElse(throw new IllegalStateException("Impossible"))
+      log.info(s"Snapshot has been saved at offset $snapshotOffset: $metadata")
+      owner ! OrderBookSnapshotUpdated(assetPair, snapshotOffset)
+      lastSavedSnapshotOffset = Some(snapshotOffset)
       savingSnapshot = None
+      deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
     case SaveSnapshotFailure(metadata, reason) =>
       savingSnapshot = None
