@@ -578,7 +578,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     ngState.fold(blockchain.accountDataKeys(address)) { ng =>
       val fromInner = blockchain.accountDataKeys(address)
       val fromDiff  = ng.bestLiquidDiff.accountData.get(address).toVector.flatMap(_.data.keys)
-      fromInner ++ fromDiff
+      (fromInner ++ fromDiff).distinct
     }
   }
 

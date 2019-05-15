@@ -172,7 +172,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   }
 
   override def accountDataKeys(acc: Address): Seq[String] = {
-    inner.accountDataKeys(acc) ++ diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    val fromInner = inner.accountDataKeys(acc)
+    val fromDiff = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    (fromInner ++ fromDiff).distinct
   }
 
   override def accountData(acc: Address): AccountDataInfo = {

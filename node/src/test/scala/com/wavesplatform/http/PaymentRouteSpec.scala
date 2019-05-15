@@ -27,8 +27,8 @@ class PaymentRouteSpec
   private val allChannels = stub[ChannelGroup]
 
   (utx.putIfNew _)
-    .when(*)
-    .onCall((t: Transaction) => TracedResult(Right(true)))
+    .when(*, *)
+    .onCall((t: Transaction, _: Boolean) => TracedResult(Right(true)))
     .anyNumberOfTimes()
 
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
