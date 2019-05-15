@@ -15,7 +15,10 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.MalformedInputException
 import java.nio.{BufferUnderflowException, ByteBuffer}
+
 import com.wavesplatform.lang.directives.values._
+
+import scala.annotation.tailrec
 import scala.util.{Success, Try}
 
 object PureContext {
@@ -374,7 +377,7 @@ object PureContext {
 
   private val seqWithEmptyStr = IndexedSeq("")
 
-  private def splitRec(
+  @tailrec private def splitRec(
                 str: String,
                 sep: String,
                 offset: Int = 0,
