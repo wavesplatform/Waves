@@ -21,6 +21,9 @@ import com.wavesplatform.lang.directives.values._
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
 
+import java.math.{MathContext, BigDecimal => BD}
+import ch.obermuhlner.math.big.BigDecimalMath
+
 object PureContext {
 
   implicit def intToLong(num: Int): Long = num.toLong
@@ -483,6 +486,21 @@ object PureContext {
     uNot
   )
 
+  lazy val pow: BaseFunction =
+    NativeFunction("pow", 20, POW, LONG, "Match pow",
+        ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
+        ("exponent", LONG, "exponents value"), ("ep", LONG, "exponents decimal"),
+        ("rp", LONG, "results decimal")
+     ) {
+      case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: Nil => Try({
+        val base = BD.valueOf(b, bp.toInt)
+        val exp = BD.valueOf(e, ep.toInt)
+        val res = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
+        CONST_LONG(res.setScale(rp.toInt).unscaledValue.longValueExact)
+      }).toEither.left.map(_.toString)
+      case xs                      => notImplemented("pow(Int, Int, Int, Int, Int)", xs)
+    }
+
   private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
     ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
   )
@@ -531,7 +549,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
+            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal, pow)
           )
         )
     }
