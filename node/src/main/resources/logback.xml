@@ -56,6 +56,5 @@
         <appender-ref ref="FILE"/>
     </root>
 
-    <include optional="true" file="/etc/waves/logback.xml"/>
-    <include optional="true" file="waves_logback.xml"/>
+    <include optional="true" file="${waves.config.directory:-.}/logback.xml"/>
 </configuration>
