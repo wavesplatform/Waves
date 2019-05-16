@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -18,7 +18,7 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
 
     "put(transaction)" - tests { (maxTxs, txs) =>
       val constraint = createConstConstraint(maxTxs, transactionSize = 1)
-      txs.foldLeft(constraint)(_.put(stub[Blockchain], _))
+      txs.foldLeft(constraint)(_.put(stub[Blockchain], _, Diff.empty))
     }
   }
 

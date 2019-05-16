@@ -94,7 +94,7 @@ package object appender extends ScorexLogging {
     blockchainUpdater.processBlock(block, verify).map { maybeDiscardedTxs =>
       utxStorage.removeAll(block.transactionData)
       maybeDiscardedTxs.map { discarded =>
-        discarded.foreach(utxStorage.putIfNew)
+        discarded.foreach(utxStorage.putIfNew(_, verify = false))
         blockchainUpdater.height
       }
     }
@@ -106,8 +106,8 @@ package object appender extends ScorexLogging {
 
     for {
       height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-      parent <- blockchain.parent(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
-      grandParent = blockchain.parent(parent, 2)
+      parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+      grandParent = blockchain.parentHeader(parent, 2)
       effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
       _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
       _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))

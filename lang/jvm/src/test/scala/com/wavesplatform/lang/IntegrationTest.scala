@@ -495,6 +495,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
+  property("extract Long from < 8 bytes (Buffer underflow)") {
+    val src =
+      """ "AAAAAAA".toBytes().toInt() """
+    eval[EVALUATED](src)  should produce("Buffer underflow")
+  }
+
   property("indexOf") {
     val src =
       """ "qweqwe".indexOf("we") """
@@ -554,5 +560,43 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
       """.stripMargin
     eval[EVALUATED](sampleScript, None) should produce("all possible types are List(Int, String)")
+  }
+
+  property("big let assignment chain") {
+    val count = 5000
+    val script =
+      s"""
+         | let a0 = 1
+         | ${1 to count map (i => s"let a$i = a${i - 1}") mkString "\n"}
+         | a$count == a$count
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("big function assignment chain") {
+    val count = 2000
+    val script =
+      s"""
+         | func a0() = {
+         |   1 + 1
+         | }
+         | ${1 to count map (i => s"func a$i() = a${i - 1}()") mkString "\n"}
+         | a$count() == a$count()
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("big let assignment chain with function") {
+    val count = 5000
+    val script =
+      s"""
+         | let a0 = 1
+         | ${1 to count map (i => s"let a$i = a${i - 1} + 1") mkString "\n"}
+         | a$count == a$count
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 }

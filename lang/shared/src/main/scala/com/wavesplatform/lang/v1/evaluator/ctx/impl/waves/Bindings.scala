@@ -93,13 +93,24 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, callerPk: ByteStr, payment: Option[Pmt], dappAddress: Recipient.Address) =
+  def buildInvocation(
+                       caller:        Recipient.Address,
+                       callerPk:      ByteStr,
+                       payment:       Option[Pmt],
+                       dappAddress:   Recipient.Address,
+                       transactionId: ByteStr,
+                       fee:           Long,
+                       feeAssetId:    Option[ByteStr]
+                     ) =
     CaseObj(
       invocationType,
       Map(
         "caller"          -> mapRecipient(caller)._2,
         "callerPublicKey" -> callerPk,
-        "payment"         -> buildPayment(payment)
+        "payment"         -> buildPayment(payment),
+        "transactionId"   -> transactionId,
+        "fee"             -> fee,
+        "feeAssetId"      -> feeAssetId
       )
     )
 
@@ -176,16 +187,16 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
+      case CI(p, addressOrAlias, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled),
           combine(
             Map(
-              "dappAddress" -> mapRecipient(address)._2,
-              "payment"     -> buildPayment(maybePayment),
-              "feeAssetId"  -> feeAssetId,
-              "function"    -> funcName,
-              "args"        -> funcArgs
+              "dApp"       -> mapRecipient(addressOrAlias)._2,
+              "payment"    -> buildPayment(maybePayment),
+              "feeAssetId" -> feeAssetId,
+              "function"   -> funcName,
+              "args"       -> funcArgs
             ),
             provenTxPart(p, proofsEnabled)
           )
@@ -278,6 +289,16 @@ object Bindings {
         "reissuable"  -> sAInfo.reissuable,
         "scripted"    -> sAInfo.scripted,
         "sponsored"   -> sAInfo.sponsored
+      )
+    )
+
+  def buildLastBlockInfo(blockInf: BlockInfo) =
+    CaseObj(
+      blockInfo,
+      Map(
+        "timestamp"           -> blockInf.timestamp,
+        "height"              -> blockInf.height.toLong,
+        "generationSignature" -> blockInf.generationSignature
       )
     )
 }

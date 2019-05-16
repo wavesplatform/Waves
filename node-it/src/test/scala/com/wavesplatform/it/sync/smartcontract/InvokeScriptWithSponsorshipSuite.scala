@@ -130,6 +130,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
     dAppScriptInfo.script.isEmpty shouldBe false
     dAppScriptInfo.scriptText.isEmpty shouldBe false
     dAppScriptInfo.script.get.startsWith("base64:") shouldBe true
+
     val smartCallerScriptInfo = sender.addressScriptInfo(caller.address)
     smartCallerScriptInfo.script.isEmpty shouldBe false
     smartCallerScriptInfo.scriptText.isEmpty shouldBe false
@@ -148,30 +149,30 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
       sender.invokeScript(
         caller.address,
         dApp.address,
-        "payCallerGetDAppAsset",
+        Some("payCallerGetDAppAsset"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(callerAsset).get))),
         fee = feeAmount - 1,
         feeAssetId = Some(dAppAsset)
       ),
-      s"does not exceed minimal value of 900000 WAVES: ${feeAmount - 1}"
+      s"does not exceed minimal value of 900000 WAVES or $feeAmount"
     )
     assertBadRequestAndMessage(
       sender.invokeScript(
         caller.address,
         dApp.address,
-        "spendMaxFee",
+        Some("spendMaxFee"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(smartAsset).get))),
         fee = smartFeeAmount - 1,
         feeAssetId = Some(dAppAsset)
       ),
-      s"does not exceed minimal value of 5300000 WAVES: ${smartFeeAmount - 1}"
+      s"does not exceed minimal value of 5300000 WAVES"
     )
 
     val invokeScript1TxId = sender
       .invokeScript(
         caller.address,
         dApp.address,
-        "payCallerGetDAppAsset",
+        Some("payCallerGetDAppAsset"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(callerAsset).get))),
         fee = feeAmount,
         feeAssetId = Some(dAppAsset)
@@ -181,7 +182,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
       .invokeScript(
         caller.address,
         dApp.address,
-        "spendMaxFee",
+        Some("spendMaxFee"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(smartAsset).get))),
         fee = smartFeeAmount,
         feeAssetId = Some(dAppAsset)

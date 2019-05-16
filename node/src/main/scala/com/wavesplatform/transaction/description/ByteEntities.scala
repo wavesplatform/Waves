@@ -443,7 +443,7 @@ case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
       val paymentLength     = Shorts.fromByteArray(buf.slice(offset, offset + 2))
       val arr               = buf.slice(offset + 2, offset + 2 + paymentLength)
       val amt: Long         = Longs.fromByteArray(arr.take(8))
-      val (maybeAssetId, _) = Deser.parseOption(arr, 8)(ByteStr.apply)
+      val (maybeAssetId, _) = Deser.parseOption(arr, 8, 32)(ByteStr.apply)
       val asset             = maybeAssetId.fold[Asset](Waves)(IssuedAsset)
 
       Payment(amt, asset) -> (offset + 2 + paymentLength)

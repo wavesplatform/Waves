@@ -70,8 +70,8 @@ object Importer extends ScorexLogging {
 
     val format = Try(argi.next)
       .map(_.toUpperCase)
-      .collect { case custom @ "BINARY_OLD" => custom }
-      .getOrElse("BINARY")
+      .collect { case custom @ "BINARY" => custom }
+      .getOrElse("BINARY_OLD")
       .intern()
 
     blockchainFilename
@@ -91,7 +91,7 @@ object Importer extends ScorexLogging {
   def initTime(ntpServer: String): NTP = new NTP(ntpServer)
 
   def initUtxPool(): UtxPool = new UtxPool {
-    override def putIfNewTraced(tx: Transaction)                         = ???
+    override def putIfNew(tx: Transaction, b: Boolean)           = ???
     override def removeAll(txs: Traversable[Transaction]): Unit          = {}
     override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
     override def pessimisticPortfolio(addr: Address): Portfolio          = ???
@@ -114,7 +114,6 @@ object Importer extends ScorexLogging {
                      db,
                      time,
                      Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr),
-                     storeTransactionsByAddress = false,
                      blockchainUpdated)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, settings, scheduler, importerSettings.verifyTransactions) _

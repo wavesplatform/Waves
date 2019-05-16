@@ -4,7 +4,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 
 import com.wavesplatform.Version
-import com.wavesplatform.network.Handshake
+import com.wavesplatform.network.{Handshake, TrafficLogger}
 import com.wavesplatform.settings._
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.Bootstrap
@@ -15,7 +15,7 @@ import io.netty.channel.socket.nio.NioSocketChannel
 
 import scala.concurrent.{Future, Promise}
 
-class NetworkClient(chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) extends ScorexLogging {
+class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) extends ScorexLogging {
 
   private val workerGroup = new NioEventLoopGroup()
   private val handshake   = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
@@ -26,7 +26,7 @@ class NetworkClient(chainId: Char, nodeName: String, nonce: Long, allChannels: C
     val bootstrap = new Bootstrap()
       .group(workerGroup)
       .channel(classOf[NioSocketChannel])
-      .handler(new LegacyChannelInitializer(handshake, p))
+      .handler(new LegacyChannelInitializer(trafficLoggerSettings, handshake, p))
 
     log.debug(s"Connecting to $remoteAddress")
     val channelFuture = bootstrap.connect(remoteAddress)

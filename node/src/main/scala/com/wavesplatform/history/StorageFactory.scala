@@ -12,17 +12,13 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, BlockchainUpdated}
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 4
 
-  def apply(settings: WavesSettings, db: DB, time: Time, spendableBalanceChanged: Observer[(Address, Asset)], storeTransactionsByAddress: Boolean, blockchainUpdated: Option[Observer[BlockchainUpdated]] = None): BlockchainUpdater with NG = {
+  def apply(settings: WavesSettings,
+            db: DB,
+            time: Time,
+            spendableBalanceChanged: Observer[(Address, Asset)],
+            blockchainUpdated: Option[Observer[BlockchainUpdated]] = None): BlockchainUpdater with NG = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(
-      db,
-      spendableBalanceChanged,
-      settings.blockchainSettings.functionalitySettings,
-      settings.dbSettings.maxCacheSize,
-      settings.dbSettings.maxRollbackDepth,
-      settings.dbSettings.rememberBlocks.toMillis,
-      storeTransactionsByAddress
-    )
+    val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
     new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdated)
   }
 

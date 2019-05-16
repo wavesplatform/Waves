@@ -125,4 +125,51 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
         .json())
     nodes.waitForHeightAriseAndTxPresent(transferAfterUpd.id)
   }
+
+  test("split around empty string") {
+    val scriptText =
+      s"""
+         |  {-# STDLIB_VERSION 3       #-}
+         |  {-# CONTENT_TYPE   DAPP    #-}
+         |  {-# SCRIPT_TYPE    ACCOUNT #-}
+         |
+         |  @Verifier(tx)
+         |  func verify() = {
+         |    let strs = split("some", "")
+         |    strs.size() == 4  &&
+         |    strs[0] == "s"    &&
+         |    strs[1] == "o"    &&
+         |    strs[2] == "m"    &&
+         |    strs[3] == "e"
+         |  }
+      """.stripMargin
+
+    val compiledScript = ScriptCompiler.compile(scriptText).explicitGet()._1
+
+    val newAddress   = sender.createAddress()
+    val pkNewAddress = pkByAddress(newAddress)
+    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+
+    val scriptSet = SetScriptTransaction.selfSigned(
+      pkNewAddress,
+      Some(compiledScript),
+      setScriptFee,
+      System.currentTimeMillis()
+    )
+    val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
+    nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
+
+    val transfer = TransferTransactionV2.selfSigned(
+      Waves,
+      pkNewAddress,
+      pkNewAddress,
+      1.waves,
+      System.currentTimeMillis(),
+      Waves,
+      smartMinFee,
+      Array()
+    )
+    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
+    nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
+  }
 }

@@ -158,8 +158,11 @@ object OrderBook {
 
   private def formatSide(side: Side) =
     side
-      .map { case (price, level) => s""""$price":${level.map(lo => s""""${lo.order.id()}"""").mkString("[", ",", "]")}""" }
+      .map { case (price, level) => s""""$price":${level.map(formatLo).mkString("[", ",", "]")}""" }
       .mkString("{", ",", "}")
+
+  // Showing owner for old orders. Should be deleted in Order.MaxLiveTime
+  private def formatLo(lo: LimitOrder): String = s"""{"id":"${lo.order.id()}","owner":"${lo.order.senderPublicKey.toAddress.stringRepr}"}"""
 
   val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
   val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
@@ -171,11 +174,28 @@ object OrderBook {
     case OrderType.SELL => SellLimitOrder(remainingAmount, remainingFee, o)
   }
 
+  private implicit val limitOrderFormat: Format[LimitOrder] = Format(
+    Reads[LimitOrder] {
+      case js: JsObject =>
+        val amount = (js \ "amount").as[Long]
+        val order  = (js \ "order").as[Order]
+        val fee    = (js \ "fee").asOpt[Long].getOrElse(LimitOrder.partialFee(order.matcherFee, order.amount, amount))
+        JsSuccess(limitOrder(amount, fee, order))
+      case _ => JsError("failed to deserialize LimitOrder")
+    },
+    ((__ \ "amount").format[Long] and
+      (__ \ "fee").format[Long] and
+      (__ \ "order").format[Order])(limitOrder, (lo: LimitOrder) => (lo.amount, lo.fee, lo.order))
+  )
+
+  /*
+  // Replace by:
   private implicit val limitOrderFormat: Format[LimitOrder] = (
     (JsPath \ "amount").format[Long] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "order").format[Order]
   )(limitOrder, lo => (lo.amount, lo.fee, lo.order))
+   */
 
   implicit val priceMapFormat: Format[SideSnapshot] =
     implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(

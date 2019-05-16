@@ -30,8 +30,13 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Common.emptyBlockchainEnvironment()
       )
 
-  private val callerAddress: ByteStr   = ByteStr.fromLong(1)
-  private val callerPublicKey: ByteStr = ByteStr.fromLong(2)
+  private val callerAddress: ByteStr      = ByteStr.fromLong(1)
+  private val callerPublicKey: ByteStr    = ByteStr.fromLong(2)
+  private val transactionId: ByteStr      = ByteStr.fromLong(777)
+  private val fee: Int                    = 1000 * 1000
+  private val feeAssetId: Option[ByteStr] = None
+
+
   property("Simple call") {
     parseCompileAndEvaluate(
       """
@@ -50,7 +55,19 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |  let y = invocation.callerPublicKey
         |  if (fooHelper())
         |    then WriteSet([DataEntry("b", 1), DataEntry("sender", x)])
-        |    else WriteSet([DataEntry("caller", x), DataEntry("callerPk", y)])
+        |    else WriteSet(
+        |      [
+        |         DataEntry("caller", x),
+        |         DataEntry("callerPk", y),
+        |         DataEntry("transactionId", invocation.transactionId),
+        |         DataEntry("fee",           invocation.fee),
+        |         DataEntry("feeAssetId",    match invocation.feeAssetId  {
+        |                                      case custom: ByteVector => custom
+        |                                      case waves:  Unit       => base64''
+        |                                    }
+        |         )
+        |      ]
+        |    )
         |}
         |
         |@Verifier(t)
@@ -63,7 +80,10 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     ).explicitGet() shouldBe ScriptResult(
       List(
         DataItem.Bin("caller", callerAddress),
-        DataItem.Bin("callerPk", callerPublicKey)
+        DataItem.Bin("callerPk", callerPublicKey),
+        DataItem.Bin("transactionId", transactionId),
+        DataItem.Lng("fee", fee),
+        DataItem.Bin("feeAssetId", ByteStr.empty),
       ),
       List()
     )
@@ -131,14 +151,23 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User(func), args), Recipient.Address(callerAddress), callerPublicKey, None, ByteStr.empty)
+      Invocation(
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User(func), args)),
+        Recipient.Address(callerAddress),
+        callerPublicKey,
+        None,
+        ByteStr.empty,
+        transactionId,
+        fee,
+        feeAssetId
+      )
     )
   }
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
-    val evalm    = ContractEvaluator.verify(compiled.dec, compiled.vf.get, tx)
+    val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
     EvaluatorV1.evalWithLogging(Right(ctx.evaluationContext), evalm)._2
   }
 
@@ -189,10 +218,10 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         senderPk = ByteStr.empty,
         proofs = IndexedSeq.empty
       ),
-      dappAddress = Recipient.Address(ByteStr.empty),
+      dAppAddressOrAlias = Recipient.Address(ByteStr.empty),
       maybePayment = None,
       feeAssetId = None,
-      funcName = "foo",
+      funcName = Some("foo"),
       funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes), CONST_STRING("ok"))
     )
     parseCompileAndVerify(

@@ -4,9 +4,11 @@ import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.directives.values.V2
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{DefaultFuncAnnotation, DefaultFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.directives.values.{V2, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs.CommonValidation
@@ -27,6 +29,24 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   val script = FUNCTION_CALL(
     function = PureContext.eq.header,
     args = List(CONST_LONG(1), CONST_LONG(2))
+  )
+
+  val dappVer = DApp(
+    decs = List.empty,
+    callableFuncs = List.empty,
+    defaultFuncOpt = None,
+    verifierFuncOpt = Some(
+      VerifierFunction(VerifierAnnotation("tx"), FUNC("verify", List(), TRUE))
+    )
+  )
+
+  val dappDefault = DApp(
+    decs = List.empty,
+    callableFuncs = List.empty,
+    defaultFuncOpt = Some(
+      DefaultFunction(DefaultFuncAnnotation("i"), FUNC("default", List(), TRUE))
+    ),
+    verifierFuncOpt = None
   )
 
   routePath("/script/decompile") in {
@@ -51,16 +71,23 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "true"
     }
 
-    Post(routePath("/script/decompile"), "AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAbAmSEV") ~> route ~> check {
+    val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
+
+    testdAppDirective(dappVerBytesStr)
+    testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
+  }
+
+  private def testdAppDirective(str: String) =
+    Post(routePath("/script/decompile"), str) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
       (json \ "SCRIPT_TYPE").as[String] shouldBe "ACCOUNT"
 
-      val expectedResult = "{-# STDLIB_VERSION 3 #-}\n{-# SCRIPT_TYPE ACCOUNT #-}\n{-# CONTENT_TYPE DAPP #-}\n\n\n\n@Verifier(tx)\nfunc verify () = true\n"
+      val expectedResult =
+        "{-# STDLIB_VERSION 3 #-}\n{-# SCRIPT_TYPE ACCOUNT #-}\n{-# CONTENT_TYPE DAPP #-}\n\n\n\n@Verifier(tx)\nfunc verify () = true\n"
       (json \ "script").as[String] shouldBe expectedResult
     }
-  }
 
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {
@@ -79,7 +106,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe base64
-      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(CONST_LONG(1), CONST_LONG(2)))" // [WAIT] s"(1 == 2)"
+      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(1, 2))" // [WAIT] s"(1 == 2)"
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

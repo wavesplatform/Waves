@@ -29,8 +29,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   private val FEE_AMT = 1000000L
 
   // default settings, no NG
-  private val functionalitySettings = TestFunctionalitySettings.Stub
-  private val wavesSettings         = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+  private lazy val functionalitySettings = TestFunctionalitySettings.Stub
+  private lazy val wavesSettings         = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
   // to settings with NG enabled
   private def withNg(settings: FunctionalitySettings): FunctionalitySettings =
@@ -42,14 +42,12 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     settings.copy(
       blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings)))
 
-  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Option[Observer[BlockchainUpdated]] = None)(
-      f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
+  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Option[Observer[BlockchainUpdated]] = None)(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
     val (fs, settings) =
       if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
 
-    val defaultWriter =
-      new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, maxCacheSize, 2000, 120 * 60 * 1000, true)
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, events)
+    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, events)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -270,7 +268,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
         val events = ReplaySubject[BlockchainUpdated]()
         val defaultWriter =
-          new LevelDBWriter(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), maxCacheSize, 2000, 120 * 60 * 1000, true)
+          new LevelDBWriter(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
         val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, Some(events))
 
         try {

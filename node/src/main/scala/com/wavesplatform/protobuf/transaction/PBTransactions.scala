@@ -6,12 +6,13 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
+import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
@@ -35,26 +36,20 @@ object PBTransactions {
   }
 
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
-    def toAmountAndAssetId(amount: Amount): Either[ValidationError, (Long, VanillaAssetId)] = amount.amount match {
-      case Amount.Amount.WavesAmount(value)                        => Right((value, Waves))
-      case Amount.Amount.AssetAmount(AssetAmount(assetId, amount)) => Right((amount, IssuedAsset(assetId.toByteArray)))
-      case Amount.Amount.Empty                                     => Left(GenericError("Empty amount"))
-    }
-
     for {
-      parsedTx  <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
-      fee       <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
-      _         <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
-      feeAmount <- toAmountAndAssetId(fee)
-      sender = PublicKey(parsedTx.senderPublicKey.toByteArray)
+      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
+      fee      <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
+      _        <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
+      feeAmount = PBAmounts.toAssetAndAmount(fee)
+      sender    = PublicKey(parsedTx.senderPublicKey.toByteArray)
       tx <- if (unsafe)
         Right(
           createVanillaUnsafe(
             parsedTx.version,
             parsedTx.chainId.toByte,
             sender,
-            feeAmount._1,
             feeAmount._2,
+            feeAmount._1,
             parsedTx.timestamp,
             Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
             parsedTx.data
@@ -64,8 +59,8 @@ object PBTransactions {
           parsedTx.version,
           parsedTx.chainId.toByte,
           sender,
-          feeAmount._1,
           feeAmount._2,
+          feeAmount._1,
           parsedTx.timestamp,
           Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
           parsedTx.data
@@ -96,7 +91,7 @@ object PBTransactions {
             for {
               address <- recipient.toAddressOrAlias
               tx <- vt.transfer.TransferTransactionV1.create(
-                amount.assetId,
+                amount.vanillaAssetId,
                 sender,
                 address,
                 amount.longAmount,
@@ -112,7 +107,7 @@ object PBTransactions {
             for {
               address <- recipient.toAddressOrAlias
               tx <- vt.transfer.TransferTransactionV2.create(
-                amount.assetId,
+                amount.vanillaAssetId,
                 sender,
                 address,
                 amount.longAmount,
@@ -265,31 +260,61 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.DataTransaction(DataTransactionData(data)) =>
+      case Data.DataTransaction(dt) =>
         vt.DataTransaction.create(
           sender,
-          data.toList.map(toVanillaDataEntry),
+          dt.data.toList.map(toVanillaDataEntry),
           feeAmount,
           timestamp,
           proofs
         )
 
-      case Data.MassTransfer(MassTransferTransactionData(assetId, transfers, attachment)) =>
+      case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
-          Asset.fromCompatId(Option(assetId.toByteArray: ByteStr).filterNot(_.isEmpty)),
+          PBAmounts.toVanillaAssetId(mt.getAssetId),
           sender,
-          transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
           feeAmount,
-          attachment.toByteArray,
+          mt.attachment.toByteArray,
           proofs
         )
 
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction.create(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
-      case data =>
-        throw new IllegalArgumentException(s"Unsupported transaction data: $data")
+      case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+        import com.wavesplatform.common.utils._
+        import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+
+        for {
+          address <- Address.fromBytes(dappAddress.toByteArray)
+
+          desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1
+
+          _ <- Either.cond(desFCOpt.isEmpty || desFCOpt.get.isRight,
+                           (),
+                           GenericError(s"Invalid InvokeScript function call: ${desFCOpt.get.left.get}"))
+
+          fcOpt = desFCOpt.map(_.explicitGet()._1)
+
+          _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
+
+          tx <- vt.smart.InvokeScriptTransaction.create(
+            sender,
+            address,
+            fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
+            payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
+            feeAmount,
+            feeAssetId,
+            timestamp,
+            proofs
+          )
+        } yield tx
+
+      case _ =>
+        Left(TxValidationError.UnsupportedTransactionType)
     }
 
     result
@@ -317,7 +342,7 @@ object PBTransactions {
         version match {
           case 1 =>
             vt.transfer.TransferTransactionV1(
-              amount.assetId,
+              amount.vanillaAssetId,
               sender,
               recipient.toAddressOrAlias.explicitGet(),
               amount.longAmount,
@@ -332,7 +357,7 @@ object PBTransactions {
             vt.transfer.TransferTransactionV2(
               sender,
               recipient.toAddressOrAlias.explicitGet(),
-              amount.assetId,
+              amount.vanillaAssetId,
               amount.longAmount,
               timestamp,
               feeAssetId,
@@ -479,32 +504,47 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.DataTransaction(DataTransactionData(data)) =>
-
+      case Data.DataTransaction(dt) =>
         vt.DataTransaction(
           sender,
-          data.toList.map(toVanillaDataEntry),
+          dt.data.toList.map(toVanillaDataEntry),
           feeAmount,
           timestamp,
           proofs
         )
 
-      case Data.MassTransfer(MassTransferTransactionData(assetId, transfers, attachment)) =>
+      case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
-          Asset.fromProtoId(assetId),
+          PBAmounts.toVanillaAssetId(mt.getAssetId),
           sender,
-          transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
+          mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
           feeAmount,
-          attachment.toByteArray,
+          mt.attachment.toByteArray,
           proofs
         )
 
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
-      case data =>
-        throw new IllegalArgumentException(s"Unsupported transaction data: $data")
+      case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+        import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+
+        vt.smart.InvokeScriptTransaction(
+          chainId,
+          sender,
+          Address.fromBytes(dappAddress.toByteArray).explicitGet(),
+          Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
+          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
+          feeAmount,
+          feeAssetId,
+          timestamp,
+          proofs
+        )
+
+      case other =>
+        throw new IllegalArgumentException(s"Unsupported transaction data: $other")
     }
   }
 
@@ -513,7 +553,7 @@ object PBTransactions {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)
-        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, data = Data.Genesis(data))
+        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, proofsArray = Seq(signature), data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
         val data = PaymentTransactionData(ByteString.copyFrom(recipient.bytes), amount)
@@ -606,7 +646,7 @@ object PBTransactions {
 
       case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
         val data = MassTransferTransactionData(
-          ByteString.copyFrom(assetId.compatId.getOrElse(ByteStr.empty)),
+          Some(PBAmounts.toPBAssetId(assetId)),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
           attachment: ByteStr
         )
@@ -619,6 +659,15 @@ object PBTransactions {
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
         val data = SponsorFeeTransactionData(Some(AssetAmount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SponsorFee(data))
+
+      case vt.smart.InvokeScriptTransaction(chainId, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
+        import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.serialization.Deser
+
+        val data = InvokeScriptTransactionData(dappAddress.toByteString,
+                                               ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+                                               payment.map(p => (p.assetId, p.amount): Amount))
+        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")

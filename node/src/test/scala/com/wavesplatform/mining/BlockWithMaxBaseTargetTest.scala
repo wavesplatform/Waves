@@ -109,7 +109,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000, false)
+    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -119,13 +119,18 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       )
     )
     val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTargetOpt = Some(1L))
-    val settings = settings0.copy(blockchainSettings = blockchainSettings0, minerSettings = minerSettings, synchronizationSettings = synchronizationSettings0, featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val settings = settings0.copy(
+      blockchainSettings = blockchainSettings0,
+      minerSettings = minerSettings,
+      synchronizationSettings = synchronizationSettings0,
+      featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
+    )
 
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
     val utxPoolStub = new UtxPool {
-      override def putIfNewTraced(tx: Transaction)                 = ???
+      override def putIfNew(tx: Transaction, b: Boolean)                   = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
       override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
       override def pessimisticPortfolio(addr: Address): Portfolio          = ???

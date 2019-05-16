@@ -94,7 +94,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val maybeBlockchainUpdated = maybeBlockchainUpdatesScheduler map (ConcurrentSubject.publish[BlockchainUpdated](_))
 
   private val blockchainUpdater =
-    StorageFactory(settings, db, time, spendableBalanceChanged, settings.dbSettings.storeTransactionsByAddress, maybeBlockchainUpdated)
+    StorageFactory(settings, db, time, spendableBalanceChanged, maybeBlockchainUpdated)
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -335,7 +335,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       if (extensions.nonEmpty) {
         log.info(s"Shutting down extensions")
-        Future.sequence(extensions.map(_.shutdown()))
+        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
       }
 
       spendableBalanceChanged.onComplete()

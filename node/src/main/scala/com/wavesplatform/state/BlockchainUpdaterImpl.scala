@@ -19,11 +19,10 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
@@ -458,12 +457,12 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     }
   }
 
-  override def parent(block: Block, back: Int): Option[Block] = readLock {
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
-        if (back == 1) Some(ng.base) else blockchain.parent(ng.base, back - 1)
+        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
       case _ =>
-        blockchain.parent(block, back)
+        blockchain.parentHeader(block, back)
     }
   }
 
@@ -487,8 +486,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
   }
 
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
-    val p = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
-    blockchain.portfolio(a).combine(p)
+    val diffPf = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
+    val lease = blockchain.leaseBalance(a)
+    val balance = blockchain.balance(a)
+    Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
@@ -500,9 +501,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
       .orElse(blockchain.transactionInfo(id))
   }
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     readLock {
-      addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, count, fromId)
+      addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, fromId)
     }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {
@@ -594,7 +597,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     ngState.fold(blockchain.accountDataKeys(address)) { ng =>
       val fromInner = blockchain.accountDataKeys(address)
       val fromDiff  = ng.bestLiquidDiff.accountData.get(address).toVector.flatMap(_.data.keys)
-      fromInner ++ fromDiff
+      (fromInner ++ fromDiff).distinct
     }
   }
 
@@ -647,17 +650,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     }
   }
 
-  override def allActiveLeases(predicate: LeaseTransaction => Boolean): Set[LeaseTransaction] = readLock {
-    ngState.fold(blockchain.allActiveLeases(predicate)) { ng =>
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = readLock {
+    ngState.fold(blockchain.allActiveLeases) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
-      val fromDiff = active.keys
-        .map { id =>
-          ng.bestLiquidDiff.transactions(id)._2
-        }
-        .collect { case lt: LeaseTransaction if predicate(lt) => lt }
-        .toSet
-      val fromInner = blockchain.allActiveLeases(predicate).filterNot(ltx => canceled.keySet.contains(ltx.id()))
-      fromDiff ++ fromInner
+      val fromDiff = active.keysIterator
+        .map(id => ng.bestLiquidDiff.transactions(id)._2)
+        .collect { case lt: LeaseTransaction => lt }
+
+      val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+      CloseableIterator.seq(fromDiff, fromInner)
     }
   }
 
@@ -674,6 +675,25 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
       blockchain.collectLposPortfolios(pf) ++ b.result()
     }
   }
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = readLock {
+    ngState.fold(blockchain.invokeScriptResult(txId)) { ng =>
+      ng.bestLiquidDiff.scriptResults
+        .get(txId)
+        .toRight(GenericError("InvokeScript result not found"))
+        .orElse(blockchain.invokeScriptResult(txId))
+    }
+  }
+
+  /* override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
+    ngState.fold(blockchain.transactionsIterator(ofTypes, reverse)) { ng =>
+      val typeSet = ofTypes.toSet
+      val ngTransactions = ng.bestLiquidDiff.transactions.valuesIterator
+        .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
+
+      CloseableIterator.seq(ngTransactions, blockchain.transactionsIterator(ofTypes, reverse))
+    }
+  } */
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
     ngState flatMap { ng =>

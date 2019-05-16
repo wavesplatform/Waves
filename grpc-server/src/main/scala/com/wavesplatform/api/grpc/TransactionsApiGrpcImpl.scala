@@ -1,13 +1,13 @@
 package com.wavesplatform.api.grpc
-import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.TransactionNotExists
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction, VanillaTransaction}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.state.{Blockchain, TransactionId}
+import com.wavesplatform.transaction.AuthorizedTransaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
@@ -26,38 +26,50 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
 
   private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, broadcast)
 
-  override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionWithHeight]): Unit = {
+  override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi
-      .transactionsByAddress(request.getRecipient.toAddress, Option(request.fromId.toByteStr).filterNot(_.isEmpty))
-      .map { case (height, transaction) => TransactionWithHeight(Some(transaction.toPB), height) }
+      .transactionsByAddress(request.sender.toAddress)
+      .map {
+        case (height, transaction) if transactionFilter(request, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB))
+      }
 
     responseObserver.completeWith(stream)
   }
 
-  override def getTransaction(request: TransactionRequest): Future[TransactionWithHeight] = {
-    commonApi
-      .transactionById(request.transactionId)
-      .map { case (height, transaction) => TransactionWithHeight(Some(transaction.toPB), height) }
-      .toFuture(TransactionNotExists)
-  }
+  override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
+    val stream = Observable(commonApi.unconfirmedTransactions(): _*)
+      .filter(transactionFilter(request, _))
+      .map(tx => TransactionResponse(tx.id(), transaction = Some(tx.toPB)))
 
-  override def getUnconfirmedTransactions(request: Empty, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
-    val stream = Observable(commonApi.unconfirmedTransactions().map(_.toPB): _*)
     responseObserver.completeWith(stream)
   }
 
-  override def getUnconfirmedTransaction(request: TransactionRequest): Future[PBSignedTransaction] = {
-    commonApi
-      .unconfirmedTransactionById(request.transactionId)
-      .map(_.toPB)
-      .toFuture(TransactionNotExists)
+  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResult]): Unit = {
+    import com.wavesplatform.state.{InvokeScriptResult => VISR}
+
+    val result = Observable(request.transactionIds: _*)
+      .flatMap(txId => Observable.fromIterable(blockchain.invokeScriptResult(TransactionId(txId.toByteStr)).toOption))
+      .map(VISR.toPB)
+
+    responseObserver.completeWith(result)
   }
 
-  override def calculateFee(request: PBTransaction): Future[CalculateFeeResponse] = {
-    commonApi.calculateFee(request.toVanilla).map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId.protoId, assetAmount) }.toFuture
+  override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit = {
+    val result = Observable(request.transactionIds: _*).map { txId =>
+      blockchain.transactionHeight(txId) match {
+        case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height)
+
+        case None =>
+          utx.transactionById(txId) match {
+            case Some(_) => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED)
+            case None    => TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS)
+          }
+      }
+    }
+    responseObserver.completeWith(result)
   }
 
-  override def signTransaction(request: SignRequest): Future[PBSignedTransaction] = {
+  override def sign(request: SignRequest): Future[PBSignedTransaction] = {
     def signTransactionWith(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBSignedTransaction] =
       for {
         sender <- wallet.findPrivateKey(tx.sender.toString)
@@ -69,11 +81,26 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString).toFuture
   }
 
-  override def broadcastTransaction(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
+  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
     commonApi
       .broadcastTransaction(tx.toVanilla)
       .map(_.toPB)
       .resultE
       .toFuture
+  }
+
+  private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {
+    val senderMatches = request.sender.isEmpty || (tx match {
+      case a: AuthorizedTransaction => a.sender.toAddress == request.sender.toAddress
+      case _                        => false
+    })
+
+    val recipientMatches = tx match {
+      case tt: TransferTransaction => tt.recipient == request.getRecipient.toAddressOrAlias
+      case _                       => request.recipient.isEmpty
+    }
+
+    val transactionIdMatches = request.transactionIds.isEmpty || request.transactionIds.contains(tx.id().toPBByteString)
+    senderMatches && recipientMatches && transactionIdMatches
   }
 }

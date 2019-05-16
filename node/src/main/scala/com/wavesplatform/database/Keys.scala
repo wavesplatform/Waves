@@ -162,4 +162,8 @@ object Keys {
       Longs.fromByteArray,
       Longs.toByteArray
     )
+
+  val InvokeScriptResultPrefix: Short = 56
+  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
+    Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 }

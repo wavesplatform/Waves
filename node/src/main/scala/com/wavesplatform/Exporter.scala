@@ -26,8 +26,8 @@ object Exporter extends ScorexLogging {
 
     val format = Try(args(3)).toOption
       .map(_.toUpperCase)
-      .collect { case custom @ ("JSON" | "BINARY_OLD") => custom }
-      .getOrElse("BINARY")
+      .collect { case custom @ ("JSON" | "BINARY") => custom }
+      .getOrElse("BINARY_OLD")
       .intern()
 
     val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
@@ -37,7 +37,7 @@ object Exporter extends ScorexLogging {
 
     val time             = new NTP(settings.ntpServer)
     val db               = openDB(settings.dbSettings.directory)
-    val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), false, None)
+    val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), None)
     val blockchainHeight = blockchain.height
     val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
     log.info(s"Blockchain height is $blockchainHeight exporting to $height")

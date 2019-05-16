@@ -104,11 +104,11 @@ object RealTransactionWrapper {
       case ci: InvokeScriptTransaction =>
         Tx.CI(
           proven(ci),
-          ci.dappAddress,
+          ci.dAppAddressOrAlias,
           ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)),
           ci.feeAssetId.compatId,
-          ci.fc.function.funcName,
-          ci.fc.args.map(_.asInstanceOf[EVALUATED])
+          ci.funcCallOpt.map(_.function.funcName),
+          ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
         )
     }
   }

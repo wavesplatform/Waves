@@ -5,10 +5,9 @@ import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool
@@ -29,11 +28,10 @@ class AssetsBroadcastRouteSpec
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
-  (utx.putIfNewTraced _)
-    .when(*)
-    .onCall((t: Transaction) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
+  (utx.putIfNew _)
+    .when(*, *)
+    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
     .anyNumberOfTimes()
 
   "returns StateCheckFailed" - {
@@ -160,8 +158,7 @@ class AssetsBroadcastRouteSpec
 
   "compatibility" - {
     val alwaysApproveUtx = stub[UtxPool]
-    (alwaysApproveUtx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
-    (alwaysApproveUtx.putIfNewTraced _).when(*).onCall((_: Transaction) => TracedResult(Right((true, Diff.empty)))).anyNumberOfTimes()
+    (alwaysApproveUtx.putIfNew _).when(*, *).onCall((_: Transaction, _: Boolean) => TracedResult(Right(true))).anyNumberOfTimes()
 
     val alwaysSendAllChannels = stub[ChannelGroup]
     (alwaysSendAllChannels

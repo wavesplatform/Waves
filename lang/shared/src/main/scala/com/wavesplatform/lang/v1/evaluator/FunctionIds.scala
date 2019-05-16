@@ -49,6 +49,7 @@ object FunctionIds {
   val KECCAK256: Short = 501
   val BLAKE256: Short  = 502
   val SHA256: Short    = 503
+  val RSAVERIFY: Short = 504
 
   val TOBASE58: Short   = 600
   val FROMBASE58: Short = 601
@@ -60,6 +61,7 @@ object FunctionIds {
   val TRANSACTIONHEIGHTBYID: Short = 1001
   val ACCOUNTASSETBALANCE: Short   = 1003
   val GETASSETINFOBYID: Short      = 1004
+  val BLOCKINFOBYHEIGHT: Short     = 1005
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041

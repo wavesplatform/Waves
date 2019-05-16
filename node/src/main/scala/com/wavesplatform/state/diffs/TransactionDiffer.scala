@@ -20,7 +20,9 @@ object TransactionDiffer extends ScorexLogging {
 
   import stats.TxTimerExt
 
-  case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError
+  case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError {
+    override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${tx.toPrettyString})"
+  }
 
   def apply(settings: FunctionalitySettings,
             prevBlockTimestamp: Option[Long],
@@ -64,7 +66,7 @@ object TransactionDiffer extends ScorexLogging {
       tx match {
         case gtx: GenesisTransaction      => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction      => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
-        case itx: IssueTransaction        => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
+        case itx: IssueTransaction        => AssetTransactionsDiff.issue(blockchain, currentBlockHeight)(itx)
         case rtx: ReissueTransaction      => AssetTransactionsDiff.reissue(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(rtx)
         case btx: BurnTransaction         => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)
         case ttx: TransferTransaction     => TransferTransactionDiff(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ttx)

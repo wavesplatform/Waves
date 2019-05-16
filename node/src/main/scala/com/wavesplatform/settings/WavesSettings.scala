@@ -5,10 +5,13 @@ import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
+import scala.concurrent.duration.FiniteDuration
+
 case class WavesSettings(directory: String,
                          ntpServer: String,
                          dbSettings: DBSettings,
                          extensions: Seq[String],
+                         extensionsShutdownTimeout: FiniteDuration,
                          networkSettings: NetworkSettings,
                          walletSettings: WalletSettings,
                          blockchainSettings: BlockchainSettings,
@@ -29,6 +32,7 @@ object WavesSettings extends CustomValueReaders {
     val ntpServer               = waves.as[String]("ntp-server")
     val dbSettings              = waves.as[DBSettings]("db")
     val extensions              = waves.as[Seq[String]]("extensions")
+    val extensionsShutdownTimeout = waves.as[FiniteDuration]("extensions-shutdown-timeout")
     val networkSettings         = waves.as[NetworkSettings]("network")
     val walletSettings          = waves.as[WalletSettings]("wallet")
     val blockchainSettings      = waves.as[BlockchainSettings]("blockchain")
@@ -45,6 +49,7 @@ object WavesSettings extends CustomValueReaders {
       ntpServer,
       dbSettings,
       extensions,
+      extensionsShutdownTimeout,
       networkSettings,
       walletSettings,
       blockchainSettings,
