@@ -4,8 +4,11 @@ import java.io.File
 import java.util.{HashMap => JHashMap}
 
 import akka.actor.ActorSystem
+import akka.persistence.query.PersistenceQuery
+import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import akka.persistence.serialization.Snapshot
 import akka.serialization.SerializationExtension
+import akka.stream.ActorMaterializer
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
@@ -136,6 +139,55 @@ object MatcherTool extends ScorexLogging {
       case "compact" =>
         log.info("Compacting database")
         db.compactRange(null, null)
+      case "mas" =>
+        val system = ActorSystem("matcher-tool", actualConfig)
+        try {
+          val snapshotDB    = openDB(settings.matcherSettings.snapshotsDataDir)
+          val persistenceId = MatcherActor.name
+          val se            = SerializationExtension(system)
+
+          val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
+          val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
+          if (history.isEmpty) log.warn("History is empty")
+          else {
+            log.info(s"Snapshots history for ${MatcherActor.name}: $history")
+            val xs = history.map { seqNr =>
+              val smKey = MatcherSnapshotStore.kSM(persistenceId, seqNr)
+              val smRaw = snapshotDB.get(smKey.keyBytes)
+              val sm    = smKey.parse(smRaw)
+
+              val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, seqNr)
+              val snapshotRaw = snapshotDB.get(snapshotKey.keyBytes)
+
+              (seqNr, sm, snapshotRaw)
+            }
+            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: SM(seqNr=${sm.seqNr}, ts=${sm.ts})" }.mkString("\n")}")
+
+            val (_, _, lastSnapshotRaw) = xs.last
+            val snapshot                = se.deserialize(lastSnapshotRaw, classOf[Snapshot]).get.data.asInstanceOf[MatcherActor.Snapshot]
+            log.info(s"The last snapshot:\n${snapshot.tradedPairsSet.map(_.key).toVector.sorted.mkString("\n")}")
+          }
+        } finally {
+          Await.ready(system.terminate(), Duration.Inf)
+        }
+      case "maj" =>
+        val from   = args(2).toLong
+        val to     = if (args.length < 4) Long.MaxValue else args(3).toLong
+        val system = ActorSystem("matcher-tool", actualConfig)
+        val mat    = ActorMaterializer()(system)
+        try {
+          val readJournal = PersistenceQuery(system).readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
+          val query       = readJournal.currentEventsByPersistenceId(MatcherActor.name, from, to)
+          val process = query.runForeach { rawEvt =>
+            val evt = rawEvt.event.asInstanceOf[MatcherActor.OrderBookCreated]
+            log.info(s"[offset=${rawEvt.offset}, seqNr=${rawEvt.sequenceNr}] $evt")
+          }(mat)
+
+          Await.ready(process, Duration.Inf)
+        } finally {
+          mat.shutdown()
+          Await.ready(system.terminate(), Duration.Inf)
+        }
       case "mar" =>
         val system = ActorSystem("matcher-tool", actualConfig)
         try {
