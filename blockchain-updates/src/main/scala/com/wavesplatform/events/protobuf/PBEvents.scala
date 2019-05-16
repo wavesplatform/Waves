@@ -4,7 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.events.protobuf.StateUpdated.ReasonType.{BLOCK, MICROBLOCK, TRANSACTION}
 import com.wavesplatform.events.protobuf.StateUpdated.{BalanceUpdated => PBBalanceUpdated, LeasingUpdated => PBLeasingUpdated}
-import com.wavesplatform.state.{BlockAdded, MicroBlockAdded, RollbackCompleted}
+import com.wavesplatform.state.{BlockAdded, MicroBlockAdded, MicroBlockRollbackCompleted, RollbackCompleted}
 
 object PBEvents {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -43,7 +43,8 @@ object PBEvents {
           id = block.uniqueId,
           height = height,
           stateUpdates = Seq(blockUpdate) ++ txsUpdates,
-          reason = PBBlockchainUpdated.Reason.Block(PBBlocks.protobuf(block))
+          reason = PBBlockchainUpdated.Reason.Block(PBBlocks.protobuf(block)),
+          `type` = PBBlockchainUpdated.UpdateType.BLOCK
         )
       case MicroBlockAdded(microBlock, height, microBlockStateUpdate, transactionsStateUpdates) =>
         val txsUpdates = microBlock.transactionData
@@ -57,12 +58,20 @@ object PBEvents {
           id = microBlock.totalResBlockSig,
           height = height,
           stateUpdates = Seq(mbUpdate) ++ txsUpdates,
-          reason = PBBlockchainUpdated.Reason.MicroBlock(PBMicroBlocks.protobuf(microBlock))
+          reason = PBBlockchainUpdated.Reason.MicroBlock(PBMicroBlocks.protobuf(microBlock)),
+          `type` = PBBlockchainUpdated.UpdateType.MICROBLOCK
         )
       case RollbackCompleted(to, height) =>
         PBBlockchainUpdated(
           id = to,
           height = height,
+          `type` = PBBlockchainUpdated.UpdateType.ROLLBACK
+        )
+      case MicroBlockRollbackCompleted(to, height) =>
+        PBBlockchainUpdated(
+          id = to,
+          height = height,
+          `type` = PBBlockchainUpdated.UpdateType.MICROBLOCK_ROLLBACK
         )
     }
 }

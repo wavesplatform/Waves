@@ -318,7 +318,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           }
 
           updates(3) match {
-            case RollbackCompleted(to, height) =>
+            case MicroBlockRollbackCompleted(to, height) =>
               height shouldBe 1
               to shouldBe microBlocks1And2.head.totalResBlockSig
             case _ => fail()

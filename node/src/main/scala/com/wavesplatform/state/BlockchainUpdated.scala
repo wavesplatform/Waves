@@ -20,7 +20,8 @@ final case class MicroBlockAdded(microBlock: MicroBlock,
                                  microBlockStateUpdate: StateUpdated,
                                  transactionsStateUpdates: Seq[StateUpdated])
     extends BlockchainUpdated
-final case class RollbackCompleted(to: ByteStr, height: Int) extends BlockchainUpdated
+final case class RollbackCompleted(to: ByteStr, height: Int)           extends BlockchainUpdated
+final case class MicroBlockRollbackCompleted(to: ByteStr, height: Int) extends BlockchainUpdated
 
 object BlockchainUpdateNotifier {
 
@@ -76,4 +77,7 @@ object BlockchainUpdateNotifier {
 
   def notifyRollback(events: Option[Observer[BlockchainUpdated]], blockId: ByteStr, height: Int): Unit =
     events foreach (_.onNext(RollbackCompleted(blockId, height + 1)))
+
+  def notifyMicroBlockRollback(events: Option[Observer[BlockchainUpdated]], toSignature: ByteStr, height: Int): Unit =
+    events foreach (_.onNext(MicroBlockRollbackCompleted(toSignature, height + 1)))
 }

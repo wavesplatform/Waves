@@ -152,7 +152,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                 val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(blockchain, height)
 
-                BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, block.reference, height)
+                BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.reference, height)
 
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -170,7 +170,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                   val height            = blockchain.unsafeHeightOf(ng.base.reference)
                   val miningConstraints = MiningConstraints(blockchain, height)
 
-                  BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, block.reference, height)
+                  BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.reference, height)
 
                   BlockDiffer
                     .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -188,7 +188,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                     val height = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
 
                     if (discarded.nonEmpty) {
-                      BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, referencedForgedBlock.uniqueId, height)
+                      BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, referencedForgedBlock.uniqueId, height)
                       metrics.microBlockForkStats.increment()
                       metrics.microBlockForkHeightStats.record(discarded.size)
                     }
@@ -247,7 +247,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     val prevNgState = ngState
     val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
-      BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, blockId, blockchain.height)
+      BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, blockId, blockchain.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(_.bestLiquidBlock).toSeq

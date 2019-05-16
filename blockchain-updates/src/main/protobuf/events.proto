@@ -15,6 +15,14 @@ message BlockchainUpdated {
         Block block = 4;
         SignedMicroBlock micro_block = 5;
     }
+
+    enum UpdateType {
+        BLOCK = 0;
+        ROLLBACK = 1;
+        MICROBLOCK = 2;
+        MICROBLOCK_ROLLBACK = 3;
+    }
+    UpdateType type = 6;
 }
 
 message StateUpdated {

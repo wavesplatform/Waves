@@ -3,7 +3,7 @@ import java.util
 
 import com.wavesplatform.events.protobuf.PBEvents
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
-import com.wavesplatform.state.{BlockAdded, BlockchainUpdated, MicroBlockAdded, RollbackCompleted}
+import com.wavesplatform.state.{BlockAdded, BlockchainUpdated, MicroBlockAdded, MicroBlockRollbackCompleted, RollbackCompleted}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.kafka.common.serialization.{IntegerSerializer, Serializer}
 
@@ -43,6 +43,7 @@ package object kafka {
       case BlockAdded(_, height, _, _)      => height
       case MicroBlockAdded(_, height, _, _) => height
       case RollbackCompleted(_, height)     => height
+      case MicroBlockRollbackCompleted(_, height)     => height
     }
     new ProducerRecord[Int, BlockchainUpdated](topic, h, event)
   }
