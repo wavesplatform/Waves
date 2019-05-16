@@ -409,14 +409,19 @@ class MatcherActorSpecification
 object MatcherActorSpecification {
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
   private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {
-    owner ! OrderBookRecovered(assetPair, startOffset)
+    import context.dispatcher
+    context.system.scheduler.scheduleOnce(50.millis, owner, OrderBookRecovered(assetPair, startOffset)) // emulates recovering
     override def receive: Receive = {
       case ForceStartOrderBook(p) if p == assetPair => sender() ! MatcherActor.OrderBookCreated(assetPair)
       case _                                        =>
     }
   }
   private class FailAtStartActor extends Actor {
-    throw new RuntimeException("I don't want to work today")
     override def receive: Receive = Actor.emptyBehavior
+    override def preStart(): Unit = {
+      super.preStart()
+      Thread.sleep(50)
+      throw new RuntimeException("I don't want to work today")
+    }
   }
 }

@@ -43,6 +43,8 @@ case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningCons
 }
 
 object MultiDimensionalMiningConstraint {
+  val unlimited = MultiDimensionalMiningConstraint(NonEmptyList.of(MiningConstraint.Unlimited))
+
   def apply(constraint1: MiningConstraint, constraint2: MiningConstraint): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(NonEmptyList.of(constraint1, constraint2))
 

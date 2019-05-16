@@ -16,13 +16,6 @@ class AccountSpecification extends PropSpec with PropertyChecks with Matchers wi
     }
   }
 
-  property("PublicKey should return Address as it's string representation") {
-    forAll { bytes: Array[Byte] =>
-      val a = KeyPair(bytes).publicKey
-      PublicKey.toString(a) shouldBe a.toAddress.address
-    }
-  }
-
   property("Weak public keys are detected correctly") {
     def decode(hexarr: Array[String]): Array[Array[Byte]] = hexarr.map(
       _.grouped(2).map(b => java.lang.Integer.parseInt(b, 16).toByte).toArray
