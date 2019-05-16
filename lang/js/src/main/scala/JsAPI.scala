@@ -88,8 +88,7 @@ object JsAPI {
   }
 
   private def buildContractContext(v: StdLibVersion): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext(V3), wavesContext(V3, false, true)))
-    // XXX PureContext.build(V3) ?
+    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext(v), wavesContext(v, false, true)))
   }
 
   @JSExportTopLevel("getTypes")
