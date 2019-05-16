@@ -80,6 +80,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
+  Kamon.reconfigure()
   private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
   private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
   private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
