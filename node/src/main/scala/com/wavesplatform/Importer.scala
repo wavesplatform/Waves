@@ -29,14 +29,6 @@ import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   private implicit class TryWithTap[T](t: Try[T]) {
-    def tap(cb: T => Unit): Try[T] = {
-      t match {
-        case Success(value) => cb(value)
-        case _              => ()
-      }
-      t
-    }
-
     def tapLeft(cb: Throwable => Unit): Try[T] = {
       t match {
         case Failure(throwable) => cb(throwable)
