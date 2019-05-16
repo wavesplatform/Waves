@@ -1,10 +1,8 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.typesafe.config.Config
-import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.transactions.{BaseTransactionSuite, NodesFromDocker}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
+import org.scalatest.CancelAfterFailure
 
 class ScriptUtilsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   test("decompile script containing deep block structure should not blow stack") {
