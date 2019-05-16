@@ -23,6 +23,7 @@ import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher, RateCache}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -73,7 +74,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ orderRestrictionsInfo ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
+        getSettings ~ getRates ~ upsertRate ~ deleteRate ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
     }
   }
 
@@ -105,6 +106,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           )
       case Left(e) => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
     }
+
+  private def withAsset(a: Asset): Directive1[Asset] = {
+    assetPairBuilder.validateAssetId(a) match {
+      case Right(_) => provide(a)
+      case Left(e)  => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
+    }
+  }
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
@@ -141,9 +149,47 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete(
       StatusCodes.OK -> Json.obj(
         "priceAssets" -> matcherSettings.priceAssets,
-        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getAllRates).value
+        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value
       )
     )
+  }
+
+  @Path("/settings/rates")
+  @ApiOperation(value = "Asset rates", notes = "Get current asset rates (asset cost in Waves)", httpMethod = "GET")
+  def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
+
+  @Path("/settings/rates/{assetId}")
+  @ApiOperation(value = "Add or update rate for the specified asset", httpMethod = "PUT")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "assetId", value = "Asset for which rate is added or updated", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "rate", value = "Rate associated with the specified asset", dataType = "double", paramType = "body")
+    )
+  )
+  def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
+    entity(as[Double]) { rate =>
+      withAsset(a) { asset =>
+        val assetStr                          = AssetPair.assetIdStr(asset)
+        def toJson(message: String): JsObject = Json.obj("message" -> message)
+        complete(
+          (asset, rateCache.upsertRate(asset, rate)) match {
+            case (Waves, _)    => StatusCodes.BadRequest -> toJson("Rate for Waves cannot be changed")
+            case (_, None)     => StatusCodes.Created    -> toJson(s"Rate $rate for the asset $assetStr added")
+            case (_, Some(pv)) => StatusCodes.OK         -> toJson(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+          }
+        )
+      }
+    }
+  }
+
+  @Path("/settings/rates/{assetId}")
+  @ApiOperation(value = "Delete rate for the specified asset", httpMethod = "DELETE")
+  @ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
+  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
+    withAsset(a) { asset =>
+      rateCache.deleteRate(asset)
+      complete(StatusCodes.OK -> Json.obj("message" -> s"Rate for asset $asset removed"))
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")

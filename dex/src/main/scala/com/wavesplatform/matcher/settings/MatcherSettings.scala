@@ -78,6 +78,7 @@ object MatcherSettings {
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
       errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
     )
+
     val actorResponseTimeout         = config.as[FiniteDuration]("actor-response-timeout")
     val dataDirectory                = config.as[String]("data-directory")
     val journalDirectory             = config.as[String]("journal-directory")
@@ -105,8 +106,8 @@ object MatcherSettings {
     val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
-    val allowOrderV3 = config.as[Boolean]("allow-order-v3")
-    val broadcastUntilConfirmed  = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val allowOrderV3            = config.as[Boolean]("allow-order-v3")
+    val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
     MatcherSettings(
       account,

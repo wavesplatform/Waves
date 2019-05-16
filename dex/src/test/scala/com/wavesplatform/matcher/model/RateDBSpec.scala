@@ -18,7 +18,7 @@ class RateDBSpec extends WordSpecLike with Matchers with WithDB with MatcherTest
             100,
             for {
               asset     <- arbitraryAssetIdGen
-              rateValue <- Gen.choose(1, 100)
+              rateValue <- Gen.choose(1, 100).map(_.toDouble / 100)
             } yield asset -> rateValue
           )
           .map(_.toMap)

@@ -42,10 +42,15 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
     val rateCache: mutable.Map[Asset, Double] = mutable.Map(Waves -> 1d)
 
-    def upsertRate(asset: Asset, value: Double): Unit = rateCache += (asset -> value)
-    def getRate(asset: Asset): Option[Double]         = rateCache.get(asset)
-    def getAllRates: Map[Asset, Double]               = rateCache.toMap
-    def deleteRate(asset: Asset): Unit                = rateCache -= asset
+    def upsertRate(asset: Asset, value: Double): Option[Double] = {
+      val previousValue = rateCache.get(asset)
+      rateCache += (asset -> value)
+      previousValue
+    }
+
+    def getRate(asset: Asset): Option[Double] = rateCache.get(asset)
+    def getAllRates: Map[Asset, Double]       = rateCache.toMap
+    def deleteRate(asset: Asset): Unit        = rateCache -= asset
   }
 
   def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)

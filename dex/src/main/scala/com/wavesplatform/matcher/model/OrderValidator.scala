@@ -211,6 +211,7 @@ object OrderValidator {
     * @param order            placed order
     * @param orderFeeSettings matcher settings for the fee of orders
     * @param matchPrice       price at which order is executed
+    * @param rateCache        assets rates (asset cost in Waves)
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
   private[matcher] def getMinValidFeeForSettings(order: Order,

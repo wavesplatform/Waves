@@ -185,7 +185,7 @@ class OrderValidatorSpecification
         }
       }
 
-      "matcherFeeAssetId doesn't meet matcher's settings requirements (waves mode and incorrect asset)" in {
+      "matcherFeeAssetId doesn't meet matcher's settings requirements (dynamic mode and incorrect asset)" in {
         forAll(orderV3WithPredefinedFeeAssetGenerator()) {
           case (_, order) => validateByMatcherSettings(DynamicSettings(order.matcherFee))(order) should produce("UnexpectedFeeAsset")
         }
@@ -213,7 +213,7 @@ class OrderValidatorSpecification
         validateByMatcherSettings(FixedSettings(order.matcherFeeAssetId, order.matcherFee + 1))(order) should produce("FeeNotEnough")
       }
 
-      "matcherFee is too small (waves mode)" in forAll(orderV3WithPredefinedFeeAssetGenerator(Some(Waves))) {
+      "matcherFee is too small (dynamic mode)" in forAll(orderV3WithPredefinedFeeAssetGenerator(Some(Waves))) {
         case (_, order) => validateByMatcherSettings(DynamicSettings(order.matcherFee + 1))(order) should produce("FeeNotEnough")
       }
 

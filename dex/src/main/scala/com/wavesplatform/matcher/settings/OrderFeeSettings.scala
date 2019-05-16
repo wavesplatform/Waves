@@ -22,17 +22,13 @@ object OrderFeeSettings {
 
   sealed trait OrderFeeSettings {
 
-    /** Returns json for order fee settings taking into account fee that should be paid for matcher's account script invocation */
-    def getJson(matcherAccountFee: Long, rateMap: Map[Asset, Double]): Coeval[JsObject] = Coeval.evalOnce {
+    def getJson(matcherAccountFee: Long, ratesJson: JsObject): Coeval[JsObject] = Coeval.evalOnce {
       Json.obj(
         this match {
-
           case DynamicSettings(baseFee) =>
             "dynamic" -> Json.obj(
               "baseFee" -> (baseFee + matcherAccountFee),
-              "rates" -> Json.obj(
-                rateMap.map { case (asset, rate) => AssetPair.assetIdStr(asset) -> Json.toJsFieldJsValueWrapper(rate) }.toSeq: _*
-              )
+              "rates"   -> ratesJson
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
