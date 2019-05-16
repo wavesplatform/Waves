@@ -56,14 +56,15 @@ object SnapshotsState {
       }
     )
 
-  private def nextSnapshotOffset(assetPair: AssetPair,
-                                 currSnapshotOffset: EventOffset,
-                                 lastProcessedOffset: EventOffset,
-                                 interval: EventOffset): EventOffset = {
+  def nextSnapshotOffset(assetPair: AssetPair,
+                         currSnapshotOffset: EventOffset,
+                         lastProcessedOffset: EventOffset,
+                         interval: EventOffset): EventOffset = {
+    val prevOffset              = math.max(currSnapshotOffset, lastProcessedOffset)
     val z                       = snapshotOffset(assetPair, interval)
-    val currIntervalStartOffset = (lastProcessedOffset / interval) * interval
+    val currIntervalStartOffset = (prevOffset / interval) * interval
     val r                       = currIntervalStartOffset + z
-    if (r == currSnapshotOffset) r + interval else r
+    if (r <= prevOffset) r + interval else r
   }
 
   /**
