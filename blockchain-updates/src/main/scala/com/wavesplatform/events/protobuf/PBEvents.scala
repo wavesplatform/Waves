@@ -1,9 +1,16 @@
 package com.wavesplatform.events.protobuf
 
 import com.wavesplatform.common.state.ByteStr
+
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
+import com.wavesplatform.protobuf.transaction.PBTransactions
+
 import com.wavesplatform.events.protobuf.StateUpdated.ReasonType.{BLOCK, MICROBLOCK, TRANSACTION}
-import com.wavesplatform.events.protobuf.StateUpdated.{BalanceUpdated => PBBalanceUpdated, LeasingUpdated => PBLeasingUpdated}
+import com.wavesplatform.events.protobuf.StateUpdated.{
+  BalanceUpdated => PBBalanceUpdated,
+  LeasingUpdated => PBLeasingUpdated,
+  DataEntryUpdated => PBDataEntryUpdated
+}
 import com.wavesplatform.state.{BlockAdded, MicroBlockAdded, MicroBlockRollbackCompleted, RollbackCompleted}
 
 object PBEvents {
@@ -25,6 +32,9 @@ object PBEvents {
       leases = su.leases.map {
         case (addr, leaseBalance) =>
           PBLeasingUpdated(address = addr, in = leaseBalance.in, out = leaseBalance.out)
+      },
+      dataEntries = su.dataEntries.map {
+        case (addr, entry) => PBDataEntryUpdated(address = addr, dataEntry = Some(PBTransactions.toPBDataEntry(entry)))
       }
     )
   }

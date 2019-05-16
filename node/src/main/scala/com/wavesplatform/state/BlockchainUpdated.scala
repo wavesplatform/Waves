@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import monix.reactive.Observer
 
-final case class StateUpdated(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)])
+final case class StateUpdated(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)], dataEntries: Seq[(Address, DataEntry[_])])
 
 sealed trait BlockchainUpdated
 final case class BlockAdded(block: Block, height: Int, blockStateUpdate: StateUpdated, transactionsStateUpdates: Seq[StateUpdated])
@@ -47,7 +47,12 @@ object BlockchainUpdateNotifier {
       }
     }
 
-    StateUpdated(balances.result(), leases.result())
+    val dataEntries = diff.accountData.toSeq.flatMap {
+      case (address, AccountDataInfo(data)) =>
+        data.toSeq.map { case (_, entry) => (address, entry) }
+    }
+
+    StateUpdated(balances.result(), leases.result(), dataEntries)
   }
 
   private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdated, Seq[StateUpdated]) = {
