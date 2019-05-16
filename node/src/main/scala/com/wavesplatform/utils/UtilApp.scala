@@ -49,7 +49,7 @@ object UtilApp {
                      hashOptions: HashOptions = HashOptions(),
                      signTxOptions: SignTxOptions = SignTxOptions())
 
-  def _main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
       case Some(c) =>
         val inBytes = IO.readInput(c)

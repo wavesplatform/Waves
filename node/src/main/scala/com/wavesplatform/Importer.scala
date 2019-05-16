@@ -28,7 +28,7 @@ import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   //noinspection ScalaStyle
-  def _main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ImportOptions()).foreach {
       case ImportOptions(configFile, blockchainFile, importHeight, format, verifyTransactions) =>
         val config   = loadConfig(ConfigFactory.parseFile(configFile))

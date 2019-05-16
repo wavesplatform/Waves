@@ -390,10 +390,10 @@ object Application extends ScorexLogging {
     System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
-      case "export"  => Exporter._main(args.tail)
-      case "import"  => Importer._main(args.tail)
-      case "explore" => Explorer._main(args.tail)
-      case "util"    => UtilApp._main(args.tail)
+      case "export"  => Exporter.main(args.tail)
+      case "import"  => Importer.main(args.tail)
+      case "explore" => Explorer.main(args.tail)
+      case "util"    => UtilApp.main(args.tail)
       case _         => startNode(args.headOption)
     }
   }

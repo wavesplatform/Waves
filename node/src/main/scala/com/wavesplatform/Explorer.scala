@@ -88,7 +88,7 @@ object Explorer extends ScorexLogging {
     "invoke-script-result"
   )
 
-  def _main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
 
     val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))

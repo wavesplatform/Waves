@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
   //noinspection ScalaStyle
-  def _main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFilename, outputFileNamePrefix, exportHeight, format) =>
         val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(configFilename)))
