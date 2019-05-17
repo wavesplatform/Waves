@@ -90,7 +90,7 @@ object OrderFeeSettings {
     }
 
     cfgValidator.validate[FeeMode](s"$path.mode").toEither >>= (mode => getSettingsByMode(mode).toEither) match {
-      case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString(", "))
+      case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString_(", "))
       case Right(orderFeeSettings) => orderFeeSettings
     }
   }

@@ -5,6 +5,7 @@ import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
+import com.wavesplatform.settings.utils.ConfigSettingsValidator._
 
 case class DeviationsSettings(enabled: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxFeeDeviation: Double)
 
@@ -22,6 +23,6 @@ object DeviationsSettings {
       validateDeviationPercent(s"$path.profit"),
       validateDeviationPercent(s"$path.loss"),
       validateDeviationPercent(s"$path.fee")
-    ) mapN DeviationsSettings.apply valueOr (errorsAcc => throw new Exception(errorsAcc.mkString(", ")))
+    ) mapN DeviationsSettings.apply getValueOrThrowErrors
   }
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.settings
 
+import cats.data.NonEmptyList
 import cats.implicits._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
@@ -9,6 +10,7 @@ import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
+import com.wavesplatform.settings.utils.ConfigSettingsValidator._
 
 case class OrderRestrictionsSettings(stepSize: Double,
                                      minAmount: Double,
@@ -59,7 +61,7 @@ object OrderRestrictionsSettings {
         validateSetting(minSettingName, minDefaultValue),
         validateSetting(maxSettingName, maxDefaultValue)
       ).mapN(Tuple3.apply)
-        .ensure(List(s"Required $minSettingName < $maxSettingName")) { case (_, min, max) => min < max }
+        .ensure(NonEmptyList(s"Required $minSettingName < $maxSettingName", Nil)) { case (_, min, max) => min < max }
     }
 
     lazy val validateAssetPair        = cfgValidator.validate[AssetPair](s"$path.pair")
@@ -70,10 +72,9 @@ object OrderRestrictionsSettings {
       validateSizeMinMax(s"$path.step-size", s"$path.min-amount", s"$path.max-amount", stepSizeDefault, minAmountDefault, maxAmountDefault),
       validateSizeMinMax(s"$path.tick-size", s"$path.min-price", s"$path.max-price", tickSizeDefault, minPriceDefault, maxPriceDefault),
       validateMergeSmallPrices
-    ).mapN {
-        case (assetPair, (stepSize, minAmount, maxAmount), (tickSize, minPrice, maxPrice), mergeSmallPrices) =>
-          assetPair -> OrderRestrictionsSettings(stepSize, minAmount, maxAmount, tickSize, minPrice, maxPrice, mergeSmallPrices)
-      }
-      .valueOr(errorsAcc => throw new Exception(errorsAcc.mkString(", ")))
+    ) mapN {
+      case (assetPair, (stepSize, minAmount, maxAmount), (tickSize, minPrice, maxPrice), mergeSmallPrices) =>
+        assetPair -> OrderRestrictionsSettings(stepSize, minAmount, maxAmount, tickSize, minPrice, maxPrice, mergeSmallPrices)
+    } getValueOrThrowErrors
   }
 }

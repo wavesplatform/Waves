@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.RateCache
 import com.wavesplatform.matcher.error._
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
+import com.wavesplatform.matcher.model.MatcherModel.Normalization
 import com.wavesplatform.matcher.settings.OrderFeeSettings._
 import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
@@ -108,11 +109,11 @@ object OrderValidator {
       val (amountAssetDecimals, priceAssetDecimals) = decimalsPair
       val restrictions                              = orderRestrictions(order.assetPair)
 
-      def normalizeAmount(amt: Double): Long = MatcherModel.toNormalized(amt, -amountAssetDecimals, -8)
-      def normalizePrice(prc: Double): Long  = MatcherModel.toNormalized(prc, amountAssetDecimals, priceAssetDecimals)
+      def normalizeAmount(amt: Double): Long = Normalization.normalizeAmountAndFee(amt, amountAssetDecimals)
+      def normalizePrice(prc: Double): Long  = Normalization.normalizePrice(prc, amountAssetDecimals, priceAssetDecimals)
 
       lift(order)
-        .ensure(MatcherError.OrderInvalidAmount(order, restrictions, amountAssetDecimals, priceAssetDecimals)) { o =>
+        .ensure(MatcherError.OrderInvalidAmount(order, restrictions, amountAssetDecimals)) { o =>
           normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
           BigDecimal(o.amount).remainder(normalizeAmount(restrictions.stepSize).max(1)) == 0
         }
