@@ -4,6 +4,7 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.lagonaki.mocks.TestBlock.defaultSigner
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -340,13 +341,17 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
+                 | let lastBlockTs = lastBlock.timestamp > ${setScriptTransaction.timestamp} && lastBlock.timestamp < ${setScriptTransaction.timestamp + 100}
                  | let lastBlockHeight = lastBlock.height == 5
+                 | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
                    Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                 | let lastBlockGenerator = lastBlock.generator == base58'${defaultSigner.publicKey.toAddress.bytes}'
+                 | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
-                 | lastBlockHeight && lastBlockGenerationSignature
+                 | lastBlockTs && lastBlockHeight && lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
                  |
-              |
+                 |
               """.stripMargin
             )
             .explicitGet()
@@ -381,9 +386,14 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | let checkUnexistingBlock = !isDefined(blockInfoByHeight(unexistingHeight))
                  |
                  | let block = extract(blockInfoByHeight(4))
-                 | let checkSignature = block.generationSignature == base58'$generatorSignature'
+                 | let checkTs = block.timestamp > ${setScriptTransaction.timestamp} && block.timestamp < ${setScriptTransaction.timestamp + 100}
+                 | let checkHeight = block.height == 5
+                 | let checkBaseTarget = lastBlock.baseTarget == 2
+                 | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
+                 | let checkGenerator = block.generator == base58'${defaultSigner.publicKey.toAddress.bytes}'
+                 | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
-                 | checkUnexistingBlock && checkSignature
+                 | checkUnexistingBlock && checkTs && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
                  |
               """.stripMargin
             )

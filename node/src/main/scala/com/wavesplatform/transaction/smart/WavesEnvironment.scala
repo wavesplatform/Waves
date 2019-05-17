@@ -103,6 +103,13 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   override def blockInfoByHeight(height: Int): Option[BlockInfo] = blockchain.blockAt(height).map(toBlockInfo)
 
   private def toBlockInfo(block: Block) = {
-    BlockInfo(block.timestamp, blockchain.height, block.consensusData.generationSignature)
+    BlockInfo(
+      timestamp = block.timestamp,
+      height = blockchain.height,
+      baseTarget = block.consensusData.baseTarget,
+      generationSignature = block.consensusData.generationSignature,
+      generator = block.signerData.generator.toAddress.bytes,
+      generatorPublicKey = ByteStr(block.signerData.generator)
+    )
   }
 }
