@@ -33,9 +33,11 @@ import scala.util.Try
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private val pureContext = PureContext.build(Global, V1)
+  val version = V3
 
-  private val defaultCryptoContext = CryptoContext.build(Global, V1)
+  private val pureContext = PureContext.build(Global, version)
+
+  private val defaultCryptoContext = CryptoContext.build(Global, version)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) (BLOCK.apply _) else (LET_BLOCK.apply _))
 
@@ -44,13 +46,17 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       defaultCryptoContext,
       pureContext,
       WavesContext.build(
-        DirectiveSet(V1, Account, Expression).explicitGet(),
+        DirectiveSet(version, Account, Expression).explicitGet(),
         environment
       )
     )
   )
 
+<<<<<<< HEAD
   private val pureEvalContext: EvaluationContext = PureContext.build(Global, V1).evaluationContext
+=======
+  private val pureEvalContext: EvaluationContext = PureContext.build(version).evaluationContext
+>>>>>>> 04d85cfff05ade0a96a2b4898cc7672209323b01
 
   private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
@@ -502,6 +508,19 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
+    }
+  }
+
+  property("from/to Base16(String)") {
+    val gen = for {
+      len <- Gen.choose(0, 512)
+      xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
+    } yield xs
+
+    forAll(gen) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE16), List(FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(xs)))))
+      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      actual shouldBe evaluated(ByteStr(xs))
     }
   }
 

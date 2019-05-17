@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.pureEvalContext
+import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
@@ -21,6 +21,7 @@ import scorex.crypto.signatures.Curve25519
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
+  val version = V1
   val pureEvalContext = PureContext.build(Global, V1).evaluationContext
 }
 
@@ -69,7 +70,7 @@ class NestedBlocks {
 
 @State(Scope.Benchmark)
 class Base58Perf {
-  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global, V1).evaluationContext)
+  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global, version).evaluationContext)
 
   val encode: EXPR = {
     val base58Count = 120
@@ -102,7 +103,7 @@ class Base58Perf {
 
 @State(Scope.Benchmark)
 class Signatures {
-  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global, V1).evaluationContext)
+  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global, version).evaluationContext)
 
   val expr: EXPR = {
     val sigCount = 20
