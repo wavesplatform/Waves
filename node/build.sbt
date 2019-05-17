@@ -44,6 +44,7 @@ coverageExcludedPackages := ""
 inConfig(Compile)(
   Seq(
     mainClass := Some("com.wavesplatform.Application"),
+    discoveredMainClasses := (mainClass in Compile).value.toSeq,
     sourceGenerators += versionSource,
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
