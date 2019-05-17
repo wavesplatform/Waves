@@ -28,13 +28,7 @@ object ContractSerDe {
     out.writeInt(c.callableFuncs.size)
     c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
-    c.defaultFuncOpt match {
-      case None =>
-        out.writeInt(0)
-      case Some(df) =>
-        out.writeInt(1)
-        serializeAnnotatedFunction(out, df.u, df.annotation.invocationArgName)
-    }
+    out.writeInt(0)
 
     c.verifierFuncOpt match {
       case None =>
@@ -50,11 +44,11 @@ object ContractSerDe {
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
     for {
-      _    <- tryEi(bb.getInt())
-      decs <- deserializeList[DECLARATION](bb, deserializeDeclaration)
-      callableFuncs  <- deserializeList(bb, deserializeCallableFunction)
-      _   = Either.cond(bb.getInt ==0,(),"Incorrect byte, must be 0")
-      verifierFuncOpt   <- deserializeOption(bb, deserializeVerifierFunction)
+      _               <- tryEi(bb.getInt())
+      decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
+      callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
+      _               <- Either.cond(bb.getInt == 0, (), "Incorrect byte, must be 0")
+      verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
     } yield DApp(decs, callableFuncs, verifierFuncOpt)
   }
 
@@ -83,7 +77,11 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
-      _  <- Either.cond(cf.name.getBytes().size <= ContractLimits.MaxAnnotatedFunctionNameInBytes, (), s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}")
+      _ <- Either.cond(
+        cf.name.getBytes().size <= ContractLimits.MaxAnnotatedFunctionNameInBytes,
+        (),
+        s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}"
+      )
     } yield CallableFunction(ca, cf)
   }
 
@@ -118,5 +116,7 @@ object ContractSerDe {
     } flatMap df
   }
 
-  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap(_.getMessage)
+  private[lang] def tryEi[A](f: => A): Either[String, A] = Try(f).toEither.leftMap { e =>
+    if (e.getMessage != null) e.getMessage else e.toString
+  }
 }

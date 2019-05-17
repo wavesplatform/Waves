@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -24,7 +23,7 @@ import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
                                             sender: PublicKey,
-                                            dappAddress: Address,
+                                            dAppAddressOrAlias: AddressOrAlias,
                                             funcCallOpt: Option[Terms.FUNCTION_CALL],
                                             payment: Seq[Payment],
                                             fee: Long,
@@ -45,7 +44,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
       Bytes.concat(
         Array(builder.typeId, version, chainId),
         sender,
-        dappAddress.bytes.arr,
+        dAppAddressOrAlias.bytes.arr,
         Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
         Longs.toByteArray(fee),
@@ -59,9 +58,9 @@ case class InvokeScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       jsonBase()
         ++ Json.obj(
-          "version"     -> version,
-          "dappAddress" -> dappAddress.bytes,
-          "payment"     -> payment
+          "version" -> version,
+          "dApp"    -> dAppAddressOrAlias.stringRepr,
+          "payment" -> payment
         )
         ++ (funcCallOpt match {
           case Some(fc) => Json.obj("call" -> InvokeScriptTransaction.functionCallToJson(fc))
@@ -124,7 +123,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   }
 
   def create(sender: PublicKey,
-             dappAddress: Address,
+             dappAddress: AddressOrAlias,
              fc: Option[Terms.FUNCTION_CALL],
              p: Seq[Payment],
              fee: Long,
@@ -170,7 +169,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
           ).asLeft[Unit])
 
   def signed(sender: PublicKey,
-             dappAddress: Address,
+             dappAddress: AddressOrAlias,
              fc: Option[Terms.FUNCTION_CALL],
              p: Seq[Payment],
              fee: Long,
@@ -183,7 +182,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     } yield tx.copy(proofs = proofs)
 
   def selfSigned(sender: KeyPair,
-                 dappAddress: Address,
+                 dappAddress: AddressOrAlias,
                  fc: Option[Terms.FUNCTION_CALL],
                  p: Seq[Payment],
                  fee: Long,
@@ -196,7 +195,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyBytes(tailIndex(2), "Sender's public key"),
-      AddressBytes(tailIndex(3), "Contract address"),
+      AddressOrAliasBytes(tailIndex(3), "Contract address or alias"),
       OptionBytes(tailIndex(4), "Function call", FunctionCallBytes(tailIndex(4), "Function call")),
       SeqBytes(tailIndex(5), "Payments", PaymentBytes(tailIndex(5), "Payment")),
       LongBytes(tailIndex(6), "Fee"),

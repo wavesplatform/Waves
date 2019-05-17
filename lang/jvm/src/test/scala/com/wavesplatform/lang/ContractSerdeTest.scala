@@ -36,7 +36,6 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           LET("letName", CONST_BOOLEAN(true))
         ),
         List.empty,
-        None,
         None
       ))
 

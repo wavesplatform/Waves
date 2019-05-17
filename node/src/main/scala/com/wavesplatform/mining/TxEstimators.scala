@@ -4,7 +4,6 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 
-//noinspection ScalaStyle
 object TxEstimators extends ScorexLogging {
   abstract class Fn extends ((Blockchain, Transaction, Diff) => Long) {
     val minEstimate: Long
@@ -28,7 +27,7 @@ object TxEstimators extends ScorexLogging {
 
   object scriptRunNumber extends Fn {
     override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = {
-      ScriptRunsLegacy.assertEquals(blockchain, tx, diff.scriptsRun)
+      // ScriptRunsLegacy.assertEquals(blockchain, tx, diff)
       diff.scriptsRun
     }
 

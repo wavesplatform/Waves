@@ -69,7 +69,7 @@ class NestedBlocks {
 
 @State(Scope.Benchmark)
 class Base58Perf {
-  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global).evaluationContext)
+  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global, V1).evaluationContext)
 
   val encode: EXPR = {
     val base58Count = 120
@@ -102,7 +102,7 @@ class Base58Perf {
 
 @State(Scope.Benchmark)
 class Signatures {
-  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global).evaluationContext)
+  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global, V1).evaluationContext)
 
   val expr: EXPR = {
     val sigCount = 20

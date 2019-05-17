@@ -8,6 +8,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import play.api.libs.json._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction._
+import monix.eval.Coeval
 
 case class ApiErrorResponse(error: Int, message: String)
 
@@ -60,7 +61,7 @@ object ApiError {
     }
 
   implicit val lvWrites: Writes[LazyVal] = Writes { lv =>
-    lv.value.value.attempt
+    Coeval.fromEval(lv.value).attempt
       .map({
         case Left(thr) =>
           Json.obj(

@@ -59,7 +59,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
         AddressScheme.current.chainId,
         accountA,
         IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
-        Some(ContractScript(V3, DApp(List.empty, List.empty, None, None)).explicitGet()),
+        Some(ContractScript(V3, DApp(List.empty, List.empty, None)).explicitGet()),
         1222,
         System.currentTimeMillis(),
         Proofs.empty

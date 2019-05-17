@@ -94,7 +94,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
@@ -146,7 +148,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
-      val bs = BalanceSnapshot(height, portfolio(address))
+      val balance = this.balance(address)
+      val lease = this.leaseBalance(address)
+      val bs = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
       if (inner.height > 0 && from < this.height) bs +: inner.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
@@ -168,7 +172,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   }
 
   override def accountDataKeys(acc: Address): Seq[String] = {
-    inner.accountDataKeys(acc) ++ diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    val fromInner = inner.accountDataKeys(acc)
+    val fromDiff = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    (fromInner ++ fromDiff).distinct
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
@@ -234,7 +240,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = inner.blockIdsAfter(parentSignature, howMany)
 
-  override def parent(block: Block, back: Int): Option[Block] = inner.parent(block, back)
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
 
   override def totalFee(height: Int): Option[Long] = inner.totalFee(height)
 

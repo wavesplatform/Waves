@@ -40,8 +40,8 @@ object Importer extends ScorexLogging {
 
     val format = Try(argi.next)
       .map(_.toUpperCase)
-      .collect { case custom @ "BINARY_OLD" => custom }
-      .getOrElse("BINARY")
+      .collect { case custom @ "BINARY" => custom }
+      .getOrElse("BINARY_OLD")
       .intern()
 
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
@@ -52,7 +52,7 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                               = ???
+      override def putIfNew(tx: Transaction, b: Boolean)                   = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
       override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
       override def pessimisticPortfolio(addr: Address): Portfolio          = ???

@@ -15,7 +15,7 @@ import com.wavesplatform.matcher.AddressActor.GetOrderStatus
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
@@ -35,7 +35,7 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
-import scala.util.Failure
+import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -83,8 +83,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(Left(_)) => complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
-    case _             => pass
+    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
+    case None    => forceCheckOrderBook(p)
+  }
+
+  private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
+    case Success(_) => pass
+    case _          => complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
   }
 
   private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
@@ -249,7 +254,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>
-      handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+      assetPair.fold(pass)(unavailableOrderBookBarrier).apply {
+        handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+      }
     }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
@@ -273,8 +280,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
-    withAssetPair(p) { pair =>
-      handleCancelRequest(Some(pair))
+    unavailableOrderBookBarrier(p) {
+      withAssetPair(p) { pair =>
+        handleCancelRequest(Some(pair))
+      }
     }
   }
 
@@ -516,7 +525,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
       unavailableOrderBookBarrier(pair) {
-        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map(_ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")))
+        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
+          case None => NotImplemented(MatcherError.FeatureDisabled)
+          case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+        })
       }
     }
   }
@@ -549,8 +561,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Get the oldest snapshot's offset in the queue", notes = "", httpMethod = "GET")
   def getOldestSnapshotOffset: Route = (path("debug" / "oldestSnapshotOffset") & get & withAuth) {
     complete {
-      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
-        StatusCodes.OK -> x.offsets.valuesIterator.min
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
+        StatusCodes.OK -> response.offsets.valuesIterator.collect { case Some(x) => x }.min
       }
     }
   }
@@ -561,9 +573,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
         val js = Json.obj(
-          x.offsets.map {
-            case (assetPair, offset) =>
-              assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
+          x.offsets.collect {
+            case (assetPair, Some(offset)) => assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
           }.toSeq: _*
         )
 

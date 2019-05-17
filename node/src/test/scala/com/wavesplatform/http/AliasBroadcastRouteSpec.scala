@@ -24,8 +24,8 @@ class AliasBroadcastRouteSpec
   private val allChannels = stub[ChannelGroup]
 
   (utx.putIfNew _)
-    .when(*)
-    .onCall((t: Transaction) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
+    .when(*, *)
+    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
     .anyNumberOfTimes()
 
 

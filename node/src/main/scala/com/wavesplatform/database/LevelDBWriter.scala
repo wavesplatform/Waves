@@ -344,7 +344,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     for ((addressId, addressData) <- data) {
       rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
-      addressData.data.keys.toSeq
       val newKeys = (
         for {
           (key, value) <- addressData.data
@@ -355,6 +354,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           if isNew
         } yield key
       ).toSeq
+
       if (newKeys.nonEmpty) {
         val chunkCountKey = Keys.dataKeyChunkCount(addressId)
         val chunkCount    = rw.get(chunkCountKey)
@@ -882,11 +882,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  override def parent(block: Block, back: Int): Option[Block] = readOnly { db =>
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readOnly { db =>
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      block <- loadBlock(height, db)
+      (block, _) <- loadBlockHeaderAndSize(height, db)
     } yield block
   }
 

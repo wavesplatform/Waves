@@ -31,9 +31,6 @@ object PublicKey extends TaggedType[ByteStr] {
   def unapply(arg: Array[Byte]): Option[PublicKey] =
     Some(apply(arg))
 
-  def toString(pk: PublicKey): String =
-    pk.toAddress.address
-
   implicit def toAddress(pk: PublicKey): Address =
     pk.toAddress
 

@@ -41,7 +41,6 @@ object ContractScript {
     type E[A] = Either[String, A]
     val funcsWithComplexity: Seq[E[(String, Long)]] =
       (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
-        contract.defaultFuncOpt.map(func => (func.annotation.invocationArgName, func.u)) ++
         contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>

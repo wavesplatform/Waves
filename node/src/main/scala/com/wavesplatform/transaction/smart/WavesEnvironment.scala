@@ -1,12 +1,13 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -85,15 +86,23 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
-    blockchain.assetDescription(IssuedAsset(id)).map{
-      assetDesc =>
-        ScriptAssetInfo(
-          totalAmount = assetDesc.totalVolume.toLong,
-          decimals = assetDesc.decimals,
-          issuer = assetDesc.issuer,
-          reissuable = assetDesc.reissuable,
-          scripted = assetDesc.script.nonEmpty,
-          sponsored = assetDesc.sponsorship != 0)
+    blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
+      ScriptAssetInfo(
+        totalAmount = assetDesc.totalVolume.toLong,
+        decimals = assetDesc.decimals,
+        issuer = assetDesc.issuer,
+        reissuable = assetDesc.reissuable,
+        scripted = assetDesc.script.nonEmpty,
+        sponsored = assetDesc.sponsorship != 0
+      )
     }
+  }
+
+  override def lastBlockOpt(): Option[BlockInfo] = blockchain.lastBlock.map(toBlockInfo)
+
+  override def blockInfoByHeight(height: Int): Option[BlockInfo] = blockchain.blockAt(height).map(toBlockInfo)
+
+  private def toBlockInfo(block: Block) = {
+    BlockInfo(block.timestamp, blockchain.height, block.consensusData.generationSignature)
   }
 }

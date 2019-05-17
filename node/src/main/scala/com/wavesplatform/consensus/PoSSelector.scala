@@ -2,7 +2,7 @@ package com.wavesplatform.consensus
 
 import cats.implicits._
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -49,7 +49,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .toRight(GenericError("No blocks in blockchain"))
   }
 
-  def validateBlockDelay(height: Int, block: Block, parent: Block, effectiveBalance: Long): Either[ValidationError, Unit] = {
+  def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
     getValidBlockDelay(height, block.signerData.generator, parent.consensusData.baseTarget, effectiveBalance)
       .map(_ + parent.timestamp)
       .ensureOr(mvt => GenericError(s"Block timestamp ${block.timestamp} less than min valid timestamp $mvt"))(ts => ts <= block.timestamp)
@@ -83,7 +83,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     )
   }
 
-  def validateBaseTarget(height: Int, block: Block, parent: Block, grandParent: Option[Block]): Either[ValidationError, Unit] = {
+  def validateBaseTarget(height: Int, block: Block, parent: BlockHeader, grandParent: Option[BlockHeader]): Either[ValidationError, Unit] = {
     val blockBT = block.consensusData.baseTarget
     val blockTS = block.timestamp
 
