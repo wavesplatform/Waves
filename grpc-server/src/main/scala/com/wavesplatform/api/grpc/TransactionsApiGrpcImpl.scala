@@ -91,7 +91,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {
     val senderMatches = request.sender.isEmpty || (tx match {
-      case a: AuthorizedTransaction => a.sender.toAddress == request.sender.toAddress
+      case a: AuthorizedTransaction => request.sender.isEmpty || a.sender.toAddress == request.sender.toAddress
       case _                        => false
     })
 
