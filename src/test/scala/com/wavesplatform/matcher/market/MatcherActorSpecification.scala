@@ -5,9 +5,9 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
 import akka.persistence.serialization.Snapshot
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
-import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.matcher.db.AssetPairsDB
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
 import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdated}
@@ -18,6 +18,7 @@ import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}
+import com.wavesplatform.{NTPTime, WithDB}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
@@ -27,6 +28,7 @@ import scala.concurrent.duration.DurationInt
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
     with MatcherTestData
+    with WithDB
     with BeforeAndAfterEach
     with PathMockFactory
     with ImplicitSender
@@ -88,16 +90,16 @@ class MatcherActorSpecification
       "it crashes at start" in {
         val pair = AssetPair(randomAssetId, randomAssetId)
         val ob   = emptyOrderBookRefs
-        val actor = waitInitialization(
-          TestActorRef(
-            new MatcherActor(
-              matcherSettings,
-              doNothingOnRecovery,
-              ob,
-              (_, _, _) => Props(new FailAtStartActor),
-              blockchain.assetDescription
-            )
-          ))
+        val actor = TestActorRef(
+          new MatcherActor(
+            matcherSettings,
+            mkAssetPairsDB,
+            doNothingOnRecovery,
+            ob,
+            (_, _, _) => Props(new FailAtStartActor),
+            blockchain.assetDescription
+          )
+        )
 
         val probe = TestProbe()
         probe.send(actor, wrap(buy(pair, 2000, 1)))
@@ -144,6 +146,7 @@ class MatcherActorSpecification
         Props(
           new MatcherActor(
             matcherSettings,
+            mkAssetPairsDB,
             startResult => working = startResult.isRight,
             ob,
             (_, _, _) => Props(new FailAtStartActor()),
@@ -161,17 +164,19 @@ class MatcherActorSpecification
 
     "stop the work" when {
       "an order book as failed during recovery" in {
+        val apdb    = mkAssetPairsDB
         val pair    = AssetPair(randomAssetId, randomAssetId)
         val ob      = emptyOrderBookRefs
         var stopped = false
 
-        matcherHadOrderBooksBefore(pair -> Some(1))
+        matcherHadOrderBooksBefore(apdb, pair -> Some(1))
         val probe = TestProbe()
         val actor = probe.watch(
           system.actorOf(
             Props(
               new MatcherActor(
                 matcherSettings,
+                apdb,
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _, _) => Props(new FailAtStartActor),
@@ -185,17 +190,19 @@ class MatcherActorSpecification
       }
 
       "received Shutdown during start" in {
+        val apdb    = mkAssetPairsDB
         val pair    = AssetPair(randomAssetId, randomAssetId)
         val ob      = emptyOrderBookRefs
         var stopped = false
 
-        matcherHadOrderBooksBefore(pair -> Some(1))
+        matcherHadOrderBooksBefore(apdb, pair -> Some(1))
         val probe = TestProbe()
         val actor = probe.watch(
           system.actorOf(
             Props(
               new MatcherActor(
                 matcherSettings,
+                apdb,
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _, _) => Props(new NothingDoActor),
@@ -272,12 +279,13 @@ class MatcherActorSpecification
 
     "create an order book" when {
       "place order - new order book" in {
+        val apdb  = mkAssetPairsDB
         val pair1 = AssetPair(randomAssetId, randomAssetId)
         val pair2 = AssetPair(randomAssetId, randomAssetId)
 
-        matcherHadOrderBooksBefore(pair1 -> Some(9L))
+        matcherHadOrderBooksBefore(apdb, pair1 -> Some(9L))
         val ob    = emptyOrderBookRefs
-        val actor = defaultActor(ob)
+        val actor = defaultActor(ob, apdb = apdb)
 
         val probe = TestProbe()
         probe.send(actor, MatcherActor.GetSnapshotOffsets)
@@ -299,6 +307,7 @@ class MatcherActorSpecification
           Props(
             new MatcherActor(
               matcherSettings,
+              mkAssetPairsDB,
               _ => {},
               ob,
               (pair, matcherActor, _) => Props(new RecoveringActor(matcherActor, pair)),
@@ -325,20 +334,20 @@ class MatcherActorSpecification
     */
   private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
     val r = assetPairs.map(fakeOrderBookActor).toList
-    val actor = waitInitialization(
-      TestActorRef(
-        new MatcherActor(
-          matcherSettings.copy(snapshotsInterval = 17),
-          doNothingOnRecovery,
-          emptyOrderBookRefs,
-          (assetPair, _, _) => {
-            val idx = assetPairs.indexOf(assetPair)
-            if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
-            r(idx)._1
-          },
-          blockchain.assetDescription
-        )
-      ))
+    val actor = TestActorRef(
+      new MatcherActor(
+        matcherSettings.copy(snapshotsInterval = 17),
+        mkAssetPairsDB,
+        doNothingOnRecovery,
+        emptyOrderBookRefs,
+        (assetPair, _, _) => {
+          val idx = assetPairs.indexOf(assetPair)
+          if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
+          r(idx)._1
+        },
+        blockchain.assetDescription
+      )
+    )
 
     f(actor, r.map(_._2))
   }
@@ -365,35 +374,29 @@ class MatcherActorSpecification
   }
 
   private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
+                           apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref): TestActorRef[MatcherActor] = {
     val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
-    val r = waitInitialization(
-      TestActorRef(
-        new MatcherActor(
-          matcherSettings,
-          doNothingOnRecovery,
-          ob,
-          (assetPair, matcher, notify) =>
-            OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, notify),
-          blockchain.assetDescription
-        )
-      ))
+    val r = TestActorRef(
+      new MatcherActor(
+        matcherSettings,
+        apdb,
+        doNothingOnRecovery,
+        ob,
+        (assetPair, matcher, notify) =>
+          OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, notify),
+        blockchain.assetDescription
+      )
+    )
     val probe = TestProbe()
     probe.send(r, MatcherActor.StartNotifyAddresses)
     r
   }
 
-  private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = {
-    val r = eventually(timeout(1.second)) {
-      x.underlyingActor.recoveryFinished shouldBe true
-      x
-    }
-    Thread.sleep(1000) // TODO: This is a hack!
-    r
-  }
+  private def mkAssetPairsDB: AssetPairsDB = AssetPairsDB(db)
 
-  private def matcherHadOrderBooksBefore(pairs: (AssetPair, Option[Long])*): Unit = {
-    SnapshotUtils.provideSnapshot(MatcherActor.name, Snapshot(MatcherActor.Snapshot(pairs.map(_._1).toSet)))
+  private def matcherHadOrderBooksBefore(apdb: AssetPairsDB, pairs: (AssetPair, Option[Long])*): Unit = {
+    pairs.map(_._1).foreach(apdb.add)
     pairs.foreach {
       case (pair, offset) =>
         SnapshotUtils.provideSnapshot(OrderBookActor.name(pair), Snapshot(OrderBookActor.Snapshot(offset, OrderBook.empty.snapshot)))
