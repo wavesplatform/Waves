@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -60,7 +59,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
       jsonBase()
         ++ Json.obj(
           "version" -> version,
-          "dApp"    -> dAppAddressOrAlias.bytes,
+          "dApp"    -> dAppAddressOrAlias.stringRepr,
           "payment" -> payment
         )
         ++ (funcCallOpt match {

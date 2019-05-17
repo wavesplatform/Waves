@@ -260,12 +260,13 @@ object Parser {
       }
 
   val byteVectorP: P[EXPR] =
-    P(Index ~~ "base" ~~ ("58" | "64").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
+    P(Index ~~ "base" ~~ ("58" | "64" | "16").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
       .map {
         case (start, base, xs, end) =>
           val innerStart = start + 8
           val innerEnd   = end - 1
           val decoded = base match {
+            case "16" => Global.base16Decode(xs)
             case "58" => Global.base58Decode(xs)
             case "64" => Global.base64Decode(xs)
           }

@@ -44,6 +44,7 @@ coverageExcludedPackages := ""
 inConfig(Compile)(
   Seq(
     mainClass := Some("com.wavesplatform.Application"),
+    discoveredMainClasses := (mainClass in Compile).value.toSeq,
     sourceGenerators += versionSource,
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
@@ -87,6 +88,7 @@ inTask(assembly)(
 scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
 bashScriptExtraDefines += s"""addJava "-Dwaves.directory=/var/lib/${(Universal / normalizedName).value}""""
+bashScriptExtraDefines += s"""addJava "-Dwaves.config.directory=/etc/${(Universal / normalizedName).value}""""
 
 inConfig(Universal)(
   Seq(
