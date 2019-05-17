@@ -52,11 +52,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
   )
 
-<<<<<<< HEAD
-  private val pureEvalContext: EvaluationContext = PureContext.build(Global, V1).evaluationContext
-=======
-  private val pureEvalContext: EvaluationContext = PureContext.build(version).evaluationContext
->>>>>>> 04d85cfff05ade0a96a2b4898cc7672209323b01
+  private val pureEvalContext: EvaluationContext = PureContext.build(Global, version).evaluationContext
 
   private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
