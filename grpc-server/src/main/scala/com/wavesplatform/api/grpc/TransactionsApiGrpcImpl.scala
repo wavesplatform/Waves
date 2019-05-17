@@ -96,7 +96,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     })
 
     val recipientMatches = tx match {
-      case tt: TransferTransaction => tt.recipient == request.getRecipient.toAddressOrAlias
+      case tt: TransferTransaction => request.recipient.isEmpty || tt.recipient == request.getRecipient.toAddressOrAlias
       case _                       => request.recipient.isEmpty
     }
 
