@@ -32,4 +32,15 @@ trait WithDB extends BeforeAndAfterEach {
     } finally {
       TestHelpers.deleteRecursively(path)
     }
+
+  protected def tempDb(f: DB => Any): Any = {
+    val path = Files.createTempDirectory("lvl-temp").toAbsolutePath
+    val db   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
+    try {
+      f(db)
+    } finally {
+      db.close()
+      TestHelpers.deleteRecursively(path)
+    }
+  }
 }

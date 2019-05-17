@@ -1,9 +1,10 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.matcher.db
 
-import com.wavesplatform.{NoShrink, WithDB}
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.matcher.{MatcherTestData, OrderDB}
+import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.model.{OrderInfo, OrderStatus}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.{NoShrink, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}

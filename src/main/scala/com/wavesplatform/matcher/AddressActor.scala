@@ -7,8 +7,9 @@ import akka.pattern.pipe
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.Matcher.StoreEvent
-import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.api.SavingEventsDisabled
+import com.wavesplatform.matcher.db.OrderDB
+import com.wavesplatform.matcher.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.matcher.queue.QueueEvent

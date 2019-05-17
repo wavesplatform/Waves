@@ -9,6 +9,7 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
+import com.wavesplatform.matcher.db.EmptyOrderDB
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
