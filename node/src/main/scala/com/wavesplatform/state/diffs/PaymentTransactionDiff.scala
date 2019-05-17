@@ -5,8 +5,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.PaymentTransaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 import scala.util.{Left, Right}
 
@@ -27,7 +27,7 @@ object PaymentTransactionDiff {
               balance = -tx.amount - tx.fee,
               LeaseBalance.empty,
               assets = Map.empty
-            )),
+            ))
         ))
     }
   }

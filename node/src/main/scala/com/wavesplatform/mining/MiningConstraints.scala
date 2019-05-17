@@ -11,6 +11,7 @@ case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint
 
 object MiningConstraints {
   val MaxScriptRunsInBlock              = 100
+  val MaxScriptsComplexityInBlock       = 500000
   private val ClassicAmountOfTxsInBlock = 100
   private val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
 
@@ -19,6 +20,7 @@ object MiningConstraints {
     val isNgEnabled           = activatedFeatures.contains(BlockchainFeatures.NG.id)
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
     val isScriptEnabled       = activatedFeatures.contains(BlockchainFeatures.SmartAccounts.id)
+    val isDAppsEnabled        = activatedFeatures.contains(BlockchainFeatures.Ride4DApps.id)
 
     val total: MiningConstraint =
       if (isMassTransferEnabled) OneDimensionalMiningConstraint(MaxTxsSizeInBytes, TxEstimators.sizeInBytes, "MaxTxsSizeInBytes")
@@ -29,7 +31,11 @@ object MiningConstraints {
 
     new MiningConstraints(
       total =
-        if (isScriptEnabled)
+        if (isDAppsEnabled)
+          MultiDimensionalMiningConstraint(
+            NonEmptyList
+              .of(OneDimensionalMiningConstraint(MaxScriptsComplexityInBlock, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total))
+        else if (isScriptEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
         else total,

@@ -66,6 +66,20 @@ object ExchangeTransactionDiff {
           addressScripted +
           ordersScripted
       }
+      scriptsComplexity = {
+        val assetsComplexity = assets.toSeq
+          .flatten
+          .flatMap(_.script)
+          .map(_.complexity)
+          .sum
+
+        val accountsComplexity = Seq(tx.sender.toAddress, buyer, seller)
+          .flatMap(blockchain.accountScript)
+          .map(_.complexity)
+          .sum
+
+        assetsComplexity + accountsComplexity
+      }
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
@@ -104,7 +118,8 @@ object ExchangeTransactionDiff {
           tx.buyOrder.id()  -> VolumeAndFee(tx.amount, tx.buyMatcherFee),
           tx.sellOrder.id() -> VolumeAndFee(tx.amount, tx.sellMatcherFee)
         ),
-        scriptsRun = scripts
+        scriptsRun = scripts,
+        scriptsComplexity = scriptsComplexity
       )
     }
   }
