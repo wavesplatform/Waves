@@ -94,7 +94,9 @@ class ReservedBalanceSpecification
               new TestOrderDB(100),
               _ => false,
               _ => Future.failed(new IllegalStateException("Should not be used in the test"))
-            ))
+            )
+        ),
+        None
       )
     ))
 
@@ -107,10 +109,10 @@ class ReservedBalanceSpecification
       .getOrElse(assetId, 0L)
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
-    addressDir ! OrderAdded(LimitOrder(submitted))
-    addressDir ! OrderAdded(LimitOrder(counter))
+    addressDir ! OrderAdded(LimitOrder(submitted), ntpTime.getTimestamp())
+    addressDir ! OrderAdded(LimitOrder(counter), ntpTime.getTimestamp())
 
-    oh.process(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
     addressDir ! exec
     exec

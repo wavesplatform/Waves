@@ -87,7 +87,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       orderBook ! RestartActor
 
-      tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o)))
+      tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o), o.timestamp))
     }
 
     "execute partial market orders and preserve remaining after restart" in obcTest { (pair, actor, tp) =>
@@ -104,12 +104,13 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! RestartActor
 
       tp.expectMsg(
-        OrderAdded(
-          SellLimitOrder(
-            ord2.amount - ord1.amount,
-            ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
-            ord2
-          )))
+        OrderAdded(SellLimitOrder(
+                     ord2.amount - ord1.amount,
+                     ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
+                     ord2
+                   ),
+                   ord2.timestamp)
+      )
     }
 
     "execute one order fully and other partially and restore after restart" in obcTest { (pair, actor, tp) =>
@@ -128,12 +129,13 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(
-          BuyLimitOrder(
-            restAmount,
-            ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-            ord2
-          )))
+        OrderAdded(BuyLimitOrder(
+                     restAmount,
+                     ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+                     ord2
+                   ),
+                   ord2.timestamp)
+      )
     }
 
     "match multiple best orders at once and restore after restart" in obcTest { (pair, actor, tp) =>
@@ -159,7 +161,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
             restAmount,
             ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2
-          )))
+          ),
+          ord2.timestamp
+        ))
     }
 
     "place orders and restart without waiting for response" in obcTest { (pair, actor, tp) =>

@@ -3,6 +3,7 @@ package com.wavesplatform.matcher
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.matcher.history.HistoryRouter
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.transaction.Asset
@@ -12,7 +13,10 @@ import monix.reactive.Observable
 
 import scala.collection.mutable
 
-class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)], settings: MatcherSettings, addressActorProps: Address => Props)
+class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
+                       settings: MatcherSettings,
+                       addressActorProps: Address => Props,
+                       historyRouter: Option[ActorRef])
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
@@ -26,9 +30,10 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)], se
     .filter(_.nonEmpty)
     .foreach { changes =>
       val acc = mutable.Map.empty[Address, Set[Asset]]
-      changes.foreach { case (addr, changed) => acc.update(addr, acc.getOrElse(addr, Set.empty) + changed) }
 
+      changes.foreach { case (addr, changed)   => acc.update(addr, acc.getOrElse(addr, Set.empty) + changed) }
       acc.foreach { case (addr, changedAssets) => children.get(addr).foreach(_ ! AddressActor.BalanceUpdated(changedAssets)) }
+
     }(Scheduler(context.dispatcher))
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
@@ -43,19 +48,28 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)], se
     handler.forward(msg)
   }
 
+  import HistoryRouter._
+
   override def receive: Receive = {
+
     case Envelope(address, cmd) =>
       forward(address, cmd)
 
-    case e @ Events.OrderAdded(lo) =>
+    case e @ Events.OrderAdded(lo, timestamp) =>
       forward(lo.order.sender, e)
-    case e @ Events.OrderExecuted(submitted, counter, _) =>
+      historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
+
+    case e @ Events.OrderExecuted(submitted, counter, timestamp) =>
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) {
         forward(counter.order.sender, e)
       }
-    case e @ Events.OrderCanceled(lo, _) =>
+      if (e.submittedRemainingAmount == 0) historyRouter foreach { _ ! SaveOrder(submitted, timestamp) } // handle the case when the order is filled right after placing
+      historyRouter foreach { _ ! SaveEvent(e) }
+
+    case e @ Events.OrderCanceled(lo, _, _) =>
       forward(lo.order.sender, e)
+      historyRouter foreach { _ ! SaveEvent(e) }
 
     case Terminated(child) =>
       val addressString = child.path.name

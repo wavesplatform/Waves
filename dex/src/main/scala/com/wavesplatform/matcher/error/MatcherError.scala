@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.matcher.error.MatcherError._
-import com.wavesplatform.matcher.model.MatcherModel
+import com.wavesplatform.matcher.model.MatcherModel.Denormalization
 import com.wavesplatform.matcher.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -221,15 +221,16 @@ object MatcherError {
         e"The orders of version 3 are not allowed by matcher"
       )
 
-  case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings, amountAssetDecimals: Int, priceAssetDecimals: Int)
+  import OrderRestrictionsSettings.formatValue
+
+  case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings, amountAssetDecimals: Int)
       extends MatcherError(
         order,
         amount,
         denied,
-        e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> OrderRestrictionsSettings.formatValue(MatcherModel
-          .fromNormalized(ord.amount, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max amount = ${'maxAmount -> OrderRestrictionsSettings
-          .formatValue(amtSettings.maxAmount)}, min amount = ${'minAmount -> OrderRestrictionsSettings
-          .formatValue(amtSettings.minAmount)}, step size = ${'stepSize   -> OrderRestrictionsSettings.formatValue(amtSettings.stepSize)}"
+        e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> formatValue(Denormalization
+          .denormalizeAmountAndFee(ord.amount, amountAssetDecimals))}) does not meet matcher requirements: max amount = ${'maxAmount -> formatValue(
+          amtSettings.maxAmount)}, min amount = ${'minAmount                                                                         -> formatValue(amtSettings.minAmount)}, step size = ${'stepSize -> formatValue(amtSettings.stepSize)}"
       )
 
   case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings, amountAssetDecimals: Int, priceAssetDecimals: Int)
@@ -237,11 +238,10 @@ object MatcherError {
         order,
         price,
         denied,
-        e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> OrderRestrictionsSettings.formatValue(MatcherModel
-          .fromNormalized(ord.price, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max price = ${'maxPrice -> OrderRestrictionsSettings
-          .formatValue(prcSettings.maxPrice)}, min price = ${'minPrice -> OrderRestrictionsSettings
-          .formatValue(prcSettings.minPrice)}, tick size = ${'tickSize                  -> OrderRestrictionsSettings
-          .formatValue(prcSettings.tickSize)}, merge small prices = ${'mergeSmallPrices -> prcSettings.mergeSmallPrices}"
+        e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> formatValue(Denormalization
+          .denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max price = ${'maxPrice -> formatValue(
+          prcSettings.maxPrice)}, min price = ${'minPrice                                                                                      -> formatValue(prcSettings.minPrice)}, tick size = ${'tickSize -> formatValue(
+          prcSettings.tickSize)}, merge small prices = ${'mergeSmallPrices                                                                     -> prcSettings.mergeSmallPrices}"
       )
 
   sealed abstract class Entity(val code: Int)
