@@ -25,7 +25,7 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[Or
       lo         <- level
     } yield lo
 
-  def cancel(orderId: ByteStr, normalizedTickSize: Option[Long]): Option[OrderCanceled] = {
+  def cancel(orderId: ByteStr, timestamp: Long, normalizedTickSize: Option[Long]): Option[OrderCanceled] = {
     allOrders.collectFirst {
       case lo if lo.order.id() == orderId =>
         (if (lo.order.orderType == OrderType.BUY) bids else asks)
@@ -33,12 +33,12 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[Or
             correctPriceByTickSize(lo.order.price, lo.order.orderType, normalizedTickSize),
             lo.order.id()
           )
-        OrderCanceled(lo, false)
+        OrderCanceled(lo, false, timestamp)
     }
   }
 
-  def cancelAll(): Seq[OrderCanceled] = {
-    val canceledOrders = allOrders.map(lo => OrderCanceled(lo, unmatchable = false)).toSeq
+  def cancelAll(timestamp: Long): Seq[OrderCanceled] = {
+    val canceledOrders = allOrders.map(lo => OrderCanceled(lo, unmatchable = false, timestamp)).toSeq
     bids.clear()
     asks.clear()
     canceledOrders
@@ -130,26 +130,32 @@ object OrderBook {
       counterSide: Side,
       normalizedTickSize: Option[Long]
   ): Seq[Event] =
-    if (!submitted.order.isValid(eventTs)) OrderCanceled(submitted, false) +: prevEvents
+    if (!submitted.order.isValid(eventTs)) OrderCanceled(submitted, false, eventTs) +: prevEvents
     else
       counterSide.best match {
         case counter if counter.forall(c => !canMatch(submitted.price, c.price)) =>
           val correctedKey = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
           submittedSide += correctedKey -> (submittedSide.getOrElse(correctedKey, Vector.empty) :+ submitted)
-          OrderAdded(submitted) +: prevEvents
+          OrderAdded(submitted, eventTs) +: prevEvents
         case Some(counter) =>
           if (!submitted.isValid(counter.price)) {
-            OrderCanceled(submitted, true) +: prevEvents
+            OrderCanceled(submitted, true, eventTs) +: prevEvents
           } else if (!counter.order.isValid(eventTs)) {
             counterSide.removeBest()
-            doMatch(eventTs, canMatch, submitted, OrderCanceled(counter, false) +: prevEvents, submittedSide, counterSide, normalizedTickSize)
+            doMatch(eventTs,
+                    canMatch,
+                    submitted,
+                    OrderCanceled(counter, false, eventTs) +: prevEvents,
+                    submittedSide,
+                    counterSide,
+                    normalizedTickSize)
           } else {
             val x         = OrderExecuted(submitted, counter, eventTs)
             val newEvents = x +: prevEvents
 
             if (x.counterRemaining.isValid) {
               counterSide.replaceBest(x.counterRemaining)
-              if (x.submittedRemaining.isValid) OrderCanceled(x.submittedRemaining, true) +: newEvents
+              if (x.submittedRemaining.isValid) OrderCanceled(x.submittedRemaining, true, eventTs) +: newEvents
               else newEvents
             } else {
               counterSide.removeBest()
