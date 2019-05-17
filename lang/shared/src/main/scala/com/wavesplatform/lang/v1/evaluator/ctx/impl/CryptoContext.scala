@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.directives.values._
 
 object CryptoContext {
 
@@ -110,6 +111,17 @@ object CryptoContext {
         case xs                               => notImplemented("fromBase64String(str: String)", xs)
       }
 
+    def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
+      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).map(CONST_STRING)
+      case xs                                         => notImplemented("toBase16String(bytes: byte[])", xs)
+    }
+
+    def fromBase16StringF: BaseFunction =
+      NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, "Base16 decode", ("str", STRING, "base16 encoded string")) {
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, global.MaxBase64String).map(x => CONST_BYTESTR(ByteStr(x)))
+        case xs                               => notImplemented("fromBase16String(str: String)", xs)
+      }
+ 
     val v1Functions =
       Array(
         keccak256F,
@@ -142,12 +154,12 @@ object CryptoContext {
       ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512)))
     )
 
-    val v3Functions = Array(rsaVerifyF)
+    val v3Functions = Array(rsaVerifyF, toBase16StringF, fromBase16StringF)
 
     version match {
-      case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
-      case _  => CTX(List.empty, Map.empty, v1Functions)
-    }
+            case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
+            case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
+          }
   }
 
   def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext   = build(global, version).evaluationContext
