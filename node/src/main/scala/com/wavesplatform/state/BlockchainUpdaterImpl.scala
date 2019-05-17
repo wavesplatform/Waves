@@ -438,12 +438,12 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def parent(block: Block, back: Int): Option[Block] = readLock {
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
-        if (back == 1) Some(ng.base) else blockchain.parent(ng.base, back - 1)
+        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
       case _ =>
-        blockchain.parent(block, back)
+        blockchain.parentHeader(block, back)
     }
   }
 
@@ -467,8 +467,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   }
 
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
-    val p = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
-    blockchain.portfolio(a).combine(p)
+    val diffPf = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
+    val lease = blockchain.leaseBalance(a)
+    val balance = blockchain.balance(a)
+    Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
@@ -576,7 +578,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     ngState.fold(blockchain.accountDataKeys(address)) { ng =>
       val fromInner = blockchain.accountDataKeys(address)
       val fromDiff  = ng.bestLiquidDiff.accountData.get(address).toVector.flatMap(_.data.keys)
-      fromInner ++ fromDiff
+      (fromInner ++ fromDiff).distinct
     }
   }
 

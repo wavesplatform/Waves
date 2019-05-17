@@ -211,7 +211,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         .combineAll(
           Seq(
             PureContext.build(V3),
-            CryptoContext.build(Global),
+            CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -279,7 +279,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         .combineAll(
           Seq(
             PureContext.build(V3),
-            CryptoContext.build(Global),
+            CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, DAppType).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))

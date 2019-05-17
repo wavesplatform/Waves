@@ -5,6 +5,8 @@ import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, UNIT}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -14,16 +16,13 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.OrdType
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.RealTransactionWrapper
 
 object MatcherContext {
 
   def build(version: StdLibVersion, nByte: Byte, in: Eval[Order], proofsEnabled: Boolean): EvaluationContext = {
-    val baseContext = Monoid.combine(PureContext.build(version), CryptoContext.build(Global)).evaluationContext
+    val baseContext = Monoid.combine(PureContext.build(version), CryptoContext.build(Global, version)).evaluationContext
 
     val inputEntityCoeval: Eval[Either[String, CaseObj]] =
       Eval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled))))

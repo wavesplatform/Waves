@@ -600,7 +600,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       PureContext
         .build(V2) |+|
         CryptoContext
-          .build(Global) |+|
+          .build(Global, V2) |+|
         WavesContext
           .build(
             DirectiveSet(V2, Asset, Expression).explicitGet(),
@@ -622,7 +622,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val ctx =
       PureContext.build(V2) |+|
         CryptoContext
-          .build(Global) |+|
+          .build(Global, V2) |+|
         WavesContext
           .build(
             DirectiveSet(V2, Account, Expression).explicitGet(),

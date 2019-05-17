@@ -143,7 +143,8 @@ inScope(Global)(
     concurrentRestrictions := {
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
-    }
+    },
+    network := Network(sys.props.get("network"))
   ))
 
 // ThisBuild options

@@ -73,7 +73,7 @@ object InvokeScriptTransactionDiff {
             .combineAll(
               Seq(
                 PureContext.build(V3),
-                CryptoContext.build(Global),
+                CryptoContext.build(Global, V3),
                 WavesContext.build(directives, environment)
               )
             )
@@ -105,6 +105,13 @@ object InvokeScriptTransactionDiff {
               scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dAppAddressOrAlias, Some(funcCall), scriptResultE)))
               ScriptResult(ds, ps) = scriptResult
 
+              dataEntries = ds.map {
+                case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
+                case DataItem.Str(k, b)  => StringDataEntry(k, b)
+                case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
+                case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
+              }
+
               pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {
                 case (Recipient.Address(addrBytes), amt, maybeAsset) =>
                   Map(Address.fromBytes(addrBytes.arr).explicitGet() -> Map(maybeAsset -> amt))
@@ -132,7 +139,7 @@ object InvokeScriptTransactionDiff {
               })
               dAppAddress <- TracedResult(dAppAddressEi)
               wavesFee = feeInfo._1
-              dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, dAppAddress, ds, feeInfo._2))
+              dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, dAppAddress, dataEntries, feeInfo._2))
               _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
               _ <- TracedResult(
                 validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
@@ -184,7 +191,8 @@ object InvokeScriptTransactionDiff {
                 .mapValues(l => Monoid.combineAll(l))
               val paymentFromContractMap = Map(dAppAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
               val transfers              = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
-              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers)
+              val isr = InvokeScriptResult(data = dataEntries, transfers = paymentReceiversMap.toVector.flatMap { case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf) })
+              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
             }
         }
       case Left(l) => TracedResult(Left(l))
@@ -195,14 +203,8 @@ object InvokeScriptTransactionDiff {
   private def payableAndDataPart(height: Int,
                                  tx: InvokeScriptTransaction,
                                  dAppAddress: Address,
-                                 ds: List[DataItem[_]],
+                                 dataEntries: List[DataEntry[_]],
                                  feePart: Map[Address, Portfolio]) = {
-    val dataEntries: Seq[DataEntry[_]] = ds.map {
-      case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
-      case DataItem.Str(k, b)  => StringDataEntry(k, b)
-      case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
-      case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
-    }
     if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
       Left(GenericError(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
     } else if (dataEntries.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
@@ -226,23 +228,12 @@ object InvokeScriptTransactionDiff {
         .foldLeft(Map[Address, Portfolio]())(_ combine _)
 
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
-        val recordedData = InvokeScriptResult(
-          dataEntries,
-          payablePart.toVector.flatMap {
-            case (addr, portfolio) =>
-              val waves  = InvokeScriptResult.Payment(addr, Waves, portfolio.balance)
-              val assets = portfolio.assets.map { case (assetId, amount) => InvokeScriptResult.Payment(addr, assetId, amount) }
-              (assets ++ Some(waves)).filter(_.amount != 0)
-          }
-        )
-
         Right(
           Diff(
             height = height,
             tx = tx,
             portfolios = feePart combine payablePart,
-            accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap)),
-            scriptResults = Map(tx.id()   -> recordedData)
+            accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap))
           )
         )
       } else
