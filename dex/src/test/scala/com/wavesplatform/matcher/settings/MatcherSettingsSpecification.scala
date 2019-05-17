@@ -117,8 +117,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    $orderFeeStr
       |    $deviationsStr
       |    $allowedAssetPairsStr
-      |    allow-order-v3 = no
       |    $orderRestrictionsStr
+      |    allow-order-v3 = no
       |    exchange-transaction-broadcast {
       |      broadcast-until-confirmed = yes
       |      interval = 1 day

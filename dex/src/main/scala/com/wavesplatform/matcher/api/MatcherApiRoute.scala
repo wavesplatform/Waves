@@ -15,6 +15,7 @@ import com.wavesplatform.matcher.AddressActor.GetOrderStatus
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.error.MatcherError
+import com.wavesplatform.matcher.error.MatcherError.OrderRestrictionsNotFound
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
@@ -249,7 +250,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
       matcherSettings.orderRestrictions
         .get(pair)
-        .fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { restrictions =>
+        .fold { complete(InfoNotFound(OrderRestrictionsNotFound(pair))) } { restrictions =>
           complete(StatusCodes.OK -> restrictions.getJson.value)
         }
     }

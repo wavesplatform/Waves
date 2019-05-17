@@ -72,10 +72,12 @@ object MatcherError {
       extends MatcherError(order, price, denied, e"Invalid price, last ${'insignificantDecimals -> insignificantDecimals} digits must be 0")
 
   case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
-    extends MatcherError(order,
-      fee,
-      unexpected,
-      e"Required one of the following: ${'required -> required.map(assetIdStr).mkString(", ")} as asset fee, but given ${'given -> assetIdStr(given)}")
+      extends MatcherError(
+        order,
+        fee,
+        unexpected,
+        e"Required one of the following: ${'required -> required.map(assetIdStr).mkString(", ")} as asset fee, but given ${'given -> assetIdStr(given)}"
+      )
 
   case class FeeNotEnough(required: Long, given: Long, assetId: Asset)
       extends MatcherError(
@@ -267,6 +269,14 @@ object MatcherError {
           .formatValue(prcSettings.maxPrice)}, min price = ${'minPrice -> OrderRestrictionsSettings
           .formatValue(prcSettings.minPrice)}, tick size = ${'tickSize                  -> OrderRestrictionsSettings
           .formatValue(prcSettings.tickSize)}, merge small prices = ${'mergeSmallPrices -> prcSettings.mergeSmallPrices}"
+      )
+
+  case class OrderRestrictionsNotFound(assetPair: AssetPair)
+      extends MatcherError(
+        commonEntity,
+        commonEntity,
+        notFound,
+        e"Order restrictions for the asset pair ${'assetPair -> assetPair} not found"
       )
 
   sealed abstract class Entity(val code: Int)
