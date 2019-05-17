@@ -40,10 +40,10 @@ package object kafka {
 
   def createProducerRecord(topic: String, event: BlockchainUpdated): ProducerRecord[Int, BlockchainUpdated] = {
     val h = event match {
-      case BlockAdded(_, height, _, _)      => height
-      case MicroBlockAdded(_, height, _, _) => height
-      case RollbackCompleted(_, height)     => height
-      case MicroBlockRollbackCompleted(_, height)     => height
+      case BlockAdded(_, height, _, _)            => height
+      case MicroBlockAdded(_, height, _, _)       => height
+      case RollbackCompleted(_, height)           => height
+      case MicroBlockRollbackCompleted(_, height) => height
     }
     new ProducerRecord[Int, BlockchainUpdated](topic, h, event)
   }
