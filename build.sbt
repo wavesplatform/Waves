@@ -164,11 +164,6 @@ lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := Def.sequential(
   root / cleanAll,
   Def.task {
-    (node / Compile / compile).value
-    (dex / Compile / compile).value
-    (`grpc-server` / Compile / compile).value
-  },
-  Def.task {
     (node / assembly).value
     (node / Debian / packageBin).value
     (dex / Universal / packageZipTarball).value
