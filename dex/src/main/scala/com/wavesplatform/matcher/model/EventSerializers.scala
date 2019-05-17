@@ -62,7 +62,7 @@ object EventSerializers {
   private def parse[A: Reads](bytes: Array[Byte]): A = Json.parse(bytes).as[A]
 
   private def mkOrderBookCreated(a1: String, a2: String) = OrderBookCreated(AssetPair.createAssetPair(a1, a2).get)
-  private def orderBookToPair(obc: OrderBookCreated)     = (obc.pair.amountAssetStr, obc.pair.priceAssetStr)
+  private def orderBookToPair(obc: OrderBookCreated)     = (obc.assetPair.amountAssetStr, obc.assetPair.priceAssetStr)
 
   implicit val orderBookCreatedFormat: Format[OrderBookCreated] = ((__ \ "a1").format[String] and
     (__ \ "a2").format[String])(mkOrderBookCreated, orderBookToPair)
@@ -80,8 +80,9 @@ object EventSerializers {
       JsSuccess(jv.as[Map[String, (Long, Long)]])
   }
 
+  // Remove nullable for "n" in the future. It's a hack for old snapshots
   implicit val snapshotFormat: Format[Snapshot] = Format(
-    ((JsPath \ "n").readNullable[Long].map(_.getOrElse(-1L)) and (JsPath \ "o").read[OrderBook.Snapshot])(Snapshot),
+    ((JsPath \ "n").readNullable[Long] and (JsPath \ "o").read[OrderBook.Snapshot])(Snapshot),
     Writes[Snapshot](s => Json.obj("n" -> s.eventNr, "o" -> s.orderBook))
   )
 }

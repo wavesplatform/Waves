@@ -30,8 +30,8 @@ class AssetsBroadcastRouteSpec
 
 
   (utx.putIfNew _)
-    .when(*)
-    .onCall((t: Transaction) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
+    .when(*, *)
+    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
     .anyNumberOfTimes()
 
   "returns StateCheckFailed" - {
@@ -158,7 +158,7 @@ class AssetsBroadcastRouteSpec
 
   "compatibility" - {
     val alwaysApproveUtx = stub[UtxPool]
-    (alwaysApproveUtx.putIfNew _).when(*).onCall((_: Transaction) => TracedResult(Right(true))).anyNumberOfTimes()
+    (alwaysApproveUtx.putIfNew _).when(*, *).onCall((_: Transaction, _: Boolean) => TracedResult(Right(true))).anyNumberOfTimes()
 
     val alwaysSendAllChannels = stub[ChannelGroup]
     (alwaysSendAllChannels

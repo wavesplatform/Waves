@@ -187,7 +187,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       sender.invokeScript(
         smartCaller.address,
         dApp.address,
-        "justWriteData",
+        Some("justWriteData"),
         fee = 0.00899999.waves
       ),
       s"does not exceed minimal value of 900000 WAVES"
@@ -200,7 +200,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       sender.invokeScript(
         smartCaller.address,
         dApp.address,
-        "spendMaxFee",
+        Some("spendMaxFee"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = 0.05299999.waves
       ),
@@ -211,7 +211,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .invokeScript(
         smartCaller.address,
         dApp.address,
-        "spendMaxFee",
+        Some("spendMaxFee"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = 5300000
       )
@@ -227,7 +227,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         .invokeScript(
           smartCaller.address,
           dApp.address,
-          "get10ofAsset1",
+          Some("get10ofAsset1"),
           payment = Seq(Payment(amountLessThanVerifierLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee + smartFee
         )
@@ -244,7 +244,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         .invokeScript(
           caller.address,
           dApp.address,
-          "payAsset2GetAsset1",
+          Some("payAsset2GetAsset1"),
           payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee
         )
@@ -261,7 +261,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         .invokeScript(
           caller.address,
           dApp.address,
-          "payAsset2GetAsset1",
+          Some("payAsset2GetAsset1"),
           payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee + smartFee
         )
@@ -277,7 +277,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .invokeScript(
         caller.address,
         dApp.address,
-        "payAsset2GetAsset1",
+        Some("payAsset2GetAsset1"),
         payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = smartMinFee + smartFee + smartFee
       )
@@ -294,7 +294,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         .invokeScript(
           caller.address,
           dApp.address,
-          "payAsset1GetAsset2",
+          Some("payAsset1GetAsset2"),
           payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset1).get))),
           fee = smartMinFee + smartFee + smartFee
         )
@@ -311,7 +311,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         .invokeScript(
           caller.address,
           dApp.address,
-          "payAsset2GetAsset1",
+          Some("payAsset2GetAsset1"),
           payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee + smartFee + smartFee
         )
@@ -327,7 +327,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       sender.invokeScript(
         caller.address,
         dApp.address,
-        "payAsset2GetAsset1",
+        Some("payAsset2GetAsset1"),
         payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = smartMinFee + smartFee + smartFee
       ),
@@ -337,7 +337,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
 
   test("can't invoke a function that transfers less than asset script's limit") {
     assertBadRequestAndMessage(
-      sender.invokeScript(caller.address, dApp.address, "get10ofAsset1", fee = smartMinFee + smartFee),
+      sender.invokeScript(caller.address, dApp.address, Some("get10ofAsset1"), fee = smartMinFee + smartFee),
       s"Transaction is not allowed by token-script"
     )
   }

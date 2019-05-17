@@ -28,7 +28,8 @@ object DocExport {
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
           override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
-          override def lastBlockOpt(): Option[BlockInfo]                                                                  = ???
+          override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
+          override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
@@ -36,7 +37,7 @@ object DocExport {
         }
       )
 
-      val cryptoContext = CryptoContext.build(Global)
+      val cryptoContext = CryptoContext.build(Global, version)
 
       abstract class TypeDoc {
         val name: String

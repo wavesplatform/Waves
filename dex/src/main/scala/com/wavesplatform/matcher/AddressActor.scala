@@ -8,6 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
+import com.wavesplatform.matcher.api.NotImplemented
 import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
@@ -50,20 +51,20 @@ class AddressActor(
 
   private def reserve(limitOrder: LimitOrder): Unit = {
     activeOrders += limitOrder.order.id() -> limitOrder
-    for ((id, b) <- limitOrder.requiredBalance if b != 0) {
-      val prevBalance = openVolume(id)
-      val newBalance  = prevBalance + b
-      log.trace(s"${limitOrder.order.id()}, ${assetIdStr(id)}: $prevBalance + $b = $newBalance")
-      openVolume += id -> newBalance
+    for ((assetId, b) <- limitOrder.requiredBalance if b != 0) {
+      val prevReserved    = openVolume(assetId)
+      val updatedReserved = prevReserved + b
+      log.trace(s"id=${limitOrder.order.id()}: $prevReserved + $b = $updatedReserved of ${assetIdStr(assetId)}")
+      openVolume += assetId -> updatedReserved
     }
   }
 
   private def release(orderId: ByteStr): Unit =
-    for (limitOrder <- activeOrders.get(orderId); (id, b) <- limitOrder.requiredBalance if b != 0) {
-      val prevBalance = openVolume(id)
-      val newBalance  = prevBalance - b
-      log.trace(s"${limitOrder.order.id()}, ${assetIdStr(id)}: $prevBalance - $b = $newBalance")
-      openVolume += id -> newBalance
+    for (limitOrder <- activeOrders.get(orderId); (assetId, b) <- limitOrder.requiredBalance if b != 0) {
+      val prevReserved    = openVolume(assetId)
+      val updatedReserved = prevReserved - b
+      log.trace(s"id=${limitOrder.order.id()}: $prevReserved - $b = $updatedReserved of ${assetIdStr(assetId)}")
+      openVolume += assetId -> updatedReserved
     }
 
   private def updateTimestamp(newTimestamp: Long): Unit = if (newTimestamp > latestOrderTs) {
@@ -121,7 +122,11 @@ class AddressActor(
       val batchCancelFutures = for {
         lo <- activeOrders.values
         if maybePair.forall(_ == lo.order.assetPair)
-      } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
+      } yield {
+        val id = lo.order.id()
+        val f  = pendingCancellation.get(id).fold(storeCanceled(lo.order.assetPair, id))(_.future)
+        f.map(id -> _)
+      }
 
       Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
 
@@ -144,7 +149,12 @@ class AddressActor(
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
         Future.successful(error)
-      case Success(_) => promisedResponse.future
+      case Success(r) =>
+        r match {
+          case None    => promisedResponse.tryComplete(Success(NotImplemented(MatcherError.FeatureDisabled)))
+          case Some(x) => log.info(s"Stored $x")
+        }
+        promisedResponse.future
     }
   }
 
@@ -187,18 +197,21 @@ class AddressActor(
       updateTimestamp(submitted.order.timestamp)
       release(submitted.order.id())
       handleOrderAdded(submitted)
+
     case e @ OrderExecuted(submitted, counter, _) =>
-      log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount = ${e.executedAmount}")
+      log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
 
     case OrderCanceled(lo, unmatchable) =>
+      val id = lo.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       confirmPlacement(lo.order)
-      pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCanceled(lo.order.id())))
-      if (activeOrders.contains(lo.order.id())) {
-        log.trace(s"OrderCanceled(${lo.order.id()}, system=$unmatchable)")
-        release(lo.order.id())
+      pendingCancellation.remove(id).foreach(_.success(api.OrderCanceled(id)))
+      val isActive = activeOrders.contains(id)
+      log.trace(s"OrderCanceled($id, system=$unmatchable, isActive=$isActive)")
+      if (isActive) {
+        release(id)
         handleOrderTerminated(lo, OrderStatus.finalStatus(lo, unmatchable))
       }
   }

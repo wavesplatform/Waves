@@ -2,17 +2,18 @@ package tools
 
 import java.io.File
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.ActorSystem
+import akka.kafka.Metadata.PartitionsFor
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, KafkaConsumerActor, Metadata, Subscriptions}
 import akka.pattern.ask
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.queue.KafkaMatcherQueue.eventDeserializer
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
@@ -22,16 +23,18 @@ import scala.concurrent.duration.DurationInt
 object KafkaTopicInfo extends App {
   implicit val system: ActorSystem = ActorSystem()
 
-  val configFile = new File(args(1))
-  val topic      = args(2)
-  val partition  = args(3).toInt
-  val from       = args(4).toLong
-  val max        = args(5).toInt
+  val configFile = new File(args(0))
+  val topic      = args(1)
+  val from       = args(2).toLong
+  val max        = args(3).toInt
+
+  println(s"""configFile: ${configFile.getAbsolutePath}
+       |topic: $topic
+       |from: $from
+       |max: $max""".stripMargin)
 
   try {
     implicit val timeout: Timeout = Timeout(5.seconds)
-
-    val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
 
     val config = ConfigFactory
       .parseFile(configFile)
@@ -40,27 +43,44 @@ object KafkaTopicInfo extends App {
       .resolve()
       .getConfig("akka.kafka.consumer")
 
-    val consumerSettings = ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer).withClientId("consumer").withGroupId("0")
+    val consumerSettings =
+      ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer)
+        .withClientId("consumer")
+        .withGroupId("kafka-topics-info")
+        .withProperties(
+          Map(
+            ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG  -> "earliest"
+          ))
 
     val metadataConsumer = system.actorOf(
       KafkaConsumerActor.props(consumerSettings),
       "meta-consumer"
     )
 
-    val topicPartition = new TopicPartition(topic, partition)
-    val r = Await.result(metadataConsumer
-                           .ask(Metadata.GetEndOffsets(Set(topicPartition)))
-                           .mapTo[Metadata.EndOffsets],
-                         timeout.duration)
-    println(s"Meta: $r")
+    {
+      val partitions = Await.result(metadataConsumer.ask(Metadata.GetPartitionsFor(topic)).mapTo[PartitionsFor], timeout.duration)
+      println(s"Partitions: ${partitions.response.toOption}")
+    }
+
+    val topicPartition = new TopicPartition(topic, 0)
+
+    {
+      val r = Await.result(metadataConsumer
+                             .ask(Metadata.GetEndOffsets(Set(topicPartition)))
+                             .mapTo[Metadata.EndOffsets],
+                           timeout.duration)
+      println(s"Meta for $topicPartition: $r")
+    }
 
     implicit val mat: ActorMaterializer = ActorMaterializer()
 
     val lock = new CountDownLatch(max)
+
+    println(s"Reading options: ${Subscriptions.assignmentWithOffset(topicPartition -> from)}")
     val consumer = Consumer
-      .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> from))
-      .mapMaterializedValue(consumerControl.set)
-      .buffer(100, OverflowStrategy.backpressure)
+      .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition, from))
+      .take(max)
       .map { msg =>
         QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
       }
