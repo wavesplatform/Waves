@@ -198,6 +198,10 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
 
+    def debugStateChange(transactionId:String): DebugStateChanges ={
+      sync(async(n).debugStateChange(transactionId))
+    }
+
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       sync(async(n).payment(sourceAddress, recipient, amount, fee))
 
@@ -212,6 +216,9 @@ object SyncHttpApi extends Assertions {
 
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
+
+    def scriptDecompile(code: String): DecompiledScript =
+      sync(async(n).scriptDecompile(code))
 
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
@@ -418,7 +425,7 @@ object SyncHttpApi extends Assertions {
 
     def invokeScript(caller: String,
                      dappAddress: String,
-                     func: String,
+                     func: Option[String],
                      args: List[Terms.EXPR] = List.empty,
                      payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
                      fee: Long = 500000,

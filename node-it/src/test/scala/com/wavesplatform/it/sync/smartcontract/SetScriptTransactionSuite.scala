@@ -13,7 +13,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.Json
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val fourthAddress: String = sender.createAddress()
@@ -24,24 +23,15 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   private val acc3 = pkByAddress(fourthAddress)
 
   test("setup acc0 with 1 waves") {
-    val tx =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = sender.privateKey,
-          recipient = acc0,
-          amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-
-    val transferId = sender
-      .signedBroadcast(tx.json())
-      .id
-    nodes.waitForHeightAriseAndTxPresent(transferId)
+    sender.transfer(
+      sender.address,
+      acc0.address,
+      assetId = None,
+      amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
+      fee = minFee,
+      version = 2,
+      waitForTx = true
+    )
   }
 
   test("set acc0 as 2of2 multisig") {
@@ -58,16 +48,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         }
       """.stripMargin
 
-    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(acc0, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
-
-    val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json())
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+    val script      = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
+    val setScriptId = sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true).id
 
     val acc0ScriptInfo = sender.addressScriptInfo(acc0.address)
 
@@ -76,25 +58,18 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    val json = Json.parse(sender.get(s"/transactions/info/$setScriptId").getResponseBody)
-    (json \ "script").as[String].startsWith("base64:") shouldBe true
+    sender.transactionInfo(setScriptId).script.get.startsWith("base64:") shouldBe true
   }
 
   test("can't send from acc0 using old pk") {
-    val tx =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = acc0,
-          recipient = acc3,
-          amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee + 0.00001.waves + 0.00002.waves,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-    assertBadRequest(sender.signedBroadcast(tx.json()))
+    assertBadRequest(
+      sender.transfer(
+        acc0.address,
+        recipient = acc3.address,
+        assetId = None,
+        amount = transferAmount,
+        fee = minFee + 0.00001.waves + 0.00002.waves,
+      ))
   }
 
   test("can send from acc0 using multisig of acc1 and acc2") {
@@ -117,10 +92,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
-    val versionedTransferId =
-      sender.signedBroadcast(signed.json()).id
+    sender.signedBroadcast(signed.json(), waitForTx = true).id
 
-    nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
   test("can clear script at acc0") {
@@ -138,43 +111,22 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
-    nodes.waitForHeightArise()
+    val removeScriptId =  sender
+      .signedBroadcast(signed.json(), waitForTx = true).id
 
-    sender
-      .signedBroadcast(signed.json(), waitForTx = true)
-
-    val tx =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = acc0,
-          recipient = acc3,
-          amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-    sender.signedBroadcast(tx.json(), waitForTx = true)
+    sender.transactionInfo(removeScriptId).script shouldBe None
 
   }
 
   test("can send using old pk of acc0") {
-    val tx =
-      TransferTransactionV2
-        .selfSigned(
-          assetId = Waves,
-          sender = acc0,
-          recipient = acc3,
-          amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee + 0.004.waves,
-          attachment = Array.emptyByteArray
-        )
-        .explicitGet()
-    val txId = sender.signedBroadcast(tx.json()).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
+    sender.transfer(
+      acc0.address,
+      recipient = acc3.address,
+      assetId = None,
+      amount = transferAmount,
+      fee = minFee,
+      version = 2,
+      waitForTx = true
+    )
   }
 }

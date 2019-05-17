@@ -313,7 +313,7 @@ object AsyncHttpApi extends Assertions {
 
     def invokeScript(caller: String,
                      dappAddress: String,
-                     func: String,
+                     func: Option[String],
                      args: List[Terms.EXPR] = List.empty,
                      payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
                      fee: Long = 500000,
@@ -325,7 +325,7 @@ object AsyncHttpApi extends Assertions {
           "version"    -> version,
           "sender"     -> caller,
           "dApp"       -> dappAddress,
-          "call"       -> InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func), args)),
+          "call"       -> { if (func.isDefined) InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull },
           "payment"    -> payment,
           "fee"        -> fee,
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
@@ -333,6 +333,8 @@ object AsyncHttpApi extends Assertions {
     }
 
     def scriptCompile(code: String): Future[CompiledScript] = post("/utils/script/compile", code).as[CompiledScript]
+
+    def scriptDecompile(script: String): Future[DecompiledScript] = post("/utils/script/decompile", script).as[DecompiledScript]
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
@@ -346,6 +348,9 @@ object AsyncHttpApi extends Assertions {
                  "fee"      -> fee,
                  "version"  -> version))
     }
+
+    def debugStateChange(invokeScriptTransactionId: String): Future[DebugStateChanges] =
+      get(s"/debug/stateChanges/info/$invokeScriptTransactionId").as[DebugStateChanges]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]

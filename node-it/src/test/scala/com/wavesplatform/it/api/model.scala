@@ -46,6 +46,11 @@ object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
 }
 
+case class DecompiledScript(script: String)
+object DecompiledScript {
+  implicit val decompiledScriptFormat: Format[DecompiledScript] = Json.format
+}
+
 case class FullAssetInfo(assetId: String,
                          balance: Long,
                          reissuable: Boolean,
@@ -93,7 +98,8 @@ case class TransactionInfo(`type`: Int,
                            sender: Option[String],
                            height: Int,
                            minSponsoredAssetFee: Option[Long],
-                           recipient: Option[String])
+                           recipient: Option[String],
+                           script: Option[String])
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
@@ -119,6 +125,34 @@ object OrderInfo {
 case class AssetPairResponse(amountAsset: Option[String], priceAsset: Option[String])
 object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
+}
+
+
+
+case class StateChangesDetails(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
+object StateChangesDetails {
+  implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
+}
+
+case class DebugStateChanges(stateChanges: StateChangesDetails)
+object DebugStateChanges{
+  implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
+}
+
+case class DataResponse(`type`: String, value: Long, key: String)
+object DataResponse {
+  implicit val dataResponseFormat: Format[DataResponse] = Json.format
+}
+
+case class TransfersInfoResponse(address: String, asset: Option[String], amount: Long)
+object TransfersInfoResponse {
+  implicit val assetIdReads: Reads[Option[String]] = Reads {
+    case JsString(str) => JsSuccess(Some(str))
+    case JsNull        => JsSuccess(None)
+    case _             => JsError("Unexpected value")
+  }
+
+  implicit val transfersInfoResponseFormat: Format[TransfersInfoResponse] = Json.format
 }
 
 case class ExchangeTransaction(`type`: Int,

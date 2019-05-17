@@ -313,7 +313,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       if (extensions.nonEmpty) {
         log.info(s"Shutting down extensions")
-        Future.sequence(extensions.map(_.shutdown()))
+        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
       }
 
       spendableBalanceChanged.onComplete()
