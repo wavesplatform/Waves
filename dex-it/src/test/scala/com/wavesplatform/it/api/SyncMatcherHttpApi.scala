@@ -253,6 +253,7 @@ object SyncMatcherHttpApi extends Assertions {
 
     def getRates: Map[Asset, Double] = sync(async(m).getRates())
 
-    def deleteRate(asset: Asset): RatesResponse = sync(async(m).deleteRate(asset))
+    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK): RatesResponse =
+      sync(async(m).deleteRate(asset, expectedStatusCode.intValue))
   }
 }

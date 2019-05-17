@@ -78,6 +78,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
+  private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
+
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case Matcher.Status.Working  => pass
     case Matcher.Status.Starting => complete(DuringStart)
@@ -169,13 +171,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
     entity(as[Double]) { rate =>
       withAsset(a) { asset =>
-        val assetStr                          = AssetPair.assetIdStr(asset)
-        def toJson(message: String): JsObject = Json.obj("message" -> message)
         complete(
-          (asset, rateCache.upsertRate(asset, rate)) match {
-            case (Waves, _)    => StatusCodes.BadRequest -> toJson("Rate for Waves cannot be changed")
-            case (_, None)     => StatusCodes.Created    -> toJson(s"Rate $rate for the asset $assetStr added")
-            case (_, Some(pv)) => StatusCodes.OK         -> toJson(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+          if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be changed")
+          else {
+            val assetStr = AssetPair.assetIdStr(asset)
+            rateCache.upsertRate(asset, rate) match {
+              case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
+              case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+            }
           }
         )
       }
@@ -187,8 +190,16 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
   def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
     withAsset(a) { asset =>
-      rateCache.deleteRate(asset)
-      complete(StatusCodes.OK -> Json.obj("message" -> s"Rate for asset $asset removed"))
+      complete(
+        if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
+        else {
+          val assetStr = AssetPair.assetIdStr(asset)
+          rateCache.deleteRate(asset) match {
+            case None     => StatusCodes.NotFound -> wrapMessage(s"Rate for the asset $assetStr is not specified")
+            case Some(pv) => StatusCodes.OK       -> wrapMessage(s"Rate for the asset $assetStr deleted, old value = $pv")
+          }
+        }
+      )
     }
   }
 

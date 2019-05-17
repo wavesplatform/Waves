@@ -348,9 +348,11 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def getRates(): Future[Map[Asset, Double]] = matcherGet("/matcher/settings/rates").as[Map[Asset, Double]]
 
-    def deleteRate(asset: Asset): Future[RatesResponse] = {
-      retrying(_delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build())
-        .as[RatesResponse]
+    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[RatesResponse] = {
+      retrying(
+        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build(),
+        statusCode = expectedStatusCode
+      ).as[RatesResponse]
     }
   }
 

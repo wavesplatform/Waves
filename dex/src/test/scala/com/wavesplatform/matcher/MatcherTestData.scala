@@ -50,7 +50,12 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
     def getRate(asset: Asset): Option[Double] = rateCache.get(asset)
     def getAllRates: Map[Asset, Double]       = rateCache.toMap
-    def deleteRate(asset: Asset): Unit        = rateCache -= asset
+
+    def deleteRate(asset: Asset): Option[Double] = {
+      val previousValue = rateCache.get(asset)
+      rateCache -= asset
+      previousValue
+    }
   }
 
   def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)

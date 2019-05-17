@@ -292,7 +292,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val invalidFeeInWaves =
+    val invalidFeeInDynamicMode =
       s"""
          |order-fee {
          |  mode = dynamic
@@ -310,11 +310,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val configStr: String => Config   = configWithSettings(_)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
-    val settingsInvalidMode           = getSettingByConfig(configStr(invalidMode))
-    val settingsInvalidTypeAndPercent = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
-    val settingsInvalidAssetAndFee    = getSettingByConfig(configStr(invalidAssetAndFee))
-    val settingsInvalidFeeInWaves     = getSettingByConfig(configStr(invalidFeeInWaves))
+    val configStr: String => Config     = configWithSettings(_)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
+    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
+    val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
+    val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
 
     settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
 
@@ -328,7 +328,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         "Invalid setting order-fee.fixed.asset value: ;;;;, " +
           "Invalid setting order-fee.fixed.min-fee value: -300000 (required 0 < fee)")
 
-    settingsInvalidFeeInWaves shouldBe Left(
+    settingsInvalidFeeInDynamicMode shouldBe Left(
       s"Invalid setting order-fee.dynamic.base-fee value: -350000 (required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount})"
     )
   }
