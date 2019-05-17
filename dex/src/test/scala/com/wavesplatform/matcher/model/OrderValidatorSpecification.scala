@@ -11,11 +11,11 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.model.OrderValidator.Result
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.matcher.{MatcherTestData, RateCache}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
@@ -481,6 +481,16 @@ class OrderValidatorSpecification
             orderValidator(defaultRestrictionsMergeSmallPrices)(orderWithNonMultiplePrice) shouldBe 'right
         }
       }
+
+      "matcherFee is too small according to rate for matcherFeeAssetId" in forAll(orderV3WithDynamicFeeSettingsAndRateCacheGen) {
+        case (order, dynamicSettings, rates) =>
+          validateByMatcherSettings(dynamicSettings, rateCache = rates)(order) shouldBe 'right
+
+          val updatedRate = rates.getRate(order.matcherFeeAssetId).map(_ + 1).get
+          rates.upsertRate(order.matcherFeeAssetId, updatedRate)
+
+          validateByMatcherSettings(dynamicSettings, rateCache = rates)(order) should produce("FeeNotEnough")
+      }
     }
 
     "verify script of matcherFeeAssetId" in {
@@ -700,7 +710,8 @@ class OrderValidatorSpecification
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
                                         blacklistedAssets: Set[IssuedAsset] = Set.empty[IssuedAsset],
                                         allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair],
-                                        allowOrderV3: Boolean = true): Order => Result[Order] =
+                                        allowOrderV3: Boolean = true,
+                                        rateCache: RateCache = rateCache): Order => Result[Order] =
     order =>
       OrderValidator
         .matcherSettingsAware(

@@ -36,26 +36,29 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   private val seqNr = new AtomicLong(-1)
 
-  val rateCache = new RateCache {
+  def rateCache: RateCache = new RateCache {
 
     import scala.collection.mutable
 
-    val rateCache: mutable.Map[Asset, Double] = mutable.Map(Waves -> 1d)
+    private val rates: mutable.Map[Asset, Double] = mutable.Map(Waves -> 1d)
 
     def upsertRate(asset: Asset, value: Double): Option[Double] = {
-      val previousValue = rateCache.get(asset)
-      rateCache += (asset -> value)
-      previousValue
+      asset.fold { Option(1d) } { issuedAsset =>
+        val previousValue = rates.get(issuedAsset)
+        rates += (asset -> value)
+        previousValue
+      }
     }
 
-    def getRate(asset: Asset): Option[Double] = rateCache.get(asset)
-    def getAllRates: Map[Asset, Double]       = rateCache.toMap
+    def getRate(asset: Asset): Option[Double] = rates.get(asset)
+    def getAllRates: Map[Asset, Double]       = rates.toMap
 
-    def deleteRate(asset: Asset): Option[Double] = {
-      val previousValue = rateCache.get(asset)
-      rateCache -= asset
-      previousValue
-    }
+    def deleteRate(asset: Asset): Option[Double] =
+      asset.fold { Option(1d) } { issuedAsset =>
+        val previousValue = rates.get(issuedAsset)
+        rates -= issuedAsset
+        previousValue
+      }
   }
 
   def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)
@@ -314,13 +317,13 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def fixedSettingsGenerator(defaultAsset: Asset, lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
 
-  def fixedWavesSettingsGenerator(lowerBaseFeeBound: Long = 1, upperBaseFeeBound: Long = 1000000L): Gen[DynamicSettings] =
+  def dynamicSettingsGenerator(lowerBaseFeeBound: Long = 1, upperBaseFeeBound: Long = 1000000L): Gen[DynamicSettings] =
     for { baseFee <- Gen.choose(lowerBaseFeeBound, upperBaseFeeBound) } yield { DynamicSettings(baseFee) }
 
   def orderFeeSettingsGenerator(defaultAssetForFixedSettings: Option[Asset] = None): Gen[OrderFeeSettings] = {
     for {
       defaultAsset     <- defaultAssetForFixedSettings.fold(arbitraryAssetIdGen)(_.fold(arbitraryAssetIdGen)(Gen.const))
-      orderFeeSettings <- Gen.oneOf(fixedWavesSettingsGenerator(), fixedSettingsGenerator(defaultAsset), percentSettingsGenerator)
+      orderFeeSettings <- Gen.oneOf(dynamicSettingsGenerator(), fixedSettingsGenerator(defaultAsset), percentSettingsGenerator)
     } yield orderFeeSettings
   }
 
@@ -380,7 +383,23 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     }
   }
 
-  private def correctOrderByFeeSettings(order: Order, sender: KeyPair, orderFeeSettings: OrderFeeSettings): Order = {
+  val orderV3WithDynamicFeeSettingsAndRateCacheGen: Gen[(Order, DynamicSettings, RateCache)] = {
+    for {
+      (sender, order) <- orderV3WithPredefinedFeeAssetGenerator()
+      dynamicSettings <- dynamicSettingsGenerator()
+      rate            <- Gen.choose[Double](0, 10).map(_ / 10)
+    } yield {
+      val ratesMap = rateCache
+      ratesMap.upsertRate(order.matcherFeeAssetId, rate)
+      (correctOrderByFeeSettings(order, sender, dynamicSettings, Some(order.matcherFeeAssetId), Some(rate)), dynamicSettings, ratesMap)
+    }
+  }
+
+  private def correctOrderByFeeSettings(order: Order,
+                                        sender: KeyPair,
+                                        orderFeeSettings: OrderFeeSettings,
+                                        matcherFeeAssetForDynamicSettings: Option[Asset] = None,
+                                        rateForDynamicSettings: Option[Double] = None): Order = {
     val correctedOrder = (order.version, orderFeeSettings) match {
       case (3, FixedSettings(defaultAssetId, minFee)) =>
         order
@@ -392,8 +411,12 @@ trait MatcherTestData extends NTPTime { _: Suite =>
           .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price, rateCache))
       case (_, DynamicSettings(baseFee)) =>
         order
-          .updateMatcherFeeAssetId(Waves)
-          .updateFee(baseFee)
+          .updateMatcherFeeAssetId(matcherFeeAssetForDynamicSettings getOrElse Waves)
+          .updateFee(
+            rateForDynamicSettings.fold(baseFee) { rate =>
+              OrderValidator.multiplyFeeByDouble(baseFee, rate)
+            }
+          )
       case _ => order
     }
 

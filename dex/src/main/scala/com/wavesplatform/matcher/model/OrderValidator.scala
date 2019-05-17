@@ -43,7 +43,9 @@ object OrderValidator {
 
   val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
 
-  private def multiplyLongByDoubleRoundHalfUp(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[matcher] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[matcher] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[matcher] def multiplyFeeByDouble(f: Long, d: Double): Long    = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): Result[Order] =
     Verifier.verifyAsEllipticCurveSignature(order).leftMap(x => MatcherError.OrderInvalidSignature(order.id(), x.toString))
@@ -158,7 +160,7 @@ object OrderValidator {
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
         val mof =
-          multiplyLongByDoubleRoundHalfUp(
+          multiplyFeeByDouble(
             ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee),
             rateCache.getRate(order.matcherFeeAssetId).get
           )
@@ -221,7 +223,7 @@ object OrderValidator {
                                                  multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
-      case DynamicSettings(dynamicBaseFee) => multiplyLongByDoubleRoundHalfUp(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)
+      case DynamicSettings(dynamicBaseFee) => multiplyFeeByDouble(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)
       case FixedSettings(_, fixedMinFee)   => fixedMinFee
       case PercentSettings(assetType, minFeeInPercent) =>
         lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
@@ -234,7 +236,7 @@ object OrderValidator {
           case AssetType.SPENDING  => spentAmount
         }
 
-        multiplyLongByDoubleRoundHalfUp(amountFactor, multiplier * minFeeInPercent / 100)
+        multiplyAmountByDouble(amountFactor, multiplier * minFeeInPercent / 100)
     }
   }
 
@@ -292,11 +294,11 @@ object OrderValidator {
 
     def isPriceInDeviationBounds(subtractedPercent: Double, addedPercent: Double): Boolean = marketStatus forall { ms =>
       lazy val isPriceHigherThanMinDeviation = ms.bestBid forall { bestBid =>
-        order.price >= multiplyLongByDoubleRoundHalfUp(bestBid.price, 1 - (subtractedPercent / 100))
+        order.price >= multiplyPriceByDouble(bestBid.price, 1 - (subtractedPercent / 100))
       }
 
       lazy val isPriceLessThanMaxDeviation = ms.bestAsk forall { bestAsk =>
-        order.price <= multiplyLongByDoubleRoundHalfUp(bestAsk.price, 1 + (addedPercent / 100))
+        order.price <= multiplyPriceByDouble(bestAsk.price, 1 + (addedPercent / 100))
       }
 
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
