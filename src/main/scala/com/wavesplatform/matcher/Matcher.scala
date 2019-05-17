@@ -51,8 +51,8 @@ class Matcher(actorSystem: ActorSystem,
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
   import as.dispatcher
 
-  private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
-  private var currentOffset                   = -1L // Used only for REST API
+  private val status: AtomicReference[Status]                    = new AtomicReference(Status.Starting)
+  @volatile private var currentOffset: QueueEventWithMeta.Offset = -1L // Used only for REST API
 
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
