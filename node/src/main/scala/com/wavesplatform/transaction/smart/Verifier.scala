@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
+import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
@@ -197,16 +198,22 @@ object Verifier extends ScorexLogging {
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 
-  private def logged(id: => String, result: (Log, Either[String, EVALUATED])): (Log, Either[String, EVALUATED]) = {
+  @VisibleForTesting
+  private[smart] def logged(
+                             id:       => String,
+                             result:   (Log, Either[String, EVALUATED]),
+                             applyStr: String => Unit = log.debug(_)
+                           ): (Log, Either[String, EVALUATED]) = {
+
     val (execLog, execResult) = result
-    log.debug(s"Script for $id evaluated to $execResult")
+    applyStr(s"Script for $id evaluated to $execResult")
     execLog.foreach {
-      case (k, Right(v))  => log.debug(s"Evaluated `$k` to ")
+      case (k, Right(v))  => applyStr(s"Evaluated `$k` to ")
         v match {
-          case obj: EVALUATED => TermPrinter.print(s => log.debug(s), obj)
-          case a              => log.debug(a.toString)
+          case obj: EVALUATED => TermPrinter.print(applyStr, obj)
+          case a              => applyStr(a.toString)
         }
-      case (k, Left(err)) => log.debug(s"Failed to evaluate `$k`: $err")
+      case (k, Left(err)) => applyStr(s"Failed to evaluate `$k`: $err")
     }
     result
   }
