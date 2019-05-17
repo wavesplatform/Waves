@@ -210,7 +210,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(V3),
+            PureContext.build(Global, V3),
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
@@ -278,7 +278,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(V3),
+            PureContext.build(Global, V3),
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, DAppType).explicitGet(),

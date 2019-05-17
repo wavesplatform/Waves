@@ -76,4 +76,7 @@ trait BaseGlobal {
       scriptText
     }
   }
+
+  // Math functions
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long]
 }

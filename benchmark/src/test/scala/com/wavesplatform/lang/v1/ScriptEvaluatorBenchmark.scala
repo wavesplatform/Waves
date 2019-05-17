@@ -21,7 +21,7 @@ import scorex.crypto.signatures.Curve25519
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
-  val pureEvalContext = PureContext.build(V1).evaluationContext
+  val pureEvalContext = PureContext.build(Global, V1).evaluationContext
 }
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)

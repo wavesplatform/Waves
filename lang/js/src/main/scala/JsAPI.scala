@@ -70,6 +70,7 @@ object JsAPI {
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version)
+  private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version)
   private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
   private def typeRepr(t: TYPE): js.Any = t match {
@@ -84,11 +85,11 @@ object JsAPI {
     buildContractContext(V3)
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
+    Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
   }
 
   private def buildContractContext(v: StdLibVersion): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext(v), wavesContext(V3, false, true)))
+    Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(V3, false, true)))
   }
 
   @JSExportTopLevel("getTypes")

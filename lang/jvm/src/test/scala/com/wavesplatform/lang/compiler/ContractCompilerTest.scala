@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.compiler
+
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -333,7 +334,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3),
+          PureContext.build(com.wavesplatform.lang.Global, V3),
           CryptoContext.build(com.wavesplatform.lang.Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet(),

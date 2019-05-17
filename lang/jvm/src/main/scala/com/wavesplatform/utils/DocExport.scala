@@ -70,7 +70,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
+      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(Global, version), cryptoContext, wavesContext))
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 

@@ -7,6 +7,11 @@ import com.wavesplatform.lang.v1.BaseGlobal
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
+import scala.util.Try
+
+import java.math.{MathContext, BigDecimal => BD}
+import ch.obermuhlner.math.big.BigDecimalMath
+
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] =
     if (input.length > MaxBase58Bytes) Left(s"base58Encode input exceeds $MaxBase58Bytes")
@@ -32,4 +37,12 @@ object Global extends BaseGlobal {
   def keccak256(message: Array[Byte]): Array[Byte]  = Keccak256.hash(message)
   def blake2b256(message: Array[Byte]): Array[Byte] = Blake2b256.hash(message)
   def sha256(message: Array[Byte]): Array[Byte]     = Sha256.hash(message)
+
+  // Math functions
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long] = (Try {
+        val base = BD.valueOf(b, bp.toInt)
+        val exp = BD.valueOf(e, ep.toInt)
+        val res = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
+        res.setScale(rp.toInt).unscaledValue.longValueExact
+      }).toEither.left.map(_.toString)
 }

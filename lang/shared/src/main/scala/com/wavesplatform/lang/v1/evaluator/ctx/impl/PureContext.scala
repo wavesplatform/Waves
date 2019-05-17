@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -20,9 +20,6 @@ import com.wavesplatform.lang.directives.values._
 
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
-
-import java.math.{MathContext, BigDecimal => BD}
-import ch.obermuhlner.math.big.BigDecimalMath
 
 object PureContext {
 
@@ -485,22 +482,6 @@ object PureContext {
     uMinus,
     uNot
   )
-
-  lazy val pow: BaseFunction =
-    NativeFunction("pow", 20, POW, LONG, "Match pow",
-        ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
-        ("exponent", LONG, "exponents value"), ("ep", LONG, "exponents decimal"),
-        ("rp", LONG, "results decimal")
-     ) {
-      case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: Nil => Try({
-        val base = BD.valueOf(b, bp.toInt)
-        val exp = BD.valueOf(e, ep.toInt)
-        val res = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
-        CONST_LONG(res.setScale(rp.toInt).unscaledValue.longValueExact)
-      }).toEither.left.map(_.toString)
-      case xs                      => notImplemented("pow(Int, Int, Int, Int, Int)", xs)
-    }
-
   private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
     ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
   )
@@ -540,8 +521,19 @@ object PureContext {
     functions
   )
 
-  def build(version: StdLibVersion): CTX =
-    version match {
+  def build(math: BaseGlobal, version: StdLibVersion): CTX = {
+    val pow: BaseFunction =
+      NativeFunction("pow", 20, POW, LONG, "Match pow",
+          ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
+          ("exponent", LONG, "exponents value"), ("ep", LONG, "exponents decimal"),
+          ("rp", LONG, "results decimal")
+       ) {
+        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: Nil =>
+          math.pow(b, bp, e, ep, rp).right.map(CONST_LONG)
+        case xs                      => notImplemented("pow(Int, Int, Int, Int, Int)", xs)
+      }
+
+   version match {
       case V1 | V2 => ctx
       case V3 =>
         Monoid.combine(
@@ -553,5 +545,5 @@ object PureContext {
           )
         )
     }
-
+  }
 }
