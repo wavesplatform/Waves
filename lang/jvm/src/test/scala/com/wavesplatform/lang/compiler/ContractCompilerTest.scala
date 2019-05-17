@@ -42,7 +42,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
-          | @Default(invocation)
+          | @Callable(invocation)
           | func default() = {
           |   let sender0 = invocation.caller.bytes
           |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
@@ -79,10 +79,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
               )
             )
           )
-        )),
-        Some(
-          DefaultFunction(
-            DefaultFuncAnnotation("invocation"),
+        ),
+          CallableFunction(
+            CallableAnnotation("invocation"),
             Terms.FUNC(
               "default",
               List.empty,
@@ -107,59 +106,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             VerifierAnnotation("t"),
             FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty))))
           ))
-      ))
-    compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
-  }
-
-  property("contract with default func compiles") {
-    val ctx = Monoid.combine(
-      compilerContext,
-      WavesContext
-        .build(
-          DirectiveSet(V3, Account, DAppType).explicitGet(),
-          Common.emptyBlockchainEnvironment()
-        )
-        .compilerContext
-    )
-    val expr = {
-      val script =
-        """
-          | @Default(invocation)
-          | func default() = {
-          |   let sender0 = invocation.caller.bytes
-          |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
-          | }
-          |
-        """.stripMargin
-      Parser.parseContract(script).get.value
-    }
-    val expectedResult = Right(
-      DApp(
-        List.empty,
-        List.empty,
-        Some(
-          DefaultFunction(
-            DefaultFuncAnnotation("invocation"),
-            Terms.FUNC(
-              "default",
-              List.empty,
-              LET_BLOCK(
-                LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
-                FUNCTION_CALL(
-                  User(FieldNames.WriteSet),
-                  List(FUNCTION_CALL(
-                    Native(1100),
-                    List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), CONST_STRING("b"))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
-                    )
-                  ))
-                )
-              )
-            )
-          )
-        ),
-        None
       ))
     compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
@@ -309,26 +255,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
   }
-
-  property("default function must have 0 arguments") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
-    val expr = {
-      val script =
-        """
-          | {-# STDLIB_VERSION 3 #-}
-          | {-# CONTENT_TYPE DAPP #-}
-          |
-          | @Default(invocation)
-          | func default(a: Int) = {
-          |   let sender0 = invocation.caller.bytes
-          |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
-          | }
-        """.stripMargin
-      Parser.parseContract(script).get.value
-    }
-    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
-  }
-
+  
   property("hodlContract") {
     val ctx = Monoid
       .combineAll(

@@ -42,10 +42,7 @@ object ContractCompiler {
           _ <- Either
             .cond(
               tpe match {
-                case _
-                  if tpe <= UNION(WavesContext.writeSetType,
-                    WavesContext.scriptTransferSetType,
-                    WavesContext.scriptResultType) =>
+                case _ if tpe <= UNION(WavesContext.writeSetType, WavesContext.scriptTransferSetType, WavesContext.scriptResultType) =>
                   true
                 case _ => false
               },
@@ -54,24 +51,6 @@ object ContractCompiler {
             )
             .toCompileM
         } yield CallableFunction(c, func)
-
-      case (List(c: DefaultFuncAnnotation), (func, tpe, _)) =>
-        for {
-          _ <- Either
-            .cond(
-              tpe match {
-                case _
-                  if tpe <= UNION(WavesContext.writeSetType,
-                    WavesContext.scriptTransferSetType,
-                    WavesContext.scriptResultType) =>
-                  true
-                case _ => false
-              },
-              (),
-              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
-            )
-            .toCompileM
-        } yield DefaultFunction(c, func)
 
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
         for {
@@ -143,22 +122,7 @@ object ContractCompiler {
         )
         .toCompileM
 
-      callableFuncs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
-
-      defaultFunctions = l.filter(_.isInstanceOf[DefaultFunction]).map(_.asInstanceOf[DefaultFunction])
-      defaultFuncOpt <- defaultFunctions match {
-        case Nil => Option.empty[DefaultFunction].pure[CompileM]
-        case df :: Nil =>
-          if (df.u.args.isEmpty)
-            Option.apply(df).pure[CompileM]
-          else
-            raiseError[CompilerContext, CompilationError, Option[DefaultFunction]](
-              Generic(contract.position.start, contract.position.start, "Default function must have 0 arguments"))
-        case _ =>
-          raiseError[CompilerContext, CompilationError, Option[DefaultFunction]](
-            Generic(contract.position.start, contract.position.start, "Can't have more than 1 default function defined"))
-      }
-
+      callableFuncs     = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       verifierFuncOpt <- verifierFunctions match {
         case Nil => Option.empty[VerifierFunction].pure[CompileM]
@@ -172,11 +136,11 @@ object ContractCompiler {
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
-    } yield DApp(decs, callableFuncs, defaultFuncOpt, verifierFuncOpt)
+    } yield DApp(decs, callableFuncs, verifierFuncOpt)
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
-    case x:PART.VALID[T]          => x.pure[CompileM]
+    case x: PART.VALID[T]         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }
 
@@ -193,13 +157,16 @@ object ContractCompiler {
             args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
           } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
       }
-      _ <- annotationVars.flatMap(a => a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
-        raiseError[CompilerContext, CompilationError, Unit](Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
+      _ <- annotationVars.flatMap(a =>
+        a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
+          raiseError[CompilerContext, CompilationError, Unit](
+            Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
       })
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
           case None => ().pure[CompileM]
-          case Some(PART.VALID(p,n)) => raiseError[CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
+          case Some(PART.VALID(p, n)) =>
+            raiseError[CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
         }
       }
     } yield ()

@@ -29,18 +29,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
           )
         )),
       Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(""),
-          Terms.FUNC(
-            "second",
-            List("arg1", "arg2"),
-            LET_BLOCK(
-              LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
-              REF("x")
-            )
-          )
-        )),
-      Some(
         VerifierFunction(
           VerifierAnnotation(""),
           Terms.FUNC(
@@ -80,18 +68,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
           )
         )),
       Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(""),
-          Terms.FUNC(
-            "second",
-            List("arg1", "arg2"),
-            LET_BLOCK(
-              LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
-              REF("x")
-            )
-          )
-        )),
-      Some(
         VerifierFunction(
           VerifierAnnotation(""),
           Terms.FUNC(
@@ -126,18 +102,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
             List("arg1", "arg2"),
             LET_BLOCK(
               LET("x", FUNCTION_CALL(sumLong.header, List(REF("y"), REF("z")))),
-              REF("x")
-            )
-          )
-        )),
-      Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(""),
-          Terms.FUNC(
-            "first",
-            List("arg1", "arg2"),
-            LET_BLOCK(
-              LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
               REF("x")
             )
           )

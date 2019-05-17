@@ -14,7 +14,7 @@ import cats.implicits._
 
 object ContractEvaluator {
 
-  val DEFAULT_FUNC_NAME = "defaultFunction"
+  val DEFAULT_FUNC_NAME = "default"
 
   case class Invocation(funcCallOpt: Option[FUNCTION_CALL],
                         caller: Recipient.Address,
@@ -23,13 +23,13 @@ object ContractEvaluator {
                         dappAddress: ByteStr)
 
   def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
-     val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
+    val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
 
-    val contractFuncAndCall =
-      if (i.funcCallOpt.nonEmpty)
-        c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCallOpt.get))
-      else
-        c.defaultFuncOpt.map(defFunc => (defFunc, FUNCTION_CALL(FunctionHeader.User(defFunc.u.name), List.empty)))
+    val contractFuncAndCall = i.funcCallOpt match {
+      case Some(fc) =>
+        c.callableFuncs.find(_.u.name == functionName).map((_, fc))
+      case None => c.callableFuncs.find(_.u.name == DEFAULT_FUNC_NAME).map((_, FUNCTION_CALL(FunctionHeader.User(DEFAULT_FUNC_NAME), List.empty)))
+    }
 
     contractFuncAndCall match {
       case None =>

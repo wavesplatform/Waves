@@ -33,12 +33,6 @@ trait TypedScriptGen {
       fnc     <- funcGen()
     } yield CallableFunction(CallableAnnotation(binding), fnc)
 
-  private def defaultFuncGen =
-    for {
-      binding <- Gen.alphaStr
-      fnc     <- funcGen(false)
-    } yield DefaultFunction(DefaultFuncAnnotation(binding), fnc)
-
   private def verifierGen =
     for {
       binding <- Gen.alphaStr
@@ -54,9 +48,8 @@ trait TypedScriptGen {
       lets        <- Gen.listOfN(nLets, letGen)
       funcs       <- Gen.listOfN(nFuncs, funcGen())
       callables   <- Gen.listOfN(nCallables, callableGen)
-      defaultFunc <- Gen.option(defaultFuncGen)
       verifier    <- Gen.option(verifierGen)
-      c = DApp(lets ++ funcs, callables, defaultFunc, verifier)
+      c = DApp(lets ++ funcs, callables, verifier)
       if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
     } yield c
 

@@ -322,7 +322,7 @@ object AsyncHttpApi extends Assertions {
           "version"     -> version,
           "sender"      -> caller,
           "dappAddress" -> dappAddress,
-          "call"        -> InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func), args)),
+          "call"        -> JsNull,
           "payment"     -> payment,
           "fee"         -> fee,
           "feeAssetId"  -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }

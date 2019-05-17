@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, DefaultFuncAnnotation, DefaultFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
@@ -94,7 +94,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
       None
     )
   }
@@ -135,7 +134,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
       None
     )
   }
@@ -165,19 +163,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     DApp(
       List.empty,
       List.empty,
-      Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(senderBinding),
-          Terms.FUNC(
-            funcName,
-            List(argName),
-            FUNCTION_CALL(
-              User(FieldNames.TransferSet),
-              List(payments)
-            )
-          )
-        )
-      ),
       None
     )
   }
