@@ -67,7 +67,7 @@ object Dependencies {
       shapeless.value
     ))
 
-  val console = Seq("com.github.scopt" %% "scopt" % "3.6.0")
+  val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
 
   val lang = Def.setting(
     Seq(
@@ -137,7 +137,7 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test
+    ) ++ protobuf.value ++ test ++ console
   )
 
   lazy val matcher = Seq(
