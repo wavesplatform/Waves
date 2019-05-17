@@ -25,10 +25,14 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[Or
       lo         <- level
     } yield lo
 
-  def cancel(orderId: ByteStr): Option[OrderCanceled] = {
+  def cancel(orderId: ByteStr, normalizedTickSize: Option[Long]): Option[OrderCanceled] = {
     allOrders.collectFirst {
       case lo if lo.order.id() == orderId =>
-        (if (lo.order.orderType == OrderType.BUY) bids else asks).remove(lo.order.price, lo.order.id())
+        (if (lo.order.orderType == OrderType.BUY) bids else asks)
+          .remove(
+            correctPriceByTickSize(lo.order.price, lo.order.orderType, normalizedTickSize),
+            lo.order.id()
+          )
         OrderCanceled(lo, false)
     }
   }

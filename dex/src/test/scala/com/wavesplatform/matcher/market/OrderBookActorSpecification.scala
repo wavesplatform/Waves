@@ -7,14 +7,15 @@ import akka.persistence.serialization.Snapshot
 import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.matcher.api.AlreadyProcessed
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.OrderAdded
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.matcher.queue.QueueEvent.Canceled
+import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -37,7 +38,14 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     f(pair, actor, probe)
   }
 
-  private def obcTestWithPrepare(prepare: AssetPair => Unit)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
+  private def obcTestWithTickSize(normalizedTickSize: Option[Long])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+    obcTestWithPrepare(_ => (), normalizedTickSize) { (pair, actor, probe) =>
+      probe.expectMsg(OrderBookRecovered(pair, None))
+      f(pair, actor, probe)
+    }
+
+  private def obcTestWithPrepare(prepare: AssetPair => Unit, normalizedTickSize: Option[Long] = None)(
+      f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
     val b = ByteStr(new Array[Byte](32))
@@ -55,7 +63,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           update(pair),
           p => Option(md.get(p)),
           txFactory,
-          ntpTime
+          ntpTime,
+          normalizedTickSize
         ) with RestartableActor))
 
     f(pair, actor, tp)
@@ -233,6 +242,25 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       actor ! SaveSnapshot(10)
       tp.expectMsgType[OrderBookSnapshotUpdated]
+    }
+
+    "cancel order in merge small prices mode" in obcTestWithTickSize(Some(100)) { (pair, orderBook, tp) =>
+      val buyOrder = buy(pair, 100000000, 0.0000041)
+
+      orderBook ! wrap(1, buyOrder)
+
+      tp.expectMsg(
+        OrderAdded(
+          BuyLimitOrder(
+            buyOrder.amount,
+            buyOrder.matcherFee,
+            buyOrder
+          )
+        )
+      )
+
+      orderBook ! wrap(2, Canceled(buyOrder.assetPair, buyOrder.id()))
+      tp.expectMsgType[OrderCanceled]
     }
   }
 }
