@@ -21,6 +21,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    min-order-fee = 100000
         |    order-match-tx-fee = 100000
         |    snapshots-interval = 999
+        |    limit-events-during-recovery = 48879
         |    make-snapshots-at-start = yes
         |    snapshots-loading-timeout = 423s
         |    start-events-processing-timeout = 543s
@@ -84,6 +85,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
+    settings.limitEventsDuringRecovery should be(Some(48879))
     settings.makeSnapshotsAtStart should be(true)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)

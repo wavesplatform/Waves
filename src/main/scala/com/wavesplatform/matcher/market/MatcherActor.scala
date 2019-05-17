@@ -234,29 +234,40 @@ class MatcherActor(settings: MatcherSettings,
     case _ => stash()
   }
 
-  private def becomeWorking(oldestEventNr: Option[EventOffset],
-                            newestEventNr: EventOffset,
+  private def becomeWorking(oldestSnapshotOffset: Option[EventOffset],
+                            newestSnapshotOffset: EventOffset,
                             currentOffsets: Map[AssetPair, Option[EventOffset]]): Unit = {
     context.become(receiveCommand)
 
-    // If oldestEventNr <= snapshotsInterval, there could be a situation:
-    // 1. There was an event with offset=N for order book X
-    // 2. A snapshot for X wasn't created at the moment of last event, but it was created for order book Y at offset=N+2
-    // 3. After restart we ignore the event with offset=N, starting from offset=N+1
-    // So we need to start from the nearest snapshot interval start point
-    val processedEventNr = oldestEventNr.fold(0L)(_ / settings.snapshotsInterval * settings.snapshotsInterval) - 1L
+    // Imagine we have no order books and start the DEX:
+    // index:     0  1  2  3  4  5  6  7  8  9 10 11 12
+    // events:    A  A  B  C  A  B  A  A  A  A  B  B  A
+    // snapshots:                   ^ for A           ^ for B
+    // Then we restart the DEX:
+    // 1. The DEX observes two snapshots: A (offset=6) and B (offset=12)
+    // 2. The oldest snapshot is the snapshot for A with offset=6
+    // 3. The DEX replays events from offset=6 and ignores offset=3 for order book C
+    val safeStartOffset = oldestSnapshotOffset.fold(0L)(_ / settings.snapshotsInterval * settings.snapshotsInterval) - 1L
+
+    val safestStartOffset = math.max(
+      -1L,
+      settings.limitEventsDuringRecovery.fold(safeStartOffset) { limitEventsDuringRecovery =>
+        math.max(safeStartOffset, newestSnapshotOffset - limitEventsDuringRecovery)
+      }
+    )
 
     snapshotsState = SnapshotsState(
       currentOffsets = currentOffsets,
-      lastProcessedOffset = newestEventNr,
+      lastProcessedOffset = newestSnapshotOffset,
       interval = settings.snapshotsInterval
     )
 
-    log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, processedEventNr: $processedEventNr, newestEventNr: $newestEventNr")
+    log.info(
+      s"All snapshots are loaded, oldestSnapshotOffset: $oldestSnapshotOffset, safeStartOffset: $safeStartOffset, safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset")
     log.trace(s"Expecting snapshots at:\n${snapshotsState.nearestSnapshotOffsets.map { case (p, x) => s"$p -> $x" }.mkString("\n")}")
 
     unstashAll()
-    recoveryCompletedWithEventNr(Right((self, processedEventNr)))
+    recoveryCompletedWithEventNr(Right((self, safestStartOffset)))
   }
 
   private def snapshotsCommands: Receive = {
