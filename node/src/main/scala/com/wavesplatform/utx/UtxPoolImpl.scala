@@ -150,6 +150,7 @@ class UtxPoolImpl(time: Time,
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
         transactions.put(tx.id(), tx)
+        PoolMetrics.addTransaction(tx)
         true
       }
     }
