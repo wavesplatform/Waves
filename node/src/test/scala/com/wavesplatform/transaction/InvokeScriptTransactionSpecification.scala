@@ -155,7 +155,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     ) should produce("more than 22 arguments")
   }
 
-  property(s"can't call a func with non native(simple) args") {
+  property(s"can't call a func with non native(simple) args - ARR") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
@@ -164,7 +164,26 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
-          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))), CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
+          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
+        )),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
+  }
+
+  property(s"can't call a func with non native(simple) args - CaseObj") {
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    InvokeScriptTransaction.create(
+      pk,
+      pk.toAddress,
+      Some(
+        Terms.FUNCTION_CALL(
+          FunctionHeader.User("foo"),
+          List(CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
         )),
       Seq(),
       1,
