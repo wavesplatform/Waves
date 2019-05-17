@@ -166,11 +166,13 @@ packageAll := Def.sequential(
   Def.task {
     (node / Compile / compile).value
     (dex / Compile / compile).value
+    (`grpc-server` / Compile / compile).value
   },
   Def.task {
     (node / assembly).value
     (node / Debian / packageBin).value
     (dex / Universal / packageZipTarball).value
+    (`grpc-server` / Universal / packageZipTarball).value
   }
 ).value
 
