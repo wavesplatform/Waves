@@ -170,8 +170,8 @@ class MatcherActor(settings: MatcherSettings,
     case OrderBookRecovered(assetPair, eventNr) =>
       snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, settings.snapshotsInterval)
 
-    case OrderBookSnapshotUpdated(assetPair, eventNr) =>
-      snapshotsState = snapshotsState.updated(assetPair, Some(eventNr), lastProcessedNr, settings.snapshotsInterval)
+    case OrderBookSnapshotUpdateCompleted(assetPair, currentOffset) =>
+      snapshotsState = snapshotsState.updated(assetPair, currentOffset, lastProcessedNr, settings.snapshotsInterval)
   }
 
   private def collectOrderBooks(restOrderBooksNumber: Long,
@@ -194,6 +194,8 @@ class MatcherActor(settings: MatcherSettings,
       else becomeWorking(updatedOldestSnapshotOffset, updatedNewestEventNr, updatedCurrentOffsets)
 
     case Terminated(ref) =>
+      log.error(s"$ref is terminated during start, recovery failed")
+      context.children.foreach(context.unwatch)
       context.stop(self)
       recoveryCompletedWithEventNr(Left(s"$ref is terminated"))
 
@@ -234,7 +236,7 @@ class MatcherActor(settings: MatcherSettings,
     )
 
     log.info(
-      s"All snapshots are loaded, oldestSnapshotOffset: $oldestSnapshotOffset, safeStartOffset: $safeStartOffset, safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset")
+      s"All snapshots are loaded, oldestSnapshotOffset: $oldestSnapshotOffset, newestSnapshotOffset: $newestSnapshotOffset, safeStartOffset: $safeStartOffset, safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset")
     log.trace(s"Expecting snapshots at:\n${snapshotsState.nearestSnapshotOffsets.map { case (p, x) => s"$p -> $x" }.mkString("\n")}")
 
     unstashAll()

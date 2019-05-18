@@ -142,7 +142,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(2)
 
       orderBook ! SaveSnapshot(Long.MaxValue)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       orderBook ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
 
@@ -159,7 +159,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(3)
 
       actor ! SaveSnapshot(Long.MaxValue)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
 
@@ -183,7 +183,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(4)
 
       actor ! SaveSnapshot(Long.MaxValue)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
 
@@ -210,7 +210,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(6)
 
       actor ! SaveSnapshot(Long.MaxValue)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
 
@@ -237,7 +237,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
 
       actor ! SaveSnapshot(Long.MaxValue)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
       tp.expectMsgType[OrderBookRecovered]
 
@@ -265,7 +265,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(10)
 
       actor ! SaveSnapshot(10)
-      tp.expectMsg(OrderBookSnapshotUpdated(pair, 10))
+      tp.expectMsg(OrderBookSnapshotUpdateCompleted(pair, Some(10)))
 
       (11 to 20).foreach { i =>
         actor ! wrap(i, buy(pair, 100000000, 0.00041))
@@ -273,7 +273,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(10)
 
       actor ! SaveSnapshot(20)
-      tp.expectMsg(OrderBookSnapshotUpdated(pair, 20))
+      tp.expectMsg(OrderBookSnapshotUpdateCompleted(pair, Some(20)))
     }
 
     "don't do a snapshot if there is no changes" in obcTest { (pair, actor, tp) =>
@@ -284,7 +284,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       actor ! SaveSnapshot(10)
       actor ! SaveSnapshot(10)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       tp.expectNoMessage(200.millis)
     }
 
@@ -295,7 +295,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.receiveN(10)
 
       actor ! SaveSnapshot(10)
-      tp.expectMsgType[OrderBookSnapshotUpdated]
+      tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
     }
   }
 }

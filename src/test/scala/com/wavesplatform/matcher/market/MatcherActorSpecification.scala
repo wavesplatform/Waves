@@ -10,7 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.db.AssetPairsDB
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
-import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdated}
+import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
@@ -230,17 +230,17 @@ class MatcherActorSpecification
         "first time" in snapshotTest(pair23) { (matcherActor, probes) =>
           val eventSender = TestProbe()
           sendBuyOrders(eventSender, matcherActor, pair23, 0 to 9)
-          probes.head.expectMsg(OrderBookSnapshotUpdated(pair23, 9))
+          probes.head.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
         }
 
         "later" in snapshotTest(pair23) { (matcherActor, probes) =>
           val eventSender = TestProbe()
           val probe       = probes.head
           sendBuyOrders(eventSender, matcherActor, pair23, 0 to 10)
-          probe.expectMsg(OrderBookSnapshotUpdated(pair23, 9))
+          probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
           sendBuyOrders(eventSender, matcherActor, pair23, 10 to 28)
-          probe.expectMsg(OrderBookSnapshotUpdated(pair23, 26))
+          probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(26)))
         }
 
         "multiple order books" in snapshotTest(pair23, pair45) { (matcherActor, probes) =>
@@ -253,12 +253,12 @@ class MatcherActorSpecification
           probe45.expectNoMessage(200.millis)
 
           sendBuyOrders(eventSender, matcherActor, pair45, 4 to 10)
-          probe23.expectMsg(OrderBookSnapshotUpdated(pair23, 9))
+          probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
           probe45.expectNoMessage(200.millis)
 
           sendBuyOrders(eventSender, matcherActor, pair23, 11 to 14)
           probe23.expectNoMessage(200.millis)
-          probe45.expectMsg(OrderBookSnapshotUpdated(pair45, 12))
+          probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(12)))
         }
       }
 
@@ -266,13 +266,13 @@ class MatcherActorSpecification
         val eventSender = TestProbe()
         val probe       = probes.head
         sendBuyOrders(eventSender, matcherActor, pair23, 0 to 30)
-        probe.expectMsg(OrderBookSnapshotUpdated(pair23, 9))
+        probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
         // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor, because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
         probe.expectNoMessage(200.millis)
 
         sendBuyOrders(eventSender, matcherActor, pair23, 31 to 45)
-        probe.expectMsg(OrderBookSnapshotUpdated(pair23, 43))
+        probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(43)))
         probe.expectNoMessage(200.millis)
       }
     }
@@ -361,7 +361,7 @@ class MatcherActorSpecification
       override def receive: Receive = {
         case x: QueueEventWithMeta if x.offset > nr => nr = x.offset
         case SaveSnapshot(globalNr) =>
-          val event = OrderBookSnapshotUpdated(assetPair, globalNr)
+          val event = OrderBookSnapshotUpdateCompleted(assetPair, Some(globalNr))
           context.system.scheduler.scheduleOnce(200.millis) {
             context.parent ! event
             probe.ref ! event

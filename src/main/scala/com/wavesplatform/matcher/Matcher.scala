@@ -293,16 +293,16 @@ class Matcher(actorSystem: ActorSystem,
   }
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
-    val p = Promise[Unit]()
-
-    def loop(): Unit = {
-      if (currentOffset >= lastQueueOffset) p.trySuccess(())
+    def loop(p: Promise[Unit]): Unit = {
+      log.trace(s"offsets: $currentOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
+      if (currentOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
-        p.tryFailure(new TimeoutException(s"Can't process all events in ${settings.matcherSettings.startEventsProcessingTimeout.toMinutes} minutes"))
-      else actorSystem.scheduler.scheduleOnce(1.second)(loop())
+        p.failure(new TimeoutException(s"Can't process all events in ${settings.matcherSettings.startEventsProcessingTimeout.toMinutes} minutes"))
+      else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
     }
 
-    loop()
+    val p = Promise[Unit]()
+    loop(p)
     p.future
   }
 }
