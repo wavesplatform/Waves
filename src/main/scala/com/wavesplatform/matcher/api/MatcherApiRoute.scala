@@ -179,7 +179,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
-    withAssetPair(p, redirectToInverse = true) { pair =>
+    withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
       getMarketStatus(pair).fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { ms =>
         complete(StatusCodes.OK -> ms)
       }
