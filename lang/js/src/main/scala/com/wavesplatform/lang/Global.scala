@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.BaseGlobal
 
 import scala.scalajs.js.JSConverters._
