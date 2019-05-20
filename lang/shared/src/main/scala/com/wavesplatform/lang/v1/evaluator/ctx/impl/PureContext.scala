@@ -395,13 +395,13 @@ object PureContext {
 
   lazy val parseInt: BaseFunction =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
-      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).orElse(Success(unit)).toEither.left.map(_.toString)
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).orElse(Success(unit)).toEither.left.map(_.toString)
       case xs                      => notImplemented("parseInt(STRING)", xs)
     }
 
   lazy val parseIntVal: BaseFunction =
     NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
-      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).toEither.left.map(_.toString)
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).toEither.left.map(_.toString)
       case xs                      => notImplemented("parseInt(STRING)", xs)
     }
 
