@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -16,7 +16,6 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.duration._
-
 import scala.concurrent.Await
 import scala.util.{Failure, Success, Try}
 
@@ -27,7 +26,7 @@ object ImporterSending extends ScorexLogging {
 
     val extensionContext = new Context {
       override def settings: WavesSettings                                  = wavesSettings
-      override def blockchain: Blockchain                                   = ???
+      override def blockchain: Blockchain with BlockchainUpdater            = ???
       override def time: Time                                               = ???
       override def wallet: Wallet                                           = ???
       override def utx: UtxPool                                             = ???
@@ -53,8 +52,8 @@ object ImporterSending extends ScorexLogging {
 
       scheduler = Scheduler.singleThread("appender")
 
-      sendingScheduler           = Scheduler.singleThread("blockchain-updates")
-      blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](sendingScheduler)
+      sendingScheduler  = Scheduler.singleThread("blockchain-updates")
+      blockchainUpdated = ConcurrentSubject.publish[BlockchainUpdated](sendingScheduler)
       blockchainUpdatesExtension = {
         val e = initBlockchainUpdatesExtension(wavesSettings, blockchainUpdated)
         e.start()

@@ -32,7 +32,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -111,6 +111,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   def run(): Unit = {
     checkGenesis(settings, blockchainUpdater)
+
+    // rollback to block 500
+    val sigToRollback = blockchainUpdater.blockHeaderAndSize(200).get._1.signerData.signature
+    blockchainUpdater.removeAfter(sigToRollback)
 
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
@@ -216,7 +220,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val extensionContext = new Context {
       override def settings: WavesSettings                                  = app.settings
-      override def blockchain: Blockchain                                   = app.blockchainUpdater
+      override def blockchain: Blockchain with BlockchainUpdater            = app.blockchainUpdater
       override def time: Time                                               = app.time
       override def wallet: Wallet                                           = app.wallet
       override def utx: UtxPool                                             = utxStorage

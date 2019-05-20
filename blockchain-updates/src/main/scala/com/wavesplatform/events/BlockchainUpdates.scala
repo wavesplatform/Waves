@@ -91,7 +91,20 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
         if (kafkaHeight == blockchainHeight) { // this makes sure height is > 0
           if (isMicroBlockRelated) Some(MicroBlockRollbackCompleted(context.blockchain.lastBlockIds(1).head, blockchainHeight))
           else None // do nothing
-        } else throw new IllegalStateException(s"Kafka and node not synchronized: Kafka is at $kafkaHeight, while node is at $blockchainHeight")
+        } else if (kafkaHeight < blockchainHeight) {
+          // rollback node to kafka height
+          try {
+            val sigToRollback = context.blockchain.blockHeaderAndSize(kafkaHeight).get._1.signerData.signature
+            context.blockchain.removeAfter(sigToRollback) // this already sends Rollback event
+            None                                          // no need to send an event here
+          } catch {
+            case _: Throwable =>
+              throw new IllegalStateException(
+                s"Unable to rollback Node to Kafka state. Kafka is at $kafkaHeight, while node is at $blockchainHeight.")
+          }
+        } else
+          throw new IllegalStateException(
+            s"Error: node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight. This should never happen.")
       case None if blockchainHeight > 0 => throw new IllegalStateException("No events in Kafka, but blockchain is not empty.")
       case _                            => None
     }
