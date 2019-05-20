@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-// [WAIT] import cats.kernel.Monoid
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -8,12 +7,9 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import monix.execution.Scheduler
-// [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
-// [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
-// [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
@@ -184,12 +180,7 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
-      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),None,Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
-// [WAIT]                                           Decompiler(
-//      testContract,
-//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

@@ -157,9 +157,9 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |  "feeAsset" : null,
             |  "id" : "DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM",
             |  "timestamp" : 0
-            |}\)\)""".stripMargin.r
+            |}\)\)""".stripMargin.replace("\r\n", "\n").r
 
-        error.toString should fullyMatch regex expected
+        error.toString.replace("\r\n", "\n") should fullyMatch regex expected
     }
   }
 }

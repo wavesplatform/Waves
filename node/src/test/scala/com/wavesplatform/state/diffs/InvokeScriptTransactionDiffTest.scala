@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, DefaultFuncAnnotation, DefaultFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
@@ -18,7 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
@@ -94,7 +94,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
       None
     )
   }
@@ -135,14 +134,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
       None
     )
   }
 
   def defaultPaymentContract(senderBinding: String,
                              argName: String,
-                             funcName: String,
                              recipientAddress: Address,
                              recipientAmount: Long,
                              assets: List[Asset] = List(Waves)): DApp = {
@@ -156,7 +153,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id))
           )
-      ))
+        ))
 
     val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) {
       case (elem, tail) => FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
@@ -164,7 +161,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
     DApp(
       List.empty,
-      List.empty,
+      List(
+        CallableFunction(
+          CallableAnnotation(senderBinding),
+          Terms.FUNC(
+            ContractEvaluator.DEFAULT_FUNC_NAME,
+            List(argName),
+            FUNCTION_CALL(
+              User(FieldNames.TransferSet),
+              List(payments)
+            )
+          )
+      )),
       None
     )
   }
@@ -197,7 +205,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         .combineAll(
           Seq(
             PureContext.build(V3),
-            CryptoContext.build(Global),
+            CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -256,11 +264,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, assets)
 
-  def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(func: String) =
+  def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves)) =
     for {
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
-    } yield defaultPaymentContract(senderBinging, argBinding, func, address, amount, assets)
+    } yield defaultPaymentContract(senderBinging, argBinding, address, amount, assets)
 
   def preconditionsAndSetContract(senderBindingToContract: String => Gen[DApp],
                                   invokerGen: Gen[KeyPair] = accountGen,
@@ -336,8 +344,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = (paymentContractGen(a, am) _)
-      r <- preconditionsAndSetContract(contractGen)
+      r <- preconditionsAndSetContract(paymentContractGen(a, am))
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -351,8 +358,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = (defaultPaymentContractGen(a, am) _)
-      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+      r <- preconditionsAndSetContract(_ => defaultPaymentContractGen(a, am), accountGen, accountGen, None, ciFee(0), false, true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -399,7 +405,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
             newState.balance(invoker, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
-            newState.balance(ci.dappAddress, IssuedAsset(asset.id())) shouldBe 1
+            newState.balance(ci.dAppAddressOrAlias.asInstanceOf[Address], IssuedAsset(asset.id())) shouldBe 1
         }
     }
   }
@@ -545,7 +551,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                 AssetVerifierTrace(allowedAssetId, None),
                 AssetVerifierTrace(bannedAssetId, Some(TransactionNotAllowedByScript(_, _)))
                 ) =>
-              dAppAddress shouldBe ci.dappAddress
+              dAppAddress shouldBe ci.dAppAddressOrAlias
               functionOpt shouldBe ci.funcCallOpt
 
               allowedAssetId shouldBe asset1.id.value
