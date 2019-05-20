@@ -32,6 +32,7 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
     val data: List[LeafData] =
       List
         .fill(100)(Random.nextInt(10000))
+        .distinct
         .map(Ints.toByteArray)
         .map(LeafData @@ _)
 
@@ -66,7 +67,7 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
 
   property("FALSE on incorrect root") {
     val (tree1, leafs) = testData()
-    val (tree2, _) = testData()
+    val (tree2, _)     = testData()
 
     forAll(Gen.oneOf(leafs)) { leaf =>
       val proof = tree1
