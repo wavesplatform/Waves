@@ -94,7 +94,7 @@ package object appender extends ScorexLogging {
     blockchainUpdater.processBlock(block, verify).map { maybeDiscardedTxs =>
       utxStorage.removeAll(block.transactionData)
       maybeDiscardedTxs.map { discarded =>
-        discarded.foreach(utxStorage.putIfNew)
+        discarded.foreach(utxStorage.putIfNew(_, verify = false))
         blockchainUpdater.height
       }
     }

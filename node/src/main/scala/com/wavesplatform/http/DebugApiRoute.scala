@@ -173,9 +173,7 @@ case class DebugApiRoute(ws: WavesSettings,
       .map {
         case Right(blocks) =>
           allChannels.broadcast(LocalScoreChanged(ng.score))
-          if (returnTransactionsToUtx) {
-            blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
-          }
+          if (returnTransactionsToUtx) blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
           miner.scheduleMining()
           Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
         case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
