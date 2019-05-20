@@ -723,4 +723,40 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
+
+  property("compiler error if annotated func has argument of not native type") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3#-}
+          | {-#CONTENT_TYPE DAPP#-}
+          |
+          | @Callable(i)
+          | func f1(a:Alias) = WriteSet([])
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Unexpected argument type in function")
+  }
+
+  property("contract compiles if annotated func has argument of native type") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3#-}
+          | {-#CONTENT_TYPE DAPP#-}
+          |
+          | @Callable(i)
+          | func f1(a:Int, b:ByteVector, c:Boolean, d:String) = WriteSet([])
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
 }

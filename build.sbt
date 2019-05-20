@@ -143,7 +143,8 @@ inScope(Global)(
     concurrentRestrictions := {
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
-    }
+    },
+    network := Network(sys.props.get("network"))
   ))
 
 // ThisBuild options
@@ -163,13 +164,10 @@ lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := Def.sequential(
   root / cleanAll,
   Def.task {
-    (node / Compile / compile).value
-    (dex / Compile / compile).value
-  },
-  Def.task {
     (node / assembly).value
     (node / Debian / packageBin).value
     (dex / Universal / packageZipTarball).value
+    (`grpc-server` / Universal / packageZipTarball).value
   }
 ).value
 

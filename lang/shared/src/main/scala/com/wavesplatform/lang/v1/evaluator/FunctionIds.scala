@@ -55,6 +55,8 @@ object FunctionIds {
   val FROMBASE58: Short = 601
   val TOBASE64: Short   = 602
   val FROMBASE64: Short = 603
+  val TOBASE16: Short   = 604
+  val FROMBASE16: Short = 605
 
   val CHECK_MERKLE_PROOF: Short = 700
 

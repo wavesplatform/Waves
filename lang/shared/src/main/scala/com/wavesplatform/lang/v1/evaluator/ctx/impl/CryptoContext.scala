@@ -5,7 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
@@ -126,6 +126,17 @@ object CryptoContext {
         case _ => ???
       }
 
+    def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
+      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).map(CONST_STRING)
+      case xs                                         => notImplemented("toBase16String(bytes: byte[])", xs)
+    }
+
+    def fromBase16StringF: BaseFunction =
+      NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, "Base16 decode", ("str", STRING, "base16 encoded string")) {
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, global.MaxBase64String).map(x => CONST_BYTESTR(ByteStr(x)))
+        case xs                               => notImplemented("fromBase16String(str: String)", xs)
+      }
+
     val v1Functions =
       Array(
         keccak256F,
@@ -161,13 +172,15 @@ object CryptoContext {
     val v3Functions =
       Array(
         rsaVerifyF,
-        checkMerkleProofF
+        checkMerkleProofF,
+        toBase16StringF,
+        fromBase16StringF
       )
 
     version match {
-      case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
-      case _  => CTX(List.empty, Map.empty, v1Functions)
-    }
+            case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
+            case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
+          }
   }
 
   def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext   = build(global, version).evaluationContext

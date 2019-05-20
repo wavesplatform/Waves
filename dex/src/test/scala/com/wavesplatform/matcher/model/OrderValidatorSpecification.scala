@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.matcher.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.randomBytes
@@ -260,7 +261,7 @@ class OrderValidatorSpecification
           }
       }
 
-      "buy order's price is too high" in {
+      "buy order's price is too high (market aware)" in {
         val preconditions =
           for {
             bestAmount <- maxWavesAmountGen
@@ -283,7 +284,7 @@ class OrderValidatorSpecification
         }
       }
 
-      "sell order's price is out of deviation bounds" in {
+      "sell order's price is out of deviation bounds (market aware)" in {
         val fixedWavesFeeSettings = FixedWavesSettings(300000L)
 
         // seller cannot sell with price which:
@@ -332,7 +333,7 @@ class OrderValidatorSpecification
         orderValidator(highButValidPriceOrder) shouldBe 'right
       }
 
-      "order's fee is out of deviation bounds" in {
+      "order's fee is out of deviation bounds (market aware)" in {
         val percentSettings   = PercentSettings(AssetType.PRICE, 10)
         val deviationSettings = DeviationsSettings(true, 100, 100, maxPriceFee = 10)
 
@@ -407,11 +408,11 @@ class OrderValidatorSpecification
 
         forAll(preconditions) {
           case (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize) =>
-            def normalizeAmount(value: Double): Long = MatcherModel.toNormalized(value, -amountAssetDecimals, -8) // value * 10 ^ amountAssetDecimals
-            def normalizePrice(value: Double): Long  = MatcherModel.toNormalized(value, amountAssetDecimals, priceAssetDecimals)
+            def normalizeAmount(value: Double): Long = Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
+            def normalizePrice(value: Double): Long  = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
 
-            def denormalizeAmount(value: Long): Double = MatcherModel.fromNormalized(value, -amountAssetDecimals, -8)
-            def denormalizePrice(value: Long): Double  = MatcherModel.fromNormalized(value, amountAssetDecimals, priceAssetDecimals)
+            def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals)
+            def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
 
             val normalizedStepSize = normalizeAmount(stepSize).max(2) // if normalized size == 1 then all amounts/prices are multiple of size
             val normalizedTickSize = normalizePrice(tickSize).max(2)

@@ -2,6 +2,7 @@ package com.wavesplatform.account
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import play.api.libs.json.{Format, Writes}
 import supertagged._
 
 object PrivateKey extends TaggedType[ByteStr] {
@@ -22,4 +23,9 @@ object PrivateKey extends TaggedType[ByteStr] {
   @deprecated("Use KeyPair.fromSeed", "0.17.0")
   def fromSeed(base58: String): Either[GenericError, PrivateKey] =
     KeyPair.fromSeed(base58).map(_.privateKey)
+
+  implicit lazy val jsonFormat: Format[PrivateKey] = Format[PrivateKey](
+    com.wavesplatform.utils.byteStrWrites.map(this.apply),
+    Writes(pk => com.wavesplatform.utils.byteStrWrites.writes(pk))
+  )
 }
