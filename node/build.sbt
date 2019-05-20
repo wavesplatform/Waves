@@ -4,7 +4,7 @@ import com.typesafe.sbt.packager.Keys.executableScriptName
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
 
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
+enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -43,8 +43,6 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
-    mainClass := Some("com.wavesplatform.Application"),
-    discoveredMainClasses := (mainClass in Compile).value.toSeq,
     sourceGenerators += versionSource,
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
