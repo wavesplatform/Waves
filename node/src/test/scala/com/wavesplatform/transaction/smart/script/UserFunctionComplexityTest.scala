@@ -30,7 +30,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       .combineAll(
         Seq(
           PureContext.build(V1),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V1),
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
@@ -95,7 +95,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       .combineAll(
         Seq(
           PureContext.build(V2),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V2),
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -160,7 +160,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       .combineAll(
         Seq(
           PureContext.build(V3),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))

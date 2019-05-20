@@ -37,7 +37,7 @@ object DocExport {
         }
       )
 
-      val cryptoContext = CryptoContext.build(Global)
+      val cryptoContext = CryptoContext.build(Global, version)
 
       abstract class TypeDoc {
         val name: String

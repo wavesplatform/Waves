@@ -44,7 +44,7 @@ case object EmptyBlockchain extends Blockchain {
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = None
 
-  override def parent(block: Block, back: Int): Option[Block] = None
+  override def parentHeader(block: BlockHeader, back: Int): Option[Block] = None
 
   override def totalFee(height: Int): Option[Long] = None
 

@@ -30,8 +30,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
 
   (utx.putIfNew _)
-    .when(*)
-    .onCall((_: Transaction) => TracedResult(Right(true)))
+    .when(*, *)
+    .onCall((_: Transaction, _: Boolean) => TracedResult(Right(true)))
     .anyNumberOfTimes()
 
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()

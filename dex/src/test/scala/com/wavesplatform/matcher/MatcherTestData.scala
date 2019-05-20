@@ -38,7 +38,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)
   def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
-  private def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
+  def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
 
   def assetIdGen(prefix: Byte): Gen[IssuedAsset] =
     Gen

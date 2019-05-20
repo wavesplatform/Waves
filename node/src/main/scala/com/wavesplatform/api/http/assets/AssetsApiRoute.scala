@@ -265,7 +265,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "assetId"        -> JsString(id.base58),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
-          "issuer"         -> JsString(tx.sender.toString),
+          "issuer"         -> JsString(tx.sender.address),
           "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
           "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
           "decimals"       -> JsNumber(tx.decimals.toInt),

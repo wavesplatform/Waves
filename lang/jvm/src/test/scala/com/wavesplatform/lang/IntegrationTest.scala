@@ -495,6 +495,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
+  property("extract Long from < 8 bytes (Buffer underflow)") {
+    val src =
+      """ "AAAAAAA".toBytes().toInt() """
+    eval[EVALUATED](src)  should produce("Buffer underflow")
+  }
+
   property("indexOf") {
     val src =
       """ "qweqwe".indexOf("we") """

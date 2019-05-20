@@ -49,11 +49,14 @@ object FunctionIds {
   val KECCAK256: Short = 501
   val BLAKE256: Short  = 502
   val SHA256: Short    = 503
+  val RSAVERIFY: Short = 504
 
   val TOBASE58: Short   = 600
   val FROMBASE58: Short = 601
   val TOBASE64: Short   = 602
   val FROMBASE64: Short = 603
+  val TOBASE16: Short   = 604
+  val FROMBASE16: Short = 605
 
   // Waves
   val GETTRANSACTIONBYID: Short    = 1000

@@ -6,4 +6,4 @@ inConfig(Compile)(Seq(
   PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
 ))
 
-enablePlugins(ExtensionPackaging)
+enablePlugins(RunApplicationSettings, ExtensionPackaging)

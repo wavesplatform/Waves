@@ -217,6 +217,9 @@ object SyncHttpApi extends Assertions {
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
 
+    def scriptDecompile(code: String): DecompiledScript =
+      sync(async(n).scriptDecompile(code))
+
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: Byte = 1, waitForTx: Boolean = false): Transaction =
