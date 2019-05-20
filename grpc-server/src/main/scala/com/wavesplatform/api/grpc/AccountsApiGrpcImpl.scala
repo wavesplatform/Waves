@@ -10,7 +10,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class AccountsApiGrpcImpl(blockchain: Blockchain)(sc: Scheduler)
+class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler)
     extends AccountsApiGrpc.AccountsApi {
   private[this] val commonApi = new CommonAccountApi(blockchain)
 
