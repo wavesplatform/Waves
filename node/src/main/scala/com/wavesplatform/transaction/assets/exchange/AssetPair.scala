@@ -11,7 +11,7 @@ import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
 import scala.annotation.meta.field
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 @ApiModel
 case class AssetPair(@(ApiModelProperty @field)(
@@ -71,13 +71,10 @@ object AssetPair {
     )
   }
 
-  implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
-    val source    = cfg.getString(path)
-    val sourceArr = source.split("-")
-    val res = sourceArr match {
-      case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-      case _                               => throw new Exception(s"$source (incorrect assets count, expected 2 but got ${sourceArr.size})")
-    }
-    res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
+  def fromString(s: String): Try[AssetPair] = Try(s.split("-")).flatMap {
+    case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
+    case xs                              => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.size}: ${xs.mkString(", ")})"))
   }
+
+  implicit val assetPairReader: ValueReader[AssetPair] = (cfg, path) => fromString(cfg.getString(path)).get
 }

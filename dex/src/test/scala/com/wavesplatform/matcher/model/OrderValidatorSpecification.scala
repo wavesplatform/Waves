@@ -268,7 +268,7 @@ class OrderValidatorSpecification
             bestPrice  <- Gen.choose(1, (Long.MaxValue / bestAmount) - 100)
 
             bestAsk                = LevelAgg(bestAmount, bestPrice)
-            deviationSettings      = DeviationsSettings(true, 50, 70, 50)
+            deviationSettings      = DeviationsSettings(enabled = true, 50, 70, 50)
             tooHighPriceInBuyOrder = (bestAsk.price * (1 + (deviationSettings.maxPriceLoss / 100))).toLong + 50L
 
             (order, orderFeeSettings) <- orderWithFeeSettingsGenerator(OrderType.BUY, tooHighPriceInBuyOrder)
@@ -391,10 +391,10 @@ class OrderValidatorSpecification
         case (order, _, orderFeeSettings) =>
           if (order.version == 3) {
             validateByMatcherSettings(orderFeeSettings, allowOrderV3 = false)(order) should produce("OrderV3IsNotAllowed")
-            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = true)(order) shouldBe 'right
+            validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
           } else {
             validateByMatcherSettings(orderFeeSettings, allowOrderV3 = false)(order) shouldBe 'right
-            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = true)(order) shouldBe 'right
+            validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
           }
       }
 
@@ -422,13 +422,12 @@ class OrderValidatorSpecification
             val normalizedTickSize = normalizePrice(tickSize).max(2)
 
             def getRestrictionsByOrder(order: Order, mergeSmallPrices: Boolean = false): OrderRestrictionsSettings = OrderRestrictionsSettings(
-              stepSize = denormalizeAmount(normalizedStepSize),
+              stepAmount = denormalizeAmount(normalizedStepSize),
               minAmount = denormalizeAmount(order.amount / 2),
               maxAmount = denormalizeAmount(order.amount * 2),
-              tickSize = denormalizePrice(normalizedTickSize),
+              stepPrice = denormalizePrice(normalizedTickSize),
               minPrice = denormalizePrice(order.price / 2),
-              maxPrice = denormalizePrice(order.price * 2),
-              mergeSmallPrices = mergeSmallPrices
+              maxPrice = denormalizePrice(order.price * 2)
             )
 
             def updateOrderAmount(ord: Order, amt: Long): Order = Order.sign(ord.updateAmount(amt), sender)
@@ -472,14 +471,10 @@ class OrderValidatorSpecification
             val restrictionsMapWithSmallMaxPrice =
               Map(defaultOrder.assetPair -> defaultRestrictions.copy(maxPrice = denormalizePrice((defaultOrder.price / 1.5).toLong)))
 
-            val defaultRestrictionsMergeSmallPrices =
-              Map(defaultOrder.assetPair -> defaultRestrictions.copy(mergeSmallPrices = true))
-
             orderValidator(restrictionsMapWithBigMinPrice)(defaultOrder) should produce("OrderInvalidPrice")
             orderValidator(restrictionsMapWithSmallMaxPrice)(defaultOrder) should produce("OrderInvalidPrice")
 
             orderValidator(defaultRestrictionsMap)(orderWithNonMultiplePrice) should produce("OrderInvalidPrice")
-            orderValidator(defaultRestrictionsMergeSmallPrices)(orderWithNonMultiplePrice) shouldBe 'right
         }
       }
 

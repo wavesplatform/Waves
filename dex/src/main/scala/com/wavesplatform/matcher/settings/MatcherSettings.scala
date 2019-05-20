@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.settings
 
 import java.io.File
 
+import cats.data.{NonEmptyList, Validated}
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
@@ -9,10 +10,10 @@ import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.matcher.settings.DeviationsSettings._
-import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
+import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings, RawMatchingRules}
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.matcher.settings.OrderHistorySettings._
-import com.wavesplatform.matcher.settings.OrderRestrictionsSettings._
+import com.wavesplatform.matcher.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.matcher.settings.PostgresConnection._
 import com.wavesplatform.settings.utils.ConfigOps._
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -49,6 +50,7 @@ case class MatcherSettings(account: String,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+                           matchingRules: Map[AssetPair, NonEmptyList[RawMatchingRules]],
                            allowedAssetPairs: Set[AssetPair],
                            allowOrderV3: Boolean,
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
@@ -70,7 +72,24 @@ object MatcherSettings {
     )
   }
 
+  private implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
+    case Nil     => throw new IllegalArgumentException("Expected at least one element")
+    case x :: xs => NonEmptyList(x, xs)
+  }
+
+  private val rawMatchingRulesNel: ValueReader[NonEmptyList[RawMatchingRules]] = nonEmptyListReader[RawMatchingRules].map { xs =>
+    val strictOrder = xs.tail.zip(xs.toList).forall {
+      case (next, prev) => next.startOffset > prev.startOffset
+    }
+
+    if (strictOrder) xs
+    else throw new IllegalArgumentException(s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}")
+  }
+
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
+
+  private def parseAssetPair(key: String): Validated[String, AssetPair] =
+    Validated.fromTry(AssetPair.fromString(key)).leftMap(_ => s"Can't parse asset pair '$key'")
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
 
@@ -107,7 +126,8 @@ object MatcherSettings {
 
     val orderFee          = config.as[OrderFeeSettings]("order-fee")
     val deviation         = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
+    val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(parseAssetPair)
+    val matchingRules     = config.getValidatedMap[AssetPair, NonEmptyList[RawMatchingRules]]("matching-rules")(parseAssetPair)(rawMatchingRulesNel)
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
     val allowOrderV3            = config.as[Boolean]("allow-order-v3")
@@ -141,6 +161,7 @@ object MatcherSettings {
       orderFee,
       deviation,
       orderRestrictions,
+      matchingRules,
       allowedAssetPairs,
       allowOrderV3,
       broadcastUntilConfirmed,
@@ -150,4 +171,5 @@ object MatcherSettings {
   }
 
   case class ExchangeTransactionBroadcastSettings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
+  case class RawMatchingRules(startOffset: Long, mergePrices: Boolean, tickSize: Double = 0)
 }
