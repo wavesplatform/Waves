@@ -112,7 +112,7 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp) match {
+    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp, normalizedTickSize) match {
       case Some(cancelEvent) =>
         processEvents(List(cancelEvent))
       case None =>

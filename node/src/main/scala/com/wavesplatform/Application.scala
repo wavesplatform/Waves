@@ -219,6 +219,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     extensions = settings.extensions.map { extensionClassName =>
       val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
       val ctor           = extensionClass.getConstructor(classOf[Context])
+      log.info(s"Enable extension: $extensionClassName")
       ctor.newInstance(extensionContext)
     }
 
