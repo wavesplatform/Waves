@@ -199,28 +199,37 @@ class UtxPoolImpl(time: Time,
         .iterator
         .scanLeft((Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
           case ((valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
-            val updatedBlockchain = composite(blockchain, diff)
-            if (TxCheck.isExpired(tx)) {
-              log.trace(s"Transaction [${tx.id()}] is expired")
-              remove(tx.id())
-              (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+            val preUpdatedRest = currRest.put(blockchain, tx, Diff.empty) // TODO: Doesn't handle scriptRuns/scriptComplexity
+            if (preUpdatedRest.isOverfilled) {
+              if (preUpdatedRest != lastOverfilled) {
+                log.trace(
+                  s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, preUpdatedRest).mkString(", ")}")
+              }
+              (valid, diff, currRest, currRest.isEmpty, preUpdatedRest, iterations + 1)
             } else {
-              differ(updatedBlockchain, tx).resultE match {
-                case Right(newDiff) =>
-                  val updatedRest = currRest.put(updatedBlockchain, tx, newDiff)
-                  if (updatedRest.isOverfilled) {
-                    if (updatedRest != lastOverfilled) {
-                      log.trace(
-                        s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+              val updatedBlockchain = composite(blockchain, diff)
+              if (TxCheck.isExpired(tx)) {
+                log.trace(s"Transaction [${tx.id()}] is expired")
+                remove(tx.id())
+                (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+              } else {
+                differ(updatedBlockchain, tx).resultE match {
+                  case Right(newDiff) =>
+                    val updatedRest = currRest.put(updatedBlockchain, tx, newDiff)
+                    if (updatedRest.isOverfilled) {
+                      if (updatedRest != lastOverfilled) {
+                        log.trace(
+                          s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+                      }
+                      (valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
+                    } else {
+                      (tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
                     }
-                    (valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
-                  } else {
-                    (tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
-                  }
-                case Left(error) =>
-                  log.trace(s"Transaction [${tx.id()}] is removed: $error")
-                  remove(tx.id())
-                  (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                  case Left(error) =>
+                    log.trace(s"Transaction [${tx.id()}] is removed: $error")
+                    remove(tx.id())
+                    (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                }
               }
             }
         }
