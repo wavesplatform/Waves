@@ -98,14 +98,14 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     }
   }
 
-  override def lastBlockOpt(): Option[BlockInfo] = blockchain.lastBlock.map(toBlockInfo)
+  override def lastBlockOpt(): Option[BlockInfo] = blockchain.lastBlock.map(toBlockInfo(_))
 
-  override def blockInfoByHeight(height: Int): Option[BlockInfo] = blockchain.blockAt(height).map(toBlockInfo)
+  override def blockInfoByHeight(height: Int): Option[BlockInfo] = blockchain.blockAt(height).map(toBlockInfo(_, height))
 
-  private def toBlockInfo(block: Block) = {
+  private def toBlockInfo(block: Block, bHeight: Int = blockchain.height) = {
     BlockInfo(
       timestamp = block.timestamp,
-      height = blockchain.height,
+      height = bHeight,
       baseTarget = block.consensusData.baseTarget,
       generationSignature = block.consensusData.generationSignature,
       generator = block.signerData.generator.toAddress.bytes,

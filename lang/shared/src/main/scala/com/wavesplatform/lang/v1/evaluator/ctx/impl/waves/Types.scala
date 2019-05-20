@@ -28,7 +28,7 @@ object Types {
       "height"              -> LONG,
       "baseTarget"          -> LONG,
       "generationSignature" -> BYTESTR,
-      "generator"           -> BYTESTR,
+      "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
     )
   )

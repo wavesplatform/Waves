@@ -300,7 +300,7 @@ object Bindings {
         "height"              -> blockInf.height.toLong,
         "baseTarget"          -> blockInf.baseTarget,
         "generationSignature" -> blockInf.generationSignature,
-        "generator"           -> blockInf.generator,
+        "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
         "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
     )
