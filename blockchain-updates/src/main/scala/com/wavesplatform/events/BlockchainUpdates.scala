@@ -99,8 +99,8 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
                 s"Unable to rollback Node to Kafka state. Kafka is at $kafkaHeight, while node is at $blockchainHeight.")
           }
         } else
-          throw new IllegalStateException(
-            s"Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight. This should never happen.")
+          throw new IllegalStateException(s"""Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight.
+               |This should never happen. Manual correction of even full system restart might be necessary.""".stripMargin)
 
       // Genesis block gets applied before extension starts, so it's possible to have no events in Kafka, but blockchainHeight == 1.
       case None if blockchainHeight > 1 =>
