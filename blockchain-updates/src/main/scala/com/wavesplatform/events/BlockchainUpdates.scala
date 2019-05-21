@@ -135,7 +135,8 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
             forceStopApplication()
           }
           override def onComplete(): Unit = {
-            log.info("Blockchain updates Observable complete")
+            log.error("Blockchain updates Observable complete")
+            forceStopApplication() // this should never happen, but just in case, explicit stop.
           }
         })
       }
