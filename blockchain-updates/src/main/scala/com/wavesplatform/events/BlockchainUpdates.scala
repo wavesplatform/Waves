@@ -29,7 +29,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
 
   private[this] var maybeProducer: Option[KafkaProducer[Int, BlockchainUpdated]] = None
 
-  private[this] def getLastHeight(timeout: Duration = 10.seconds): Option[(Int, Boolean)] = {
+  private[this] def getLastHeight(timeout: Duration = 10.seconds): Option[Int] = {
     import scala.collection.JavaConverters._
 
     val props = new Properties()
@@ -41,21 +41,17 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1")
 
     // read height and whether last event in Kafka is MicroBlock or MicroBlockRollback
-    val consumer = new KafkaConsumer[Unit, (Int, Boolean)](
+    val consumer = new KafkaConsumer[Unit, Int](
       props,
       new Deserializer[Unit] {
         override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {}
         override def deserialize(topic: String, data: Array[Byte]): Unit           = {}
         override def close(): Unit                                                 = {}
       },
-      new Deserializer[(Int, Boolean)] {
+      new Deserializer[Int] {
         override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {}
-        override def deserialize(topic: String, data: Array[Byte]): (Int, Boolean) = {
-          val bu                  = PBBlockchainUpdated.parseFrom(data)
-          val height              = bu.height
-          val isMicroBlockRelated = bu.`type`.isMicroblock || bu.`type`.isMicroblockRollback
-          (height, isMicroBlockRelated)
-        }
+        override def deserialize(topic: String, data: Array[Byte]): Int =
+          PBBlockchainUpdated.parseFrom(data).height
         override def close(): Unit = {}
       }
     )
@@ -76,25 +72,22 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
 
   @throws[IllegalStateException]("if events in Kafka are different from node state and it's impossible to recover")
   private[this] def startupCheck(): Option[BlockchainUpdated] = {
-    // @todo more consistent checks. Possibly perform node rollbacks if necessary
-    // for example:
-    // if kafkaHeight < blockchainHeight — rollback node with event sending to Kafka. If rollback fails — fail
-    // if kafkaHeight == blockchainHeight — rollback microblocks
+    // if kafkaHeight <= blockchainHeight — rollback node with event sending to Kafka. If rollback fails — fail
     // if kafkaHeight > blockchainHeight — fail. This should not happen
 
-    // Also, blockchain consistency can be checked using Kafka view of blocks with signatures
+    // For later (maybe):, blockchain consistency can be checked better using Kafka view of blocks with signatures
 
     val blockchainHeight = context.blockchain.height
-
     getLastHeight() match {
-      case Some((kafkaHeight, isMicroBlockRelated)) =>
-        if (kafkaHeight == blockchainHeight) { // this makes sure height is > 0
-          if (isMicroBlockRelated) Some(MicroBlockRollbackCompleted(context.blockchain.lastBlockIds(1).head, blockchainHeight))
-          else None // do nothing
-        } else if (kafkaHeight < blockchainHeight) {
-          // rollback node to kafka height
+      case Some(kafkaHeight) =>
+        if (kafkaHeight <= blockchainHeight) {
+          // always rollback node on startup at least 1 block, since node loses ngState
+          // and it's hard to tell whether the block in Kafka is full or not
+
+          // rollback node to kafka height - 1 to be sure
           try {
-            val sigToRollback = context.blockchain.blockHeaderAndSize(kafkaHeight).get._1.signerData.signature
+            val heightToRollback = Math.max(kafkaHeight - 1, 1)
+            val sigToRollback    = context.blockchain.blockHeaderAndSize(heightToRollback).get._1.signerData.signature
             context.blockchain.removeAfter(sigToRollback) // this already sends Rollback event
             None                                          // no need to send an event here
           } catch {
