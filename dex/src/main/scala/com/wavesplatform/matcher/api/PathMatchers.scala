@@ -3,8 +3,9 @@ package com.wavesplatform.matcher.api
 import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.server.PathMatcher.{Matched, Unmatched}
 import akka.http.scaladsl.server.{PathMatcher, PathMatcher1, PathMatchers => AkkaMatchers}
-import com.wavesplatform.account.{PublicKey, Address}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 object PathMatchers {
@@ -18,6 +19,10 @@ object PathMatchers {
   val AssetPairPM: PathMatcher1[AssetPair] = AkkaMatchers.Segments(2).flatMap {
     case a1 :: a2 :: Nil => AssetPair.createAssetPair(a1, a2).toOption
     case _               => None
+  }
+
+  val AssetPM: PathMatcher1[Asset] = AkkaMatchers.Segment.flatMap { s =>
+    AssetPair.extractAssetId(s).toOption
   }
 
   object ByteStrPM extends Base58[ByteStr](ByteStr.decodeBase58(_).toOption)

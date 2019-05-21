@@ -110,8 +110,7 @@ object MatcherSettings {
     val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
-    val allowOrderV3 = config.as[Boolean]("allow-order-v3")
-
+    val allowOrderV3            = config.as[Boolean]("allow-order-v3")
     val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
     val postgresConnection = config.as[PostgresConnection]("postgres")

@@ -14,8 +14,8 @@ import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
@@ -334,6 +334,26 @@ object AsyncMatcherHttpApi extends Assertions {
     private def clean(x: MatcherState): MatcherState = x.copy(
       orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(timestamp = 0L) }
     )
+
+    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int): Future[RatesResponse] = {
+      put(
+        s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}",
+        (rb: RequestBuilder) =>
+          rb.withApiKey(matcherNode.apiKey)
+            .setHeader("Content-type", "application/json;charset=utf-8")
+            .setBody(stringify(toJson(rate))),
+        expectedStatusCode
+      ).as[RatesResponse]
+    }
+
+    def getRates(): Future[Map[Asset, Double]] = matcherGet("/matcher/settings/rates").as[Map[Asset, Double]]
+
+    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[RatesResponse] = {
+      retrying(
+        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build(),
+        statusCode = expectedStatusCode
+      ).as[RatesResponse]
+    }
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {
