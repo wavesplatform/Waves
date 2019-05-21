@@ -45,4 +45,11 @@ object Global extends BaseGlobal {
         val res = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
         res.setScale(rp.toInt).unscaledValue.longValueExact
       }).toEither.left.map(_.toString)
+
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long] = (Try {
+        val base = BD.valueOf(b, bp.toInt)
+        val exp = BD.valueOf(e, ep.toInt)
+        val res = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128))
+        res.setScale(rp.toInt).unscaledValue.longValueExact
+      }).toEither.left.map(_.toString)
 }

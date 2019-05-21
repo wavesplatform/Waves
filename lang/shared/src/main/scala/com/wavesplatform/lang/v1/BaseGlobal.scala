@@ -119,4 +119,5 @@ trait BaseGlobal {
 
   // Math functions
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long]
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long]
 }

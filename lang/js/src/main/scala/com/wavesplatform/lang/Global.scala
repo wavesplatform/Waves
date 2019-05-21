@@ -51,4 +51,5 @@ object Global extends BaseGlobal {
   private def toArray(xs: ArrayBuffer): Array[Byte] = new Int8Array(xs).toArray
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long] = ???
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long] = ???
 }
