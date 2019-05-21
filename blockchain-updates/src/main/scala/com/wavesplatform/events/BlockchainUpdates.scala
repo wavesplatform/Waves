@@ -7,12 +7,12 @@ import java.util.Properties
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
-import com.wavesplatform.state.{BlockchainUpdated, MicroBlockRollbackCompleted}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.state.BlockchainUpdated
+import com.wavesplatform.utils.{ScorexLogging, forceStopApplication}
 import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.reactive.Observer
-import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.kafka.clients.producer.{KafkaProducer, RecordMetadata}
 import com.wavesplatform.events.kafka.{createProducer, createProducerRecord}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.serialization.Deserializer
@@ -120,17 +120,22 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
         log.info("Starting sending blockchain updates to Kafka")
         blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
           override def onNext(elem: BlockchainUpdated): Ack = {
-            producer.send(createProducerRecord(settings.topic, elem))
+            producer.send(
+              createProducerRecord(settings.topic, elem),
+              (_: RecordMetadata, exception: Exception) =>
+                if (exception != null) {
+                  log.error("Error sending blockchain updates", exception)
+                  forceStopApplication()
+              }
+            )
             Continue
           }
           override def onError(ex: Throwable): Unit = {
             log.error("Error sending blockchain updates", ex)
-            // @todo should it be synchronous?
-            shutdown()
+            forceStopApplication()
           }
           override def onComplete(): Unit = {
             log.info("Blockchain updates Observable complete")
-            shutdown()
           }
         })
       }
