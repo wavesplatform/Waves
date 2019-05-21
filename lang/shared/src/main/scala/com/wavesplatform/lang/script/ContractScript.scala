@@ -17,14 +17,14 @@ object ContractScript {
 
   def apply(version: StdLibVersion, contract: DApp): Either[String, Script] = {
     for {
-      funcMaxComplexity <- estimateComplexityMap(version, contract)
+      funcMaxComplexity <- estimateComplexityByFunction(version, contract)
       tcf = funcMaxComplexity.find(_._2 > MaxContractComplexity)
       _ <- Either.cond(
         tcf.isEmpty,
         (),
         s"Contract function (${tcf.get._1}) is too complex: ${tcf.get._2} > $MaxContractComplexity"
       )
-      s = ContractScriptImpl(version, contract, funcMaxComplexity)
+      s = ContractScriptImpl(version, contract, funcMaxComplexity.toMap)
       _ <- validateBytes(s.bytes().arr)
 
     } yield s
@@ -37,7 +37,7 @@ object ContractScript {
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 
-  def estimateComplexityMap(version: StdLibVersion, contract: DApp): Either[String, Map[String, Long]] = {
+  def estimateComplexityByFunction(version: StdLibVersion, contract: DApp): Either[String, Vector[(String, Long)]] = {
     import cats.implicits._
     val funcsWithComplexity: Seq[Either[String, (String, Long)]] =
       (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
@@ -50,11 +50,11 @@ object ContractScript {
               constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
         }
-    funcsWithComplexity.toVector.sequence.map(_.toMap)
+    funcsWithComplexity.toVector.sequence
   }
 
   def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (String, Long)] = {
-    estimateComplexityMap(version, contract).map(namesAndComp => (("", 0L) +: namesAndComp.toSeq).maxBy(_._2))
+    estimateComplexityByFunction(version, contract).map(namesAndComp => (("", 0L) +: namesAndComp).maxBy(_._2))
   }
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
