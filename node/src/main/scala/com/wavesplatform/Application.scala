@@ -411,6 +411,9 @@ object Application extends ScorexLogging {
     }
 
     val config = readConfig(configFile)
+    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+    Kamon.reconfigure(config)
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
@@ -428,7 +431,6 @@ object Application extends ScorexLogging {
 
     if (config.getBoolean("kamon.enable")) {
       log.info("Aggregated metrics are enabled")
-      Kamon.reconfigure(config)
       Kamon.addReporter(new InfluxDBReporter())
       SystemMetrics.startCollecting()
     }
