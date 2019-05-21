@@ -81,10 +81,13 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     getLastHeight() match {
       case Some(kafkaHeight) =>
         if (kafkaHeight <= blockchainHeight) {
-          // always rollback node on startup at least 1 block, since node loses ngState
-          // and it's hard to tell whether the block in Kafka is full or not
+          /*
+          Always rollback node on startup at least 1 block, since node loses ngState
+          and it's hard to tell whether the block in Kafka is full or not.
 
-          // rollback node to kafka height - 1 to be sure
+          Rollback node to (kafkaHeight - 1) to be sure, since previous block is guaranteed to be solid.
+           */
+
           try {
             val heightToRollback = Math.max(kafkaHeight - 1, 1)
             val sigToRollback    = context.blockchain.blockHeaderAndSize(heightToRollback).get._1.signerData.signature
@@ -98,7 +101,12 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
         } else
           throw new IllegalStateException(
             s"Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight. This should never happen.")
-      case None if blockchainHeight > 0 => throw new IllegalStateException("No events in Kafka, but blockchain is not empty.")
+
+      // Genesis block gets applied before extension starts, so it's possible to have no events in Kafka, but blockchainHeight == 1.
+      case None if blockchainHeight > 1 =>
+        throw new IllegalStateException("No events in Kafka, but blockchain is neither empty nor on genesis block.")
+
+      case _ => ()
     }
   }
 
