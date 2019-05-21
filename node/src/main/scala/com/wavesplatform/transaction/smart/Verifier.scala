@@ -199,15 +199,24 @@ object Verifier extends ScorexLogging {
 
   private def logged(id: => String, result: (Log, Either[String, EVALUATED])): (Log, Either[String, EVALUATED]) = {
     val (execLog, execResult) = result
-    log.debug(s"Script for $id evaluated to $execResult")
-    execLog.foreach {
-      case (k, Right(v))  => log.debug(s"Evaluated `$k` to ")
-        v match {
-          case obj: EVALUATED => TermPrinter.print(s => log.debug(s), obj)
-          case a              => log.debug(a.toString)
-        }
-      case (k, Left(err)) => log.debug(s"Failed to evaluate `$k`: $err")
-    }
+    if (log.logger.isDebugEnabled) logResults(id, execLog, execResult)
     result
+  }
+
+  private def logResults(
+                          id:         String,
+                          execLog:    Log,
+                          execResult: Either[String, EVALUATED]
+                        ): Unit = {
+    val builder = new StringBuilder(s"Script for $id evaluated to $execResult")
+    val wholeLog = execLog.foldLeft(builder) {
+      case (sb, (k, Right(v))) => sb.append(s"Evaluated `$k` to ")
+        v match {
+          case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
+          case a              => sb.append(a.toString)
+        }
+      case (sb, (k, Left(err))) => sb.append(s"Failed to evaluate `$k`: $err")
+    }
+    log.debug(wholeLog.toString)
   }
 }
