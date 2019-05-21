@@ -7,7 +7,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 import com.wavesplatform.settings.utils.ConfigSettingsValidator._
 
-case class DeviationsSettings(enabled: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxPriceFee: Double)
+case class DeviationsSettings(enabled: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxFeeDeviation: Double)
 
 object DeviationsSettings {
 

@@ -74,6 +74,12 @@ object Dependencies {
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
 
+  val common = Def.setting(
+    Seq(
+      scalaTest
+    )
+  )
+
   val lang = Def.setting(
     Seq(
       // defined here because %%% can only be used within a task or setting macro
@@ -94,6 +100,8 @@ object Dependencies {
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
         .exclude("org.typelevel", "cats-testkit_2.12"),
+      bouncyCastle("bcpkix"),
+      bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
     ))

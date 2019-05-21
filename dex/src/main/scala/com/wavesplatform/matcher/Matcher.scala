@@ -113,19 +113,25 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   }
 
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
+  private val rateCache                                          = RateCache(db)
 
   private def validateOrder(o: Order) = {
+
     import com.wavesplatform.matcher.error._
+
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
-      _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair))(o)
-      _ <- OrderValidator.blockchainAware(context.blockchain,
-                                          transactionCreator.createTransaction,
-                                          matcherPublicKey.toAddress,
-                                          context.time,
-                                          settings.orderFee,
-                                          settings.orderRestrictions)(o)
+      _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
+      _ <- OrderValidator.blockchainAware(
+        context.blockchain,
+        transactionCreator.createTransaction,
+        matcherPublicKey.toAddress,
+        context.time,
+        settings.orderFee,
+        settings.orderRestrictions,
+        rateCache
+      )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(o.assetPair, x))
     } yield o
   }
@@ -148,7 +154,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       () => currentOffset,
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-      Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+      Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption,
+      rateCache
     )
   )
 

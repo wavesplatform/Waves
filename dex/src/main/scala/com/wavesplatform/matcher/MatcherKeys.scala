@@ -7,6 +7,7 @@ import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 
 object MatcherKeys {
@@ -62,6 +63,7 @@ object MatcherKeys {
   val LqElementPrefix: Short            = 21
   val LqElementPrefixBytes: Array[Byte] = Shorts.toByteArray(LqElementPrefix)
   val LqElementKeyName: String          = "lq-element"
+
   def lpqElement(idx: Long): Key[Option[QueueEventWithMeta]] =
     Key.opt(
       LqElementKeyName,
@@ -69,4 +71,18 @@ object MatcherKeys {
       xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
       QueueEventWithMeta.toBytes(_).drop(8)
     )
+
+  val ratePrefix: Short = 22
+
+  def rate(asset: IssuedAsset): Key[Double] = {
+
+    import java.lang.Double._
+
+    Key(
+      keyName = "matcher-rate",
+      key = bytes(ratePrefix, asset.id.arr),
+      parser = arr => longBitsToDouble(Longs.fromByteArray(arr)),
+      encoder = double => Longs.toByteArray(doubleToLongBits(double))
+    )
+  }
 }

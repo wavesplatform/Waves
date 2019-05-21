@@ -61,14 +61,37 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "(1 == 2)"
     }
 
+    //V1 Expression
+    Post(routePath("/script/decompile"), "AQa3b8tH") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 1
+      (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
+      (json \ "script").as[String] shouldBe "" +
+        "{-# STDLIB_VERSION 1 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
+    }
+
+    //V2 Expression
     Post(routePath("/script/decompile"), "AgZ7TN8j") ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 2
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-        "{-# STDLIB_VERSION 2 #-}\n" +
-        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
-        "true"
+      "{-# STDLIB_VERSION 2 #-}\n" +
+      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+      "true"
+    }
+
+    //V3 Expression
+    Post(routePath("/script/decompile"), "AwZd0cYf") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 3
+      (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
+      (json \ "script").as[String] shouldBe "" +
+      "{-# STDLIB_VERSION 3 #-}\n" +
+      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+      "true"
     }
 
     val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
