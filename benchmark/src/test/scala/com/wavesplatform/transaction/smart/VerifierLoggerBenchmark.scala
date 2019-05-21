@@ -27,9 +27,8 @@ class VerifierLoggerBenchmark {
 
   @Benchmark
   def verifierLogged(bh: Blackhole, log: BigLog): Unit = {
-    bh.consume(
-      Verifier.logged("id", log.value, (s: String) => log.writer.write(s))
-    )
+    val logs = Verifier.buildLogs("id", log.value)
+    bh.consume(log.writer.write(logs))
   }
 }
 
@@ -55,7 +54,7 @@ object VerifierLoggerBenchmark {
 
     val value: (Log, Either[String, EVALUATED]) =
       (
-        List.fill(1000)("txVal" -> Right(dataTxObj)),
+        List.fill(500)("txVal" -> Right(dataTxObj)),
         Right(CONST_BOOLEAN(true))
       )
 

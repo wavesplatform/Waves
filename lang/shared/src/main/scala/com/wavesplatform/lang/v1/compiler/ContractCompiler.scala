@@ -3,16 +3,15 @@ import cats.Show
 import cats.implicits._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic}
+import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
-import com.wavesplatform.lang.v1.parser.Expressions.FUNC
+import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.parser.Expressions.PART
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 object ContractCompiler {
@@ -42,10 +41,7 @@ object ContractCompiler {
           _ <- Either
             .cond(
               tpe match {
-                case _
-                  if tpe <= UNION(WavesContext.writeSetType,
-                    WavesContext.scriptTransferSetType,
-                    WavesContext.scriptResultType) =>
+                case _ if tpe <= UNION(WavesContext.writeSetType, WavesContext.scriptTransferSetType, WavesContext.scriptResultType) =>
                   true
                 case _ => false
               },
@@ -60,10 +56,7 @@ object ContractCompiler {
           _ <- Either
             .cond(
               tpe match {
-                case _
-                  if tpe <= UNION(WavesContext.writeSetType,
-                    WavesContext.scriptTransferSetType,
-                    WavesContext.scriptResultType) =>
+                case _ if tpe <= UNION(WavesContext.writeSetType, WavesContext.scriptTransferSetType, WavesContext.scriptResultType) =>
                   true
                 case _ => false
               },
@@ -103,10 +96,11 @@ object ContractCompiler {
     }
   }
 
-  private def compileContract(contract: Expressions.DAPP): CompileM[DApp] = {
+  private def compileContract(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[DApp] = {
     for {
       decs <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       _    <- validateDuplicateVarsInContract(contract)
+      _    <- validateAnnotatedFuncsArgTypes(ctx, contract)
       funcNameWithWrongSize = contract.fs
         .map(af => Expressions.PART.toOption[String](af.name))
         .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes().size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
@@ -176,8 +170,32 @@ object ContractCompiler {
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
-    case x:PART.VALID[T]          => x.pure[CompileM]
+    case x: PART.VALID[T]         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
+  }
+
+  private def validateAnnotatedFuncsArgTypes(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[Any] = {
+    for {
+      annotatedFuncsArgTypesCM <- contract.fs
+        .map { af =>
+          (af.f.position, af.f.name, af.f.args.flatMap(_._2))
+        }
+        .toVector
+        .traverse[CompileM, (Pos, String, List[String])] {
+          case (pos, funcNamePart, argTypesPart) =>
+            for {
+              argTypes <- argTypesPart.toList.traverse[CompileM, PART.VALID[String]](handleValid)
+              funcName <- handleValid(funcNamePart)
+            } yield (pos, funcName.v, argTypes.map(_.v))
+        }
+        .pure[CompileM]
+      _ <- annotatedFuncsArgTypesCM.flatMap { annotatedFuncs =>
+        annotatedFuncs.find(af => af._3.find(!Types.nativeTypeList.contains(_)).nonEmpty).fold(().pure[CompileM]) { af =>
+          val wrongArgType = af._3.find(!Types.nativeTypeList.contains(_)).getOrElse("")
+          raiseError[CompilerContext, CompilationError, Unit](WrongArgumentType(af._1.start, af._1.end, af._2, wrongArgType, Types.nativeTypeList))
+        }
+      }
+    } yield ()
   }
 
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
@@ -193,20 +211,23 @@ object ContractCompiler {
             args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
           } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
       }
-      _ <- annotationVars.flatMap(a => a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
-        raiseError[CompilerContext, CompilationError, Unit](Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
+      _ <- annotationVars.flatMap(a =>
+        a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
+          raiseError[CompilerContext, CompilationError, Unit](
+            Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
       })
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
           case None => ().pure[CompileM]
-          case Some(PART.VALID(p,n)) => raiseError[CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
+          case Some(PART.VALID(p, n)) =>
+            raiseError[CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
         }
       }
     } yield ()
   }
 
   def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] = {
-    compileContract(contract)
+    compileContract(c, contract)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value

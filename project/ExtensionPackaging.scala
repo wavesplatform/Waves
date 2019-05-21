@@ -1,5 +1,7 @@
+import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Compat._
+import com.typesafe.sbt.packager.Keys.packageName
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
 import sbt._
@@ -9,9 +11,10 @@ object ExtensionPackaging extends AutoPlugin {
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = UniversalDeployPlugin
+  override def requires: Plugins = UniversalDeployPlugin && CommonSettings
 
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
+    packageName := s"${name.value}${network.value.packageSuffix}",
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
     javaOptions in Universal := Nil,
@@ -28,12 +31,14 @@ object ExtensionPackaging extends AutoPlugin {
       jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
     },
     classpathOrdering ++= excludeProvidedArtifacts((dependencyClasspath in Runtime).value, findProvidedArtifacts.value),
-    mappings in Universal ++= {
-      val baseConfigName = s"${normalizedName.value}-base.conf"
-      val localFile      = (Compile / resourceDirectory).value / baseConfigName
-      val artifactPath   = s"conf/$baseConfigName"
-      localFile -> artifactPath
-    } +: classpathOrdering.value,
+    mappings in Universal ++= classpathOrdering.value ++ {
+      val baseConfigName = s"${normalizedName.value}-${network.value}.conf"
+      val localFile      = (Compile / baseDirectory).value / baseConfigName
+      if (localFile.exists()) {
+        val artifactPath = "doc/dex.conf.sample"
+        Seq(localFile -> artifactPath)
+      } else Seq.empty
+    },
     classpath := makeRelativeClasspathNames(classpathOrdering.value),
   )
 

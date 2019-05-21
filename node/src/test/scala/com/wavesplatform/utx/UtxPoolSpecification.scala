@@ -195,7 +195,7 @@ class UtxPoolSpecification
                   allowTransactionsFromSmartAccounts = true,
                   allowSkipChecks = false)
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, settings)
-    txs.foreach(utxPool.putIfNew)
+    txs.foreach(utxPool.putIfNew(_))
     (sender, bcu, utxPool, time, settings)
   }).label("withValidPayments")
 

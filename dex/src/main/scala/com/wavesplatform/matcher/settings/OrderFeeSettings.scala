@@ -22,13 +22,13 @@ object OrderFeeSettings {
 
   sealed trait OrderFeeSettings {
 
-    /** Returns json for order fee settings taking into account fee that should be paid for matcher's account script invocation */
-    def getJson(matcherAccountFee: Long): Coeval[JsObject] = Coeval.evalOnce {
+    def getJson(matcherAccountFee: Long, ratesJson: JsObject): Coeval[JsObject] = Coeval.evalOnce {
       Json.obj(
         this match {
-          case FixedWavesSettings(baseFee) =>
-            "waves" -> Json.obj(
-              "baseFee" -> (baseFee + matcherAccountFee)
+          case DynamicSettings(baseFee) =>
+            "dynamic" -> Json.obj(
+              "baseFee" -> (baseFee + matcherAccountFee),
+              "rates"   -> ratesJson
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
@@ -45,7 +45,7 @@ object OrderFeeSettings {
     }
   }
 
-  case class FixedWavesSettings(baseFee: Long)                     extends OrderFeeSettings
+  case class DynamicSettings(baseFee: Long)                        extends OrderFeeSettings
   case class FixedSettings(defaultAssetId: Asset, minFee: Long)    extends OrderFeeSettings
   case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
@@ -54,11 +54,11 @@ object OrderFeeSettings {
 
     def getPrefixByMode(mode: FeeMode): String = s"$path.$mode"
 
-    def validateWavesSettings: ErrorsListOr[FixedWavesSettings] = {
-      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(FeeMode.WAVES)}.base-fee")(
+    def validateDynamicSettings: ErrorsListOr[DynamicSettings] = {
+      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(FeeMode.DYNAMIC)}.base-fee")(
         predicate = fee => 0 < fee && fee <= totalWavesAmount,
         errorMsg = s"required 0 < base fee <= $totalWavesAmount"
-      ) map FixedWavesSettings
+      ) map DynamicSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {
@@ -84,13 +84,13 @@ object OrderFeeSettings {
     }
 
     def getSettingsByMode(mode: FeeMode): ErrorsListOr[OrderFeeSettings] = mode match {
-      case FeeMode.WAVES   => validateWavesSettings
+      case FeeMode.DYNAMIC => validateDynamicSettings
       case FeeMode.FIXED   => validateFixedSettings
       case FeeMode.PERCENT => validatePercentSettings
     }
 
     cfgValidator.validate[FeeMode](s"$path.mode").toEither >>= (mode => getSettingsByMode(mode).toEither) match {
-      case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString(", "))
+      case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString_(", "))
       case Right(orderFeeSettings) => orderFeeSettings
     }
   }
@@ -108,7 +108,7 @@ object AssetType extends Enumeration {
 object FeeMode extends Enumeration {
   type FeeMode = Value
 
-  val WAVES   = Value("waves")
+  val DYNAMIC = Value("dynamic")
   val FIXED   = Value("fixed")
   val PERCENT = Value("percent")
 }

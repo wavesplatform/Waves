@@ -98,7 +98,7 @@ object ExtensionAppender extends ScorexLogging {
                             .addField("txs", droppedBlocks.size)
                         )
                       }
-                      droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
+                      droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
                       Right(Some(blockchainUpdater.score))
                   }
               }

@@ -198,23 +198,30 @@ object Verifier extends ScorexLogging {
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 
-  @VisibleForTesting
-  private[smart] def logged(
-                             id:       => String,
-                             result:   (Log, Either[String, EVALUATED]),
-                             applyStr: String => Unit = log.debug(_)
-                           ): (Log, Either[String, EVALUATED]) = {
-
-    val (execLog, execResult) = result
-    applyStr(s"Script for $id evaluated to $execResult")
-    execLog.foreach {
-      case (k, Right(v))  => applyStr(s"Evaluated `$k` to ")
-        v match {
-          case obj: EVALUATED => TermPrinter.print(applyStr, obj)
-          case a              => applyStr(a.toString)
-        }
-      case (k, Left(err)) => applyStr(s"Failed to evaluate `$k`: $err")
-    }
+  private def logged(
+                      id:     => String,
+                      result: (Log, Either[String, EVALUATED])
+                    ): (Log, Either[String, EVALUATED]) = {
+    if (log.logger.isDebugEnabled) log.debug(buildLogs(id, result))
     result
+  }
+
+  @VisibleForTesting
+  private[smart] def buildLogs(
+                                id:     String,
+                                result: (Log, Either[String, EVALUATED])
+                              ): String = {
+    val (execLog, execResult) = result
+    val builder = new StringBuilder(s"Script for $id evaluated to $execResult")
+    execLog
+      .foldLeft(builder) {
+        case (sb, (k, Right(v))) => sb.append(s"Evaluated `$k` to ")
+          v match {
+            case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
+            case a              => sb.append(a.toString)
+          }
+        case (sb, (k, Left(err))) => sb.append(s"Failed to evaluate `$k`: $err")
+      }
+      .toString
   }
 }

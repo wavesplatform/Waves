@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.common.crypto.RSA
-import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}

@@ -495,6 +495,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
+  property("extract Long from < 8 bytes (Buffer underflow)") {
+    val src =
+      """ "AAAAAAA".toBytes().toInt() """
+    eval[EVALUATED](src)  should produce("Buffer underflow")
+  }
+
   property("indexOf") {
     val src =
       """ "qweqwe".indexOf("we") """
@@ -525,10 +531,38 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
   }
 
+  property("parseInt Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseInt Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
   property("parseIntValue") {
     val src =
-      """ "42".parseInt() """
+      """ "42".parseIntValue() """
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseIntValue Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseIntValue Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
   }
 
   property("parseInt fail") {
