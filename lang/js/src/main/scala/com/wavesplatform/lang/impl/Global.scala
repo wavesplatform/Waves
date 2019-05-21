@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.impl
 
-import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 
 import scala.scalajs.js.annotation.JSGlobalScope
 import scala.scalajs.js.typedarray.ArrayBuffer

@@ -2,7 +2,7 @@ package com.wavesplatform
 import java.io.BufferedInputStream
 
 import akka.actor.ActorSystem
-import com.wavesplatform.Importer.{initBlockchain, initFileStream, initTime, initUtxPool, loadSettings, parseArgs, startImport}
+import com.wavesplatform.Importer.{initBlockchain, initFileStream, initTime, initUtxPool, loadSettings, parseOptions, startImport}
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.settings.WavesSettings
@@ -41,16 +41,14 @@ object ImporterSending extends ScorexLogging {
 
   def run(args: Array[String]): Try[() => Unit] =
     for {
-      importerSettings <- parseArgs(args)
-      wavesSettings = loadSettings(importerSettings.configFilename)
+      importOptions <- parseOptions(args)
+      wavesSettings = loadSettings(importOptions.configFile)
       _ = AddressScheme.current = new AddressScheme {
         override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
       }
 
-      fis <- initFileStream(importerSettings.blockchainFilename)
+      fis <- initFileStream(importOptions.blockchainFile)
       bis = new BufferedInputStream(fis)
-
-      scheduler = Scheduler.singleThread("appender")
 
       sendingScheduler  = Scheduler.singleThread("blockchain-updates")
       blockchainUpdated = ConcurrentSubject.publish[BlockchainUpdated](sendingScheduler)
@@ -60,10 +58,11 @@ object ImporterSending extends ScorexLogging {
         e
       }
 
+      scheduler                        = Scheduler.singleThread("appender")
       time                             = initTime(wavesSettings.ntpServer)
       utxPool                          = initUtxPool()
-      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importerSettings, Some(blockchainUpdated))
-      _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importerSettings)
+      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, Some(blockchainUpdated))
+      _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield
       () => {
         blockchainUpdated.onComplete()

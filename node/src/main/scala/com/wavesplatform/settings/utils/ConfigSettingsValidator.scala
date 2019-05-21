@@ -1,6 +1,6 @@
 package com.wavesplatform.settings.utils
 
-import cats.data.Validated
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigException}
 import net.ceedubs.ficus.Ficus._
@@ -10,15 +10,19 @@ import scala.collection.JavaConverters._
 import scala.util.Try
 
 object ConfigSettingsValidator {
-  type ErrorsListOr[A] = Validated[List[String], A]
+  type ErrorsListOr[A] = ValidatedNel[String, A]
   def apply(config: Config): ConfigSettingsValidator = new ConfigSettingsValidator(config)
+
+  implicit class ErrorListOrOpts[A](validatedValue: ErrorsListOr[A]) {
+    def getValueOrThrowErrors: A = validatedValue valueOr (errorsAcc => throw new Exception(errorsAcc.mkString_(", ")))
+  }
 }
 
 class ConfigSettingsValidator(config: Config) {
 
   import ConfigSettingsValidator.ErrorsListOr
 
-  private def createError[T](settingName: String, errorMsg: String, showError: Boolean = true, showValue: Boolean = true): List[String] = {
+  private def createError[T](settingName: String, errorMsg: String, showError: Boolean = true, showValue: Boolean = true): NonEmptyList[String] = {
     lazy val value = config.getValue(settingName).unwrapped
     lazy val msg = (showValue, showError) match {
       case (true, true)  => s"$value ($errorMsg)"
@@ -27,7 +31,7 @@ class ConfigSettingsValidator(config: Config) {
       case _             => ""
     }
 
-    List(s"Invalid setting $settingName value: $msg")
+    NonEmptyList(s"Invalid setting $settingName value: $msg", Nil)
   }
 
   def validate[T: ValueReader](settingName: String, showError: Boolean = false): ErrorsListOr[T] = {

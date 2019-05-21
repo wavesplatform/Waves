@@ -15,7 +15,7 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .disablePlugins(ProtocPlugin)
   .settings(
-    libraryDependencies += Dependencies.scalaTest,
+    libraryDependencies ++= Dependencies.common.value,
     coverageExcludedPackages := ""
   )
 
@@ -70,7 +70,7 @@ lazy val `dex-it` = project
 lazy val `dex-generator` = project.dependsOn(
   dex,
   `node-it` % "compile->test", // Without this IDEA doesn't find classes
-  `dex-it` % "compile->test"
+  `dex-it`  % "compile->test"
 )
 
 lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
@@ -163,18 +163,17 @@ lazy val cleanAll = taskKey[Unit]("Clean all projects")
 cleanAll := clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := Def.sequential(
-  root / cleanAll,
-  Def.task {
-    (node / Compile / compile).value
-    (dex / Compile / compile).value
-  },
-  Def.task {
-    (node / assembly).value
-    (node / Debian / packageBin).value
-    (dex / Universal / packageZipTarball).value
-  }
-).value
+packageAll := Def
+  .sequential(
+    root / cleanAll,
+    Def.task {
+      (node /  assembly).value
+      (node / Debian / packageBin).value
+      (dex / Universal / packageZipTarball).value
+    (`grpc-server` /Universal / packageZipTarball).value
+    }
+  )
+  .value
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := {
@@ -189,7 +188,8 @@ checkPRRaw := {
 }
 
 def checkPR: Command = Command.command("checkPR") { state =>
-  val updatedState = Project.extract(state)
+  val updatedState = Project
+    .extract(state)
     .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state

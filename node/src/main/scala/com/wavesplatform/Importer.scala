@@ -26,6 +26,7 @@ import monix.reactive.Observer
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
+import scopt.OParser
 
 object Importer extends ScorexLogging {
   private implicit class TryWithTap[T](t: Try[T]) {
@@ -40,50 +41,63 @@ object Importer extends ScorexLogging {
 
   type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
 
-  case class ImporterSettings(
-      verifyTransactions: Boolean,
-      configFilename: String,
-      blockchainFilename: String,
-      importHeight: Int,
-      format: String
-  )
+  final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
+                                 blockchainFile: File = new File("blockchain"),
+                                 importHeight: Int = Int.MaxValue,
+                                 format: String = "BINARY_OLD",
+                                 verify: Boolean = true)
 
-  def parseArgs(args: Array[String]): Try[ImporterSettings] = {
-    val argi = args.iterator
-    val (verifyTransactions, configOpt) = {
-      Try(argi.next) match {
-        case Success("-n") | Success("-no-verify") => (false, Try(argi.next))
-        case conf                                  => (true, conf)
-      }
+  def parseOptions(args: Array[String]): Try[ImportOptions] = {
+    lazy val commandParser = {
+      val builder = OParser.builder[ImportOptions]
+      import builder._
+
+      OParser.sequence(
+        programName("waves import"),
+        head("Waves Blockchain Importer", Version.VersionString),
+        opt[File]('c', "config")
+          .text("Config file name")
+          .action((f, c) => c.copy(configFile = f)),
+        opt[File]('i', "input-file")
+          .text("Blockchain data file name")
+          .action((f, c) => c.copy(blockchainFile = f)),
+        opt[Int]('h', "height")
+          .text("Import to height")
+          .action((h, c) => c.copy(importHeight = h))
+          .validate(h => if (h > 0) success else failure("Import height must be > 0")),
+        opt[String]('f', "format")
+          .text("Blockchain data file format")
+          .action((f, c) => c.copy(format = f))
+          .valueName("<BINARY|BINARY_OLD>")
+          .validate {
+            case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
+            case f                                                        => failure(s"Unsupported format: $f")
+          },
+        opt[Boolean]('n', "no-verify")
+          .text("Disable signatures verification")
+          .action((n, c) => c.copy(verify = !n))
+      )
     }
-    val configFilename     = configOpt.toOption.getOrElse("waves-testnet.conf")
-    val blockchainFilename = Try(argi.next).tapLeft(_ => log.error("Usage: Importer [-n | -no-verify] <config file> <blockchain file> [height]"))
-    val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
 
-    val format = Try(argi.next)
-      .map(_.toUpperCase)
-      .collect { case custom @ "BINARY" => custom }
-      .getOrElse("BINARY_OLD")
-      .intern()
-
-    blockchainFilename
-      .map(ImporterSettings(verifyTransactions, configFilename, _, importHeight, format))
+    OParser.parse(commandParser, args, ImportOptions()) match {
+      case Some(v) => Success(v)
+      case None    => Failure(new IllegalArgumentException("Incorrect arguments"))
+    }
   }
 
-  def loadSettings(fileName: String): WavesSettings =
-    ((name: String) => new File(name)) andThen
-      ConfigFactory.parseFile andThen
+  def loadSettings(file: File): WavesSettings =
+    ((file: File) => ConfigFactory.parseFile(file)) andThen
       settings.loadConfig andThen
-      WavesSettings.fromRootConfig apply fileName
+      WavesSettings.fromRootConfig apply file
 
-  def initFileStream(fileName: String): Try[FileInputStream] =
-    Try(new FileInputStream(fileName))
-      .tapLeft(_ => log.error(s"Failed to open file '$fileName"))
+  def initFileStream(file: File): Try[FileInputStream] =
+    Try(new FileInputStream(file))
+      .tapLeft(_ => log.error(s"Failed to open file '$file"))
 
   def initTime(ntpServer: String): NTP = new NTP(ntpServer)
 
   def initUtxPool(): UtxPool = new UtxPool {
-    override def putIfNew(tx: Transaction, b: Boolean)           = ???
+    override def putIfNew(tx: Transaction, b: Boolean)                   = ???
     override def removeAll(txs: Traversable[Transaction]): Unit          = {}
     override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
     override def pessimisticPortfolio(addr: Address): Portfolio          = ???
@@ -98,17 +112,13 @@ object Importer extends ScorexLogging {
                      time: NTP,
                      utxPool: UtxPool,
                      settings: WavesSettings,
-                     importerSettings: ImporterSettings,
+                     importOptions: ImportOptions,
                      blockchainUpdated: Option[Observer[BlockchainUpdated]]): (Blockchain, AppendBlock) = {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
-      StorageFactory(settings,
-                     db,
-                     time,
-                     Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr),
-                     blockchainUpdated)
+      StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), blockchainUpdated)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
-    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, settings, scheduler, importerSettings.verifyTransactions) _
+    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, settings, scheduler, importOptions.verify) _
 
     checkGenesis(settings, blockchainUpdater)
 
@@ -119,14 +129,14 @@ object Importer extends ScorexLogging {
                   bis: BufferedInputStream,
                   blockchainUpdater: Blockchain,
                   appendBlock: AppendBlock,
-                  importerSettings: ImporterSettings): Unit = {
+                  importOptions: ImportOptions): Unit = {
     var quit     = false
     val lenBytes = new Array[Byte](Ints.BYTES)
     val start    = System.currentTimeMillis()
     var counter  = 0
 
     var blocksToSkip  = blockchainUpdater.height - 1
-    val blocksToApply = importerSettings.importHeight - blockchainUpdater.height + 1
+    val blocksToApply = importOptions.importHeight - blockchainUpdater.height + 1
 
     println(s"Skipping $blocksToSkip blocks(s)")
 
@@ -141,7 +151,7 @@ object Importer extends ScorexLogging {
             blocksToSkip -= 1
           } else {
             val Right(block) =
-              if (importerSettings.format == "BINARY_OLD") Block.parseBytes(buffer).toEither
+              if (importOptions.format == "BINARY_OLD") Block.parseBytes(buffer).toEither
               else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
 
             if (blockchainUpdater.lastBlockId.contains(block.reference)) {
@@ -170,20 +180,20 @@ object Importer extends ScorexLogging {
 
   def run(args: Array[String]): Try[() => Unit] =
     for {
-      importerSettings <- parseArgs(args)
-      wavesSettings = loadSettings(importerSettings.configFilename)
+      importOptions <- parseOptions(args)
+      wavesSettings = loadSettings(importOptions.configFile)
       _ = AddressScheme.current = new AddressScheme {
         override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
       }
 
-      fis <- initFileStream(importerSettings.blockchainFilename)
+      fis <- initFileStream(importOptions.blockchainFile)
       bis = new BufferedInputStream(fis)
 
       scheduler                        = Scheduler.singleThread("appender")
       time                             = initTime(wavesSettings.ntpServer)
       utxPool                          = initUtxPool()
-      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importerSettings, None)
-      _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importerSettings)
+      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, None)
+      _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield
       () => {
         bis.close()
@@ -198,5 +208,4 @@ object Importer extends ScorexLogging {
       case Failure(ext)      => log.error(ext.getMessage)
     }
   }
-
 }

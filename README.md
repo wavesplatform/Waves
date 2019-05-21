@@ -81,7 +81,26 @@ java -jar node/target/waves-all*.jar path/to/config/file
 
 **Note.** For OSX - homebrew is preferable choice. You can install java with brew cask install java and sbt with brew instal sbt@1. Build/Test steps are common for any OS \(but you should use ‘\' instead of '/' in windows\). {% endprettyhint %}
 
+## 9. Running an extension project locally during development
 
+For example we run `DEX`.
+
+### SBT
+
+`sbt "dex/run /path/to/configuration"`
+
+### IntelliJ IDEA
+
+1. Click on `Add configuration` (or `Edit configurations...`)
+2. Click on `+` to add a new configuration, choose `Application`
+3. Specify:
+
+    * Main class: `com.wavesplatform.Application`
+    * Program arguments: `/path/to/configuration`
+    * Use classpath of module: `dex`
+
+4. Click on `OK`
+5. Run this configuration
 
 # Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves)
 

@@ -70,7 +70,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   private val genesisOverride = Docker.genesisOverride
 
   // a random network in 10.x.x.x range
-  private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
+  val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
   // 10.x.x.x/28 network will accommodate up to 13 nodes
   private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28"
 
@@ -136,6 +136,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     attempt(5)
   }
+
+  def createNetwork: Network = wavesNetwork
 
   def startNodes(nodeConfigs: Seq[Config]): Seq[DockerNode] = {
     log.trace(s"Starting ${nodeConfigs.size} containers")

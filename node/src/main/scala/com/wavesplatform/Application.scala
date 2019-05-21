@@ -33,7 +33,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, Transaction}
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -229,6 +229,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     extensions = settings.extensions.map { extensionClassName =>
       val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
       val ctor           = extensionClass.getConstructor(classOf[Context])
+      log.info(s"Enable extension: $extensionClassName")
       ctor.newInstance(extensionContext)
     }
 
@@ -388,17 +389,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application extends ScorexLogging {
-
-  private def readConfig(userConfigPath: Option[String]): Config = {
-    val maybeConfigFile = for {
-      maybeFilename <- userConfigPath
-      file = new File(maybeFilename)
-      if file.exists
-    } yield ConfigFactory.parseFile(file)
-
-    loadConfig(maybeConfigFile)
-  }
-
   def main(args: Array[String]): Unit = {
 
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
@@ -412,7 +402,30 @@ object Application extends ScorexLogging {
     // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
     System.setProperty("org.aspectj.tracing.factory", "default")
 
-    val config = readConfig(args.headOption)
+    args.headOption.getOrElse("") match {
+      case "export"  => Exporter.main(args.tail)
+      case "import"  => Importer.main(args.tail)
+      case "explore" => Explorer.main(args.tail)
+      case "util"    => UtilApp.main(args.tail)
+      case _         => startNode(args.headOption)
+    }
+  }
+
+  private[this] def startNode(configFile: Option[String]): Unit = {
+    def readConfig(userConfigPath: Option[String]): Config = {
+      val maybeConfigFile = for {
+        maybeFilename <- userConfigPath
+        file = new File(maybeFilename)
+        if file.exists
+      } yield ConfigFactory.parseFile(file)
+
+      loadConfig(maybeConfigFile)
+    }
+
+    val config = readConfig(configFile)
+    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+    Kamon.reconfigure(config)
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
@@ -430,7 +443,6 @@ object Application extends ScorexLogging {
 
     if (config.getBoolean("kamon.enable")) {
       log.info("Aggregated metrics are enabled")
-      Kamon.reconfigure(config)
       Kamon.addReporter(new InfluxDBReporter())
       SystemMetrics.startCollecting()
     }

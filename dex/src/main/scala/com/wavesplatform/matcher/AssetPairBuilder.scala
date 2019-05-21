@@ -35,7 +35,7 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
     settings.blacklistedNames.forall(_.findFirstIn(new String(d.name, UTF_8)).isEmpty)
   }
 
-  private def validateAssetId(assetId: Asset): Either[String, Asset] = {
+  def validateAssetId(assetId: Asset): Either[String, Asset] = {
     val strName = assetId.maybeBase58Repr.getOrElse(AssetPair.WavesName)
 
     assetId match {
