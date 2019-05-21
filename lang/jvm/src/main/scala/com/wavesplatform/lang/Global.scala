@@ -9,7 +9,7 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 import scala.util.Try
 
-import java.math.{MathContext, BigDecimal => BD}
+import java.math.{MathContext, RoundingMode, BigDecimal => BD}
 import ch.obermuhlner.math.big.BigDecimalMath
 
 object Global extends BaseGlobal {
@@ -39,17 +39,25 @@ object Global extends BaseGlobal {
   def sha256(message: Array[Byte]): Array[Byte]     = Sha256.hash(message)
 
   // Math functions
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long] = (Try {
+  def roundMode(round: BaseGlobal.Rounds) : RoundingMode = {
+    round match {
+      case BaseGlobal.RoundUp() => RoundingMode.UP
+      case BaseGlobal.RoundHalfUp() => RoundingMode.HALF_UP
+      case BaseGlobal.RoundDown() => RoundingMode.DOWN
+    }
+  }
+
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = (Try {
         val base = BD.valueOf(b, bp.toInt)
         val exp = BD.valueOf(e, ep.toInt)
         val res = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
-        res.setScale(rp.toInt).unscaledValue.longValueExact
+        res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
       }).toEither.left.map(_.toString)
 
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long] = (Try {
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = (Try {
         val base = BD.valueOf(b, bp.toInt)
         val exp = BD.valueOf(e, ep.toInt)
         val res = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128))
-        res.setScale(rp.toInt).unscaledValue.longValueExact
+        res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
       }).toEither.left.map(_.toString)
 }

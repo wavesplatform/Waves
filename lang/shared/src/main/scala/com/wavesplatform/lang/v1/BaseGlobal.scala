@@ -118,6 +118,14 @@ trait BaseGlobal {
   }
 
   // Math functions
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long]
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long) : Either[String, Long]
+
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
+}
+
+object BaseGlobal {
+  sealed trait Rounds
+  case class RoundDown() extends Rounds
+  case class RoundUp() extends Rounds
+  case class RoundHalfUp() extends Rounds
 }

@@ -482,9 +482,6 @@ object PureContext {
     uMinus,
     uNot
   )
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
-  )
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -509,13 +506,39 @@ object PureContext {
     throwNoMessage,
   ) ++ operators
 
+  val roundDown = CASETYPEREF("Down", List.empty)
+  val roundUp = CASETYPEREF("Up", List.empty)
+  val roundHalfUp = CASETYPEREF("HalfUp", List.empty)
+  val rounds = UNION(roundDown, roundUp, roundHalfUp)
+
+  def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
+    m match {
+      case (p: CaseObj) => p.caseType.name match {
+        case "Down" => BaseGlobal.RoundDown()
+        case "Up" => BaseGlobal.RoundUp()
+        case "HalfUp" => BaseGlobal.RoundHalfUp()
+      }
+    }
+  }
+
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
+    ("UP", ((roundUp, "'UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
+    ("HALFUP", ((roundHalfUp, "'HALF_UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
+    ("DOWN", ((roundDown, "'DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundDown, Map.empty)))))
+  )
+
   private lazy val ctx = CTX(
     Seq(
       UNIT,
       LONG,
       BOOLEAN,
       BYTESTR,
-      STRING
+      STRING,
+      roundDown,
+      roundUp,
+      roundHalfUp,
+      rounds
     ),
     vars,
     functions
@@ -523,15 +546,29 @@ object PureContext {
 
   def build(math: BaseGlobal, version: StdLibVersion): CTX = {
     val pow: BaseFunction =
-      NativeFunction("pow", 20, POW, LONG, "Match pow",
+      NativeFunction("pow", 20, POW, LONG, "Math pow",
           ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
           ("exponent", LONG, "exponents value"), ("ep", LONG, "exponents decimal"),
-          ("rp", LONG, "results decimal")
+          ("rp", LONG, "results decimal"),
+          ("round", rounds, "round method")
        ) {
-        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: Nil =>
-          math.pow(b, bp, e, ep, rp).right.map(CONST_LONG)
-        case xs                      => notImplemented("pow(Int, Int, Int, Int, Int)", xs)
+        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+          math.pow(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+        case xs                      => notImplemented("pow(Int, Int, Int, Int, Int, Rounds)", xs)
       }
+
+    val log: BaseFunction =
+      NativeFunction("log", 20, POW, LONG, "Math log",
+          ("value", LONG, "value"), ("ep", LONG, "value decimal"),
+          ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
+          ("rp", LONG, "results decimal"),
+          ("round", rounds, "round method")
+       ) {
+        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+          math.log(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+        case xs                      => notImplemented("log(Int, Int, Int, Int, Int, Rounds)", xs)
+      }
+
 
    version match {
       case V1 | V2 => ctx
@@ -541,7 +578,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal, pow)
+            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal, pow, log)
           )
         )
     }
