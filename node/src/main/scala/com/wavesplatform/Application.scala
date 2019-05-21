@@ -112,10 +112,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   def run(): Unit = {
     checkGenesis(settings, blockchainUpdater)
 
-    // rollback to block 500
-    val sigToRollback = blockchainUpdater.blockHeaderAndSize(200).get._1.signerData.signature
-    blockchainUpdater.removeAfter(sigToRollback)
-
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
