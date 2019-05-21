@@ -80,7 +80,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     val blockchainHeight = context.blockchain.height
     getLastHeight() match {
       case Some(kafkaHeight) =>
-        if (kafkaHeight <= blockchainHeight) {
+        if (kafkaHeight <= (blockchainHeight + 1)) {
           /*
           Always rollback node on startup at least 1 block, since node loses ngState
           and it's hard to tell whether the block in Kafka is full or not.
@@ -88,13 +88,18 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
           Rollback node to (kafkaHeight - 1) to be sure, since previous block is guaranteed to be solid.
            */
 
-          try {
-            val heightToRollback = Math.max(kafkaHeight - 1, 1)
-            val sigToRollback    = context.blockchain.blockHeaderAndSize(heightToRollback).get._1.signerData.signature
-            log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollback")
-            context.blockchain.removeAfter(sigToRollback) // this already sends Rollback event
-          } catch {
-            case _: Throwable =>
+          val heightToRollbackTo = Math.max(kafkaHeight - 1, 1)
+
+          context.blockchain
+            .blockHeaderAndSize(heightToRollbackTo)
+            .toRight(new IllegalStateException(s"No block at height $heightToRollbackTo"))
+            .map(_._1.signerData.signature)
+            .flatMap { sigToRollback =>
+              log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollbackTo")
+              context.blockchain.removeAfter(sigToRollback)
+            } match {
+            case Right(_) =>
+            case Left(_) =>
               throw new IllegalStateException(
                 s"Unable to rollback Node to Kafka state. Kafka is at $kafkaHeight, while node is at $blockchainHeight.")
           }
@@ -115,9 +120,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
       maybeProducer = Some(createProducer(settings))
       maybeProducer foreach { producer =>
         log.info("Performing startup node/Kafka consistency check...")
-        startupCheck()
 
-        log.info("Starting sending blockchain updates to Kafka")
         blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
           override def onNext(elem: BlockchainUpdated): Ack = {
             producer.send(createProducerRecord(settings.topic, elem))
@@ -133,6 +136,10 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
             shutdown()
           }
         })
+k
+        // startupCheck is after subscription, so that if the check makes a rollback, it would be handled
+        startupCheck()
+        log.info("Starting sending blockchain updates to Kafka")
       }
     }
   }

@@ -80,8 +80,9 @@ object BlockchainUpdateNotifier {
       es.onNext(MicroBlockAdded(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates))
     }
 
+  // here height + 1 is not required, because blockchain rollback resets height and ngState no longer affects it
   def notifyRollback(events: Option[Observer[BlockchainUpdated]], blockId: ByteStr, height: Int): Unit =
-    events foreach (_.onNext(RollbackCompleted(blockId, height + 1)))
+    events foreach (_.onNext(RollbackCompleted(blockId, height)))
 
   def notifyMicroBlockRollback(events: Option[Observer[BlockchainUpdated]], toSignature: ByteStr, height: Int): Unit =
     events foreach (_.onNext(MicroBlockRollbackCompleted(toSignature, height + 1)))
