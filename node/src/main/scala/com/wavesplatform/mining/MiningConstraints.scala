@@ -10,10 +10,10 @@ import com.wavesplatform.state.Blockchain
 case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint, micro: MiningConstraint)
 
 object MiningConstraints {
-  val MaxScriptRunsInBlock              = 100
-  val MaxScriptsComplexityInBlock       = 500000
-  private val ClassicAmountOfTxsInBlock = 100
-  private val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
+  val MaxScriptRunsInBlock = 100
+  val MaxScriptsComplexityInBlock = 1000000
+  val ClassicAmountOfTxsInBlock = 100
+  val MaxTxsSizeInBytes = 1 * 1024 * 1024 // 1 megabyte
 
   def apply(blockchain: Blockchain, height: Int, minerSettings: Option[MinerSettings] = None): MiningConstraints = {
     val activatedFeatures     = blockchain.activatedFeaturesAt(height)

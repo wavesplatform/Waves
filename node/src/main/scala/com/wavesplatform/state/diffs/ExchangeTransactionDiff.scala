@@ -70,12 +70,12 @@ object ExchangeTransactionDiff {
         val assetsComplexity = assets.toSeq
           .flatten
           .flatMap(_.script)
-          .map(_.complexity)
+          .map(DiffsCommon.verifierComplexity)
           .sum
 
         val accountsComplexity = Seq(tx.sender.toAddress, buyer, seller)
           .flatMap(blockchain.accountScript)
-          .map(_.complexity)
+          .map(DiffsCommon.verifierComplexity)
           .sum
 
         assetsComplexity + accountsComplexity

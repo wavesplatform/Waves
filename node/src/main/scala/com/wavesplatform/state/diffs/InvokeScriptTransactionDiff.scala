@@ -187,11 +187,15 @@ object InvokeScriptTransactionDiff {
               scriptsComplexity = {
                 val assetsComplexity = (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
                   .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
-                  .map(_.complexity)
+                  .map(DiffsCommon.verifierComplexity)
                   .sum
 
-                val accountComplexity = blockchain.accountScript(tx.sender).fold(0L)(_.complexity)
-                assetsComplexity + accountComplexity
+                val accountComplexity = blockchain.accountScript(tx.sender)
+                  .fold(0L)(DiffsCommon.verifierComplexity)
+
+                val funcComplexity = DiffsCommon.functionComplexity(sc, tx.funcCallOpt)
+
+                assetsComplexity + accountComplexity + funcComplexity
               }
 
               _ <- foldScriptTransfers(blockchain, tx, dAppAddress)(ps, dataAndPaymentDiff)
@@ -205,7 +209,7 @@ object InvokeScriptTransactionDiff {
               val isr = InvokeScriptResult(data = dataEntries, transfers = paymentReceiversMap.toVector.flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
               })
-              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1, scriptsComplexity = scriptsComplexity + sc.complexity) |+| Diff.stateOps(
+              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1, scriptsComplexity = scriptsComplexity) |+| Diff.stateOps(
                 portfolios = transfers,
                 scriptResults = Map(tx.id() -> isr))
             }
