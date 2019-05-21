@@ -397,4 +397,52 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         }
     }
   }
+
+  property("transfer transaction by id") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 3          #-}
+                 | {-# CONTENT_TYPE   EXPRESSION #-}
+                 | {-# SCRIPT_TYPE    ACCOUNT    #-}
+                 |
+                 | let transfer = transferTransactionById(base64'${transfer2.id.value.base64}')
+                 |
+                 | let checkAddress = match transfer.recipient {
+                 |   case addr: Address => addr.bytes == base64'${transfer2.recipient.bytes.base64}'
+                 |   case _             => false
+                 | }
+                 |
+                 | let checkAmount = transfer.amount == ${transfer2.amount}
+                 |
+                 | let checkAnotherTxType = !isDefined(
+                 |   transferTransactionById(base64'${dataTransaction.id.value.base64}')
+                 | )
+                 |
+                 | checkAmount && checkAddress && checkAnotherTxType
+                 |
+              """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction.selfSigned(
+            masterAcc,
+            Some(script),
+            1000000L,
+            transferTx.timestamp + 5
+          ).explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+        }
+    }
+  }
 }

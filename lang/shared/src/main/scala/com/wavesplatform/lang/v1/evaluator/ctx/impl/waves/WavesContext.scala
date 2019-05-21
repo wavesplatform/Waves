@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.domain.Tx.Transfer
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 
@@ -307,7 +308,7 @@ object WavesContext {
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
       NativeFunction("transactionById",
-                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500),
+                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100),
                      GETTRANSACTIONBYID,
                      returnType,
                      "Lookup transaction",
@@ -318,6 +319,26 @@ object WavesContext {
         case _ => ???
       }
     }
+
+    val transferTxByIdF: BaseFunction =
+      NativeFunction(
+        "transferTransactionById",
+        100,
+        TRANSFERTRANSACTIONBYID,
+        buildTransferTransactionType(proofsEnabled),
+        "Lookup transfer transaction",
+        ("id", BYTESTR, "transfer transaction id")
+      ) {
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          val maybeDomainTx =
+            env.transactionById(id.arr)
+              .filter(_.isInstanceOf[Transfer])
+              .map(transactionObject(_, proofsEnabled))
+
+          Right(fromOptionCO(maybeDomainTx))
+
+        case _ => ???
+      }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
       case addressType.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
@@ -424,7 +445,6 @@ object WavesContext {
     )
 
     lazy val functions = Array(
-      txByIdF,
       txHeightByIdF,
       getIntegerFromStateF,
       getBooleanFromStateF,
@@ -452,25 +472,26 @@ object WavesContext {
                   List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType, blockInfo)
                 } else List.empty),
       commonVars ++ vars(version.id),
-      functions ++ (if (version == V3) {
-                      List(
-                        getIntegerFromStateF,
-                        getBooleanFromStateF,
-                        getBinaryFromStateF,
-                        getStringFromStateF,
-                        getIntegerFromArrayF,
-                        getBooleanFromArrayF,
-                        getBinaryFromArrayF,
-                        getStringFromArrayF,
-                        getIntegerByIndexF,
-                        getBooleanByIndexF,
-                        getBinaryByIndexF,
-                        getStringByIndexF,
-                        addressFromStringF
-                      ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF)
-                    } else {
-                      List()
-                    })
+      functions ++ (
+        version match {
+          case V1 | V2 => List(txByIdF)
+          case V3      => List(
+            getIntegerFromStateF,
+            getBooleanFromStateF,
+            getBinaryFromStateF,
+            getStringFromStateF,
+            getIntegerFromArrayF,
+            getBooleanFromArrayF,
+            getBinaryFromArrayF,
+            getStringFromArrayF,
+            getIntegerByIndexF,
+            getBooleanByIndexF,
+            getBinaryByIndexF,
+            getStringByIndexF,
+            addressFromStringF
+          ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF)
+        }
+      )
     )
   }
 
