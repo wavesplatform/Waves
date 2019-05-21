@@ -71,7 +71,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
   }
 
   @throws[IllegalStateException]("if events in Kafka are different from node state and it's impossible to recover")
-  private[this] def startupCheck(): Option[BlockchainUpdated] = {
+  private[this] def startupCheck(): Unit = {
     // if kafkaHeight <= blockchainHeight — rollback node with event sending to Kafka. If rollback fails — fail
     // if kafkaHeight > blockchainHeight — fail. This should not happen
 
@@ -88,8 +88,8 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
           try {
             val heightToRollback = Math.max(kafkaHeight - 1, 1)
             val sigToRollback    = context.blockchain.blockHeaderAndSize(heightToRollback).get._1.signerData.signature
+            log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollback")
             context.blockchain.removeAfter(sigToRollback) // this already sends Rollback event
-            None                                          // no need to send an event here
           } catch {
             case _: Throwable =>
               throw new IllegalStateException(
@@ -97,9 +97,8 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
           }
         } else
           throw new IllegalStateException(
-            s"Error: node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight. This should never happen.")
+            s"Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight. This should never happen.")
       case None if blockchainHeight > 0 => throw new IllegalStateException("No events in Kafka, but blockchain is not empty.")
-      case _                            => None
     }
   }
 
@@ -108,12 +107,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
       maybeProducer = Some(createProducer(settings))
       maybeProducer foreach { producer =>
         log.info("Performing startup node/Kafka consistency check...")
-        startupCheck() match {
-          case Some(bu) =>
-            producer.send(createProducerRecord(settings.topic, bu))
-            log.info("Consistency check finished. Sending a correcting event to Kafka.")
-          case None => log.info("Node/Kafka state is consistent. Proceeding.")
-        }
+        startupCheck()
 
         log.info("Starting sending blockchain updates to Kafka")
         blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
