@@ -13,7 +13,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
     extends BlockchainApiGrpc.BlockchainApi {
 
   override def getActivationStatus(request: ActivationStatusRequest): Future[ActivationStatusResponse] = Future {
-    import blockchain.settings.functionalitySettings
+    val functionalitySettings = blockchain.settings.functionalitySettings
 
     ActivationStatusResponse(
       request.height,
