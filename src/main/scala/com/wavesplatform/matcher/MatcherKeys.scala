@@ -69,4 +69,8 @@ object MatcherKeys {
       xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
       QueueEventWithMeta.toBytes(_).drop(8)
     )
+
+  val AssetPairsPrefix: Short = 23
+  def assetPair(pair: AssetPair): Key[Unit] =
+    Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => (), _ => Array.emptyByteArray)
 }

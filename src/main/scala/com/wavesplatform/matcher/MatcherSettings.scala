@@ -27,6 +27,7 @@ case class MatcherSettings(enable: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: Int,
+                           limitEventsDuringRecovery: Option[Int],
                            snapshotsLoadingTimeout: FiniteDuration,
                            startEventsProcessingTimeout: FiniteDuration,
                            orderBooksRecoveringTimeout: FiniteDuration,
@@ -92,6 +93,9 @@ object MatcherSettings {
     val eventsQueue         = config.as[EventsQueueSettings](s"events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
+    val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
+    require(limitEventsDuringRecovery.forall(_ >= snapshotsInterval), "limit-events-during-recovery should be >= snapshotsInterval")
+
     def getAssetPairFromString(source: String): AssetPair = {
       val sourceArr = source.split("-")
       val res = sourceArr match {
@@ -117,6 +121,7 @@ object MatcherSettings {
       journalDirectory,
       snapshotsDirectory,
       snapshotsInterval,
+      limitEventsDuringRecovery,
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
       orderBooksRecoveringTimeout,

@@ -15,6 +15,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.db.{AssetPairsDB, OrderDB}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
@@ -141,9 +142,12 @@ class Matcher(actorSystem: ActorSystem,
 
   private val snapshotsRestore = Promise[Unit]()
 
+  private lazy val assetPairsDb = AssetPairsDB(db)
+
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
-      matcherSettings, {
+      matcherSettings,
+      assetPairsDb, {
         case Left(msg) =>
           log.error(s"Can't start matcher: $msg")
           forceStopApplication(ErrorStartingMatcher)
@@ -289,16 +293,16 @@ class Matcher(actorSystem: ActorSystem,
   }
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
-    val p = Promise[Unit]()
-
-    def loop(): Unit = {
-      if (currentOffset >= lastQueueOffset) p.trySuccess(())
+    def loop(p: Promise[Unit]): Unit = {
+      log.trace(s"offsets: $currentOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
+      if (currentOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
-        p.tryFailure(new TimeoutException(s"Can't process all events in ${settings.matcherSettings.startEventsProcessingTimeout.toMinutes} minutes"))
-      else actorSystem.scheduler.scheduleOnce(1.second)(loop())
+        p.failure(new TimeoutException(s"Can't process all events in ${settings.matcherSettings.startEventsProcessingTimeout.toMinutes} minutes"))
+      else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
     }
 
-    loop()
+    val p = Promise[Unit]()
+    loop(p)
     p.future
   }
 }

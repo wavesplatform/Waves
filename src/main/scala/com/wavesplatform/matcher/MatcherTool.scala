@@ -16,6 +16,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
+import com.wavesplatform.matcher.db.AssetPairsDB
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -120,6 +121,38 @@ object MatcherTool extends ScorexLogging {
         } finally {
           Await.ready(system.terminate(), Duration.Inf)
         }
+      case "ob-compact" =>
+        val groupSize = args(2).toInt
+
+        log.info("Removing stale snapshots from order books")
+        log.info("Warning: matcher's snapshot in new format is required")
+        val system = ActorSystem("matcher-tool", actualConfig)
+        try {
+          val apdb  = AssetPairsDB(db)
+          val pairs = apdb.all().toVector
+          log.info(s"Found ${pairs.size} asset pairs")
+
+          val snapshotDB = openDB(settings.matcherSettings.snapshotsDataDir)
+          pairs.grouped(groupSize).foreach { pairs =>
+            snapshotDB.readWrite { rw =>
+              pairs.foreach { pair =>
+                val persistenceId = OrderBookActor.name(pair)
+                val history       = rw.get(MatcherSnapshotStore.kSMHistory(persistenceId))
+                if (history.lengthCompare(1) > 0) {
+                  log.info(s"Snapshots history for $pair has ${history.size} records")
+                  val (toKeep, toDelete) = history.map(seqNr => seqNr -> rw.get(MatcherSnapshotStore.kSM(persistenceId, seqNr))).splitAt(1)
+                  rw.put(MatcherSnapshotStore.kSMHistory(persistenceId), toKeep.map(_._1).sorted.reverse)
+                  for ((seqNr, _) <- toDelete) {
+                    rw.delete(MatcherSnapshotStore.kSM(persistenceId, seqNr))
+                    rw.delete(MatcherSnapshotStore.kSnapshot(persistenceId, seqNr))
+                  }
+                }
+              }
+            }
+          }
+        } finally {
+          Await.ready(system.terminate(), Duration.Inf)
+        }
       case "oi" =>
         val id = ByteStr.decodeBase58(args(2)).get
         println(s"Loading order '$id'")
@@ -139,7 +172,11 @@ object MatcherTool extends ScorexLogging {
       case "compact" =>
         log.info("Compacting database")
         db.compactRange(null, null)
-      case "mas" =>
+      case "dex-compact" =>
+        log.info("Compacting DEX database")
+        val snapshotDB = openDB(settings.matcherSettings.snapshotsDataDir)
+        snapshotDB.compactRange(null, null)
+      case "ma" =>
         val system = ActorSystem("matcher-tool", actualConfig)
         try {
           val snapshotDB    = openDB(settings.matcherSettings.snapshotsDataDir)
@@ -188,17 +225,19 @@ object MatcherTool extends ScorexLogging {
           mat.shutdown()
           Await.ready(system.terminate(), Duration.Inf)
         }
-      case "mar" =>
+      case "ma-migrate" =>
         val system = ActorSystem("matcher-tool", actualConfig)
+        val mat    = ActorMaterializer()(system)
         try {
+          val allPairs      = Set.newBuilder[AssetPair]
           val snapshotDB    = openDB(settings.matcherSettings.snapshotsDataDir)
           val persistenceId = MatcherActor.name
+          val se            = SerializationExtension(system)
 
           val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
           val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
-          if (history.isEmpty) log.warn("History is empty")
+          if (history.isEmpty) log.warn("Snapshots history is empty")
           else {
-            log.info(s"Snapshots history for ${MatcherActor.name}: $history")
             val xs = history.map { seqNr =>
               val smKey = MatcherSnapshotStore.kSM(persistenceId, seqNr)
               val smRaw = snapshotDB.get(smKey.keyBytes)
@@ -209,32 +248,37 @@ object MatcherTool extends ScorexLogging {
 
               (seqNr, sm, snapshotRaw)
             }
-            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: $sm" }.mkString("\n")}")
+            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: SM(seqNr=${sm.seqNr}, ts=${sm.ts})" }.mkString("\n")}")
 
-            log.info(s"Deleting old data")
-            xs.foreach {
-              case (seqNr, _, _) =>
-                val smKey       = MatcherSnapshotStore.kSM(persistenceId, seqNr)
-                val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, seqNr)
-
-                snapshotDB.delete(smKey.keyBytes)
-                snapshotDB.delete(snapshotKey.keyBytes)
-            }
-
-            val (firstSeqNr, firstSm, firstSnapshotRaw) = xs.head
-            val updatedSm                               = firstSm.copy(seqNr = 1L)
-            log.info(s"Writing the record with seqNr=$firstSeqNr at seqNr=1, sm was $firstSm, will be $updatedSm")
-
-            val smKey       = MatcherSnapshotStore.kSM(persistenceId, 1)
-            val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, 1)
-
-            snapshotDB.put(smKey.keyBytes, smKey.encode(updatedSm))
-            snapshotDB.put(snapshotKey.keyBytes, firstSnapshotRaw)
-            snapshotDB.put(historyKey.keyBytes, historyKey.encode(Seq(1)))
+            val (_, _, lastSnapshotRaw) = xs.last
+            val snapshot                = se.deserialize(lastSnapshotRaw, classOf[Snapshot]).get.data.asInstanceOf[MatcherActor.Snapshot]
+            log.info(s"The last snapshot:\n${snapshot.tradedPairsSet.map(_.key).toVector.sorted.mkString("\n")}")
+            allPairs ++= snapshot.tradedPairsSet
           }
+
+          val readJournal = PersistenceQuery(system).readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
+          val query       = readJournal.currentEventsByPersistenceId(MatcherActor.name, 0)
+          val process = query.runForeach { rawEvt =>
+            val evt = rawEvt.event.asInstanceOf[MatcherActor.OrderBookCreated]
+            log.info(s"[offset=${rawEvt.offset}, seqNr=${rawEvt.sequenceNr}] $evt")
+            allPairs += evt.assetPair
+          }(mat)
+
+          Await.ready(process, Duration.Inf)
+          log.info(s"Asset pairs collected")
+
+          val apdb = AssetPairsDB(db)
+          allPairs.result().foreach(apdb.add)
+          log.info(s"Asset pairs migrated")
         } finally {
+          mat.shutdown()
           Await.ready(system.terminate(), Duration.Inf)
         }
+      case "ma-inspect" =>
+        val apdb            = AssetPairsDB(db)
+        val knownAssetPairs = apdb.all()
+        if (knownAssetPairs.isEmpty) log.info("There are no known asset pairs")
+        else log.info(s"Known asset pairs: ${knownAssetPairs.mkString("\n")}")
       case _ =>
     }
 
