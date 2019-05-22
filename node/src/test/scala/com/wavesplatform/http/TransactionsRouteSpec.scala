@@ -66,7 +66,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
@@ -101,7 +101,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
@@ -132,7 +132,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
@@ -161,7 +161,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).once()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.assetDescription _)
           .expects(assetId)
           .returning(Some(AssetDescription(
@@ -204,7 +204,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
         (blockchain.hasScript _).expects(sender.toAddress).returning(true).once()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.assetDescription _)
           .expects(assetId)
           .returning(Some(AssetDescription(

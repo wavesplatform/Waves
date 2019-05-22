@@ -26,6 +26,7 @@ object CommonValidation {
 
   val ScriptExtraFee = 400000L
   val FeeUnit        = 100000
+  val NFTMultiplier  = 0.001
 
   val FeeConstants: Map[Byte, Long] = Map(
     GenesisTransaction.typeId            -> 0,
@@ -195,23 +196,26 @@ object CommonValidation {
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
     if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > settings.maxTransactionTimeForwardOffset.toMillis)
-      Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
+      Left(
+        Mistiming(
+          s"""Transaction timestamp ${tx.timestamp}
        |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
        |relative to block timestamp $time""".stripMargin
-        .replaceAll("\n", " ")
-        .replaceAll("\r", "")))
+            .replaceAll("\n", " ")
+            .replaceAll("\r", "")))
     else Right(tx)
   }
 
   def disallowTxFromPast[T <: Transaction](settings: FunctionalitySettings, prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
     prevBlockTime match {
       case Some(t) if (t - tx.timestamp) > settings.maxTransactionTimeBackOffset.toMillis =>
-        Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
+        Left(
+          Mistiming(
+            s"""Transaction timestamp ${tx.timestamp}
          |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
-         |relative to previous block timestamp $prevBlockTime"""
-          .stripMargin
-          .replaceAll("\n", " ")
-          .replaceAll("\r", "")))
+         |relative to previous block timestamp $prevBlockTime""".stripMargin
+              .replaceAll("\n", " ")
+              .replaceAll("\r", "")))
       case _ => Right(tx)
     }
 
@@ -225,6 +229,14 @@ object CommonValidation {
           case tx: DataTransaction =>
             val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
+          case itx: IssueTransaction =>
+            lazy val nftActivated = blockchain.activatedFeatures
+              .get(BlockchainFeatures.ReduceNFTFee.id)
+              .exists(_ <= height)
+
+            val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+
+            (baseFee * multiplier).toLong
           case _ => baseFee
         }
       }
