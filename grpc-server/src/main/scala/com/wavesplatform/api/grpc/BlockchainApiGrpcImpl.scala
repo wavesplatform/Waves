@@ -3,17 +3,18 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
+import com.wavesplatform.settings.FeaturesSettings
 import com.wavesplatform.state.Blockchain
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
 
-class BlockchainApiGrpcImpl(blockchain: Blockchain, functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)(
-    implicit sc: Scheduler)
+class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSettings)(implicit sc: Scheduler)
     extends BlockchainApiGrpc.BlockchainApi {
 
   override def getActivationStatus(request: ActivationStatusRequest): Future[ActivationStatusResponse] = Future {
+    val functionalitySettings = blockchain.settings.functionalitySettings
+
     ActivationStatusResponse(
       request.height,
       functionalitySettings.activationWindowSize(request.height),

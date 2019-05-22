@@ -1,17 +1,15 @@
 package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.state.{Blockchain, DataEntry}
+import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import monix.reactive.Observable
 
-class CommonAccountApi(blockchain: Blockchain, functionalitySettings: FunctionalitySettings) {
+class CommonAccountApi(blockchain: Blockchain) {
   import CommonAccountApi._
 
   def balance(address: Address, confirmations: Int = 0): Long = {
@@ -26,7 +24,7 @@ class CommonAccountApi(blockchain: Blockchain, functionalitySettings: Functional
     val portfolio = blockchain.wavesPortfolio(address)
     BalanceDetails(
       portfolio.balance,
-      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, address),
+      blockchain.generatingBalance(address),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance,
       portfolio.lease.in,

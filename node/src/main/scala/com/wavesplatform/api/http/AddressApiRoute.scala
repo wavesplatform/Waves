@@ -9,7 +9,7 @@ import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time
@@ -25,20 +25,15 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings,
-                           wallet: Wallet,
-                           blockchain: Blockchain,
-                           utx: UtxPool,
-                           allChannels: ChannelGroup,
-                           time: Time,
-                           functionalitySettings: FunctionalitySettings)(implicit ec: Scheduler)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(
+    implicit ec: Scheduler)
     extends ApiRoute
     with WithSettings
     with BroadcastRoute {
 
   import AddressApiRoute._
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain, functionalitySettings)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   val MaxAddressesPerRequest         = 1000
 
   override lazy val route =

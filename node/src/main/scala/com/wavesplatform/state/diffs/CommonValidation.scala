@@ -48,10 +48,9 @@ object CommonValidation {
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          settings: FunctionalitySettings,
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
-    if (blockTime >= settings.allowTemporaryNegativeUntil) {
+    if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -100,7 +99,6 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             settings: FunctionalitySettings,
                                              height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
@@ -243,11 +241,11 @@ object CommonValidation {
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
     type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
     def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
         // This could be true for private blockchains
         feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
       } else
@@ -313,10 +311,10 @@ object CommonValidation {
       }
   }
 
-  def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
-        minAFee <- getMinFee(blockchain, fs, height, tx)
+        minAFee <- getMinFee(blockchain, height, tx)
         minWaves   = minAFee._3
         minFee     = minAFee._2
         feeAssetId = minAFee._1
