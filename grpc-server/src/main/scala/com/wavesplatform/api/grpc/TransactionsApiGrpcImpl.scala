@@ -3,7 +3,6 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -17,8 +16,7 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
-                              wallet: Wallet,
+class TransactionsApiGrpcImpl(wallet: Wallet,
                               blockchain: Blockchain,
                               utx: UtxPool,
                               broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
