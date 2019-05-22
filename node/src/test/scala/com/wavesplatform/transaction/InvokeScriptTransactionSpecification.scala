@@ -6,6 +6,8 @@ import com.wavesplatform.api.http.{InvokeScriptRequest, SignedInvokeScriptReques
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
@@ -151,6 +153,44 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
+  }
+
+  property(s"can't call a func with non native(simple) args - ARR") {
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    InvokeScriptTransaction.create(
+      pk,
+      pk.toAddress,
+      Some(
+        Terms.FUNCTION_CALL(
+          FunctionHeader.User("foo"),
+          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
+        )),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
+  }
+
+  property(s"can't call a func with non native(simple) args - CaseObj") {
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    InvokeScriptTransaction.create(
+      pk,
+      pk.toAddress,
+      Some(
+        Terms.FUNCTION_CALL(
+          FunctionHeader.User("foo"),
+          List(CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
+        )),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
   }
 
   property("can't be more 5kb") {
