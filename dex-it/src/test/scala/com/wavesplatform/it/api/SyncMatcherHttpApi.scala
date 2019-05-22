@@ -31,9 +31,16 @@ object SyncMatcherHttpApi extends Assertions {
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
+
+      val containsError =
+        Seq("details", "message")
+          .map(parse(responseBody).\)
+          .collectFirst { case lookupResult if lookupResult.isDefined => lookupResult.get.toString }
+          .exists(_.contains(errorMessage))
+
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && containsError)
     case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting not found error")
+    case _ => Assertions.fail(s"Expecting not found error")
   }
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
@@ -90,6 +97,9 @@ object SyncMatcherHttpApi extends Assertions {
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
+
+    def transactionsByOrder(orderId: String): Seq[ExchangeTransaction] =
+      sync(async(m).transactionsByOrder(orderId))
 
     def waitTransactionsByOrder(orderId: String, min: Int): Seq[ExchangeTransaction] =
       sync(async(m).waitTransactionsByOrder(orderId, min))

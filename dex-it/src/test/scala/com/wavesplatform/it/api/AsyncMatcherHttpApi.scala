@@ -124,6 +124,9 @@ object AsyncMatcherHttpApi extends Assertions {
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
+    def transactionsByOrder(orderId:String) : Future[Seq[ExchangeTransaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
+
     def waitTransactionsByOrder(orderId: String, min: Int, retryInterval: FiniteDuration = 1.second): Future[Seq[ExchangeTransaction]] =
       waitFor[Seq[ExchangeTransaction]](s"At least $min transactions for order $orderId")(
         _.matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]],
