@@ -345,13 +345,13 @@ case class DebugApiRoute(ws: WavesSettings,
   def validate: Route = (path("validate") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        import ws.blockchainSettings.{functionalitySettings => fs}
+
         val h  = blockchain.height
         val t0 = System.nanoTime
         val tracedDiff = for {
           tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
           _  <- Verifier(blockchain, h)(tx)
-          ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
+          ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
         val response = Json.obj(

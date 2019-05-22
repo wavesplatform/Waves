@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
@@ -75,13 +75,9 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       _ <- blockConsensusValidation(blockchainUpdater, settings, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, block.sender, parent)
+        val balance = blockchainUpdater.generatingBalance(block.sender, parent)
         Either.cond(
-          GeneratingBalanceProvider.isEffectiveBalanceValid(blockchainUpdater,
-                                                            settings.blockchainSettings.functionalitySettings,
-                                                            height,
-                                                            block,
-                                                            balance),
+          blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
           balance,
           s"generator's effective balance $balance is less that required for generation"
         )

@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
@@ -105,18 +105,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-      Either
-        .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
-        .flatMap(_ => Either.cond(tx.fee > 0, (), InsufficientFee(s"insufficient fee: ${tx.fee}")))
-        .flatMap(_ =>
-          Either
-            .cond(tx.payment.forall(_.amount > 0), (), NonPositiveAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
-        .flatMap(_ =>
-          Either.cond(
-            tx.funcCallOpt.isEmpty || tx.funcCallOpt.get.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
-            (),
-            GenericError("all arguments of invokeScript must be EVALUATED")
-        ))
+      validate(tx)
         .map(_ => tx)
         .foldToTry
     }
@@ -131,27 +120,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- Either.cond(fee > 0, (), InsufficientFee(s"insufficient fee: $fee"))
-      _ <- Either.cond(
-        fc.isEmpty || fc.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
-        (),
-        GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
-      )
-      _ <- Either.cond(
-        fc.isEmpty || (fc.get.function match {
-          case FunctionHeader.User(name) => name.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
-          case _                         => true
-        }),
-        (),
-        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
-      )
-      _ <- checkAmounts(p)
-      _ <- Either.cond(p.length <= 1, (), GenericError("Multiple payment isn't allowed now"))
-      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), GenericError("duplicate payments"))
-
-      _ <- Either.cond(fc.isEmpty || fc.get.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
-                       (),
-                       GenericError("all arguments of invokeScript must be EVALUATED"))
+      _ <- validate(fc, p, fee)
       tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
       _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
@@ -189,6 +158,41 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
                  feeAssetId: Asset,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
+  }
+
+  def validate(tx: InvokeScriptTransaction): Either[ValidationError, Unit] = {
+    for {
+      _ <- Either.cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
+      _ <- validate(tx.funcCallOpt, tx.payment, tx.fee)
+      _ <- Either.cond(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
+    } yield ()
+  }
+
+  def validate(fc: Option[Terms.FUNCTION_CALL], p: Seq[Payment], fee: Long): Either[ValidationError, Unit] = {
+    for {
+      _ <- Either.cond(fee > 0, (), InsufficientFee(s"insufficient fee: $fee"))
+      _ <- Either.cond(
+        fc.isEmpty || fc.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
+        (),
+        GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
+      )
+      _ <- Either.cond(
+        fc.isEmpty || (fc.get.function match {
+          case FunctionHeader.User(name) => name.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
+          case _                         => true
+        }),
+        (),
+        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
+      )
+      _ <- checkAmounts(p)
+      _ <- Either.cond(p.length <= 1, (), GenericError("Multiple payment isn't allowed now"))
+      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), GenericError("duplicate payments"))
+      _ <- Either.cond(
+        fc.isEmpty || fc.get.args.forall(x => x.isInstanceOf[EVALUATED] && !x.isInstanceOf[CaseObj] && !x.isInstanceOf[ARR]),
+        (),
+        GenericError("All arguments of invokeScript must be one of the types: Int, ByteVector, String, Boolean")
+      )
+    } yield ()
   }
 
   val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {

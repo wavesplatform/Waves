@@ -9,7 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, DefaultFuncAnnotation, DefaultFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -20,7 +20,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -247,7 +246,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compileContractFromExpr(expr)
   }
 
-  def writeSetWithKeyLength(funcName: String, length: Int=1): DApp = {
+  def writeSetWithKeyLength(funcName: String, length: Int = 1): DApp = {
     val keyName = Array.fill(length)("a").mkString
 
     val expr = {
@@ -350,15 +349,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                   payment: Option[Payment] = None,
                                   feeGen: Gen[Long] = ciFee(0),
                                   sponsored: Boolean = false,
-                                  isCIDefaultFunc: Boolean = false): Gen[
-    (List[GenesisTransaction],
-     SetScriptTransaction,
-     InvokeScriptTransaction,
-     KeyPair,
-     IssueTransaction,
-     SponsorFeeTransaction,
-     CreateAliasTransaction,
-     InvokeScriptTransaction)] =
+                                  isCIDefaultFunc: Boolean = false)
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -369,9 +361,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       arg         <- genBoundedString(1, 32)
       funcBinding <- funcNameGen
       contract    <- senderBindingToContract(funcBinding)
-      masterAlias = Alias.create("alias").explicitGet()
-      notAlias    = Alias.create("notalias").explicitGet()
-      aliasTx <- createAliasGen(master, masterAlias, fee, ts + 1)
       script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
@@ -392,20 +381,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           ts + 3
         )
         .explicitGet()
-      ciWithAlias = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          masterAlias,
-          fc,
-          payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else { Waves },
-          ts + 3
-        )
-        .explicitGet()
-    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx, aliasTx, ciWithAlias)
+    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithAlias(senderBindingToContract: String => Gen[DApp],
                                            invokerGen: Gen[KeyPair] = accountGen,

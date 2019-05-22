@@ -6,6 +6,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -13,6 +14,8 @@ import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser, Tra
 import com.wavesplatform.utils.CloseableIterator
 
 trait Blockchain {
+  def settings: BlockchainSettings
+
   def height: Int
   def score: BigInt
   def scoreOf(blockId: ByteStr): Option[BigInt]
