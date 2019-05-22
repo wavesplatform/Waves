@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -405,29 +405,45 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
 
-          val script = ScriptCompiler
-            .compile(
+          val script = ScriptCompiler.compile(
               s"""
                  | {-# STDLIB_VERSION 3          #-}
                  | {-# CONTENT_TYPE   EXPRESSION #-}
                  | {-# SCRIPT_TYPE    ACCOUNT    #-}
                  |
-                 | let transfer = transferTransactionById(base64'${transfer2.id.value.base64}')
+                 | let transfer = extract(
+                 |   transferTransactionById(base64'${transferTx.id.value.base64Raw}')
+                 | )
                  |
                  | let checkAddress = match transfer.recipient {
-                 |   case addr: Address => addr.bytes == base64'${transfer2.recipient.bytes.base64}'
+                 |   case addr: Address => addr.bytes == base64'${transferTx.recipient.bytes.base64Raw}'
                  |   case _             => false
                  | }
                  |
-                 | let checkAmount = transfer.amount == ${transfer2.amount}
+                 | let checkAmount     = transfer.amount == ${transferTx.amount}
+                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment)}'
+                 |
+                 | let checkAssetId = match transfer.assetId {
+                 |    case _: Unit => true
+                 |    case _       => false
+                 | }
+                 |
+                 | let checkFeeAssetId = match transfer.feeAssetId {
+                 |    case _: Unit => true
+                 |    case _       => false
+                 | }
                  |
                  | let checkAnotherTxType = !isDefined(
-                 |   transferTransactionById(base64'${dataTransaction.id.value.base64}')
+                 |   transferTransactionById(base64'${dataTransaction.id.value.base64Raw}')
                  | )
                  |
-                 | checkAmount && checkAddress && checkAnotherTxType
+                 | checkAmount         &&
+                 | checkAddress        &&
+                 | checkAttachment     &&
+                 | checkAssetId        &&
+                 | checkFeeAssetId     &&
+                 | checkAnotherTxType
                  |
               """.stripMargin
             )
@@ -442,6 +458,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           ).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
         }
     }
   }

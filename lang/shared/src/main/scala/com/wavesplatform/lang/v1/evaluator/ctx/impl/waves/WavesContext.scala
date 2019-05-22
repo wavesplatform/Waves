@@ -308,7 +308,7 @@ object WavesContext {
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
       NativeFunction("transactionById",
-                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100),
+                     100,
                      GETTRANSACTIONBYID,
                      returnType,
                      "Lookup transaction",
@@ -330,12 +330,8 @@ object WavesContext {
         ("id", BYTESTR, "transfer transaction id")
       ) {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
-          val maybeDomainTx =
-            env.transactionById(id.arr)
-              .filter(_.isInstanceOf[Transfer])
-              .map(transactionObject(_, proofsEnabled))
-
-          Right(fromOptionCO(maybeDomainTx))
+          val transferTxO = env.transferTransactionById(id.arr).map(transactionObject(_, proofsEnabled))
+          Right(fromOptionCO(transferTxO))
 
         case _ => ???
       }
