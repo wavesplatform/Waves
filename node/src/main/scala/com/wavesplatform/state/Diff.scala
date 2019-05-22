@@ -7,7 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -105,10 +104,10 @@ object Sponsorship {
       amountInWaves
   }
 
-  def sponsoredFeesSwitchHeight(blockchain: Blockchain, fs: FunctionalitySettings): Int =
+  def sponsoredFeesSwitchHeight(blockchain: Blockchain): Int =
     blockchain
       .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
-      .map(h => h + fs.activationWindowSize(h))
+      .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
       .getOrElse(Int.MaxValue)
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {

@@ -15,7 +15,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -27,13 +27,13 @@ import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging {
 
   import com.wavesplatform.state.BlockchainUpdaterImpl._
-  import settings.blockchainSettings.functionalitySettings
+  import wavesSettings.blockchainSettings.functionalitySettings
 
   private def inLock[R](l: Lock, f: => R) = {
     try {
@@ -48,13 +48,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
   private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
 
-  private lazy val maxBlockReadinessAge = settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
+  private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
   private var ngState: Option[NgState]              = Option.empty
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
 
   private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
+
+  override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
   override def isLastBlockId(id: ByteStr): Boolean = readLock {
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
@@ -104,7 +106,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       if (unimplementedActivated.nonEmpty) {
         log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
         log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
-        if (settings.featuresSettings.autoShutdownOnUnsupportedFeature) {
+        if (wavesSettings.featuresSettings.autoShutdownOnUnsupportedFeature) {
           log.error("FOR THIS REASON THE NODE WAS STOPPED AUTOMATICALLY")
           forceStopApplication(UnsupportedFeature)
         } else log.error("OTHERWISE THE NODE WILL END UP ON A FORK")
@@ -123,7 +125,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
     Either
       .cond(
-        !settings.featuresSettings.autoShutdownOnUnsupportedFeature || notImplementedFeatures.isEmpty,
+        !wavesSettings.featuresSettings.autoShutdownOnUnsupportedFeature || notImplementedFeatures.isEmpty,
         (),
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
       )
@@ -139,7 +141,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
+                  .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map(r => Some((r, Seq.empty[Transaction])))
             }
           case Some(ng) =>
@@ -149,7 +151,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 val miningConstraints = MiningConstraints(blockchain, height)
 
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
+                  .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map { r =>
                     log.trace(
                       s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
@@ -165,7 +167,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                   val miningConstraints = MiningConstraints(blockchain, height)
 
                   BlockDiffer
-                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
+                    .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                     .map(r => Some((r, Seq.empty[Transaction])))
                 }
               } else
@@ -190,7 +192,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
                     val diff = BlockDiffer
                       .fromBlock(
-                        functionalitySettings,
                         CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
                         Some(referencedForgedBlock),
                         block,
@@ -220,7 +221,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
 
               if ((block.timestamp > time
-                    .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
+                    .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
                 log.info(s"New height: $height")
               }
               discarded
@@ -287,13 +288,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-                BlockDiffer.fromMicroBlock(functionalitySettings,
-                                           this,
-                                           blockchain.lastBlockTimestamp,
-                                           microBlock,
-                                           ng.base.timestamp,
-                                           mdConstraint,
-                                           verify)
+                BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint, verify)
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint) = blockDifferResult

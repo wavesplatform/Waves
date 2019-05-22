@@ -2,11 +2,9 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
@@ -27,15 +25,7 @@ class AssetsApiRouteSpec
 
   private val blockchain = stub[Blockchain]
 
-  private val route = AssetsApiRoute(
-    restAPISettings,
-    WavesSettings.fromRootConfig(ConfigFactory.load()).blockchainSettings.functionalitySettings,
-    testWallet,
-    mock[UtxPool],
-    mock[ChannelGroup],
-    blockchain,
-    new TestTime
-  ).route
+  private val route = AssetsApiRoute(restAPISettings, testWallet, mock[UtxPool], mock[ChannelGroup], blockchain, new TestTime).route
 
   private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
