@@ -128,4 +128,7 @@ object BaseGlobal {
   case class RoundDown() extends Rounds
   case class RoundUp() extends Rounds
   case class RoundHalfUp() extends Rounds
+  case class RoundHalfEven() extends Rounds
+  case class RoundCeiling() extends Rounds
+  case class RoundFloor() extends Rounds
 }

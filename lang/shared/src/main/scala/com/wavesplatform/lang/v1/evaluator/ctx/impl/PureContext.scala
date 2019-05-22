@@ -506,10 +506,13 @@ object PureContext {
     throwNoMessage,
   ) ++ operators
 
+  val roundCeiling = CASETYPEREF("Ceiling", List.empty)
+  val roundFloor = CASETYPEREF("Floor", List.empty)
+  val roundHalfEven = CASETYPEREF("HalfEven", List.empty)
   val roundDown = CASETYPEREF("Down", List.empty)
   val roundUp = CASETYPEREF("Up", List.empty)
   val roundHalfUp = CASETYPEREF("HalfUp", List.empty)
-  val rounds = UNION(roundDown, roundUp, roundHalfUp)
+  val rounds = UNION(roundDown, roundUp, roundHalfUp, roundCeiling, roundFloor, roundHalfEven)
 
   def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
     m match {
@@ -517,7 +520,12 @@ object PureContext {
         case "Down" => BaseGlobal.RoundDown()
         case "Up" => BaseGlobal.RoundUp()
         case "HalfUp" => BaseGlobal.RoundHalfUp()
+        case "HalfEven" => BaseGlobal.RoundHalfEven()
+        case "Ceiling" => BaseGlobal.RoundCeiling()
+        case "Floor" => BaseGlobal.RoundFloor()
+        case v => throw new Exception(s"Type error: $v isn't in $rounds")
       }
+        case v => throw new Exception(s"Type error: $v isn't rounds CaseObj") 
     }
   }
 
@@ -525,7 +533,10 @@ object PureContext {
     ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
     ("UP", ((roundUp, "'UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
     ("HALFUP", ((roundHalfUp, "'HALF_UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
-    ("DOWN", ((roundDown, "'DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundDown, Map.empty)))))
+    ("DOWN", ((roundDown, "'DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundDown, Map.empty))))),
+    ("HALFEVEN", ((roundHalfUp, "'HALF_EVEN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfEven, Map.empty))))),
+    ("CEILING", ((roundHalfUp, "'CEILING' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundCeiling, Map.empty))))),
+    ("FLOOR", ((roundHalfUp, "'FLOOR' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundFloor, Map.empty)))))
   )
 
   private lazy val ctx = CTX(
@@ -538,6 +549,9 @@ object PureContext {
       roundDown,
       roundUp,
       roundHalfUp,
+      roundHalfEven,
+      roundCeiling,
+      roundFloor,
       rounds
     ),
     vars,
@@ -546,26 +560,48 @@ object PureContext {
 
   def build(math: BaseGlobal, version: StdLibVersion): CTX = {
     val pow: BaseFunction =
-      NativeFunction("pow", 20, POW, LONG, "Math pow",
+      NativeFunction("pow", 100, POW, LONG, "Math pow",
           ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
           ("exponent", LONG, "exponents value"), ("ep", LONG, "exponents decimal"),
           ("rp", LONG, "results decimal"),
           ("round", rounds, "round method")
        ) {
         case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
-          math.pow(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+          if(
+               bp < 0
+            || bp > 8
+            || ep < 0
+            || ep > 8
+            || rp < 0
+            || ep < 8
+          ) {
+            Left("pow: scale out of range 0-8")
+          } else {
+            math.pow(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+          }
         case xs                      => notImplemented("pow(Int, Int, Int, Int, Int, Rounds)", xs)
       }
 
     val log: BaseFunction =
-      NativeFunction("log", 20, POW, LONG, "Math log",
+      NativeFunction("log", 100, POW, LONG, "Math log",
           ("value", LONG, "value"), ("ep", LONG, "value decimal"),
           ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
           ("rp", LONG, "results decimal"),
           ("round", rounds, "round method")
        ) {
         case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
-          math.log(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+          if(
+               bp < 0
+            || bp > 8
+            || ep < 0
+            || ep > 8
+            || rp < 0
+            || ep < 8
+          ) {
+            Left("log: scale out of range 0-8")
+          } else {
+            math.log(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+          }
         case xs                      => notImplemented("log(Int, Int, Int, Int, Int, Rounds)", xs)
       }
 

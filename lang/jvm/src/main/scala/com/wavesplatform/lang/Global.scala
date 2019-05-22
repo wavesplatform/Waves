@@ -44,6 +44,9 @@ object Global extends BaseGlobal {
       case BaseGlobal.RoundUp() => RoundingMode.UP
       case BaseGlobal.RoundHalfUp() => RoundingMode.HALF_UP
       case BaseGlobal.RoundDown() => RoundingMode.DOWN
+      case BaseGlobal.RoundHalfEven() => RoundingMode.HALF_EVEN
+      case BaseGlobal.RoundCeiling() => RoundingMode.CEILING
+      case BaseGlobal.RoundFloor() => RoundingMode.FLOOR
     }
   }
 
