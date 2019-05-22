@@ -185,6 +185,8 @@ case class Block private[block] (override val timestamp: Long,
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
 
+  def getHeader(): BlockHeader =
+    new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
 }
 
 object Block extends ScorexLogging {

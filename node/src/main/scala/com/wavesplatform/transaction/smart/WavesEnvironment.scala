@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
@@ -98,18 +98,20 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     }
   }
 
-  override def lastBlockOpt(): Option[BlockInfo] = blockchain.lastBlock.map(toBlockInfo(_))
+  override def lastBlockOpt(): Option[BlockInfo] =
+    blockchain.lastBlock.map(block => toBlockInfo(block.getHeader(), height.toInt))
 
-  override def blockInfoByHeight(height: Int): Option[BlockInfo] = blockchain.blockAt(height).map(toBlockInfo(_, height))
+  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
+    blockchain.blockHeaderAndSize(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize._1, blockHeight))
 
-  private def toBlockInfo(block: Block, bHeight: Int = blockchain.height) = {
+  private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
     BlockInfo(
-      timestamp = block.timestamp,
+      timestamp = blockH.timestamp,
       height = bHeight,
-      baseTarget = block.consensusData.baseTarget,
-      generationSignature = block.consensusData.generationSignature,
-      generator = block.signerData.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(block.signerData.generator)
+      baseTarget = blockH.consensusData.baseTarget,
+      generationSignature = blockH.consensusData.generationSignature,
+      generator = blockH.signerData.generator.toAddress.bytes,
+      generatorPublicKey = ByteStr(blockH.signerData.generator)
     )
   }
 }

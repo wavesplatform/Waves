@@ -341,15 +341,13 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let lastBlockTs = lastBlock.timestamp > ${setScriptTransaction.timestamp} && lastBlock.timestamp < ${setScriptTransaction.timestamp + 100}
-                 | let lastBlockHeight = lastBlock.height == 5
                  | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
                    Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
                  | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
-                 | lastBlockTs && lastBlockHeight && lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
+                 | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
                  |
                  |
               """.stripMargin
@@ -382,51 +380,18 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let unexistingHeight = 999
-                 | let checkUnexistingBlock = !isDefined(blockInfoByHeight(unexistingHeight))
-                 |
                  | let nonExistedBlockNeg = !blockInfoByHeight(-1).isDefined()
                  | let nonExistedBlockZero = !blockInfoByHeight(0).isDefined()
+                 | let nonExistedBlockNextPlus = !blockInfoByHeight(6).isDefined()
                  |
-                 | let block = extract(blockInfoByHeight(4))
-                 | let checkTs = block.timestamp > ${setScriptTransaction.timestamp} && block.timestamp < ${setScriptTransaction.timestamp + 100}
-                 | let checkHeight = block.height == 4
-                 | let checkBaseTarget = lastBlock.baseTarget == 2
+                 | let block = extract(blockInfoByHeight(3))
+                 | let checkHeight = block.height == 3
+                 | let checkBaseTarget = block.baseTarget == 2
                  | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
-                 | nonExistedBlockNeg && nonExistedBlockZero && checkUnexistingBlock && checkTs && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
-                 |
-              """.stripMargin
-            )
-            .explicitGet()
-            ._1
-
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
-
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
-        }
-    }
-  }
-
-  property("last block and block by height") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
-
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 | {-# STDLIB_VERSION 3 #-}
-                 | {-# CONTENT_TYPE EXPRESSION #-}
-                 | {-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 | lastBlock.timestamp == extract(blockInfoByHeight(4)).timestamp
+                 | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
                  |
               """.stripMargin
             )
