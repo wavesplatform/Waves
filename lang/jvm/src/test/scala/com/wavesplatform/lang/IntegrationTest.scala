@@ -629,7 +629,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("math functions") {
-    val script = "pow(12, 1, 3456, 3, 2, DOWN)"
-    eval[EVALUATED](script, None) shouldBe Right(CONST_LONG(187))
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
+    eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
   }
 }
