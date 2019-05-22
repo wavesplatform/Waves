@@ -573,7 +573,7 @@ object PureContext {
             || ep < 0
             || ep > 8
             || rp < 0
-            || ep < 8
+            || rp < 0
           ) {
             Left("pow: scale out of range 0-8")
           } else {
@@ -583,7 +583,7 @@ object PureContext {
       }
 
     val log: BaseFunction =
-      NativeFunction("log", 100, POW, LONG, "Math log",
+      NativeFunction("log", 100, LOG, LONG, "Math log",
           ("value", LONG, "value"), ("ep", LONG, "value decimal"),
           ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
           ("rp", LONG, "results decimal"),
@@ -596,7 +596,7 @@ object PureContext {
             || ep < 0
             || ep > 8
             || rp < 0
-            || ep < 8
+            || rp > 8
           ) {
             Left("log: scale out of range 0-8")
           } else {

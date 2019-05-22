@@ -627,4 +627,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
+
+  property("math functions") {
+    val script = "pow(12, 1, 3456, 3, 2, DOWN)"
+    eval[EVALUATED](script, None) shouldBe Right(CONST_LONG(187))
+  }
 }
