@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
+import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
@@ -32,11 +32,7 @@ import monix.reactive.{Observable, Observer}
 import scala.collection.JavaConverters._
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time,
-                  blockchain: Blockchain,
-                  spendableBalanceChanged: Observer[(Address, Asset)],
-                  fs: FunctionalitySettings,
-                  utxSettings: UtxSettings)
+class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: Observer[(Address, Asset)], utxSettings: UtxSettings)
     extends ScorexLogging
     with AutoCloseable
     with UtxPool {
@@ -146,7 +142,7 @@ class UtxPoolImpl(time: Time,
 
       for {
         _    <- TracedResult(checks)
-        diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
+        diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
         pessimisticPortfolios.add(tx.id(), diff)
         transactions.put(tx.id(), tx)
@@ -192,35 +188,43 @@ class UtxPoolImpl(time: Time,
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
-        .iterator
-        .scanLeft((Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
+        .iterator        .scanLeft((Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
           case ((valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
-            val updatedBlockchain = composite(blockchain, diff)
-            if (TxCheck.isExpired(tx)) {
-              log.trace(s"Transaction [${tx.id()}] is expired")
-              remove(tx.id())
-              (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+            val preUpdatedRest = currRest.put(blockchain, tx, Diff.empty) // TODO: Doesn't handle scriptRuns/scriptComplexity
+            if (preUpdatedRest.isOverfilled) {
+              if (preUpdatedRest != lastOverfilled) {
+                log.trace(
+                  s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, preUpdatedRest).mkString(", ")}")
+              }
+              (valid, diff, currRest, currRest.isEmpty, preUpdatedRest, iterations + 1)
             } else {
-              differ(updatedBlockchain, tx).resultE match {
-                case Right(newDiff) =>
-                  val updatedRest = currRest.put(updatedBlockchain, tx, newDiff)
-                  if (updatedRest.isOverfilled) {
-                    if (updatedRest != lastOverfilled) {
-                      log.trace(
-                        s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+              val updatedBlockchain = composite(blockchain, diff)
+              if (TxCheck.isExpired(tx)) {
+                log.trace(s"Transaction [${tx.id()}] is expired")
+                remove(tx.id())
+                (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+              } else {
+                differ(updatedBlockchain, tx).resultE match {
+                  case Right(newDiff) =>
+                    val updatedRest = currRest.put(updatedBlockchain, tx, newDiff)
+                    if (updatedRest.isOverfilled) {
+                      if (updatedRest != lastOverfilled) {
+                        log.trace(
+                          s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+                      }
+                      (valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
+                    } else {
+                      (tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
                     }
-                    (valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
-                  } else {
-                    (tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
-                  }
-                case Left(error) =>
-                  log.trace(s"Transaction [${tx.id()}] is removed: $error")
-                  remove(tx.id())
-                  (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                  case Left(error) =>
+                    log.trace(s"Transaction [${tx.id()}] is removed: $error")
+                    remove(tx.id())
+                    (valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
+                }
               }
             }
         }
@@ -235,7 +239,7 @@ class UtxPoolImpl(time: Time,
 
   //noinspection ScalaStyle
   private[this] object TxCheck {
-    private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
+    private[this] val ExpirationTime = blockchain.settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis
 
     def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()): Boolean = {
       (currentTime - transaction.timestamp) > ExpirationTime
@@ -247,7 +251,7 @@ class UtxPoolImpl(time: Time,
                  height: Int = blockchain.height): Either[ValidationError, Diff] = {
       for {
         _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
-        diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
+        diff <- TransactionDiffer(lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
       } yield diff
     }
 

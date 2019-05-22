@@ -48,9 +48,11 @@ case object AlreadyProcessed                                 extends WrappedMatc
 case class OrderAccepted(order: Order)                       extends WrappedMatcherResponse(C.OK, Json.obj("message"       -> order.json()))
 case class OrderCanceled(orderId: ByteStr)                   extends WrappedMatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
 case class OrderDeleted(orderId: ByteStr)                    extends WrappedMatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
+
 case class GetOrderBookResponse(orderBookResult: OrderBookResult) extends MatcherResponse(C.OK) {
   override def content: String = OrderBookResult.toJson(orderBookResult)
 }
+
 case class BatchCancelCompleted(orders: Map[Order.Id, WrappedMatcherResponse])
     extends WrappedMatcherResponse(C.OK, Json.obj("message" -> Json.arr(orders.values.map(_.json))))
 
@@ -62,3 +64,4 @@ case object OperationTimedOut                        extends WrappedMatcherRespo
 case class OrderBookUnavailable(error: MatcherError) extends WrappedMatcherResponse(C.ServiceUnavailable, error)
 case object DuringStart                              extends WrappedMatcherResponse(C.ServiceUnavailable, MatcherError.MatcherIsStarting)
 case object DuringShutdown                           extends WrappedMatcherResponse(C.ServiceUnavailable, MatcherError.MatcherIsStopping)
+case class InfoNotFound(error: MatcherError)         extends WrappedMatcherResponse(C.NotFound, error)
