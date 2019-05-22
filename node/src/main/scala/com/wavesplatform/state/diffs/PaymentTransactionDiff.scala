@@ -26,7 +26,7 @@ object PaymentTransactionDiff {
               balance = -tx.amount - tx.fee,
               LeaseBalance.empty,
               assets = Map.empty
-            )),
+            ))
         ))
     }
   }
