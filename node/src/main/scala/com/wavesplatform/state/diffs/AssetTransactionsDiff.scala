@@ -23,7 +23,8 @@ object AssetTransactionsDiff {
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
         assetScripts = Map(asset -> tx.script).filter(_._2.isDefined),
-        scriptsRun = countScriptRuns(blockchain, tx)
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
       ))
   }
 
@@ -39,10 +40,11 @@ object AssetTransactionsDiff {
             scriptsRun =
               // Asset script doesn't count before Ride4DApps activation
               if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)) {
-                countScriptRuns(blockchain, tx)
+                DiffsCommon.countScriptRuns(blockchain, tx)
               } else {
                 Some(tx.sender.toAddress).count(blockchain.hasScript)
-              }
+              },
+            scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
           ))
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
@@ -73,7 +75,8 @@ object AssetTransactionsDiff {
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))),
               assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable)),
-              scriptsRun = countScriptRuns(blockchain, tx)
+              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+              scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
             ))
         }
       } else {
@@ -90,7 +93,8 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))),
         assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity)),
-        scriptsRun = countScriptRuns(blockchain, tx)
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
       )
     }
   }
@@ -104,7 +108,8 @@ object AssetTransactionsDiff {
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
           sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
-          scriptsRun = countScriptRuns(blockchain, tx)
+          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+          scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
         ),
         GenericError("Sponsorship smart assets is disabled.")
       )
@@ -128,7 +133,4 @@ object AssetTransactionsDiff {
         Right({})
     }
   }
-
-  private[this] def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
-    tx.checkedAssets().count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
 }

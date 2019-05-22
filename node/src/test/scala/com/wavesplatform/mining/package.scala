@@ -9,6 +9,7 @@ package object mining {
     new com.wavesplatform.mining.TxEstimators.Fn {
       override def apply(b: Blockchain, t: Transaction, d: Diff) = transactionSize
       override val minEstimate                          = transactionSize
+      override def toString(): String = s"const($transactionSize)"
     }
   )
 }

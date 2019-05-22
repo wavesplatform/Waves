@@ -333,6 +333,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       ) {
         case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
+          blockDiff.scriptsComplexity shouldBe (allAllowed.complexity * 31)
       }
     }) { x =>
       x
