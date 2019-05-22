@@ -121,7 +121,7 @@ object CryptoContext {
     val checkMerkleProofF: BaseFunction =
       NativeFunction(
         "checkMerkleProof",
-        100,
+        30,
         CHECK_MERKLE_PROOF,
         BOOLEAN,
         "Check validity of merkle tree proof",
