@@ -5,14 +5,13 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
-import com.wavesplatform.lang.directives.values._
 
 object CryptoContext {
 
@@ -119,6 +118,22 @@ object CryptoContext {
         case xs                               => notImplemented("fromBase64String(str: String)", xs)
       }
 
+    val checkMerkleProofF: BaseFunction =
+      NativeFunction(
+        "checkMerkleProof",
+        30,
+        CHECK_MERKLE_PROOF,
+        BOOLEAN,
+        "Check validity of merkle tree proof",
+        ("merkleRoot", BYTESTR, "root hash of merkle tree"),
+        ("merkleProof", BYTESTR, "proof bytes"),
+        ("valueBytes", BYTESTR, "bytes of value to be prooven")
+      ) {
+        case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
+          Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
+        case _ => ???
+      }
+
     def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).map(CONST_STRING)
       case xs                                         => notImplemented("toBase16String(bytes: byte[])", xs)
@@ -129,7 +144,7 @@ object CryptoContext {
         case CONST_STRING(str: String) :: Nil => global.base16Decode(str, global.MaxBase64String).map(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented("fromBase16String(str: String)", xs)
       }
- 
+
     val v1Functions =
       Array(
         keccak256F,
@@ -166,7 +181,13 @@ object CryptoContext {
       ("SHA3512", ((sha3512, "SHA3-256 digest algorithm"), digestAlgValue(sha3512)))
     )
 
-    val v3Functions = Array(rsaVerifyF, toBase16StringF, fromBase16StringF)
+    val v3Functions =
+      Array(
+        rsaVerifyF,
+        checkMerkleProofF,
+        toBase16StringF,
+        fromBase16StringF
+      )
 
     version match {
             case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)

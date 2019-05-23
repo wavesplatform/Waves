@@ -58,6 +58,8 @@ object FunctionIds {
   val TOBASE16: Short   = 604
   val FROMBASE16: Short = 605
 
+  val CHECK_MERKLE_PROOF: Short = 700
+
   // Waves
   val GETTRANSACTIONBYID: Short    = 1000
   val TRANSACTIONHEIGHTBYID: Short = 1001
