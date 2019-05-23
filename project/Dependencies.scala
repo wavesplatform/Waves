@@ -127,6 +127,7 @@ object Dependencies {
       "com.iheart"           %% "ficus" % "1.4.2",
       logback                % Runtime,
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
+      "org.codehaus.janino" % "janino" % "3.0.12"  % Runtime,
       kamonCore,
       kamonModule("system-metrics", "1.0.0"),
       kamonModule("akka-2.5", "1.1.1"),

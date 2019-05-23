@@ -32,7 +32,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
+import com.wavesplatform.utils.{LoggerFacade, NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -48,6 +48,7 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -351,7 +352,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 }
 
-object Application extends ScorexLogging {
+object Application {
   def main(args: Array[String]): Unit = {
 
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
@@ -386,12 +387,14 @@ object Application extends ScorexLogging {
     }
 
     val config = readConfig(configFile)
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
 
-    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
-    System.setProperty("waves.directory", config.getString("waves.directory"))
+    val log = LoggerFacade(LoggerFactory.getLogger(getClass))
     log.info("Starting...")
     sys.addShutdownHook {
       SystemInformationReporter.report(config)
