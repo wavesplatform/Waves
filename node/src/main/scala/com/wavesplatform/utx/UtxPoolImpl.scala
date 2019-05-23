@@ -233,7 +233,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
               }
             }
         }
-        .takeWhile(!_._4 && !isTimeLimitReached) // !currRest.isEmpty
+        .takeWhile(r => !r._4 && (r._1.isEmpty || !isTimeLimitReached)) // !currRest.isEmpty && (validTxs.isEmpty || !isTimeLimitReached)
         .reduce((_, right) => right)
     }
 
