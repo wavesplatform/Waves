@@ -185,10 +185,10 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |  @Verifier(tx)
          |  func verify() = {
          |
-         |    let block = extract(blockInfoByHeight(${height + 2}))
+         |    let block = extract(blockInfoByHeight(${height + 1}))
          |    let checkTs = lastBlock.timestamp == block.timestamp
-         |    let checkHeight = block.height == ${height + 2}
-         |    let checkHeightLast = lastBlock.height == ${height + 2}
+         |    let checkHeight = block.height == ${height + 1}
+         |    let checkHeightLast = lastBlock.height == ${height + 1}
          |    checkTs && checkHeight
          |  }
       """.stripMargin
