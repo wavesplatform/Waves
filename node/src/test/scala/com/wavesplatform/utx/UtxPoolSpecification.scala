@@ -437,7 +437,7 @@ class UtxPoolSpecification
 
         val maxNumber             = Math.max(utx.all.size / 2, 3)
         val rest                  = limitByNumber(maxNumber)
-        val (packed, restUpdated) = utx.packUnconfirmed(rest, FiniteDuration(5, "second"))
+        val (packed, restUpdated) = utx.packUnconfirmed(rest, 5.seconds)
 
         packed.lengthCompare(maxNumber) should be <= 0
         if (maxNumber <= utx.all.size) restUpdated.isEmpty shouldBe true
@@ -450,7 +450,7 @@ class UtxPoolSpecification
 
         time.advance(maxAge + 1000.millis)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), FiniteDuration(5, "second"))
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
         packed shouldBe 'empty
         utx.all shouldBe 'empty
     }
@@ -462,7 +462,7 @@ class UtxPoolSpecification
 
         time.advance(offset)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), FiniteDuration(5, "second"))
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
         packed.size shouldBe 2
         utx.all.size shouldBe 2
     }
@@ -517,7 +517,7 @@ class UtxPoolSpecification
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber),
                           OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one)))
-        val (packed, _) = utx.packUnconfirmed(constraint, FiniteDuration(5, "second"))
+        val (packed, _) = utx.packUnconfirmed(constraint, 5.seconds)
         packed.size shouldBe (unscripted.size + 1)
         packed.count(scripted.contains) shouldBe 1
       }
@@ -548,7 +548,7 @@ class UtxPoolSpecification
           val poolSizeBefore  = utxPool.size
 
           time.advance(maxAge * 2)
-          utxPool.packUnconfirmed(limitByNumber(100), FiniteDuration(5, "second"))
+          utxPool.packUnconfirmed(limitByNumber(100), 5.seconds)
 
           poolSizeBefore should be > utxPool.size
           val portfolioAfter = utxPool.pessimisticPortfolio(sender)
