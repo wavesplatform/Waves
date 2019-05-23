@@ -17,7 +17,6 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    allow-blacklisted-transfer-to = ["b"]
         |    allow-transactions-from-smart-accounts = false
         |    allow-skip-checks = false
-        |    max-pack-time = 5s
         |  }
         |}""".stripMargin).resolve()
 

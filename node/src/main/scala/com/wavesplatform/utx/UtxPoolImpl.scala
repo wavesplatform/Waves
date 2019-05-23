@@ -30,6 +30,7 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.{Duration => ScalaDuration}
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: Observer[(Address, Asset)], utxSettings: UtxSettings)
@@ -187,12 +188,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
-      val maxPackTime = utxSettings.maxPackTime.toNanos
       val startTime = System.nanoTime()
-      def isTimeLimitReached: Boolean = (System.nanoTime() - startTime) >= maxPackTime
+      def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (System.nanoTime() - startTime) >= maxPackTime.toNanos
 
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
@@ -292,7 +292,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
-      UtxPoolImpl.this.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)
+      UtxPoolImpl.this.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
     }
   }
 

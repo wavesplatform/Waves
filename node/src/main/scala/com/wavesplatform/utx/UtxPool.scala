@@ -8,6 +8,8 @@ import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 
+import scala.concurrent.duration.Duration
+
 trait UtxPool extends AutoCloseable {
   self =>
 
@@ -25,6 +27,6 @@ trait UtxPool extends AutoCloseable {
 
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
-  def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint)
+  def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint)
 
 }
