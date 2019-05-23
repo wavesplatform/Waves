@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, ask, gracefulStop}
+import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
@@ -73,7 +73,7 @@ class Matcher(actorSystem: ActorSystem,
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef, notifyAddresses: Boolean): Props = OrderBookActor.props(
+  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
     matcherActor,
     addressActors,
     pair,
@@ -81,8 +81,7 @@ class Matcher(actorSystem: ActorSystem,
     marketStatuses.put(pair, _),
     matcherSettings,
     transactionCreator.createTransaction,
-    time,
-    notifyAddresses
+    time
   )
 
   private val matcherQueue: MatcherQueue = settings.matcherSettings.eventsQueue.tpe match {
@@ -180,17 +179,17 @@ class Matcher(actorSystem: ActorSystem,
         new AddressDirectory(
           spendableBalanceChanged,
           matcherSettings,
-          address =>
-            Props(
-              new AddressActor(
-                address,
-                utx.spendableBalance(address, _),
-                5.seconds,
-                time,
-                orderDb,
-                id => blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
-                matcherQueue.storeEvent
-              ))
+          (address, startSchedules) =>
+            Props(new AddressActor(
+              address,
+              utx.spendableBalance(address, _),
+              5.seconds,
+              time,
+              orderDb,
+              id => blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
+              matcherQueue.storeEvent,
+              startSchedules
+            ))
         )),
       "addresses"
     )
@@ -260,9 +259,8 @@ class Matcher(actorSystem: ActorSystem,
       lastOffsetQueue <- getLastOffset(deadline)
       _ = log.info(s"Last queue offset is $lastOffsetQueue")
       _ <- waitOffsetReached(lastOffsetQueue, deadline)
-      _ = log.info("Last offset has been reached, waiting order books to recover address actors")
-      _ <- matcher.ask(MatcherActor.StartNotifyAddresses)(settings.matcherSettings.orderBooksRecoveringTimeout)
-    } yield ()
+      _ = log.info("Last offset has been reached, notify addresses")
+    } yield addressActors ! AddressDirectory.StartSchedules
 
     startGuard.onComplete {
       case Success(_) => setStatus(Status.Working)

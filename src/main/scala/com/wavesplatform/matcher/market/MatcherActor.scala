@@ -5,13 +5,13 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.google.common.base.Charsets
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.OrderBookUnavailable
 import com.wavesplatform.matcher.db.AssetPairsDB
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.util.WorkingStash
-import com.wavesplatform.matcher.{MatcherSettings, WatchDistributedCompletionActor}
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -23,7 +23,7 @@ class MatcherActor(settings: MatcherSettings,
                    assetPairsDB: AssetPairsDB,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-                   orderBookActorProps: (AssetPair, ActorRef, Boolean) => Props,
+                   orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
     extends Actor
     with WorkingStash
@@ -33,7 +33,6 @@ class MatcherActor(settings: MatcherSettings,
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
-  private var notifyAddresses                         = false
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
   private var lastProcessedNr: Long                   = -1L
@@ -79,7 +78,7 @@ class MatcherActor(settings: MatcherSettings,
 
   private def createOrderBook(pair: AssetPair): ActorRef = {
     log.info(s"Creating order book for $pair")
-    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self, notifyAddresses), OrderBookActor.name(pair)))
+    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
     childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
@@ -150,12 +149,6 @@ class MatcherActor(settings: MatcherSettings,
 
     case request: ForceStartOrderBook =>
       runFor(request.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
-
-    case StartNotifyAddresses =>
-      val s = sender()
-      if (childrenNames.isEmpty) s ! AddressesNotified
-      else context.actorOf(recoverAddressesWatcherProps(childrenNames.keys.toSet, s), "order-book-recover-addresses")
-      notifyAddresses = true
 
     case Shutdown =>
       context.children.foreach(context.unwatch)
@@ -251,7 +244,7 @@ object MatcherActor {
             assetPairsDB: AssetPairsDB,
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            orderBookProps: (AssetPair, ActorRef, Boolean) => Props,
+            orderBookProps: (AssetPair, ActorRef) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
@@ -287,9 +280,6 @@ object MatcherActor {
 
   case class MatcherRecovered(oldestEventNr: Long)
 
-  case object StartNotifyAddresses
-  case object AddressesNotified
-
   case object Shutdown
 
   case class AssetInfo(decimals: Int)
@@ -308,7 +298,4 @@ object MatcherActor {
     else if (buffer2.isEmpty) 1
     else ByteArray.compare(buffer1.get, buffer2.get)
   }
-
-  private def recoverAddressesWatcherProps(orderBooks: Set[ActorRef], receiver: ActorRef): Props =
-    WatchDistributedCompletionActor.props(orderBooks, receiver, StartNotifyAddresses, AddressesNotified)
 }

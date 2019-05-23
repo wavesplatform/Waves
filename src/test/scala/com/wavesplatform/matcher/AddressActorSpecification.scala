@@ -193,7 +193,8 @@ class AddressActorSpecification
           event => {
             eventsProbe.ref ! event
             Future.successful(Some(QueueEventWithMeta(0, 0, event)))
-          }
+          },
+          false
         )))
     f(
       addressActor,

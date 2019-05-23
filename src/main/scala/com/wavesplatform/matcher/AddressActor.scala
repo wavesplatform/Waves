@@ -33,6 +33,7 @@ class AddressActor(
     orderDB: OrderDB,
     hasOrder: Order.Id => Boolean,
     storeEvent: StoreEvent,
+    var enableSchedules: Boolean
 ) extends Actor
     with ScorexLogging {
 
@@ -140,6 +141,12 @@ class AddressActor(
           scheduleExpiration(lo.order)
         }
       }
+
+    case AddressDirectory.StartSchedules =>
+      if (!enableSchedules) {
+        enableSchedules = true
+        activeOrders.values.foreach(x => scheduleExpiration(x.order))
+      }
   }
 
   private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], error: Resp): Future[Resp] = {
@@ -215,7 +222,7 @@ class AddressActor(
       }
   }
 
-  private def scheduleExpiration(order: Order): Unit = {
+  private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
     log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
     expiration +=
