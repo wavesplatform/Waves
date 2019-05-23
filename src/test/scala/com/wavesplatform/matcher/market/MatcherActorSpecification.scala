@@ -96,7 +96,7 @@ class MatcherActorSpecification
             mkAssetPairsDB,
             doNothingOnRecovery,
             ob,
-            (_, _, _) => Props(new FailAtStartActor),
+            (_, _) => Props(new FailAtStartActor),
             blockchain.assetDescription
           )
         )
@@ -149,7 +149,7 @@ class MatcherActorSpecification
             mkAssetPairsDB,
             startResult => working = startResult.isRight,
             ob,
-            (_, _, _) => Props(new FailAtStartActor()),
+            (_, _) => Props(new FailAtStartActor()),
             blockchain.assetDescription
           )
         )
@@ -179,7 +179,7 @@ class MatcherActorSpecification
                 apdb,
                 startResult => stopped = startResult.isLeft,
                 ob,
-                (_, _, _) => Props(new FailAtStartActor),
+                (_, _) => Props(new FailAtStartActor),
                 blockchain.assetDescription
               )
             )
@@ -205,7 +205,7 @@ class MatcherActorSpecification
                 apdb,
                 startResult => stopped = startResult.isLeft,
                 ob,
-                (_, _, _) => Props(new NothingDoActor),
+                (_, _) => Props(new NothingDoActor),
                 blockchain.assetDescription
               )
             )
@@ -310,7 +310,7 @@ class MatcherActorSpecification
               mkAssetPairsDB,
               _ => {},
               ob,
-              (pair, matcherActor, _) => Props(new RecoveringActor(matcherActor, pair)),
+              (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
               blockchain.assetDescription
             )
           )
@@ -340,7 +340,7 @@ class MatcherActorSpecification
         mkAssetPairsDB,
         doNothingOnRecovery,
         emptyOrderBookRefs,
-        (assetPair, _, _) => {
+        (assetPair, _) => {
           val idx = assetPairs.indexOf(assetPair)
           if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
           r(idx)._1
@@ -377,20 +377,16 @@ class MatcherActorSpecification
                            apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref): TestActorRef[MatcherActor] = {
     val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
-    val r = TestActorRef(
+    TestActorRef(
       new MatcherActor(
         matcherSettings,
         apdb,
         doNothingOnRecovery,
         ob,
-        (assetPair, matcher, notify) =>
-          OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, notify),
+        (assetPair, matcher) => OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
         blockchain.assetDescription
       )
     )
-    val probe = TestProbe()
-    probe.send(r, MatcherActor.StartNotifyAddresses)
-    r
   }
 
   private def mkAssetPairsDB: AssetPairsDB = AssetPairsDB(db)

@@ -31,12 +31,12 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
   private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
-    obcTestWithPrepare(_ => (), notifyAtStart = true) { (pair, actor, probe) =>
+    obcTestWithPrepare(_ => ()) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
-  private def obcTestWithPrepare(prepare: AssetPair => Unit, notifyAtStart: Boolean = false)(
+  private def obcTestWithPrepare(prepare: AssetPair => Unit)(
       f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
@@ -55,8 +55,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
         update(pair),
         p => Option(md.get(p)),
         txFactory,
-        ntpTime,
-        notifyAtStart
+        ntpTime
       ) with RestartableActor)
 
     f(pair, actor, tp)
@@ -77,7 +76,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
-    "recovery - notify address actor about orders if notifyAtStart=true" in obcTestWithPrepare(
+    "recovery - notify address actor about orders" in obcTestWithPrepare(
       { p =>
         val ord = buy(p, 10 * Order.PriceConstant, 100)
         val ob  = OrderBook.empty
@@ -86,51 +85,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           OrderBookActor.name(p),
           Snapshot(OrderBookActor.Snapshot(Some(50), ob.snapshot))
         )
-      },
-      notifyAtStart = true
+      }
     ) { (pair, _, tp) =>
+      tp.expectMsgType[OrderAdded]
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
-      tp.expectMsgType[OrderAdded]
-    }
-
-    "recovery - don't notify address actor about orders until receive StartNotifyAddresses" in obcTestWithPrepare { p =>
-      val ord = buy(p, 10 * Order.PriceConstant, 100)
-      val ob  = OrderBook.empty
-      ob.add(ord, ord.timestamp)
-      SnapshotUtils.provideSnapshot(
-        OrderBookActor.name(p),
-        Snapshot(OrderBookActor.Snapshot(Some(50), ob.snapshot))
-      )
-    } { (pair, orderBook, tp) =>
-      tp.expectMsg(OrderBookRecovered(pair, Some(50)))
-      tp.expectNoMessage()
-
-      val p = TestProbe()
-      p.send(orderBook, MatcherActor.StartNotifyAddresses)
-      tp.expectMsgType[OrderAdded]
-    }
-
-    "recovered - don't notify address actor about orders until receive StartNotifyAddresses" in obcTestWithPrepare(_ => ()) { (pair, orderBook, tp) =>
-      tp.expectMsgType[OrderBookRecovered]
-      val p = TestProbe()
-
-      val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
-      p.send(orderBook, wrap(ord1))
-      tp.expectNoMessage()
-
-      p.send(orderBook, MatcherActor.StartNotifyAddresses)
-      tp.expectMsgType[OrderAdded]
-    }
-
-    "notify about new orders after receive StartNotifyAddresses" in obcTestWithPrepare(_ => ()) { (pair, orderBook, tp) =>
-      tp.expectMsgType[OrderBookRecovered]
-
-      val p = TestProbe()
-      p.send(orderBook, MatcherActor.StartNotifyAddresses)
-
-      val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
-      p.send(orderBook, wrap(ord1))
-      tp.expectMsgType[OrderAdded]
     }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, orderBook, tp) =>
@@ -144,9 +102,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       orderBook ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       orderBook ! RestartActor
-      tp.expectMsgType[OrderBookRecovered]
 
       tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o)))
+      tp.expectMsgType[OrderBookRecovered]
     }
 
     "execute partial market orders and preserve remaining after restart" in obcTest { (pair, actor, tp) =>
@@ -160,9 +118,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
-      actor ! RestartActor
-      tp.expectMsgType[OrderBookRecovered]
 
+      actor ! RestartActor
       tp.expectMsg(
         OrderAdded(
           SellLimitOrder(
@@ -170,6 +127,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
             ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
             ord2
           )))
+      tp.expectMsgType[OrderBookRecovered]
     }
 
     "execute one order fully and other partially and restore after restart" in obcTest { (pair, actor, tp) =>
@@ -185,7 +143,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
-      tp.expectMsgType[OrderBookRecovered]
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
@@ -195,6 +152,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
             ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2
           )))
+      tp.expectMsgType[OrderBookRecovered]
     }
 
     "match multiple best orders at once and restore after restart" in obcTest { (pair, actor, tp) =>
@@ -212,7 +170,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
-      tp.expectMsgType[OrderBookRecovered]
 
       val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
       tp.expectMsg(
@@ -222,6 +179,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
             ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2
           )))
+      tp.expectMsgType[OrderBookRecovered]
     }
 
     "place orders and restart without waiting for response" in obcTest { (pair, actor, tp) =>
@@ -239,11 +197,11 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       actor ! RestartActor
-      tp.expectMsgType[OrderBookRecovered]
 
       within(10.seconds) {
         tp.receiveN(100)
       }
+      tp.expectMsgType[OrderBookRecovered]
     }
 
     "ignore outdated requests" in obcTest { (pair, actor, tp) =>

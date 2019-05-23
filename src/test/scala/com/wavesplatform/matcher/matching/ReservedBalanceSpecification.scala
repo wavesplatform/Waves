@@ -85,17 +85,17 @@ class ReservedBalanceSpecification
       new AddressDirectory(
         ignoreSpendableBalanceChanged,
         matcherSettings,
-        address =>
-          Props(
-            new AddressActor(
-              address,
-              _ => 0L,
-              5.seconds,
-              ntpTime,
-              new TestOrderDB(100),
-              _ => false,
-              _ => Future.failed(new IllegalStateException("Should not be used in the test"))
-            ))
+        (address, enableSchedules) =>
+          Props(new AddressActor(
+            address,
+            _ => 0L,
+            5.seconds,
+            ntpTime,
+            new TestOrderDB(100),
+            _ => false,
+            _ => Future.failed(new IllegalStateException("Should not be used in the test")),
+            enableSchedules
+          ))
       )
     ))
 
