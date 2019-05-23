@@ -190,9 +190,9 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
-      import scala.concurrent.duration._
+      val maxPackTime = utxSettings.maxPackTime.toNanos
       val startTime = System.nanoTime()
-      def isTimeLimitReached: Boolean = (System.nanoTime() - startTime).nanos >= utxSettings.maxPackTime
+      def isTimeLimitReached: Boolean = (System.nanoTime() - startTime) >= maxPackTime
 
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
