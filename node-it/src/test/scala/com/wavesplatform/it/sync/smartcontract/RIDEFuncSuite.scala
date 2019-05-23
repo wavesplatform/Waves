@@ -173,10 +173,8 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }
 
-  test("last block and block by height") {
-    val height = nodes.height.max
-
-    val scriptText =
+  test("lastBlock and blockInfoByHeight(last) must return liquid block") {
+    val script = ScriptCompiler.compile(
       s"""
          |  {-# STDLIB_VERSION 3       #-}
          |  {-# CONTENT_TYPE   DAPP    #-}
@@ -184,41 +182,22 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |
          |  @Verifier(tx)
          |  func verify() = {
+         |    let block = extract(blockInfoByHeight(height))
          |
-         |    let block = extract(blockInfoByHeight(${height + 1}))
          |    let checkTs = lastBlock.timestamp == block.timestamp
-         |    let checkHeight = block.height == ${height + 1}
-         |    let checkHeightLast = lastBlock.height == ${height + 1}
-         |    checkTs && checkHeight
+         |    let checkHeight = block.height == height
+         |    let checkHeightLast = lastBlock.height == height
+         |    checkTs && checkHeight && checkHeightLast
          |  }
-      """.stripMargin
+      """.stripMargin).explicitGet()._1
 
-    val compiledScript = ScriptCompiler.compile(scriptText).explicitGet()._1
-
-    val newAddress   = sender.createAddress()
-    val pkNewAddress = pkByAddress(newAddress)
+    val newAddress = sender.createAddress()
     sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
 
-    val scriptSet = SetScriptTransaction.selfSigned(
-      pkNewAddress,
-      Some(compiledScript),
-      setScriptFee,
-      System.currentTimeMillis()
-    )
-    val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
-    nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
+    val setScript = sender.setScript(newAddress, Some(script.bytes().base64), setScriptFee)
+    nodes.waitForHeightAriseAndTxPresent(setScript.id)
 
-    val transfer = TransferTransactionV2.selfSigned(
-      Waves,
-      pkNewAddress,
-      pkNewAddress,
-      1.waves,
-      System.currentTimeMillis(),
-      Waves,
-      smartMinFee,
-      Array()
-    )
-    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
-    nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
+    val transfer = sender.transfer(newAddress, newAddress, 1.waves, minFee + (2 * smartFee))
+    nodes.waitForHeightAriseAndTxPresent(transfer.id)
   }
 }
