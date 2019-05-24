@@ -43,7 +43,7 @@ object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
     def name: String = n.settings.networkSettings.nodeName
     def publicKeyStr: String = Base58.encode(n.publicKey)
-    def fee(txTypeId: Byte): Long = CommonValidation.FeeConstants(txTypeId) * CommonValidation.FeeUnit
+    def fee(txTypeId: Byte): Long = CommonValidation.OldFeeConstants(txTypeId) * CommonValidation.FeeUnit
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }
 }

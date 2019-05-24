@@ -45,8 +45,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   def ciFee(sc: Int = 0): Gen[Long] =
     Gen.choose(
-      CommonValidation.FeeUnit * CommonValidation.FeeConstants(InvokeScriptTransaction.typeId) + sc * CommonValidation.ScriptExtraFee,
-      CommonValidation.FeeUnit * CommonValidation.FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * CommonValidation.ScriptExtraFee - 1
+      CommonValidation.FeeUnit * CommonValidation.OldFeeConstants(InvokeScriptTransaction.typeId) + sc * CommonValidation.ScriptExtraFee,
+      CommonValidation.FeeUnit * CommonValidation.OldFeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * CommonValidation.ScriptExtraFee - 1
     )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -632,7 +632,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   }
 
   val chainId   = AddressScheme.current.chainId
-  val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(IssueTransactionV2.typeId) * CommonValidation.FeeUnit
+  val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.OldFeeConstants(IssueTransactionV2.typeId) * CommonValidation.FeeUnit
 
   property("invoking contract receive payment") {
     forAll(for {

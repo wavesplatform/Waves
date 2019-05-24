@@ -2,14 +2,15 @@ package com.wavesplatform.state
 
 import java.nio.charset.StandardCharsets.UTF_8
 
-import io.swagger.annotations.ApiModelProperty
-
-import scala.annotation.meta.field
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.DataEntry._
-import play.api.libs.json._
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.state.DataEntry._
+import io.swagger.annotations.ApiModelProperty
+import monix.eval.Coeval
+import play.api.libs.json._
+
+import scala.annotation.meta.field
 
 sealed abstract class DataEntry[T](
     @(ApiModelProperty @field)(required = true, dataType = "java.lang.String", value = "integer", allowableValues = "integer,boolean,binary,string")
@@ -18,11 +19,12 @@ sealed abstract class DataEntry[T](
     val value: T) {
   def valueBytes: Array[Byte]
 
-  def toBytes: Array[Byte] = {
+  private[this] val bytes = Coeval.evalOnce {
     val keyBytes = key.getBytes(UTF_8)
     Array.concat(Shorts.toByteArray(keyBytes.length.toShort), keyBytes, valueBytes)
   }
 
+  def toBytes: Array[Byte] = bytes()
   def toJson: JsObject = Json.obj("key" -> key, "type" -> `type`)
   def valid: Boolean   = key.length <= MaxKeySize
 }

@@ -146,7 +146,7 @@ object InvokeScriptTransactionDiff {
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) 1 else 0)
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val minWaves = totalScriptsInvoked * ScriptExtraFee + OldFeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             Either.cond(
               minWaves <= wavesFee,
               (),
@@ -161,7 +161,7 @@ object InvokeScriptTransactionDiff {
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val minWaves = totalScriptsInvoked * ScriptExtraFee + OldFeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
