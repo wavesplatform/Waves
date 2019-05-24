@@ -110,13 +110,11 @@ object Dependencies {
     ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
     jacksonModule("dataformat", "dataformat-properties"),
     "org.asynchttpclient" % "async-http-client" % "2.7.0",
-    "org.scalacheck"      %% "scalacheck"       % "1.14.0",
-    "org.codehaus.janino" % "janino" % "3.0.12"  % Runtime
+    "org.scalacheck"      %% "scalacheck"       % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
     logback.exclude("org.scala-js", "scalajs-library_2.12"),
-    "org.codehaus.janino" % "janino" % "3.0.12"  % Runtime,
     "org.scalacheck" %% "scalacheck" % "1.14.0",
     ("io.github.amrhassan" %% "scalacheck-cats" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
     "org.mockito"   % "mockito-all"                  % "1.10.19",
