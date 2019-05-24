@@ -176,6 +176,7 @@ object UtilApp {
     //noinspection ScalaDeprecation
     def doCompile(c: Command, str: Array[Byte]): ActionResult =
       ScriptCompiler(new String(str), c.compileOptions.assetScript)
+      .map {r => println(r._1.complexity); r}
         .map(_._1.bytes())
 
     def doDecompile(c: Command, data: Array[Byte]): ActionResult = {

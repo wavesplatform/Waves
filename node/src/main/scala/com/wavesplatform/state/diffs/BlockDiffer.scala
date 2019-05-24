@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats.Monoid
 import cats.implicits._
 import cats.syntax.either.catsSyntaxEitherId
-import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -11,6 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
@@ -52,20 +52,17 @@ object BlockDiffer extends ScorexLogging {
       else
         None
 
+    val compositeBlockchain = CompositeBlockchain.composite(blockchain, Diff.empty, block = Some(block))
     for {
       _ <- TracedResult(block.signaturesValid())
       r <- apply(
-        blockchain,
+        compositeBlockchain,
         constraint,
         maybePrevBlock.map(_.timestamp),
-        block.signerData.generator,
         prevBlockFeeDistr,
         currentBlockFeeDistr,
-        block.timestamp,
         block.transactionData,
-        stateHeight + 1,
-        verify,
-        Some(block)
+        verify
       )
     } yield r
   }
@@ -97,14 +94,10 @@ object BlockDiffer extends ScorexLogging {
         blockchain,
         constraint,
         prevBlockTimestamp,
-        micro.sender,
         None,
         None,
-        timestamp,
         micro.transactionData,
-        blockchain.height,
-        verify,
-        None
+        verify
       )
     } yield r
   }
@@ -112,17 +105,18 @@ object BlockDiffer extends ScorexLogging {
   private[this] def apply[Constraint <: MiningConstraint](blockchain: Blockchain,
                                                     initConstraint: Constraint,
                                                     prevBlockTimestamp: Option[Long],
-                                                    blockGenerator: Address,
                                                     prevBlockFeeDistr: Option[Portfolio],
                                                     currentBlockFeeDistr: Option[Portfolio],
-                                                    timestamp: Long,
                                                     txs: Seq[Transaction],
-                                                    currentBlockHeight: Int,
-                                                    verify: Boolean,
-                                                    newBlockOption: Option[Block]): TracedResult[ValidationError, Result[Constraint]] = {
+                                                    verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
       constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
-
+    
+    val currentBlockHeight = blockchain.height
+    val timestamp = blockchain.lastBlockTimestamp.get
+    val lastBlock = blockchain.lastBlock.get
+    val blockGenerator = lastBlock.sender.toAddress
+    
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
     val hasNg          = currentBlockFeeDistr.isEmpty
@@ -152,7 +146,7 @@ object BlockDiffer extends ScorexLogging {
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint)), _), tx) =>
-          val updatedBlockchain = composite(blockchain, currDiff, block = newBlockOption)
+          val updatedBlockchain = composite(blockchain, currDiff)
           txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
             if (updatedConstraint.isOverfilled)
@@ -178,17 +172,17 @@ object BlockDiffer extends ScorexLogging {
         case Result(diff, carry, totalFee, constraint) =>
           val diffWithCancelledLeases =
             if (currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight)
-              Monoid.combine(diff, CancelAllLeases(composite(blockchain, diff, block = newBlockOption)))
+              Monoid.combine(diff, CancelAllLeases(composite(blockchain, diff)))
             else diff
 
           val diffWithLeasePatches =
             if (currentBlockHeight == blockchain.settings.functionalitySettings.blockVersion3AfterHeight)
-              Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases, block = newBlockOption)))
+              Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases)))
             else diffWithCancelledLeases
 
           val diffWithCancelledLeaseIns =
             if (blockchain.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-              Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches, block = newBlockOption)))
+              Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
             else diffWithLeasePatches
 
           Result(diffWithCancelledLeaseIns, carry, totalFee, constraint)
