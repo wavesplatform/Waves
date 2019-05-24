@@ -15,7 +15,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
-import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -172,14 +171,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     Map.empty
   )
 
-  private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
+  private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt, excludeNFT: Boolean) = loadLposPortfolio(db, addressId).copy(
     assets = (for {
-      asset <- db.get(Keys.assetList(addressId))
+      issuedAsset <- db.get(Keys.assetList(addressId))
+      asset <- transactionInfo(issuedAsset.id).collect {
+        case (_, itx: IssueTransaction) if !excludeNFT || !itx.isNFT => IssuedAsset(itx.assetId())
+      }
     } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
   )
 
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _))
+    val excludeNFT = activatedFeatures.contains(BlockchainFeatures.ReduceNFTFee.id)
+    addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _, excludeNFT))
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
@@ -626,7 +629,34 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
 
-  override def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
+  override def portfolioNFT(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
+    val assetIdStream: CloseableIterator[IssuedAsset] = db
+      .get(Keys.addressId(address))
+      .fold(CloseableIterator.empty[IssuedAsset]) { id =>
+        val addressId = AddressId @@ id
+
+        val iter = db.get(Keys.assetList(addressId)).toIterator
+
+        CloseableIterator(iter, () => CloseableIterator.close(iter))
+      }
+
+    val issueTxStream = assetIdStream
+      .flatMap(ia => transactionInfo(ia.id, db).map(_._2))
+      .collect {
+        case itx: IssueTransaction if itx.isNFT => itx
+      }
+
+    from
+      .flatMap(ia => transactionInfo(ia.id, db))
+      .fold(issueTxStream) {
+        case (_, afterTx) =>
+          issueTxStream.dropWhile(_.id() != afterTx.id())
+      }
+  }
+
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
     db.get(Keys.addressId(address)).fold(CloseableIterator.empty[(Height, Transaction)]) { id =>
@@ -649,7 +679,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
               case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
               case None                   => Nil
-            })
+          })
 
         takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
           .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
@@ -757,8 +787,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
         val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        db
-          .get(Keys.transactionAt(height, txNum))
+        db.get(Keys.transactionAt(height, txNum))
           .collect { case lt: LeaseTransaction => lt }
       } else None
     }

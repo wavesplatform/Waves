@@ -12,6 +12,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 
@@ -60,6 +61,8 @@ case object EmptyBlockchain extends Blockchain {
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = None
 
   override def transactionHeight(id: ByteStr): Option[Int] = None
+
+  override def portfolioNFT(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = CloseableIterator.empty
 
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
