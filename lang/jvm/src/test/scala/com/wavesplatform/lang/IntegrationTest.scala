@@ -411,31 +411,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
   }
 
-  property("ensure user function: success") {
-    val src =
-      """
-        |let x = true
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
-  }
-
-  property("ensure user function: fail") {
-    val src =
-      """
-        |let x = false
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Left("test fail")
-  }
-
   property("postfix syntax (one argument)") {
     val src =
       """
-        |let x = true
-        |x.ensure("test fail")
+        | let list = [1, 2, 3]
+        | list.getElement(1)
       """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
+
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(2))
   }
 
   property("postfix syntax (no arguments)") {
@@ -531,10 +514,38 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
   }
 
+  property("parseInt Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseInt Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
   property("parseIntValue") {
     val src =
-      """ "42".parseInt() """
+      """ "42".parseIntValue() """
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseIntValue Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseIntValue Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
   }
 
   property("parseInt fail") {
@@ -595,6 +606,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | let a0 = 1
          | ${1 to count map (i => s"let a$i = a${i - 1} + 1") mkString "\n"}
          | a$count == a$count
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("concat empty list") {
+    val script =
+      s"""
+         | let l = if (true) then cons(1, nil) else nil
+         | let concat = 0 :: l
+         | concat == [0, 1]
+         |
       """.stripMargin
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))

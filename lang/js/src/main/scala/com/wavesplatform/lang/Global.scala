@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.BaseGlobal
 
 import scala.scalajs.js.JSConverters._
@@ -49,4 +49,7 @@ object Global extends BaseGlobal {
   }
 
   private def toArray(xs: ArrayBuffer): Array[Byte] = new Int8Array(xs).toArray
+
+  override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
+    impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
 }

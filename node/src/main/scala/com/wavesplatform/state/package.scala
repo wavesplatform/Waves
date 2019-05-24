@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -66,7 +67,7 @@ package object state {
     }
   }
 
-  implicit class BlockchainExt(blockchain: Blockchain) {
+  implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
@@ -128,6 +129,16 @@ package object state {
       blockchain.leaseBalance(address),
       Map.empty
     )
+
+    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
+
+    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
+
+
+    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
+      GeneratingBalanceProvider.balance(blockchain, account, blockId)
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]

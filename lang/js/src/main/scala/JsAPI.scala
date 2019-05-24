@@ -58,6 +58,7 @@ object JsAPI {
         override def chainId: Byte                                                                                   = 1: Byte
         override def inputEntity: Environment.InputEntity                                                            = null
         override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+        override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
         override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
         override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
         override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
@@ -88,7 +89,7 @@ object JsAPI {
   }
 
   private def buildContractContext(v: StdLibVersion): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext(v), wavesContext(V3, false, true)))
+    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext(v), wavesContext(v, false, true)))
   }
 
   @JSExportTopLevel("getTypes")

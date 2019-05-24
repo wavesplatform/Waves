@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}
+
 import scala.concurrent.duration._
 
 class MinerSettingsSpecification extends FlatSpec with Matchers {
@@ -20,6 +21,7 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
         |    max-transactions-in-key-block: 300
         |    max-transactions-in-micro-block: 400
         |    min-micro-block-age: 3s
+        |    max-pack-time: 5s
         |  }
         |}
       """.stripMargin).resolve()

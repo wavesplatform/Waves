@@ -395,13 +395,13 @@ object PureContext {
 
   lazy val parseInt: BaseFunction =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
-      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).orElse(Success(unit)).toEither.left.map(_.toString)
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).orElse(Success(unit)).toEither.left.map(_.toString)
       case xs                      => notImplemented("parseInt(STRING)", xs)
     }
 
   lazy val parseIntVal: BaseFunction =
     NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
-      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).toEither.left.map(_.toString)
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).toEither.left.map(_.toString)
       case xs                      => notImplemented("parseInt(STRING)", xs)
     }
 
@@ -458,11 +458,6 @@ object PureContext {
   lazy val uNot: BaseFunction =
     UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1), BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
       IF(REF("@p"), FALSE, TRUE)
-    }
-
-  lazy val ensure: BaseFunction =
-    UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
-      IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
     }
 
   private lazy val operators: Array[BaseFunction] = Array(
@@ -531,7 +526,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
+            Array(value, listConstructor, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
           )
         )
     }
