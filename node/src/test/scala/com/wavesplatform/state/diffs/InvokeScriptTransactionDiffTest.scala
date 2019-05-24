@@ -31,7 +31,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Proofs, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import monix.eval.Coeval
@@ -497,6 +497,51 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
+        }
+    }
+  }
+
+  property("suitable verifier error message on incorrect proofs number") {
+    forAll(for {
+      proofCount <- Gen.oneOf(0, 2)
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (defaultPaymentContractGen(a, am) _)
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+    } yield (a, am, r._1, r._2, r._3, proofCount)) {
+      case (acc, amount, genesis, setScript, ci, proofCount) =>
+
+        val proofs = Proofs(
+          List.fill(proofCount)(ByteStr.fromBytes(1, 1))
+        )
+
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ Seq(setScript))),
+          TestBlock.create(Seq(ci.copy(proofs = proofs))),
+          fs
+        ) {
+          _ should produce("Transactions from non-scripted accounts must have exactly 1 proof")
+        }
+    }
+  }
+
+  property("suitable verifier error message on incorrect proof") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (defaultPaymentContractGen(a, am) _)
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+    } yield (a, am, r._1, r._2, r._3)) {
+      case (acc, amount, genesis, setScript, ci) =>
+
+        val proofs = Proofs(List(ByteStr.fromBytes(1, 1)))
+
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ Seq(setScript))),
+          TestBlock.create(Seq(ci.copy(proofs = proofs))),
+          fs
+        ) {
+          _ should produce("Script doesn't exist and proof doesn't validate as signature")
         }
     }
   }
