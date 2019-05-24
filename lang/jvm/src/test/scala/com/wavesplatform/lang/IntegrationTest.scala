@@ -411,31 +411,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
   }
 
-  property("ensure user function: success") {
-    val src =
-      """
-        |let x = true
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
-  }
-
-  property("ensure user function: fail") {
-    val src =
-      """
-        |let x = false
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Left("test fail")
-  }
-
   property("postfix syntax (one argument)") {
     val src =
       """
-        |let x = true
-        |x.ensure("test fail")
+        | let list = [1, 2, 3]
+        | list.getElement(1)
       """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
+
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(2))
   }
 
   property("postfix syntax (no arguments)") {
