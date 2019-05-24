@@ -170,7 +170,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           DefaultFuncAnnotation(senderBinding),
           Terms.FUNC(
             funcName,
-            List(argName),
+            Nil,
             FUNCTION_CALL(
               User(FieldNames.TransferSet),
               List(payments)
@@ -233,7 +233,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
            | {-#SCRIPT_TYPE ACCOUNT#-}
            |
            | @Callable(i)
-           | func $funcName() = {
+           | func $funcName(b: ByteVector) = {
            |    WriteSet([
            |      $DataEntries
            |        ])
@@ -258,7 +258,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
            | {-#SCRIPT_TYPE ACCOUNT#-}
            |
            | @Callable(i)
-           | func $funcName() = {
+           | func $funcName(b: ByteVector) = {
            |    WriteSet([
            |      DataEntry("$keyName", 0)
            |        ])
@@ -293,7 +293,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                         masterGen: Gen[KeyPair] = accountGen,
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
-                                        sponsored: Boolean = false)
+                                        sponsored: Boolean = false,
+                                        invocationParamsCount: Int = 1
+                                       )
     : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
@@ -308,7 +310,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
-      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_STRING("Not-a-Number")))
+      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.fill(invocationParamsCount)(CONST_STRING("Not-a-Number")))
       ci = InvokeScriptTransaction
         .selfSigned(
           invoker,
@@ -491,7 +493,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       a  <- accountGen
       am <- smallFeeGen
       contractGen = (defaultPaymentContractGen(a, am) _)
-      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -960,6 +962,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           _ shouldBe 'right
+        }
+    }
+  }
+
+  property("Function call args count should be equal @Callable func one") {
+    forAll(for {
+      invocationArgsCount <- Gen.oneOf(0, 2)
+      r                   <- simplePreconditionsAndSetContract(invocationParamsCount = invocationArgsCount)
+    } yield (r._1, r._2, r._3, invocationArgsCount)) {
+      case (genesis, setScript, ci, count) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce(s"takes 1 args but $count were(was) given")
         }
     }
   }
