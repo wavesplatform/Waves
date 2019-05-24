@@ -51,7 +51,7 @@ lazy val `grpc-server` = project
 
 lazy val `node-it` = project.dependsOn(node % "compile->compile;runtime->runtime")
 
-lazy val `node-generator` = project.dependsOn(node % "compile->compile;runtime->runtime", `node-it` % "compile->test")
+lazy val `node-generator` = project.dependsOn(node % "compile;runtime->provided", `node-it` % "compile->test")
 
 lazy val benchmark = project
   .dependsOn(
