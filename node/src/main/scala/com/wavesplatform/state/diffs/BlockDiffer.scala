@@ -53,7 +53,7 @@ object BlockDiffer extends ScorexLogging {
         None
 
     // Fixes lastBlockInfo() in scripts issue
-    val blockchainWithLastBlock = CompositeBlockchain.composite(blockchain, block)
+    val blockchainWithLastBlock = CompositeBlockchain.withLastBlock(blockchain, block)
 
     for {
       _ <- TracedResult(block.signaturesValid())

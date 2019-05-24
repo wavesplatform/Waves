@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
 
-class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0, newBlock: => Option[Block] = None) extends Blockchain {
+final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff], newBlock: Option[Block] = None, carry: Long = 0) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   private def diff = maybeDiff.getOrElse(Diff.empty)
@@ -260,7 +260,16 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 }
 
 object CompositeBlockchain {
-  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain = new CompositeBlockchain(inner, diff)
-  def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): Blockchain = new CompositeBlockchain(inner, Some(diff), carryFee)
-  def composite(inner: Blockchain, block: Block): Blockchain = new CompositeBlockchain(inner, None, 0, Some(block))
+  def composite(inner: Blockchain, diff: Option[Diff]): CompositeBlockchain             = wrap(inner, diff, None)
+  def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): CompositeBlockchain = wrap(inner, Some(diff), None).copy(carry = carryFee)
+
+  def withLastBlock(inner: Blockchain, block: Block): CompositeBlockchain = wrap(inner, Some(Diff.empty), Some(block))
+
+  def wrap(inner: Blockchain, diff: Option[Diff], block: Option[Block]): CompositeBlockchain = inner match {
+    case CompositeBlockchain(inner, leftDiff, leftBlock, leftCarry) =>
+      CompositeBlockchain(inner, Monoid.combine(leftDiff, diff), block.orElse(leftBlock), leftCarry)
+
+    case _ =>
+      CompositeBlockchain(inner, diff, block)
+  }
 }
