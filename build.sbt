@@ -49,7 +49,7 @@ lazy val node = project
 lazy val `grpc-server` = project
   .dependsOn(node % "compile;test->test;runtime->provided")
 
-lazy val `node-it` = project.dependsOn(node % "compile->compile;runtime->runtime")
+lazy val `node-it` = project.dependsOn(node)
 
 lazy val `node-generator` = project.dependsOn(node % "compile;runtime->provided", `node-it` % "compile->test")
 
