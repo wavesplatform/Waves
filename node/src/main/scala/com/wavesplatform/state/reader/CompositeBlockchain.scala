@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
 
-class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
+class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0, newBlock: => Option[Block] = None) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   private def diff = maybeDiff.getOrElse(Diff.empty)
@@ -151,8 +151,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance = this.balance(address)
-      val lease = this.leaseBalance(address)
-      val bs = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
+      val lease   = this.leaseBalance(address)
+      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
       if (inner.height > 0 && from < this.height) bs +: inner.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
@@ -175,7 +175,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def accountDataKeys(acc: Address): Seq[String] = {
     val fromInner = inner.accountDataKeys(acc)
-    val fromDiff = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
     (fromInner ++ fromDiff).distinct
   }
 
@@ -226,7 +226,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 
-  override def lastBlock: Option[Block] = inner.lastBlock
+  override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)
 
   override def carryFee: Long = carry
 
@@ -237,10 +237,15 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def heightOf(blockId: ByteStr): Option[Int] = inner.heightOf(blockId)
 
   /** Returns the most recent block IDs, starting from the most recent  one */
-  override def lastBlockIds(howMany: Int): Seq[ByteStr] = inner.lastBlockIds(howMany)
+  override def lastBlockIds(howMany: Int): Seq[ByteStr] =
+    newBlock.map(_.uniqueId).toSeq ++ inner.lastBlockIds(howMany)
 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = inner.blockIdsAfter(parentSignature, howMany)
+  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] =
+    for {
+      ids <- inner.blockIdsAfter(parentSignature, howMany)
+      newId = newBlock.filter(_.reference == parentSignature).map(_.uniqueId).fold(Seq.empty[ByteStr])(Seq(_))
+    } yield newId ++ ids
 
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
 
@@ -255,6 +260,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 }
 
 object CompositeBlockchain {
-  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain          = new CompositeBlockchain(inner, diff)
-  def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): Blockchain = new CompositeBlockchain(inner, Some(diff), carryFee)
+  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain = new CompositeBlockchain(inner, diff)
+  def composite(inner: Blockchain, diff: Diff, block: Option[Block] = None, carryFee: Long = 0): Blockchain =
+    new CompositeBlockchain(inner, Some(diff), carryFee)
 }
