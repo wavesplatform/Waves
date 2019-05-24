@@ -237,7 +237,6 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     }
 
     transactionByIdComplexity(2) shouldBe 100
-    transactionByIdComplexity(3) shouldBe 500
   }
 
   private val expectedExpr = LET_BLOCK(
