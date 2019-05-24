@@ -4,6 +4,7 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -413,7 +414,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler.compile(
+          val script = ScriptCompiler
+            .compile(
               s"""
                  | {-# STDLIB_VERSION 3          #-}
                  | {-# CONTENT_TYPE   EXPRESSION #-}
@@ -457,12 +459,14 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(
-            masterAcc,
-            Some(script),
-            1000000L,
-            transferTx.timestamp + 5
-          ).explicitGet()
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(
+              masterAcc,
+              Some(script),
+              1000000L,
+              transferTx.timestamp + 5
+            )
+            .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
