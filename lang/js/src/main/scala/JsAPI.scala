@@ -119,16 +119,19 @@ object JsAPI {
       .toJSArray
 
   @JSExportTopLevel("contractLimits")
-  def contractLimits(): js.Dynamic = js.Dynamic.literal(
-    "MaxExprComplexity"          -> ContractLimits.MaxExprComplexity,
-    "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
-    "MaxContractComplexity"      -> ContractLimits.MaxContractComplexity,
-    "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
-    "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
-    "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
-    "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-    "MaxPaymentAmount"           -> ContractLimits.MaxPaymentAmount
-  )
+  def contractLimits(ver: Int = 2): js.Dynamic = {
+    val version = DirectiveDictionary[StdLibVersion].idMap(ver)
+    js.Dynamic.literal(
+      "MaxExprComplexity"          -> ContractLimits.MaxComplexityByVersion(version),
+      "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
+      "MaxContractComplexity"      -> ContractLimits.MaxComplexityByVersion(version),
+      "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
+      "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
+      "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
+      "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
+      "MaxPaymentAmount"           -> ContractLimits.MaxPaymentAmount
+    )
+  }
 
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
