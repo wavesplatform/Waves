@@ -152,7 +152,7 @@ object BlockDiffer extends ScorexLogging {
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint)), _), tx) =>
-          val updatedBlockchain = composite(blockchain, currDiff, newBlockOption)
+          val updatedBlockchain = composite(blockchain, currDiff, block = newBlockOption)
           txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
             if (updatedConstraint.isOverfilled)
@@ -178,17 +178,17 @@ object BlockDiffer extends ScorexLogging {
         case Result(diff, carry, totalFee, constraint) =>
           val diffWithCancelledLeases =
             if (currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight)
-              Monoid.combine(diff, CancelAllLeases(composite(blockchain, diff, newBlockOption)))
+              Monoid.combine(diff, CancelAllLeases(composite(blockchain, diff, block = newBlockOption)))
             else diff
 
           val diffWithLeasePatches =
             if (currentBlockHeight == blockchain.settings.functionalitySettings.blockVersion3AfterHeight)
-              Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases, newBlockOption)))
+              Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases, block = newBlockOption)))
             else diffWithCancelledLeases
 
           val diffWithCancelledLeaseIns =
             if (blockchain.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-              Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches, newBlockOption)))
+              Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches, block = newBlockOption)))
             else diffWithLeasePatches
 
           Result(diffWithCancelledLeaseIns, carry, totalFee, constraint)
