@@ -52,11 +52,13 @@ object BlockDiffer extends ScorexLogging {
       else
         None
 
-    val compositeBlockchain = CompositeBlockchain.composite(blockchain, Diff.empty, block = Some(block))
+    // Fixes lastBlockInfo() in scripts issue
+    val blockchainWithLastBlock = CompositeBlockchain.composite(blockchain, block)
+
     for {
       _ <- TracedResult(block.signaturesValid())
       r <- apply(
-        compositeBlockchain,
+        blockchainWithLastBlock,
         constraint,
         maybePrevBlock.map(_.timestamp),
         prevBlockFeeDistr,
