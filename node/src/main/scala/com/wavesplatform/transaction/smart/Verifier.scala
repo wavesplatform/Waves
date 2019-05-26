@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
+import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
@@ -188,7 +189,7 @@ object Verifier extends ScorexLogging {
     } yield et
   }
 
-  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): ValidationResult[T] =
+  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[GenericError, T] =
     pt.proofs.proofs match {
       case p :: Nil =>
         Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender),
@@ -197,17 +198,30 @@ object Verifier extends ScorexLogging {
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 
-  private def logged(id: => String, result: (Log, Either[String, EVALUATED])): (Log, Either[String, EVALUATED]) = {
-    val (execLog, execResult) = result
-    log.debug(s"Script for $id evaluated to $execResult")
-    execLog.foreach {
-      case (k, Right(v))  => log.debug(s"Evaluated `$k` to ")
-        v match {
-          case obj: EVALUATED => TermPrinter.print(s => log.debug(s), obj)
-          case a              => log.debug(a.toString)
-        }
-      case (k, Left(err)) => log.debug(s"Failed to evaluate `$k`: $err")
-    }
+  private def logged(
+                      id:     => String,
+                      result: (Log, Either[String, EVALUATED])
+                    ): (Log, Either[String, EVALUATED]) = {
+    if (log.logger.isDebugEnabled) log.debug(buildLogs(id, result))
     result
+  }
+
+  @VisibleForTesting
+  private[smart] def buildLogs(
+                                id:     String,
+                                result: (Log, Either[String, EVALUATED])
+                              ): String = {
+    val (execLog, execResult) = result
+    val builder = new StringBuilder(s"Script for $id evaluated to $execResult")
+    execLog
+      .foldLeft(builder) {
+        case (sb, (k, Right(v))) => sb.append(s"Evaluated `$k` to ")
+          v match {
+            case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
+            case a              => sb.append(a.toString)
+          }
+        case (sb, (k, Left(err))) => sb.append(s"Failed to evaluate `$k`: $err")
+      }
+      .toString
   }
 }

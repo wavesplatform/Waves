@@ -1,5 +1,7 @@
 package com.wavesplatform.settings.utils
 
+import cats.data.NonEmptyList
+import cats.implicits._
 import com.typesafe.config.Config
 import net.ceedubs.ficus.readers.ValueReader
 
@@ -9,7 +11,7 @@ object ConfigOps {
 
     val cfgValidator = ConfigSettingsValidator(config)
 
-    private def throwErrors(list: List[String]) = throw new Exception(list.mkString(", "))
+    private def throwErrors(list: NonEmptyList[String]) = throw new Exception(list.mkString_(", "))
 
     def getValidatedSet[T: ValueReader](path: String): Set[T] = {
       cfgValidator.validateList[T](path).map(_.toSet) valueOr throwErrors

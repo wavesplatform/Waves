@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction}
-import org.asynchttpclient.Dsl.{get => _get, post => _post}
+import org.asynchttpclient.Dsl.{get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
@@ -72,6 +72,9 @@ object AsyncHttpApi extends Assertions {
 
     def post(url: String, f: RequestBuilder => RequestBuilder = identity, waitForStatus: Boolean = false): Future[Response] =
       retrying(f(_post(url).withApiKey(n.apiKey)).build(), waitForStatus = waitForStatus)
+
+    def put(url: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] =
+      retrying(f(_put(url).withApiKey(n.apiKey)).build(), waitForStatus = waitForStatus, statusCode = statusCode)
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))
@@ -649,7 +652,11 @@ object AsyncHttpApi extends Assertions {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
         _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-      } yield all(finalHeights) should be >= finalHeights.head
+        _ <- waitFor("nodes sync")(1 second)(
+          _.waitForTransaction(transactionId).map(_.height),
+          (finalHeights: Iterable[Int]) => finalHeights.forall(_ == finalHeights.head)
+        )
+      } yield ()
 
     def waitForTransaction(transactionId: String)(implicit p: Position): Future[TransactionInfo] =
       traverse(nodes)(_.waitForTransaction(transactionId)).map(_.head)

@@ -3,7 +3,6 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -17,14 +16,13 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
-                              wallet: Wallet,
+class TransactionsApiGrpcImpl(wallet: Wallet,
                               blockchain: Blockchain,
                               utx: UtxPool,
                               broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, broadcast)
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, broadcast)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi
@@ -91,12 +89,12 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {
     val senderMatches = request.sender.isEmpty || (tx match {
-      case a: AuthorizedTransaction => a.sender.toAddress == request.sender.toAddress
+      case a: AuthorizedTransaction => request.sender.isEmpty || a.sender.toAddress == request.sender.toAddress
       case _                        => false
     })
 
     val recipientMatches = tx match {
-      case tt: TransferTransaction => tt.recipient == request.getRecipient.toAddressOrAlias
+      case tt: TransferTransaction => request.recipient.isEmpty || tt.recipient == request.getRecipient.toAddressOrAlias
       case _                       => request.recipient.isEmpty
     }
 

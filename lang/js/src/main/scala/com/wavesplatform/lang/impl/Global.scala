@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.impl
 
-import com.wavesplatform.common.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 
 import scala.scalajs.js.annotation.JSGlobalScope
 import scala.scalajs.js.typedarray.ArrayBuffer
@@ -19,4 +19,6 @@ object Global extends Object {
   def keccak256(message: ArrayBuffer): ArrayBuffer                                                       = native
   def blake2b256(message: ArrayBuffer): ArrayBuffer                                                      = native
   def sha256(message: ArrayBuffer): ArrayBuffer                                                          = native
+
+  def merkleVerify(root: ArrayBuffer, proof: ArrayBuffer, data: ArrayBuffer): Boolean = native
 }

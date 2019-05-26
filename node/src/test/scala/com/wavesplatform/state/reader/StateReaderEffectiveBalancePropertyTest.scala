@@ -1,7 +1,6 @@
 package com.wavesplatform.state.reader
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
@@ -55,7 +54,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
           val portfolio       = state.wavesPortfolio(lease1.sender)
           val expectedBalance = xfer1.amount + xfer2.amount - 2 * Fee
           portfolio.balance shouldBe expectedBalance
-          GeneratingBalanceProvider.balance(state, fs, leaser, state.lastBlockId.get) shouldBe 0
+          state.generatingBalance(leaser, state.lastBlockId.get) shouldBe 0
           portfolio.lease shouldBe LeaseBalance(0, expectedBalance)
           portfolio.effectiveBalance shouldBe 0
         }

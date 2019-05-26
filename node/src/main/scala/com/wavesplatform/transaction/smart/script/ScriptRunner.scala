@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
@@ -57,8 +58,8 @@ object ScriptRunner {
         val t: Proven with Authorized =
           in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], _ => ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {
-          case Right(_) => Right(TRUE)
-          case Left(_)  => Right(FALSE)
+          case Right(_)                => Right(TRUE)
+          case Left(GenericError(err)) => Left(err)
         })
       case _ => (List.empty, "Unsupported script version".asLeft[EVALUATED])
     }

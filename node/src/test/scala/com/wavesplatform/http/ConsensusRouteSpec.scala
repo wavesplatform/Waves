@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.BlockDoesNotExist
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.JsObject
@@ -24,7 +23,7 @@ class ConsensusRouteSpec
     1 to 10 foreach { _ =>
       d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchainUpdater))
     }
-    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater, FunctionalitySettings.TESTNET).route)
+    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater).route)
   }
 
   routePath("/generationsignature") - {

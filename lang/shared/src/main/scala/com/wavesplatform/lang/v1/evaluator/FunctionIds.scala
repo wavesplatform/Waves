@@ -55,13 +55,18 @@ object FunctionIds {
   val FROMBASE58: Short = 601
   val TOBASE64: Short   = 602
   val FROMBASE64: Short = 603
+  val TOBASE16: Short   = 604
+  val FROMBASE16: Short = 605
+
+  val CHECK_MERKLE_PROOF: Short = 700
 
   // Waves
-  val GETTRANSACTIONBYID: Short    = 1000
-  val TRANSACTIONHEIGHTBYID: Short = 1001
-  val ACCOUNTASSETBALANCE: Short   = 1003
-  val GETASSETINFOBYID: Short      = 1004
-  val BLOCKINFOBYHEIGHT: Short     = 1005
+  val GETTRANSACTIONBYID: Short      = 1000
+  val TRANSACTIONHEIGHTBYID: Short   = 1001
+  val ACCOUNTASSETBALANCE: Short     = 1003
+  val GETASSETINFOBYID: Short        = 1004
+  val BLOCKINFOBYHEIGHT: Short       = 1005
+  val TRANSFERTRANSACTIONBYID: Short = 1006
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041

@@ -20,55 +20,40 @@ import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observer
+import scopt.OParser
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
+  //noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
-    val argi = args.iterator
-    val (verifyTransactions, configOpt) = {
-      Try(argi.next) match {
-        case Success("-n") | Success("-no-verify") => (false, Try(argi.next))
-        case conf                                  => (true, conf)
-      }
-    }
-    val configFilename     = configOpt.toOption.getOrElse("waves-testnet.conf")
-    val blockchainFilename = Try(argi.next)
-    val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
+    OParser.parse(commandParser, args, ImportOptions()).foreach {
+      case ImportOptions(configFile, blockchainFile, importHeight, format, verifyTransactions) =>
+        val config   = loadConfig(ConfigFactory.parseFile(configFile))
+        val settings = WavesSettings.fromRootConfig(config)
+        AddressScheme.current = new AddressScheme {
+          override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+        }
 
-    val format = Try(argi.next)
-      .map(_.toUpperCase)
-      .collect { case custom @ "BINARY" => custom }
-      .getOrElse("BINARY_OLD")
-      .intern()
+        implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
+        val utxPoolStub: UtxPool = new UtxPool {
+          override def putIfNew(tx: Transaction, b: Boolean)                               = ???
+          override def removeAll(txs: Traversable[Transaction]): Unit          = {}
+          override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
+          override def pessimisticPortfolio(addr: Address): Portfolio          = ???
+          override def all                                                     = ???
+          override def size                                                    = ???
+          override def transactionById(transactionId: ByteStr)                 = ???
+          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
+          override def close(): Unit                                           = {}
+        }
 
-    val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
-    val settings = WavesSettings.fromRootConfig(config)
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
+        val time = new NTP(settings.ntpServer)
+        log.info(s"Loading file '$blockchainFile'")
 
-    implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
-    val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction, b: Boolean)                   = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-      override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
-      override def pessimisticPortfolio(addr: Address): Portfolio          = ???
-      override def all                                                     = ???
-      override def size                                                    = ???
-      override def transactionById(transactionId: ByteStr)                 = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
-      override def close(): Unit                                           = {}
-    }
-
-    val time = new NTP(settings.ntpServer)
-    blockchainFilename match {
-      case Success(filename) =>
-        log.info(s"Loading file '$filename'")
-
-        createInputStream(filename) match {
+        Try(new FileInputStream(blockchainFile)) match {
           case Success(inputStream) =>
             val db                = openDB(settings.dbSettings.directory)
             val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
@@ -122,13 +107,49 @@ object Importer extends ScorexLogging {
             inputStream.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
-          case Failure(_) => log.error(s"Failed to open file '$filename")
+          case Failure(_) => log.error(s"Failed to open file '$blockchainFile")
         }
-      case Failure(_) => log.error("Usage: Importer [-n | -no-verify] <config file> <blockchain file> [height]")
-    }
 
-    time.close()
+        time.close()
+    }
   }
 
-  private[this] def createInputStream(filename: String) = Try(new FileInputStream(filename))
+  private[this] final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
+                                               blockchainFile: File = new File("blockchain"),
+                                               importHeight: Int = Int.MaxValue,
+                                               format: String = "BINARY_OLD",
+                                               verify: Boolean = true)
+
+  private[this] lazy val commandParser = {
+    import scopt.OParser
+
+    val builder = OParser.builder[ImportOptions]
+    import builder._
+
+    OParser.sequence(
+      programName("waves import"),
+      head("Waves Blockchain Importer", Version.VersionString),
+      opt[File]('c', "config")
+        .text("Config file name")
+        .action((f, c) => c.copy(configFile = f)),
+      opt[File]('i', "input-file")
+        .text("Blockchain data file name")
+        .action((f, c) => c.copy(blockchainFile = f)),
+      opt[Int]('h', "height")
+        .text("Import to height")
+        .action((h, c) => c.copy(importHeight = h))
+        .validate(h => if (h > 0) success else failure("Import height must be > 0")),
+      opt[String]('f', "format")
+        .text("Blockchain data file format")
+        .action((f, c) => c.copy(format = f))
+        .valueName("<BINARY|BINARY_OLD>")
+        .validate {
+          case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
+          case f                                                        => failure(s"Unsupported format: $f")
+        },
+      opt[Boolean]('n', "no-verify")
+        .text("Disable signatures verification")
+        .action((n, c) => c.copy(verify = !n))
+    )
+  }
 }

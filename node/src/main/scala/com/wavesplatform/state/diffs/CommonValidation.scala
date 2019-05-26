@@ -26,6 +26,7 @@ object CommonValidation {
 
   val ScriptExtraFee = 400000L
   val FeeUnit        = 100000
+  val NFTMultiplier  = 0.001
 
   val FeeConstants: Map[Byte, Long] = Map(
     GenesisTransaction.typeId            -> 0,
@@ -47,10 +48,9 @@ object CommonValidation {
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          settings: FunctionalitySettings,
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
-    if (blockTime >= settings.allowTemporaryNegativeUntil) {
+    if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -99,7 +99,6 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             settings: FunctionalitySettings,
                                              height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
@@ -195,23 +194,26 @@ object CommonValidation {
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
     if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > settings.maxTransactionTimeForwardOffset.toMillis)
-      Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
+      Left(
+        Mistiming(
+          s"""Transaction timestamp ${tx.timestamp}
        |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
        |relative to block timestamp $time""".stripMargin
-        .replaceAll("\n", " ")
-        .replaceAll("\r", "")))
+            .replaceAll("\n", " ")
+            .replaceAll("\r", "")))
     else Right(tx)
   }
 
   def disallowTxFromPast[T <: Transaction](settings: FunctionalitySettings, prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
     prevBlockTime match {
       case Some(t) if (t - tx.timestamp) > settings.maxTransactionTimeBackOffset.toMillis =>
-        Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
+        Left(
+          Mistiming(
+            s"""Transaction timestamp ${tx.timestamp}
          |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
-         |relative to previous block timestamp $prevBlockTime"""
-          .stripMargin
-          .replaceAll("\n", " ")
-          .replaceAll("\r", "")))
+         |relative to previous block timestamp $prevBlockTime""".stripMargin
+              .replaceAll("\n", " ")
+              .replaceAll("\r", "")))
       case _ => Right(tx)
     }
 
@@ -225,17 +227,25 @@ object CommonValidation {
           case tx: DataTransaction =>
             val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
+          case itx: IssueTransaction =>
+            lazy val nftActivated = blockchain.activatedFeatures
+              .get(BlockchainFeatures.ReduceNFTFee.id)
+              .exists(_ <= height)
+
+            val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+
+            (baseFee * multiplier).toLong
           case _ => baseFee
         }
       }
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
     type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
     def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
         // This could be true for private blockchains
         feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
       } else
@@ -301,10 +311,10 @@ object CommonValidation {
       }
   }
 
-  def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
-        minAFee <- getMinFee(blockchain, fs, height, tx)
+        minAFee <- getMinFee(blockchain, height, tx)
         minWaves   = minAFee._3
         minFee     = minAFee._2
         feeAssetId = minAFee._1

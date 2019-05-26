@@ -26,7 +26,7 @@ object ContractEvaluator {
                         feeAssetId: Option[ByteStr]
                        )
 
-  def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
+  private def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
 
     val contractFuncAndCall = i.funcCallOpt match {
@@ -43,23 +43,30 @@ object ContractEvaluator {
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
+
       case Some((f, fc)) =>
-        withDecls(
-          c.decs,
-          BLOCK(
-            LET(
-              f.annotation.invocationArgName,
-              Bindings.buildInvocation(
-                  i.caller,
-                  i.callerPk,
-                  i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress),
-                  i.transactionId,
-                  i.fee,
-                  i.feeAssetId
-                )
-            ),
-            BLOCK(f.u, fc)
+        val takingArgsNumber = f.u.args.size
+        val passedArgsNumber = fc.args.size
+        if (takingArgsNumber == passedArgsNumber)
+          withDecls(
+            c.decs,
+            BLOCK(
+              LET(
+                f.annotation.invocationArgName,
+                Bindings.buildInvocation(
+                    i.caller,
+                    i.callerPk,
+                    i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress),
+                    i.transactionId,
+                    i.fee,
+                    i.feeAssetId
+                  )
+              ),
+              BLOCK(f.u, fc)
+            )
           )
+        else raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](
+          s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
         )
     }
   }

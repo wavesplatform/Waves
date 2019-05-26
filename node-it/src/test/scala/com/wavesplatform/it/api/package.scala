@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Paged
 import org.asynchttpclient.Response
 import play.api.libs.functional.syntax._
@@ -31,6 +33,12 @@ package object api {
         case (addrStr, balance) =>
           com.wavesplatform.account.Address.fromString(addrStr).explicitGet() -> balance
       }
+    }
+  }
+
+  implicit val rateMapReads: Reads[Map[Asset, Double]] = Reads { json =>
+    json.validate[Map[String, Double]].map { rate =>
+      rate.map { case (assetStr, rateValue) => AssetPair.extractAssetId(assetStr).get -> rateValue }
     }
   }
 

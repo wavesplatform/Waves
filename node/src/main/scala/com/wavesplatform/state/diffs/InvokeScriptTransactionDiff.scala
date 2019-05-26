@@ -87,7 +87,7 @@ object InvokeScriptTransactionDiff {
     }
 
     accScriptEi match {
-      case Right(Some(ContractScriptImpl(_, contract, _))) =>
+      case Right(Some(sc @ ContractScriptImpl(_, contract, _))) =>
         val functionName = tx.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(ContractEvaluator.DEFAULT_FUNC_NAME)
 
         val contractFunc = tx.funcCallOpt match {
@@ -186,6 +186,21 @@ object InvokeScriptTransactionDiff {
                     .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
                 )
               }
+
+              scriptsComplexity = {
+                val assetsComplexity = (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
+                  .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
+                  .map(DiffsCommon.verifierComplexity)
+                  .sum
+
+                val accountComplexity = blockchain.accountScript(tx.sender)
+                  .fold(0L)(DiffsCommon.verifierComplexity)
+
+                val funcComplexity = DiffsCommon.functionComplexity(sc, tx.funcCallOpt)
+
+                assetsComplexity + accountComplexity + funcComplexity
+              }
+
               _ <- foldScriptTransfers(blockchain, tx, dAppAddress)(ps, dataAndPaymentDiff)
             } yield {
               val paymentReceiversMap: Map[Address, Portfolio] = Monoid
@@ -197,7 +212,9 @@ object InvokeScriptTransactionDiff {
               val isr = InvokeScriptResult(data = dataEntries, transfers = paymentReceiversMap.toVector.flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
               })
-              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1) |+| Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
+              dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1, scriptsComplexity = scriptsComplexity) |+| Diff.stateOps(
+                portfolios = transfers,
+                scriptResults = Map(tx.id() -> isr))
             }
         }
       case Left(l) => TracedResult(Left(l))
@@ -234,12 +251,10 @@ object InvokeScriptTransactionDiff {
 
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
         Right(
-          Diff(
-            height = height,
-            tx = tx,
-            portfolios = feePart combine payablePart,
-            accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap))
-          )
+          Diff(height = height,
+               tx = tx,
+               portfolios = feePart combine payablePart,
+               accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap)))
         )
       } else
         Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))

@@ -29,6 +29,11 @@ object Dependencies {
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
+  private val quill = Seq(
+    "org.postgresql" % "postgresql"  % "9.4.1208",
+    "io.getquill"    %% "quill-jdbc" % "3.1.0"
+  )
+
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
   val enforcedVersions = Def.setting(
@@ -67,7 +72,13 @@ object Dependencies {
       shapeless.value
     ))
 
-  val console = Seq("com.github.scopt" %% "scopt" % "3.6.0")
+  val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
+
+  val common = Def.setting(
+    Seq(
+      scalaTest
+    )
+  )
 
   val lang = Def.setting(
     Seq(
@@ -88,6 +99,8 @@ object Dependencies {
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
         .exclude("org.typelevel", "cats-testkit_2.12"),
+      bouncyCastle("bcpkix"),
+      bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
     ))
@@ -114,6 +127,7 @@ object Dependencies {
       "com.iheart"           %% "ficus" % "1.4.2",
       logback                % Runtime,
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
+      "org.codehaus.janino" % "janino" % "3.0.12"  % Runtime,
       kamonCore,
       kamonModule("system-metrics", "1.0.0"),
       kamonModule("akka-2.5", "1.1.1"),
@@ -137,7 +151,7 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test
+    ) ++ protobuf.value ++ test ++ console
   )
 
   lazy val matcher = Seq(
@@ -148,7 +162,7 @@ object Dependencies {
     akkaModule("testkit"),
     akkaModule("persistence-tck"),
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
-  ).map(_ % Test) ++ test
+  ).map(_ % Test) ++ test ++ quill
 
   lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion

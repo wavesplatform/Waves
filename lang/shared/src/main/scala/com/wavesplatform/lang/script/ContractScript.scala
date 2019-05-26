@@ -17,41 +17,43 @@ object ContractScript {
 
   def apply(version: StdLibVersion, contract: DApp): Either[String, Script] = {
     for {
-      funcMaxComplexity <- estimateComplexity(version, contract)
+      funcMaxComplexity <- estimateComplexityByFunction(version, contract)
+      tcf = funcMaxComplexity.find(_._2 > MaxContractComplexity)
       _ <- Either.cond(
-        funcMaxComplexity._2 <= MaxContractComplexity,
+        tcf.isEmpty,
         (),
-        s"Contract function (${funcMaxComplexity._1}) is too complex: ${funcMaxComplexity._2} > $MaxContractComplexity"
+        s"Contract function (${tcf.get._1}) is too complex: ${tcf.get._2} > $MaxContractComplexity"
       )
-      s = ContractScriptImpl(version, contract, funcMaxComplexity._2)
+      s = ContractScriptImpl(version, contract, funcMaxComplexity.toMap)
       _ <- validateBytes(s.bytes().arr)
 
     } yield s
   }
 
-  case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: DApp, maxComplexity: Long) extends Script {
-    override val complexity: Long = maxComplexity
+  case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: DApp, complexityMap: Map[String, Long]) extends Script {
+    override val complexity: Long = (0L +: complexityMap.toSeq.map(_._2)).max
     override type Expr = DApp
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeContract(expr, stdLibVersion)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 
-  def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (String, Long)] = {
+  def estimateComplexityByFunction(version: StdLibVersion, contract: DApp): Either[String, Vector[(String, Long)]] = {
     import cats.implicits._
-    type E[A] = Either[String, A]
-    val funcsWithComplexity: Seq[E[(String, Long)]] =
+    val funcsWithComplexity: Seq[Either[String, (String, Long)]] =
       (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
         contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
             ScriptEstimator(varNames(version, DAppType),
-                            functionCosts(version),
-                            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr))
+              functionCosts(version),
+              constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
         }
-    val funcsWithComplexityEi: E[Vector[(String, Long)]] = funcsWithComplexity.toVector.sequence
+    funcsWithComplexity.toVector.sequence
+  }
 
-    funcsWithComplexityEi.map(namesAndComp => (("", 0L) +: namesAndComp).maxBy(_._2))
+  def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (String, Long)] = {
+    estimateComplexityByFunction(version, contract).map(namesAndComp => (("", 0L) +: namesAndComp).maxBy(_._2))
   }
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {

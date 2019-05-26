@@ -106,7 +106,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (genesis, issue, fee, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
           case (_, state) => {
-            val diffOrError = TransferTransactionDiff(state, smartEnabledFS, System.currentTimeMillis(), state.height)(transfer)
+            val diffOrError = TransferTransactionDiff(state, state.height, System.currentTimeMillis())(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
           }
         }
