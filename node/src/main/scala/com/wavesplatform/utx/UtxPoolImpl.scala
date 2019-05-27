@@ -156,7 +156,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
     Option(transactions.remove(txId))
       .foreach(afterRemove)
 
-  private[this] def addTransaction(tx: Transaction, verify: Boolean = true): TracedResult[ValidationError, Boolean] = {
+  private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (!transactions.containsKey(tx.id())) {
       val diff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
       diff.resultE.foreach {
