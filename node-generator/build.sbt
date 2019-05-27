@@ -1,1 +1,1 @@
-libraryDependencies ++= Dependencies.console
+libraryDependencies ++= Dependencies.console :+ Dependencies.janino
