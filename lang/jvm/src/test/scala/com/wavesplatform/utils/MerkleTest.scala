@@ -56,7 +56,13 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
   property("FALSE on incorrect proof") {
     val (tree, leafs) = testData()
 
-    forAll(Gen.oneOf(leafs), Gen.oneOf(leafs)) { (l1, l2) =>
+    val twoLeafsGen: Gen[(LeafData, LeafData)] =
+      for {
+        l1 <- Gen.oneOf(leafs)
+        l2 <- Gen.oneOf(leafs).suchThat(_ != l1)
+      } yield (l1, l2)
+
+    forAll(twoLeafsGen) { case (l1, l2) =>
       val proof = tree
         .proofByElement(Leaf[Digest32](l1)(fastHash))
         .get
