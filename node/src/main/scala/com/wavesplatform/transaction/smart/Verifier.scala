@@ -189,7 +189,7 @@ object Verifier extends ScorexLogging {
     } yield et
   }
 
-  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): ValidationResult[T] =
+  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[GenericError, T] =
     pt.proofs.proofs match {
       case p :: Nil =>
         Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender),

@@ -3,4 +3,7 @@ import com.wavesplatform.common.state.ByteStr
 
 case class BlockInfo(timestamp: Long,
                      height: Int,
-                     generationSignature: ByteStr)
+                     baseTarget: Long,
+                     generationSignature: ByteStr,
+                     generator: ByteStr,
+                     generatorPublicKey: ByteStr)

@@ -172,4 +172,32 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }
+
+  test("lastBlock and blockInfoByHeight(last) must return liquid block") {
+    val script = ScriptCompiler.compile(
+      s"""
+         |  {-# STDLIB_VERSION 3       #-}
+         |  {-# CONTENT_TYPE   DAPP    #-}
+         |  {-# SCRIPT_TYPE    ACCOUNT #-}
+         |
+         |  @Verifier(tx)
+         |  func verify() = {
+         |    let block = extract(blockInfoByHeight(height))
+         |
+         |    let checkTs = lastBlock.timestamp == block.timestamp
+         |    let checkHeight = block.height == height
+         |    let checkHeightLast = lastBlock.height == height
+         |    checkTs && checkHeight && checkHeightLast
+         |  }
+      """.stripMargin).explicitGet()._1
+
+    val newAddress = sender.createAddress()
+    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+
+    val setScript = sender.setScript(newAddress, Some(script.bytes().base64), setScriptFee)
+    nodes.waitForHeightAriseAndTxPresent(setScript.id)
+
+    val transfer = sender.transfer(newAddress, newAddress, 1.waves, minFee + (2 * smartFee))
+    nodes.waitForHeightAriseAndTxPresent(transfer.id)
+  }
 }
