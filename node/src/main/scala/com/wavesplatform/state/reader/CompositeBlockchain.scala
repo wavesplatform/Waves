@@ -263,7 +263,7 @@ object CompositeBlockchain {
   def composite(inner: Blockchain, diff: Option[Diff]): CompositeBlockchain             = wrap(inner, diff, None)
   def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): CompositeBlockchain = wrap(inner, Some(diff), None).copy(carry = carryFee)
 
-  def withLastBlock(inner: Blockchain, block: Block): CompositeBlockchain = wrap(inner, Some(Diff.empty), Some(block))
+  def withLastBlock(inner: Blockchain, block: Block): CompositeBlockchain = wrap(inner, None, Some(block))
 
   def wrap(inner: Blockchain, diff: Option[Diff], block: Option[Block]): CompositeBlockchain = inner match {
     case CompositeBlockchain(inner, leftDiff, leftBlock, leftCarry) =>
