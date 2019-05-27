@@ -118,7 +118,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
     PoolMetrics.putRequestStats.increment()
 
     if (!verify) {
-      transactions.put(tx.id(), tx)
+      addTransaction(tx)
       return TracedResult.wrapValue(true)
     }
 
@@ -145,9 +145,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
         _    <- TracedResult(checks)
         diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
       } yield {
-        pessimisticPortfolios.add(tx.id(), diff)
-        transactions.put(tx.id(), tx)
-        PoolMetrics.addTransaction(tx)
+        addTransaction(tx, Some(diff))
         true
       }
     }
@@ -173,6 +171,17 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
     Option(transactions.remove(txId))
       .foreach(afterRemove)
 
+  private[this] def addTransaction(tx: Transaction, diff: Option[Diff] = None): Unit = {
+    def evalDiff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height + 1, verify = false)(blockchain, tx)
+
+    diff
+      .orElse(evalDiff.resultE.toOption)
+      .foreach(pessimisticPortfolios.add(tx.id(), _))
+
+    transactions.put(tx.id(), tx)
+    PoolMetrics.addTransaction(tx)
+  }
+
   override def spendableBalance(addr: Address, assetId: Asset): Long =
     blockchain.balance(addr, assetId) -
       assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
@@ -188,10 +197,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
+                               maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
-      val startTime = System.nanoTime()
+      val startTime                   = System.nanoTime()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (System.nanoTime() - startTime) >= maxPackTime.toNanos
 
       transactions.values.asScala.toSeq
