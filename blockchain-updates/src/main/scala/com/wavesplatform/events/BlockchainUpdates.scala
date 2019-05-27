@@ -142,7 +142,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
             forceStopApplication() // this should never happen, but just in case, explicit stop.
           }
         })
-k
+
         // startupCheck is after subscription, so that if the check makes a rollback, it would be handled
         startupCheck()
         log.info("Starting sending blockchain updates to Kafka")

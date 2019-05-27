@@ -14,6 +14,9 @@ import com.wavesplatform.state.{BlockAdded, MicroBlockAdded, MicroBlockRollbackC
 object PBEvents {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
+  private def isEmpty(stateUpdate: VanillaStateUpdated): Boolean =
+    stateUpdate.balances.isEmpty && stateUpdate.leases.isEmpty && stateUpdate.dataEntries.isEmpty
+
   private def protobufStateUpdated(reason: (Short, ByteStr), su: VanillaStateUpdated): PBStateUpdated = {
     val reasonType = reason._1 match {
       case 0 => BLOCK
@@ -45,12 +48,14 @@ object PBEvents {
           .zip(transactionsStateUpdates)
           .map { case (id, su) => protobufStateUpdated((1, id), su) }
 
-        val blockUpdate = protobufStateUpdated((0, block.uniqueId), blockStateUpdate)
+        val stateUpdates =
+          if (isEmpty(blockStateUpdate)) txsUpdates
+          else Seq(protobufStateUpdated((0, block.uniqueId), blockStateUpdate)) ++ txsUpdates
 
         PBBlockchainUpdated(
           id = block.uniqueId,
           height = height,
-          stateUpdates = Seq(blockUpdate) ++ txsUpdates,
+          stateUpdates = stateUpdates,
           reason = PBBlockchainUpdated.Reason.Block(PBBlocks.protobuf(block)),
           `type` = PBBlockchainUpdated.UpdateType.BLOCK
         )
@@ -60,12 +65,14 @@ object PBEvents {
           .zip(transactionsStateUpdates)
           .map { case (id, su) => protobufStateUpdated((1, id), su) }
 
-        val mbUpdate = protobufStateUpdated((2, microBlock.totalResBlockSig), microBlockStateUpdate)
+        val stateUpdates =
+          if (isEmpty(microBlockStateUpdate)) txsUpdates
+          else Seq(protobufStateUpdated((2, microBlock.totalResBlockSig), microBlockStateUpdate)) ++ txsUpdates
 
         PBBlockchainUpdated(
           id = microBlock.totalResBlockSig,
           height = height,
-          stateUpdates = Seq(mbUpdate) ++ txsUpdates,
+          stateUpdates = stateUpdates,
           reason = PBBlockchainUpdated.Reason.MicroBlock(PBMicroBlocks.protobuf(microBlock)),
           `type` = PBBlockchainUpdated.UpdateType.MICROBLOCK
         )
