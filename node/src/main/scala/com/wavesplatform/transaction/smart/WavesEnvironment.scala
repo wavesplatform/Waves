@@ -97,11 +97,12 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
       ScriptAssetInfo(
         totalAmount = assetDesc.totalVolume.toLong,
-        decimals = assetDesc.decimals,
-        issuer = assetDesc.issuer,
-        reissuable = assetDesc.reissuable,
-        scripted = assetDesc.script.nonEmpty,
-        sponsored = assetDesc.sponsorship != 0
+        decimals    = assetDesc.decimals,
+        issuer      = assetDesc.issuer.toAddress.bytes,
+        issuerPk    = assetDesc.issuer,
+        reissuable  = assetDesc.reissuable,
+        scripted    = assetDesc.script.nonEmpty,
+        sponsored   = assetDesc.sponsorship != 0
       )
     }
   }

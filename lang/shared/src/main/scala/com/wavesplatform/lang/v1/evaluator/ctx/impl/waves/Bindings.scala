@@ -283,12 +283,13 @@ object Bindings {
     CaseObj(
       assetType,
       Map(
-        "totalAmount" -> sAInfo.totalAmount,
-        "decimals"    -> sAInfo.decimals.toLong,
-        "issuer"      -> sAInfo.issuer,
-        "reissuable"  -> sAInfo.reissuable,
-        "scripted"    -> sAInfo.scripted,
-        "sponsored"   -> sAInfo.sponsored
+        "totalAmount"     -> sAInfo.totalAmount,
+        "decimals"        -> sAInfo.decimals.toLong,
+        "issuer"          -> sAInfo.issuer,
+        "issuerPublicKey" -> sAInfo.issuerPk,
+        "reissuable"      -> sAInfo.reissuable,
+        "scripted"        -> sAInfo.scripted,
+        "sponsored"       -> sAInfo.sponsored
       )
     )
 
