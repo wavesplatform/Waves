@@ -50,7 +50,6 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -110,8 +109,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
-    // start
-    checkGenesis(settings, blockchainUpdater)
+    // initialization
+    implicit val as: ActorSystem                 = actorSystem
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
@@ -126,7 +126,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
 
-    // ???
     val miner =
       if (settings.minerSettings.enable)
         new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
@@ -154,6 +153,32 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       }(scheduler)
 
     val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
+
+    // Extensions start
+    val extensionContext = new Context {
+      override def settings: WavesSettings                                  = app.settings
+      override def blockchain: Blockchain with BlockchainUpdater            = app.blockchainUpdater
+      override def time: Time                                               = app.time
+      override def wallet: Wallet                                           = app.wallet
+      override def utx: UtxPool                                             = utxStorage
+      override def broadcastTx(tx: Transaction): Unit                       = allChannels.broadcastTx(tx, None)
+      override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                                 = app.actorSystem
+      override def blockchainUpdated: Option[Observable[BlockchainUpdated]] = maybeBlockchainUpdated
+    }
+
+    extensions = settings.extensions.map { extensionClassName =>
+      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+      val ctor           = extensionClass.getConstructor(classOf[Context])
+      log.info(s"Enable extension: $extensionClassName")
+      ctor.newInstance(extensionContext)
+    }
+    extensions.foreach(_.start())
+
+    // Node start
+    // After this point, node actually starts doing something
+    checkGenesis(settings, blockchainUpdater)
+
     val network =
       NetworkServer(settings, lastBlockInfo, blockchainUpdater, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     maybeNetwork = Some(network)
@@ -161,7 +186,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
-    // ???
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(
       settings.synchronizationSettings.scoreTTL,
       1.second,
@@ -194,7 +218,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    // start
     UtxPoolSynchronizer.start(utxStorage,
                               settings.synchronizationSettings.utxSynchronizer,
                               allChannels,
@@ -209,7 +232,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     Observable.merge(microBlockSink, blockSink).subscribe()
 
-    // start
     miner.scheduleMining()
     utxStorage.cleanup.runCleanupOn(blockSink)
 
@@ -217,29 +239,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       upnp.addPort(addr.getPort)
     }
 
-    implicit val as: ActorSystem                 = actorSystem
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-    val extensionContext = new Context {
-      override def settings: WavesSettings                                  = app.settings
-      override def blockchain: Blockchain with BlockchainUpdater            = app.blockchainUpdater
-      override def time: Time                                               = app.time
-      override def wallet: Wallet                                           = app.wallet
-      override def utx: UtxPool                                             = utxStorage
-      override def broadcastTx(tx: Transaction): Unit                       = allChannels.broadcastTx(tx, None)
-      override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                 = app.actorSystem
-      override def blockchainUpdated: Option[Observable[BlockchainUpdated]] = maybeBlockchainUpdated
-    }
-
-    extensions = settings.extensions.map { extensionClassName =>
-      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
-      val ctor           = extensionClass.getConstructor(classOf[Context])
-      log.info(s"Enable extension: $extensionClassName")
-      ctor.newInstance(extensionContext)
-    }
-    extensions.foreach(_.start())
-
+    // API start
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
