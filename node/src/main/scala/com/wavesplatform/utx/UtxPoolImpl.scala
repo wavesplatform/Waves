@@ -158,7 +158,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean = true): TracedResult[ValidationError, Boolean] = {
     if (!transactions.containsKey(tx.id())) {
-      val diff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height + 1, verify = false)(blockchain, tx)
+      val diff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
       diff.resultE.foreach {
         PoolMetrics.addTransaction(tx)
         pessimisticPortfolios.add(tx.id(), _)
