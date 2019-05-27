@@ -178,8 +178,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
       .orElse(evalDiff.resultE.toOption)
       .foreach(pessimisticPortfolios.add(tx.id(), _))
 
-    transactions.put(tx.id(), tx)
-    PoolMetrics.addTransaction(tx)
+    if (transactions.put(tx.id(), tx) == null) PoolMetrics.addTransaction(tx)
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
