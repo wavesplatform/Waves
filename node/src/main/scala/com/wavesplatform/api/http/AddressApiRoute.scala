@@ -6,13 +6,11 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountApi
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
@@ -23,7 +21,6 @@ import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
@@ -164,41 +161,6 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     ))
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address))
-  }
-
-  @Path("/nft/{address}/limit/{limit}")
-  @ApiOperation(value = "NFTs", notes = "Account's NFTs", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
-    ))
-  def nft: Route = (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
-    val response: Either[ApiError, Future[JsArray]] = for {
-      addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-      limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
-      maybeAfter <- maybeAfterParam match {
-        case Some(v) =>
-          ByteStr
-            .decodeBase58(v)
-            .fold(
-              _ => Left(CustomValidationError(s"Unable to decode asset id $v")),
-              id => Right(Some(IssuedAsset(id)))
-            )
-        case None => Right(None)
-      }
-    } yield {
-      commonAccountApi
-        .portfolioNFT(addr, maybeAfter)
-        .take(limit)
-        .map(_.json())
-        .toListL
-        .map(lst => JsArray(lst))
-        .runAsync
-    }
-
-    complete(response)
   }
 
   @Path("/balance/details/{address}")

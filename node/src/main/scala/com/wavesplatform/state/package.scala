@@ -37,7 +37,9 @@ package object state {
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Iterator[IssueTransaction] = {
       after
         .fold(assetStreamFromDiff(diff)) { after =>
-          assetStreamFromDiff(diff).dropWhile(_ != after)
+          assetStreamFromDiff(diff)
+            .dropWhile(_ != after)
+            .drop(1)
         }
         .map { asset =>
           transactionFromDiff(diff, asset.id)

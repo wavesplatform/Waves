@@ -635,7 +635,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .fold(CloseableIterator.empty[IssuedAsset]) { id =>
         val addressId = AddressId @@ id
 
-        val iter = db.get(Keys.assetList(addressId)).toIterator
+        val iter = db.get(Keys.assetList(addressId)).iterator
 
         CloseableIterator(iter, () => CloseableIterator.close(iter))
       }
@@ -650,7 +650,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .flatMap(ia => transactionInfo(ia.id, db))
       .fold(issueTxStream) {
         case (_, afterTx) =>
-          issueTxStream.dropWhile(_.id() != afterTx.id())
+          issueTxStream
+            .dropWhile(_.id() != afterTx.id())
+            .drop(1)
       }
   }
 
