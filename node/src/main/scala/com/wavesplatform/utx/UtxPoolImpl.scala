@@ -46,26 +46,24 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    val knownTx = pessimisticPortfolios.contains(tx.id())
-
-    if (knownTx) TracedResult.wrapValue(utxSettings.allowRebroadcasting)
+    if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
     else putNewTx(tx, verify)
   }
 
   protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    def canReissue(blockchain: Blockchain, tx: Transaction): Either[GenericError, Unit] =
+    def canReissue(tx: Transaction): Either[GenericError, Unit] =
       PoolMetrics.checkCanReissue.measure(tx match {
         case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
         case _                                                     => Right(())
       })
 
-    def checkAlias(blockchain: Blockchain, tx: Transaction): Either[GenericError, Unit] =
+    def checkAlias(tx: Transaction): Either[GenericError, Unit] =
       PoolMetrics.checkAlias.measure(tx match {
         case cat: CreateAliasTransaction if !TxCheck.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
         case _                                                                 => Right(())
       })
 
-    def checkScripted(blockchain: Blockchain, tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
+    def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
       PoolMetrics.checkScripted.measure(tx match {
         case scripted if TxCheck.isScripted(scripted) =>
           for {
@@ -117,43 +115,30 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
     PoolMetrics.putRequestStats.increment()
 
-    if (!verify) {
-      addTransaction(tx)
-      return TracedResult.wrapValue(true)
-    }
+    val checks = if (verify) PoolMetrics.putTimeStats.measure {
+      lazy val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
+      lazy val transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+        .map(_.bytes().length)
+        .sum
 
-    val tracedResult = PoolMetrics.putTimeStats.measure {
-      val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
-
-      val checks = for {
-        _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-
-        transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
-          .map(_.bytes().length)
-          .sum
+      for {
+        _ <- Either.cond(transactions.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
         _ <- Either.cond(skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
                          (),
                          GenericError("Transaction pool bytes size limit is reached"))
 
-        _ <- checkScripted(blockchain, tx, skipSizeCheck)
+        _ <- checkScripted(tx, skipSizeCheck)
         _ <- checkNotBlacklisted(tx)
-        _ <- checkAlias(blockchain, tx)
-        _ <- canReissue(blockchain, tx)
+        _ <- checkAlias(tx)
+        _ <- canReissue(tx)
       } yield ()
+    } else Right(())
 
-      for {
-        _    <- TracedResult(checks)
-        diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
-      } yield {
-        addTransaction(tx, Some(diff))
-        true
-      }
+    val tracedResult = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
+    tracedResult.resultE match {
+      case Left(err) => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}")
+      case Right(_) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = true, trace = ${tracedResult.trace}")
     }
-
-    tracedResult.resultE.fold(
-      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}"),
-      _ => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = true, trace = ${tracedResult.trace}")
-    )
     tracedResult
   }
 
@@ -171,16 +156,21 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
     Option(transactions.remove(txId))
       .foreach(afterRemove)
 
-  private[this] def addTransaction(tx: Transaction, diff: Option[Diff] = None): Unit = {
-    def evalDiff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height + 1, verify = false)(blockchain, tx)
+  private[this] def addTransaction(tx: Transaction, verify: Boolean = true): TracedResult[ValidationError, Boolean] = {
+    if (!transactions.containsKey(tx.id())) {
+      val diff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height + 1, verify = false)(blockchain, tx)
+      diff.resultE.foreach {
+        PoolMetrics.addTransaction(tx)
+        pessimisticPortfolios.add(tx.id(), _)
+      }
+      val isNew = diff.map(_ => true)
 
-    if (transactions.put(tx.id(), tx) == null) {
-      diff
-        .orElse(evalDiff.resultE.toOption)
-        .foreach(pessimisticPortfolios.add(tx.id(), _))
+      if (!verify || diff.resultE.isRight) {
+        transactions.put(tx.id(), tx)
+        if (diff.resultE.isRight) isNew else TracedResult(Right(true), diff.trace)
+      } else isNew
 
-      PoolMetrics.addTransaction(tx)
-    }
+    } else TracedResult.wrapValue(false)
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
