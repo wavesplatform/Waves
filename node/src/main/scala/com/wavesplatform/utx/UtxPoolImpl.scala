@@ -174,11 +174,13 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   private[this] def addTransaction(tx: Transaction, diff: Option[Diff] = None): Unit = {
     def evalDiff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height + 1, verify = false)(blockchain, tx)
 
-    diff
-      .orElse(evalDiff.resultE.toOption)
-      .foreach(pessimisticPortfolios.add(tx.id(), _))
+    if (transactions.put(tx.id(), tx) == null) {
+      diff
+        .orElse(evalDiff.resultE.toOption)
+        .foreach(pessimisticPortfolios.add(tx.id(), _))
 
-    if (transactions.put(tx.id(), tx) == null) PoolMetrics.addTransaction(tx)
+      PoolMetrics.addTransaction(tx)
+    }
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
