@@ -97,7 +97,7 @@
     <check level="warning" class="org.scalastyle.scalariform.PublicMethodsHaveTypeChecker" enabled="true"></check>
     <check level="warning" class="org.scalastyle.file.NewLineAtEofChecker" enabled="true"></check>
     <check level="warning" class="org.scalastyle.file.NoNewLineAtEofChecker" enabled="false"></check>
-    <check level="warning" class="org.scalastyle.scalariform.TodoCommentChecker" enabled="true">
+    <check level="warning" class="org.scalastyle.scalariform.TodoCommentChecker" enabled="false">
         <parameters>
             <parameter name="words">TODO|FIXME|todo|fixme|bug|BUG</parameter>
         </parameters>

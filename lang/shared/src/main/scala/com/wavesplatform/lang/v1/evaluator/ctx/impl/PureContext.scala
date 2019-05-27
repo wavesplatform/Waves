@@ -460,11 +460,6 @@ object PureContext {
       IF(REF("@p"), FALSE, TRUE)
     }
 
-  lazy val ensure: BaseFunction =
-    UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
-      IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
-    }
-
   private lazy val operators: Array[BaseFunction] = Array(
     mulLong,
     divLong,
@@ -614,7 +609,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal, pow, log)
+            Array(value, listConstructor, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal, pow, log)
           )
         )
     }

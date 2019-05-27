@@ -209,9 +209,6 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 2
 
-    val exprEnsure = FUNCTION_CALL(PureContext.ensure, List(TRUE))
-    est(exprEnsure).explicitGet() shouldBe 17
-
     val exprDataByIndex = LET_BLOCK(
       LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1"), REF("nil")))),
       FUNCTION_CALL(User("getString"), List(REF("arr"), CONST_LONG(0)))

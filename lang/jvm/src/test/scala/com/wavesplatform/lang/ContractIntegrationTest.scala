@@ -115,7 +115,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |     else WriteSet([])
         | }
       """.stripMargin,
-      "foo"
+      "foo",
+      args = Nil
     )
     inside(evalResult) {
       case Left((error, log)) =>
@@ -275,7 +276,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         | }
         |
         """.stripMargin,
-      "test"
+      "test",
+      args = Nil
     ).explicitGet() shouldBe ScriptResult(
       List(
         DataItem.Lng("a", 1),
