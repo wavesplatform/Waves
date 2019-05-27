@@ -229,10 +229,7 @@ object CommonValidation {
               val base = tx.data.map(_.toBytes.length).sum
               baseFee + base / 1024
             case itx: IssueTransaction =>
-              lazy val nftActivated = blockchain.activatedFeatures
-                .get(BlockchainFeatures.ReduceNFTFee.id)
-                .exists(_ <= height)
-
+              lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
               if (itx.isNFT && nftActivated) FlatFeeDefault else baseFee
             case _ =>
               baseFee
