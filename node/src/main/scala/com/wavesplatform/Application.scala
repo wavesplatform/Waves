@@ -110,6 +110,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
+    // start
     checkGenesis(settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts.isEmpty)
@@ -125,6 +126,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
 
+    // ???
     val miner =
       if (settings.minerSettings.enable)
         new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
@@ -159,6 +161,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
+    // ???
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(
       settings.synchronizationSettings.scoreTTL,
       1.second,
@@ -191,6 +194,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
+    // start
     UtxPoolSynchronizer.start(utxStorage,
                               settings.synchronizationSettings.utxSynchronizer,
                               allChannels,
@@ -204,6 +208,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .mapTask(scala.Function.tupled(processBlock))
 
     Observable.merge(microBlockSink, blockSink).subscribe()
+
+    // start
     miner.scheduleMining()
     utxStorage.cleanup.runCleanupOn(blockSink)
 
@@ -232,6 +238,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info(s"Enable extension: $extensionClassName")
       ctor.newInstance(extensionContext)
     }
+    extensions.foreach(_.start())
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
@@ -317,8 +324,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
-
-    extensions.foreach(_.start())
 
     // on unexpected shutdown
     sys.addShutdownHook {
