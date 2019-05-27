@@ -48,8 +48,8 @@ object CommonValidation {
 
   val FlatFeeDefault = 2
   val FlatFeeConstants: Map[Byte, Long] = Map(
-    IssueTransaction.typeId -> 10000
-  ).withDefaultValue(FlatFeeDefault.toLong)
+    IssueTransaction.typeId -> 10000L
+  ).withDefaultValue(FlatFeeDefault: Long)
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
