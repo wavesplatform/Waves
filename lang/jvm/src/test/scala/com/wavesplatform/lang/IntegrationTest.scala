@@ -622,4 +622,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
+
+  property("matching parameterized types") {
+    val script =
+      s"""
+         | func dosSigVerify() = {
+         |    let result = if true then [DataEntry("a", "a")] else ""
+         |    let entry = match result[0] {
+         |        case r:DataEntry => r
+         |        case _ => throw("err")
+         |    }
+         |    WriteSet(result)
+         | }
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) should produce("expected: List[T], actual: List[DataEntry]|String")
+  }
 }
