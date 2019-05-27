@@ -64,7 +64,6 @@ object BlockDiffer extends ScorexLogging {
         prevBlockFeeDistr,
         currentBlockFeeDistr,
         block.transactionData,
-        1,
         verify
       )
     } yield r
@@ -100,7 +99,6 @@ object BlockDiffer extends ScorexLogging {
         None,
         None,
         micro.transactionData,
-        0,
         verify
       )
     } yield r
@@ -112,12 +110,11 @@ object BlockDiffer extends ScorexLogging {
                                                           prevBlockFeeDistr: Option[Portfolio],
                                                           currentBlockFeeDistr: Option[Portfolio],
                                                           txs: Seq[Transaction],
-                                                          heightOffset: Int,
                                                           verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
       constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
 
-    val currentBlockHeight = blockchain.height + heightOffset
+    val currentBlockHeight = blockchain.height
     val timestamp          = blockchain.lastBlockTimestamp.get
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress

@@ -94,7 +94,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
       .map(_._1)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
+  override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
 
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
