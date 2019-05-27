@@ -285,9 +285,9 @@ object WavesContext {
       Eval.later(
         env.inputEntity
           .eliminate(
-            tx => transactionObject(tx, proofsEnabled).asRight[String],
+            tx => transactionObject(tx, proofsEnabled, version).asRight[String],
             _.eliminate(
-              o => orderObject(o, proofsEnabled).asRight[String],
+              o => orderObject(o, proofsEnabled, version).asRight[String],
               _.eliminate(
                 o => Bindings.scriptTransfer(o).asRight[String],
                 _ => "Expected Transaction or Order".asLeft[CaseObj]
@@ -314,7 +314,7 @@ object WavesContext {
                      "Lookup transaction",
                      ("id", BYTESTR, "transaction Id")) {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
-          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled))
+          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled, version))
           Right(fromOptionCO(maybeDomainTx))
         case _ => ???
       }
@@ -330,7 +330,7 @@ object WavesContext {
         ("id", BYTESTR, "transfer transaction id")
       ) {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
-          val transferTxO = env.transferTransactionById(id.arr).map(transactionObject(_, proofsEnabled))
+          val transferTxO = env.transferTransactionById(id.arr).map(transactionObject(_, proofsEnabled, version))
           Right(fromOptionCO(transferTxO))
 
         case _ => ???

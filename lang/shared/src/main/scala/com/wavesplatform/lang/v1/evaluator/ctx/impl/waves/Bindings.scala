@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
@@ -72,24 +73,26 @@ object Bindings {
 
   }
 
-  def orderObject(ord: Ord, proofsEnabled: Boolean): CaseObj =
+  def orderObject(ord: Ord, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     CaseObj(
       buildOrderType(proofsEnabled),
-      Map(
-        "id"                -> ord.id,
-        "sender"            -> senderObject(ord.sender),
-        "senderPublicKey"   -> ord.senderPublicKey,
-        "matcherPublicKey"  -> ord.matcherPublicKey,
-        "assetPair"         -> assetPair(ord.assetPair),
-        "orderType"         -> ordType(ord.orderType),
-        "amount"            -> ord.amount,
-        "price"             -> ord.price,
-        "timestamp"         -> ord.timestamp,
-        "expiration"        -> ord.expiration,
-        "matcherFee"        -> ord.matcherFee,
-        "bodyBytes"         -> ord.bodyBytes,
-        "matcherFeeAssetId" -> ord.matcherFeeAssetId,
-        proofsPart(ord.proofs)
+      combine(
+        Map(
+          "id"                -> ord.id,
+          "sender"            -> senderObject(ord.sender),
+          "senderPublicKey"   -> ord.senderPublicKey,
+          "matcherPublicKey"  -> ord.matcherPublicKey,
+          "assetPair"         -> assetPair(ord.assetPair),
+          "orderType"         -> ordType(ord.orderType),
+          "amount"            -> ord.amount,
+          "price"             -> ord.price,
+          "timestamp"         -> ord.timestamp,
+          "expiration"        -> ord.expiration,
+          "matcherFee"        -> ord.matcherFee,
+          "bodyBytes"         -> ord.bodyBytes,
+          "matcherFeeAssetId" -> ord.matcherFeeAssetId
+        ),
+        if (proofsEnabled || version != V3) Map(proofsPart(ord.proofs)) else Map.empty
       )
     )
 
@@ -133,7 +136,7 @@ object Bindings {
       false
     )
 
-  def transactionObject(tx: Tx, proofsEnabled: Boolean): CaseObj =
+  def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
         CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
@@ -267,8 +270,8 @@ object Bindings {
           buildExchangeTransactionType(proofsEnabled),
           combine(
             Map(
-              "buyOrder"       -> orderObject(buyOrder, proofsEnabled),
-              "sellOrder"      -> orderObject(sellOrder, proofsEnabled),
+              "buyOrder"       -> orderObject(buyOrder, proofsEnabled, version),
+              "sellOrder"      -> orderObject(sellOrder, proofsEnabled, version),
               "amount"         -> amount,
               "price"          -> price,
               "buyMatcherFee"  -> buyMatcherFee,
