@@ -340,7 +340,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let lastBlockHeight = lastBlock.height == 5
+                 | let lastBlockHeight = lastBlock.height == 6
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
                    Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
                  |
