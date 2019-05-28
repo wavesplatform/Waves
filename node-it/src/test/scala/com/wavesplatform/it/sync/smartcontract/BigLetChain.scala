@@ -13,7 +13,7 @@ import com.wavesplatform.common.utils.EitherExt2
 
 class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
   test("big let assignment chain") {
-    val count = 1000
+    val count = 550
     val scriptText =
       s"""
          | {-# STDLIB_VERSION 3    #-}
