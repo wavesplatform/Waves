@@ -51,72 +51,74 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   }
 
   protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    def canReissue(tx: Transaction): Either[GenericError, Unit] =
-      PoolMetrics.checkCanReissue.measure(tx match {
-        case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
-        case _                                                     => Right(())
-      })
-
-    def checkAlias(tx: Transaction): Either[GenericError, Unit] =
-      PoolMetrics.checkAlias.measure(tx match {
-        case cat: CreateAliasTransaction if !TxCheck.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
-        case _                                                                 => Right(())
-      })
-
-    def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
-      PoolMetrics.checkScripted.measure(tx match {
-        case scripted if TxCheck.isScripted(scripted) =>
-          for {
-            _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts,
-                             (),
-                             GenericError("transactions from scripted accounts are denied from UTX pool"))
-
-            scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
-            _ <- Either.cond(skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
-                             (),
-                             GenericError("Transaction pool scripted txs size limit is reached"))
-          } yield tx
-
-        case _ =>
-          Right(tx)
-      })
-
-    def checkNotBlacklisted(tx: Transaction): Either[SenderIsBlacklisted, Unit] = PoolMetrics.checkNotBlacklisted.measure {
-      if (utxSettings.blacklistSenderAddresses.isEmpty) {
-        Right(())
-      } else {
-        val sender: Option[String] = tx match {
-          case x: Authorized => Some(x.sender.address)
-          case _             => None
-        }
-
-        sender match {
-          case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
-            val recipients = tx match {
-              case tt: TransferTransaction      => Seq(tt.recipient)
-              case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
-              case _                            => Seq()
-            }
-            val allowed =
-              recipients.nonEmpty &&
-                recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
-            Either.cond(allowed, (), SenderIsBlacklisted(addr))
-          case _ => Right(())
-        }
-      }
-    }
-
-    def checkIsMostProfitable(newTx: Transaction): Boolean = PoolMetrics.checkIsMostProfitable.measure {
-      transactions
-        .values()
-        .asScala
-        .forall(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) < 0)
-    }
-
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
-      lazy val skipSizeCheck = utxSettings.allowSkipChecks && checkIsMostProfitable(tx)
+      object LimitChecks {
+        def canReissue(tx: Transaction): Either[GenericError, Unit] =
+          PoolMetrics.checkCanReissue.measure(tx match {
+            case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
+            case _ => Right(())
+          })
+
+        def checkAlias(tx: Transaction): Either[GenericError, Unit] =
+          PoolMetrics.checkAlias.measure(tx match {
+            case cat: CreateAliasTransaction if !TxCheck.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
+            case _ => Right(())
+          })
+
+        def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
+          PoolMetrics.checkScripted.measure(tx match {
+            case scripted if TxCheck.isScripted(scripted) =>
+              for {
+                _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts,
+                  (),
+                  GenericError("transactions from scripted accounts are denied from UTX pool"))
+
+                scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
+                _ <- Either.cond(skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
+                  (),
+                  GenericError("Transaction pool scripted txs size limit is reached"))
+              } yield tx
+
+            case _ =>
+              Right(tx)
+          })
+
+        def checkNotBlacklisted(tx: Transaction): Either[SenderIsBlacklisted, Unit] = PoolMetrics.checkNotBlacklisted.measure {
+          if (utxSettings.blacklistSenderAddresses.isEmpty) {
+            Right(())
+          } else {
+            val sender: Option[String] = tx match {
+              case x: Authorized => Some(x.sender.address)
+              case _ => None
+            }
+
+            sender match {
+              case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
+                val recipients = tx match {
+                  case tt: TransferTransaction => Seq(tt.recipient)
+                  case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
+                  case _ => Seq()
+                }
+                val allowed =
+                  recipients.nonEmpty &&
+                    recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
+                Either.cond(allowed, (), SenderIsBlacklisted(addr))
+              case _ => Right(())
+            }
+          }
+        }
+
+        def checkIsMostProfitable(newTx: Transaction): Boolean = PoolMetrics.checkIsMostProfitable.measure {
+          transactions
+            .values()
+            .asScala
+            .forall(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) < 0)
+        }
+      }
+
+      lazy val skipSizeCheck = utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx)
       lazy val transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
         .map(_.bytes().length)
         .sum
@@ -127,19 +129,19 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
                          (),
                          GenericError("Transaction pool bytes size limit is reached"))
 
-        _ <- checkScripted(tx, skipSizeCheck)
-        _ <- checkNotBlacklisted(tx)
-        _ <- checkAlias(tx)
-        _ <- canReissue(tx)
+        _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
+        _ <- LimitChecks.checkNotBlacklisted(tx)
+        _ <- LimitChecks.checkAlias(tx)
+        _ <- LimitChecks.canReissue(tx)
       } yield ()
     } else Right(())
 
-    val tracedResult = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
-    tracedResult.resultE match {
-      case Left(err) => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedResult.trace}")
-      case Right(_) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = true, trace = ${tracedResult.trace}")
+    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
+    tracedIsNew.resultE match {
+      case Left(err) => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err, trace = ${tracedIsNew.trace}")
+      case Right(_) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = true, trace = ${tracedIsNew.trace}")
     }
-    tracedResult
+    tracedIsNew
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit =
