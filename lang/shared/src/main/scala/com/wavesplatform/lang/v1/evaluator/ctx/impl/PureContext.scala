@@ -516,6 +516,7 @@ object PureContext {
         case "Down" => BaseGlobal.RoundDown()
         case "Up" => BaseGlobal.RoundUp()
         case "HalfUp" => BaseGlobal.RoundHalfUp()
+        case "HalfDown" => BaseGlobal.RoundHalfDown()
         case "HalfEven" => BaseGlobal.RoundHalfEven()
         case "Ceiling" => BaseGlobal.RoundCeiling()
         case "Floor" => BaseGlobal.RoundFloor()
