@@ -94,14 +94,14 @@ object Bindings {
     )
 
   def buildInvocation(
-                       caller:        Recipient.Address,
-                       callerPk:      ByteStr,
-                       payment:       Option[Pmt],
-                       dappAddress:   Recipient.Address,
-                       transactionId: ByteStr,
-                       fee:           Long,
-                       feeAssetId:    Option[ByteStr]
-                     ) =
+      caller: Recipient.Address,
+      callerPk: ByteStr,
+      payment: Option[Pmt],
+      dappAddress: Recipient.Address,
+      transactionId: ByteStr,
+      fee: Long,
+      feeAssetId: Option[ByteStr]
+  ) =
     CaseObj(
       invocationType,
       Map(
@@ -298,7 +298,10 @@ object Bindings {
       Map(
         "timestamp"           -> blockInf.timestamp,
         "height"              -> blockInf.height.toLong,
-        "generationSignature" -> blockInf.generationSignature
+        "baseTarget"          -> blockInf.baseTarget,
+        "generationSignature" -> blockInf.generationSignature,
+        "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
+        "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
     )
 }

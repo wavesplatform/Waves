@@ -4,6 +4,7 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -340,13 +341,15 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let lastBlockHeight = lastBlock.height == 6
+                 | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
                    Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                 | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
+                 | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
-                 | lastBlockHeight && lastBlockGenerationSignature
+                 | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
                  |
-              |
+                 |
               """.stripMargin
             )
             .explicitGet()
@@ -377,13 +380,18 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let unexistingHeight = 999
-                 | let checkUnexistingBlock = !isDefined(blockInfoByHeight(unexistingHeight))
+                 | let nonExistedBlockNeg = !blockInfoByHeight(-1).isDefined()
+                 | let nonExistedBlockZero = !blockInfoByHeight(0).isDefined()
+                 | let nonExistedBlockNextPlus = !blockInfoByHeight(6).isDefined()
                  |
-                 | let block = extract(blockInfoByHeight(4))
-                 | let checkSignature = block.generationSignature == base58'$generatorSignature'
+                 | let block = extract(blockInfoByHeight(3))
+                 | let checkHeight = block.height == 3
+                 | let checkBaseTarget = block.baseTarget == 2
+                 | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
+                 | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
+                 | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
-                 | checkUnexistingBlock && checkSignature
+                 | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
                  |
               """.stripMargin
             )
@@ -406,7 +414,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler.compile(
+          val script = ScriptCompiler
+            .compile(
               s"""
                  | {-# STDLIB_VERSION 3          #-}
                  | {-# CONTENT_TYPE   EXPRESSION #-}
@@ -450,12 +459,14 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(
-            masterAcc,
-            Some(script),
-            1000000L,
-            transferTx.timestamp + 5
-          ).explicitGet()
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(
+              masterAcc,
+              Some(script),
+              1000000L,
+              transferTx.timestamp + 5
+            )
+            .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()

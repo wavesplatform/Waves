@@ -26,7 +26,10 @@ object Types {
     List(
       "timestamp"           -> LONG,
       "height"              -> LONG,
-      "generationSignature" -> BYTESTR
+      "baseTarget"          -> LONG,
+      "generationSignature" -> BYTESTR,
+      "generator"           -> addressType,
+      "generatorPublicKey"  -> BYTESTR
     )
   )
 
