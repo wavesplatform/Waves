@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats.Monoid
 import cats.implicits._
 import cats.syntax.either.catsSyntaxEitherId
-import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -11,6 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
@@ -52,18 +52,18 @@ object BlockDiffer extends ScorexLogging {
       else
         None
 
+    // Fixes lastBlockInfo() in scripts issue
+    val blockchainWithLastBlock = CompositeBlockchain.withLastBlock(blockchain, block)
+
     for {
       _ <- TracedResult(block.signaturesValid())
       r <- apply(
-        blockchain,
+        blockchainWithLastBlock,
         constraint,
         maybePrevBlock.map(_.timestamp),
-        block.signerData.generator,
         prevBlockFeeDistr,
         currentBlockFeeDistr,
-        block.timestamp,
         block.transactionData,
-        stateHeight + 1,
         verify
       )
     } yield r
@@ -96,29 +96,28 @@ object BlockDiffer extends ScorexLogging {
         blockchain,
         constraint,
         prevBlockTimestamp,
-        micro.sender,
         None,
         None,
-        timestamp,
         micro.transactionData,
-        blockchain.height,
         verify
       )
     } yield r
   }
 
-  private def apply[Constraint <: MiningConstraint](blockchain: Blockchain,
-                                                    initConstraint: Constraint,
-                                                    prevBlockTimestamp: Option[Long],
-                                                    blockGenerator: Address,
-                                                    prevBlockFeeDistr: Option[Portfolio],
-                                                    currentBlockFeeDistr: Option[Portfolio],
-                                                    timestamp: Long,
-                                                    txs: Seq[Transaction],
-                                                    currentBlockHeight: Int,
-                                                    verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
+  private[this] def apply[Constraint <: MiningConstraint](blockchain: Blockchain,
+                                                          initConstraint: Constraint,
+                                                          prevBlockTimestamp: Option[Long],
+                                                          prevBlockFeeDistr: Option[Portfolio],
+                                                          currentBlockFeeDistr: Option[Portfolio],
+                                                          txs: Seq[Transaction],
+                                                          verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
       constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
+
+    val currentBlockHeight = blockchain.height
+    val timestamp          = blockchain.lastBlockTimestamp.get
+    val lastBlock          = blockchain.lastBlock.get
+    val blockGenerator     = lastBlock.sender.toAddress
 
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
