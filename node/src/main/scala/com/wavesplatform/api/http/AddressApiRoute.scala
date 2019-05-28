@@ -268,7 +268,17 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
-  @ApiImplicitParams(Array(new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "matches",
+        value = "URL encoded (percent-encoded) regular expression to filter keys (https://www.tutorialspoint.com/scala/scala_regular_expressions.htm)",
+        required = false,
+        dataType = "string",
+        paramType = "query"
+      )
+    ))
   def getData: Route = (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
     maybeRegex match {
       case None => complete(accountData(address))

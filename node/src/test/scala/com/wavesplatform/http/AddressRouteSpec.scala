@@ -221,5 +221,15 @@ class AddressRouteSpec
 
       assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
     }
+
+    val urlEncRegex = """%5ESome.%2A%24"""
+
+    Get(routePath(s"""/data/${allAddresses(1)}?matches=$urlEncRegex""")) ~> route ~> check {
+      val kvs = responseAs[JsArray].value.map { json =>
+        ((json \ "key").as[String], (json \ "value").as[String])
+      }.toList
+
+      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
+    }
   }
 }
