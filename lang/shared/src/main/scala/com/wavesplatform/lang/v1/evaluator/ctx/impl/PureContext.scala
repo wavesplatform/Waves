@@ -570,7 +570,7 @@ object PureContext {
             || ep < 0
             || ep > 8
             || rp < 0
-            || rp < 0
+            || rp > 8
           ) {
             Left("pow: scale out of range 0-8")
           } else {
