@@ -312,7 +312,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     for ((addressId, assets) <- assetBalances) {
       val prevAssets   = rw.get(Keys.assetList(addressId))
       val prevAssetSet = prevAssets.toSet
-      val newAssets    = assets.keys.filter(prevAssetSet)
+      val newAssets    = assets.keys.filter(!prevAssetSet(_))
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
