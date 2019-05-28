@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, DefaultFuncAnnotation, DefaultFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript
@@ -94,7 +94,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
       None
     )
   }
@@ -135,14 +134,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
       None
     )
   }
 
   def defaultPaymentContract(senderBinding: String,
                              argName: String,
-                             funcName: String,
                              recipientAddress: Address,
                              recipientAmount: Long,
                              assets: List[Asset] = List(Waves)): DApp = {
@@ -164,20 +161,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
     DApp(
       List.empty,
-      List.empty,
-      Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(senderBinding),
+      List(
+        CallableFunction(
+          CallableAnnotation(senderBinding),
           Terms.FUNC(
-            funcName,
+            "default",
             Nil,
             FUNCTION_CALL(
               User(FieldNames.TransferSet),
               List(payments)
             )
           )
-        )
-      ),
+        )),
       None
     )
   }
@@ -294,8 +289,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
                                         sponsored: Boolean = false,
-                                        invocationParamsCount: Int = 1
-                                       )
+                                        invocationParamsCount: Int = 1)
     : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
@@ -339,11 +333,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, assets)
 
-  def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(func: String) =
+  def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(someName: String) =
     for {
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
-    } yield defaultPaymentContract(senderBinging, argBinding, func, address, amount, assets)
+    } yield defaultPaymentContract(senderBinging, argBinding, address, amount, assets)
 
   def preconditionsAndSetContract(senderBindingToContract: String => Gen[DApp],
                                   invokerGen: Gen[KeyPair] = accountGen,
@@ -506,13 +500,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   property("suitable verifier error message on incorrect proofs number") {
     forAll(for {
       proofCount <- Gen.oneOf(0, 2)
-      a  <- accountGen
-      am <- smallFeeGen
+      a          <- accountGen
+      am         <- smallFeeGen
       contractGen = (defaultPaymentContractGen(a, am) _)
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
     } yield (a, am, r._1, r._2, r._3, proofCount)) {
       case (acc, amount, genesis, setScript, ci, proofCount) =>
-
         val proofs = Proofs(
           List.fill(proofCount)(ByteStr.fromBytes(1, 1))
         )
@@ -535,7 +528,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
-
         val proofs = Proofs(List(ByteStr.fromBytes(1, 1)))
 
         assertDiffEi(
@@ -1019,6 +1011,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci, count) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           _ should produce(s"takes 1 args but $count were(was) given")
+        }
+    }
+  }
+
+  property("Default function should not accept arguments") {
+    forAll(for {
+      a          <- accountGen
+      am         <- smallFeeGen
+      senderBinging <- validAliasStringGen
+      argBinding    <- validAliasStringGen
+      contractGen <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "default", a, am, List(Waves))))
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, am, r._1, r._2, r._3)) {
+      case (acc, amount, genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce(s"must have 0 arguments")
         }
     }
   }

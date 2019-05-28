@@ -13,6 +13,7 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResult}
@@ -88,17 +89,22 @@ object InvokeScriptTransactionDiff {
 
     accScriptEi match {
       case Right(Some(sc @ ContractScriptImpl(_, contract, _))) =>
-        val functionName = tx.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(ContractEvaluator.DEFAULT_FUNC_NAME)
+        val functionName = tx.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
 
-        val contractFunc =
-          if (tx.funcCallOpt.nonEmpty)
-            contract.callableFuncs.find(_.u.name == functionName).flatMap(_ => tx.funcCallOpt)
-          else
-            contract.defaultFuncOpt.map(defFunc => FUNCTION_CALL(FunctionHeader.User(defFunc.u.name), List.empty))
+        val contractFuncEi =
+          contract.callableFuncs
+            .find(_.u.name == functionName)
+            .map(_ => tx.funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(DEFAULT_FUNC_NAME), List.empty)))
+            .toRight(GenericError(s"No function '$functionName' at address ${tx.dAppAddressOrAlias}"))
+            .flatMap { funcCall =>
+              Either.cond(tx.funcCallOpt.nonEmpty || funcCall.args.isEmpty,
+                          funcCall,
+                          GenericError(s"Default function at address ${tx.dAppAddressOrAlias} must have 0 arguments"))
+            }
 
-        contractFunc match {
-          case None => Left(GenericError(s"No function '$functionName' at address ${tx.dAppAddressOrAlias}"))
-          case Some(funcCall) =>
+        contractFuncEi match {
+          case Left(err) => Left(err)
+          case Right(funcCall) =>
             val scriptResultE =
               stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)(evalContract(contract))
             for {
@@ -190,7 +196,8 @@ object InvokeScriptTransactionDiff {
                   .map(DiffsCommon.verifierComplexity)
                   .sum
 
-                val accountComplexity = blockchain.accountScript(tx.sender)
+                val accountComplexity = blockchain
+                  .accountScript(tx.sender)
                   .fold(0L)(DiffsCommon.verifierComplexity)
 
                 val funcComplexity = DiffsCommon.functionComplexity(sc, tx.funcCallOpt)

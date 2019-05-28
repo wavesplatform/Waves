@@ -51,21 +51,6 @@ object ContractCompiler {
             .toCompileM
         } yield CallableFunction(c, func)
 
-      case (List(c: DefaultFuncAnnotation), (func, tpe, _)) =>
-        for {
-          _ <- Either
-            .cond(
-              tpe match {
-                case _ if tpe <= UNION(WavesContext.writeSetType, WavesContext.scriptTransferSetType, WavesContext.scriptResultType) =>
-                  true
-                case _ => false
-              },
-              (),
-              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
-            )
-            .toCompileM
-        } yield DefaultFunction(c, func)
-
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
         for {
           _ <- Either
@@ -139,20 +124,6 @@ object ContractCompiler {
 
       callableFuncs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
 
-      defaultFunctions = l.filter(_.isInstanceOf[DefaultFunction]).map(_.asInstanceOf[DefaultFunction])
-      defaultFuncOpt <- defaultFunctions match {
-        case Nil => Option.empty[DefaultFunction].pure[CompileM]
-        case df :: Nil =>
-          if (df.u.args.isEmpty)
-            Option.apply(df).pure[CompileM]
-          else
-            raiseError[CompilerContext, CompilationError, Option[DefaultFunction]](
-              Generic(contract.position.start, contract.position.start, "Default function must have 0 arguments"))
-        case _ =>
-          raiseError[CompilerContext, CompilationError, Option[DefaultFunction]](
-            Generic(contract.position.start, contract.position.start, "Can't have more than 1 default function defined"))
-      }
-
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       verifierFuncOpt <- verifierFunctions match {
         case Nil => Option.empty[VerifierFunction].pure[CompileM]
@@ -166,7 +137,7 @@ object ContractCompiler {
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
-    } yield DApp(decs, callableFuncs, defaultFuncOpt, verifierFuncOpt)
+    } yield DApp(decs, callableFuncs, verifierFuncOpt)
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {

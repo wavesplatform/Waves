@@ -15,7 +15,6 @@ import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunctio
 import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utx.UtxPool
@@ -38,7 +37,8 @@ class AddressRouteSpec
   private val allAddresses = allAccounts.map(_.address)
   private val blockchain   = stub[Blockchain]
 
-  private val route = AddressApiRoute(restAPISettings, testWallet, blockchain, mock[UtxPool], mock[ChannelGroup], new TestTime)(Scheduler.global).route
+  private val route =
+    AddressApiRoute(restAPISettings, testWallet, blockchain, mock[UtxPool], mock[ChannelGroup], new TestTime)(Scheduler.global).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -169,7 +169,7 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe 0
     }
 
-    val testContract = DApp(List(), List(), None, Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    val testContract = DApp(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .onCall((_: AddressOrAlias) => Some(ContractScript(V3, testContract).explicitGet()))
@@ -178,7 +178,7 @@ class AddressRouteSpec
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
-      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),None,Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
 // [WAIT]                                           Decompiler(
 //      testContract,
 //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
