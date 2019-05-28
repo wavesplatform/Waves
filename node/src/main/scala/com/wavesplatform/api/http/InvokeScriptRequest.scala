@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http
 
 import cats.implicits._
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -63,7 +63,7 @@ case class InvokeScriptRequest(sender: String,
                                ) feeAssetId: Option[String],
                                @(ApiModelProperty @field)(required = false) call: Option[InvokeScriptRequest.FunctionCallPart],
                                @(ApiModelProperty @field)(required = true) payment: Seq[InvokeScriptTransaction.Payment],
-                               @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dappAddress: String,
+                               @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dApp: String,
                                timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Invoke script transaction")
@@ -75,7 +75,7 @@ case class SignedInvokeScriptRequest(
       example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
       required = false
     ) feeAssetId: Option[String],
-    @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dappAddress: String,
+    @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dApp: String,
     @(ApiModelProperty @field)(required = false) call: Option[InvokeScriptRequest.FunctionCallPart],
     @(ApiModelProperty @field)(required = true) payment: Option[Seq[InvokeScriptTransaction.Payment]],
     @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
@@ -84,7 +84,7 @@ case class SignedInvokeScriptRequest(
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
-      _dappAddress <- Address.fromString(dappAddress)
+      _dappAddress <- AddressOrAlias.fromString(dApp)
       _feeAssetId  <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes  <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs      <- Proofs.create(_proofBytes)

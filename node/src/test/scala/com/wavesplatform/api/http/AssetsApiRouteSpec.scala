@@ -2,11 +2,9 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
@@ -27,15 +25,7 @@ class AssetsApiRouteSpec
 
   private val blockchain = stub[Blockchain]
 
-  private val route = AssetsApiRoute(
-    restAPISettings,
-    WavesSettings.fromRootConfig(ConfigFactory.load()).blockchainSettings.functionalitySettings,
-    testWallet,
-    mock[UtxPool],
-    mock[ChannelGroup],
-    blockchain,
-    new TestTime
-  ).route
+  private val route = AssetsApiRoute(restAPISettings, testWallet, mock[UtxPool], mock[ChannelGroup], blockchain, new TestTime).route
 
   private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
@@ -57,7 +47,7 @@ class AssetsApiRouteSpec
       (response \ "assetId").as[String] shouldBe smartAssetTx.id().base58
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe smartAssetTx.timestamp
-      (response \ "issuer").as[String] shouldBe smartAssetTx.sender.toString
+      (response \ "issuer").as[String] shouldBe smartAssetTx.sender.address
       (response \ "name").as[String] shouldBe new String(smartAssetTx.name, StandardCharsets.UTF_8)
       (response \ "description").as[String] shouldBe new String(smartAssetTx.description, StandardCharsets.UTF_8)
       (response \ "decimals").as[Int] shouldBe smartAssetTx.decimals
@@ -86,7 +76,7 @@ class AssetsApiRouteSpec
       (response \ "assetId").as[String] shouldBe sillyAssetTx.id().base58
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe sillyAssetTx.timestamp
-      (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.toString
+      (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.address
       (response \ "name").as[String] shouldBe new String(sillyAssetTx.name, StandardCharsets.UTF_8)
       (response \ "description").as[String] shouldBe new String(sillyAssetTx.description, StandardCharsets.UTF_8)
       (response \ "decimals").as[Int] shouldBe sillyAssetTx.decimals

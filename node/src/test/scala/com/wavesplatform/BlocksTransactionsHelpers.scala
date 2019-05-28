@@ -1,14 +1,15 @@
 package com.wavesplatform
-import com.wavesplatform.account.{KeyPair, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.history.DefaultBaseTarget
+import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.{TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -43,6 +44,11 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
       for {
         timestamp <- timestamp
       } yield LeaseCancelTransactionV1.selfSigned(from, leaseId, FeeAmount, timestamp).explicitGet()
+
+    def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
+      for {
+        timestamp <- timestamp
+      } yield DataTransaction.selfSigned(from, List(StringDataEntry(dataKey, Gen.numStr.sample.get)), FeeAmount, timestamp).explicitGet()
   }
 
   object UnsafeBlocks {

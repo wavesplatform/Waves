@@ -5,8 +5,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, FixedWavesSettings, PercentSettings}
+import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
+import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, DynamicSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -25,7 +25,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     s"""
        |order-fee {
        |  mode = percent
-       |  waves {
+       |  dynamic {
        |    base-fee = 300000
        |  }
        |  fixed {
@@ -93,6 +93,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |      type = "kafka"
       |
       |      local {
+      |        enable-storing = no
       |        polling-interval = 1d
       |        max-elements-per-poll = 99
       |        clean-before-consume = no
@@ -107,14 +108,22 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |          max-backoff = 2d
       |        }
       |
-      |        producer.buffer-size = 200
+      |        producer {
+      |          enable = no
+      |          buffer-size = 200
+      |        }
       |      }
       |    }
       |    $orderFeeStr
       |    $deviationsStr
       |    $allowedAssetPairsStr
-      |    allow-order-v3 = no
       |    $orderRestrictionsStr
+      |    allow-order-v3 = no
+      |    exchange-transaction-broadcast {
+      |      broadcast-until-confirmed = yes
+      |      interval = 1 day
+      |      max-pending-time = 30 days
+      |    }
       |  }
       |}""".stripMargin
 
@@ -149,16 +158,16 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.balanceWatchingBufferInterval should be(33.seconds)
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
-      local = LocalMatcherQueue.Settings(1.day, 99, cleanBeforeConsume = false),
+      local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),
       kafka = KafkaMatcherQueue.Settings(
         "some-events",
         KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
-        KafkaMatcherQueue.ProducerSettings(200)
+        KafkaMatcherQueue.ProducerSettings(enable = false, 200)
       )
     )
 
     settings.orderFee match {
-      case FixedWavesSettings(baseFee) =>
+      case DynamicSettings(baseFee) =>
         baseFee shouldBe 300000
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
@@ -172,6 +181,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowOrderV3 shouldBe false
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
+    settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
+      broadcastUntilConfirmed = true,
+      interval = 1.day,
+      maxPendingTime = 30.days
+    )
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {
@@ -228,7 +242,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = invalid
-         |  waves {
+         |  dynamic {
          |    base-fee = 300000
          |  }
          |  fixed {
@@ -246,7 +260,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = percent
-         |  waves {
+         |  dynamic {
          |    base-fee = 300000
          |  }
          |  fixed {
@@ -264,7 +278,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = fixed
-         |  waves {
+         |  dynamic {
          |    base-fee = 300000
          |  }
          |  fixed {
@@ -278,11 +292,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val invalidFeeInWaves =
+    val invalidFeeInDynamicMode =
       s"""
          |order-fee {
-         |  mode = waves
-         |  waves {
+         |  mode = dynamic
+         |  dynamic {
          |    base-fee = -350000
          |  }
          |  fixed {
@@ -296,11 +310,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val configStr: String => Config   = configWithSettings(_)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
-    val settingsInvalidMode           = getSettingByConfig(configStr(invalidMode))
-    val settingsInvalidTypeAndPercent = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
-    val settingsInvalidAssetAndFee    = getSettingByConfig(configStr(invalidAssetAndFee))
-    val settingsInvalidFeeInWaves     = getSettingByConfig(configStr(invalidFeeInWaves))
+    val configStr: String => Config     = configWithSettings(_)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
+    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
+    val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
+    val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
 
     settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
 
@@ -314,8 +328,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         "Invalid setting order-fee.fixed.asset value: ;;;;, " +
           "Invalid setting order-fee.fixed.min-fee value: -300000 (required 0 < fee)")
 
-    settingsInvalidFeeInWaves shouldBe Left(
-      s"Invalid setting order-fee.waves.base-fee value: -350000 (required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount})"
+    settingsInvalidFeeInDynamicMode shouldBe Left(
+      s"Invalid setting order-fee.dynamic.base-fee value: -350000 (required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount})"
     )
   }
 

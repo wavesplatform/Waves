@@ -4,35 +4,30 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 
+//noinspection ScalaStyle
 object TxEstimators extends ScorexLogging {
-  abstract class Fn extends ((Blockchain, Transaction, Diff) => Long) {
-    val minEstimate: Long
+  trait Fn {
+    def apply(blockchain: Blockchain, transaction: Transaction, diff: Diff): Long
+    def minEstimate: Long
   }
 
-  object sizeInBytes extends Fn {
+  case object sizeInBytes extends Fn {
     override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = tx.bytes().length // + headers
-
-    override def toString(): String = "sizeInBytes"
-
-    override val minEstimate = 109L
+    override val minEstimate                                                      = 109L
   }
 
-  object one extends Fn {
+  case object one extends Fn {
     override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = 1
-
-    override def toString(): String = "one"
-
-    override val minEstimate = 1L
+    override val minEstimate                                                      = 1L
   }
 
-  object scriptRunNumber extends Fn {
-    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = {
-      ScriptRunsLegacy.assertEquals(blockchain, tx, diff.scriptsRun)
-      diff.scriptsRun
-    }
+  case object scriptRunNumber extends Fn {
+    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = diff.scriptsRun
+    override val minEstimate                                                      = 0L
+  }
 
-    override def toString(): String = "scriptRunNumber"
-
-    override val minEstimate = 0L
+  case object scriptsComplexity extends Fn {
+    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = diff.scriptsComplexity
+    override val minEstimate                                                      = 0L
   }
 }

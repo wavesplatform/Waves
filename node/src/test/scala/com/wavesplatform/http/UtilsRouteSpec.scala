@@ -61,18 +61,47 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "(1 == 2)"
     }
 
+    //V1 Expression
+    Post(routePath("/script/decompile"), "AQa3b8tH") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 1
+      (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
+      (json \ "script").as[String] shouldBe "" +
+        "{-# STDLIB_VERSION 1 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
+    }
+
+    //V2 Expression
     Post(routePath("/script/decompile"), "AgZ7TN8j") ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 2
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-        "{-# STDLIB_VERSION 2 #-}\n" +
-        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
-        "true"
+      "{-# STDLIB_VERSION 2 #-}\n" +
+      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+      "true"
     }
 
-    val dappVerBytes = ContractScript(V3, dappVer).explicitGet().bytes().base64
-    Post(routePath("/script/decompile"), dappVerBytes) ~> route ~> check {
+    //V3 Expression
+    Post(routePath("/script/decompile"), "AwZd0cYf") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 3
+      (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
+      (json \ "script").as[String] shouldBe "" +
+      "{-# STDLIB_VERSION 3 #-}\n" +
+      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+      "true"
+    }
+
+    val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
+
+    testdAppDirective(dappVerBytesStr)
+    testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
+  }
+
+  private def testdAppDirective(str: String) =
+    Post(routePath("/script/decompile"), str) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "DAPP"
@@ -82,7 +111,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "{-# STDLIB_VERSION 3 #-}\n{-# SCRIPT_TYPE ACCOUNT #-}\n{-# CONTENT_TYPE DAPP #-}\n\n\n\n@Verifier(tx)\nfunc verify () = true\n"
       (json \ "script").as[String] shouldBe expectedResult
     }
-  }
 
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {

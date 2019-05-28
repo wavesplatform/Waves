@@ -256,7 +256,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                 case "binary"  => Terms.CONST_BYTESTR(Base58.decode(value))
               }
 
-            val fc = Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList)
+            val maybeFunctionCall =
+              if (function.name.isEmpty) None
+              else Some(Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList))
 
             val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(new String(a.name))))
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
@@ -265,7 +267,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               InvokeScriptTransaction.selfSigned(
                 sender,
                 GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
-                Some(fc),
+                maybeFunctionCall,
                 Seq(InvokeScriptTransaction.Payment(random.nextInt(500000), asset)),
                 100000000L + random.nextInt(100000000),
                 Waves,

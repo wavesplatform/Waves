@@ -94,14 +94,14 @@ object Bindings {
     )
 
   def buildInvocation(
-                       caller:        Recipient.Address,
-                       callerPk:      ByteStr,
-                       payment:       Option[Pmt],
-                       dappAddress:   Recipient.Address,
-                       transactionId: ByteStr,
-                       fee:           Long,
-                       feeAssetId:    Option[ByteStr]
-                     ) =
+      caller: Recipient.Address,
+      callerPk: ByteStr,
+      payment: Option[Pmt],
+      dappAddress: Recipient.Address,
+      transactionId: ByteStr,
+      fee: Long,
+      feeAssetId: Option[ByteStr]
+  ) =
     CaseObj(
       invocationType,
       Map(
@@ -187,16 +187,16 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
+      case CI(p, addressOrAlias, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled),
           combine(
             Map(
-              "dappAddress" -> mapRecipient(address)._2,
-              "payment"     -> buildPayment(maybePayment),
-              "feeAssetId"  -> feeAssetId,
-              "function"    -> funcName,
-              "args"        -> funcArgs
+              "dApp"       -> mapRecipient(addressOrAlias)._2,
+              "payment"    -> buildPayment(maybePayment),
+              "feeAssetId" -> feeAssetId,
+              "function"   -> funcName,
+              "args"       -> funcArgs
             ),
             provenTxPart(p, proofsEnabled)
           )
@@ -296,9 +296,12 @@ object Bindings {
     CaseObj(
       blockInfo,
       Map(
-        "timestamp"   -> blockInf.timestamp,
-        "height" -> blockInf.height.toLong,
-        "generationSignature" -> blockInf.generationSignature
+        "timestamp"           -> blockInf.timestamp,
+        "height"              -> blockInf.height.toLong,
+        "baseTarget"          -> blockInf.baseTarget,
+        "generationSignature" -> blockInf.generationSignature,
+        "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
+        "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
     )
 }

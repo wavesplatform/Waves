@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction}
-import org.asynchttpclient.Dsl.{get => _get, post => _post}
+import org.asynchttpclient.Dsl.{get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
@@ -72,6 +72,9 @@ object AsyncHttpApi extends Assertions {
 
     def post(url: String, f: RequestBuilder => RequestBuilder = identity, waitForStatus: Boolean = false): Future[Response] =
       retrying(f(_post(url).withApiKey(n.apiKey)).build(), waitForStatus = waitForStatus)
+
+    def put(url: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] =
+      retrying(f(_put(url).withApiKey(n.apiKey)).build(), waitForStatus = waitForStatus, statusCode = statusCode)
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))
@@ -310,7 +313,7 @@ object AsyncHttpApi extends Assertions {
 
     def invokeScript(caller: String,
                      dappAddress: String,
-                     func: String,
+                     func: Option[String],
                      args: List[Terms.EXPR] = List.empty,
                      payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
                      fee: Long = 500000,
@@ -318,18 +321,20 @@ object AsyncHttpApi extends Assertions {
                      version: Byte = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
-          "type"        -> InvokeScriptTransaction.typeId,
-          "version"     -> version,
-          "sender"      -> caller,
-          "dappAddress" -> dappAddress,
-          "call"        -> InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func), args)),
-          "payment"     -> payment,
-          "fee"         -> fee,
-          "feeAssetId"  -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
+          "type"       -> InvokeScriptTransaction.typeId,
+          "version"    -> version,
+          "sender"     -> caller,
+          "dApp"       -> dappAddress,
+          "call"       -> { if (func.isDefined) InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull },
+          "payment"    -> payment,
+          "fee"        -> fee,
+          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
         ))
     }
 
     def scriptCompile(code: String): Future[CompiledScript] = post("/utils/script/compile", code).as[CompiledScript]
+
+    def scriptDecompile(script: String): Future[DecompiledScript] = post("/utils/script/decompile", script).as[DecompiledScript]
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
@@ -343,6 +348,9 @@ object AsyncHttpApi extends Assertions {
                  "fee"      -> fee,
                  "version"  -> version))
     }
+
+    def debugStateChange(invokeScriptTransactionId: String): Future[DebugStateChanges] =
+      get(s"/debug/stateChanges/info/$invokeScriptTransactionId").as[DebugStateChanges]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
@@ -644,7 +652,11 @@ object AsyncHttpApi extends Assertions {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
         _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-      } yield all(finalHeights) should be >= finalHeights.head
+        _ <- waitFor("nodes sync")(1 second)(
+          _.waitForTransaction(transactionId).map(_.height),
+          (finalHeights: Iterable[Int]) => finalHeights.forall(_ == finalHeights.head)
+        )
+      } yield ()
 
     def waitForTransaction(transactionId: String)(implicit p: Position): Future[TransactionInfo] =
       traverse(nodes)(_.waitForTransaction(transactionId)).map(_.head)

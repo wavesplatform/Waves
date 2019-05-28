@@ -286,7 +286,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |match tx {
             | case t : InvokeScriptTransaction  =>
             |   ${provenPart(t)}
-            |   let dappAddress = t.dappAddress.bytes == base58'${t.dappAddress.bytes.base58}'
+            |   let dAppAddressBytes = match t.dApp {
+            |     case ad : Address => ad.bytes
+            |     case al : Alias => base58''
+            |   }
+            |   let dappAddress = dAppAddressBytes == base58'${t.dAppAddressOrAlias.bytes.base58}'
             |
             |   let paymentAmount = if(${t.payment.nonEmpty})
             |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
@@ -596,7 +600,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       PureContext
         .build(V2) |+|
         CryptoContext
-          .build(Global) |+|
+          .build(Global, V2) |+|
         WavesContext
           .build(
             DirectiveSet(V2, Asset, Expression).explicitGet(),
@@ -618,7 +622,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val ctx =
       PureContext.build(V2) |+|
         CryptoContext
-          .build(Global) |+|
+          .build(Global, V2) |+|
         WavesContext
           .build(
             DirectiveSet(V2, Account, Expression).explicitGet(),

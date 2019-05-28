@@ -9,9 +9,11 @@ import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.matcher.settings.DeviationsSettings._
-import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
+import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{OrderFeeSettings, _}
+import com.wavesplatform.matcher.settings.OrderHistorySettings._
 import com.wavesplatform.matcher.settings.OrderRestrictionsSettings._
+import com.wavesplatform.matcher.settings.PostgresConnection._
 import com.wavesplatform.settings.utils.ConfigOps._
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
@@ -48,7 +50,10 @@ case class MatcherSettings(account: String,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            allowedAssetPairs: Set[AssetPair],
-                           allowOrderV3: Boolean)
+                           allowOrderV3: Boolean,
+                           exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
+                           postgresConnection: PostgresConnection,
+                           orderHistory: Option[OrderHistorySettings])
 
 object MatcherSettings {
 
@@ -77,6 +82,7 @@ object MatcherSettings {
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
       errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
     )
+
     val actorResponseTimeout         = config.as[FiniteDuration]("actor-response-timeout")
     val dataDirectory                = config.as[String]("data-directory")
     val journalDirectory             = config.as[String]("journal-directory")
@@ -104,7 +110,11 @@ object MatcherSettings {
     val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
-    val allowOrderV3 = config.as[Boolean]("allow-order-v3")
+    val allowOrderV3            = config.as[Boolean]("allow-order-v3")
+    val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+
+    val postgresConnection = config.as[PostgresConnection]("postgres")
+    val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
       account,
@@ -132,7 +142,12 @@ object MatcherSettings {
       deviation,
       orderRestrictions,
       allowedAssetPairs,
-      allowOrderV3
+      allowOrderV3,
+      broadcastUntilConfirmed,
+      postgresConnection,
+      orderHistory
     )
   }
+
+  case class ExchangeTransactionBroadcastSettings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
 }

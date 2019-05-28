@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import cats.Eval
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -11,9 +12,9 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.domain.Tx.Transfer
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import monix.eval.Coeval
 
 object WavesContext {
 
@@ -280,8 +281,8 @@ object WavesContext {
         case _ => ???
       }
 
-    val inputEntityCoeval: Coeval[Either[String, CaseObj]] = {
-      Coeval.evalOnce(
+    val inputEntityCoeval: Eval[Either[String, CaseObj]] = {
+      Eval.later(
         env.inputEntity
           .eliminate(
             tx => transactionObject(tx, proofsEnabled).asRight[String],
@@ -295,9 +296,9 @@ object WavesContext {
           ))
     }
 
-    val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
-    val lastBlockCoeval: Coeval[Either[String, CaseObj]] = Coeval.evalOnce(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
-    val thisCoeval: Coeval[Either[String, CaseObj]]      = Coeval.evalOnce(Right(Bindings.senderObject(env.tthis)))
+    val heightCoeval:    Eval[Either[String, CONST_LONG]] = Eval.later(Right(CONST_LONG(env.height)))
+    val thisCoeval:      Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.senderObject(env.tthis)))
+    val lastBlockCoeval: Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
 
     val anyTransactionType =
       UNION(
@@ -307,7 +308,7 @@ object WavesContext {
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
       NativeFunction("transactionById",
-                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500),
+                     100,
                      GETTRANSACTIONBYID,
                      returnType,
                      "Lookup transaction",
@@ -318,6 +319,22 @@ object WavesContext {
         case _ => ???
       }
     }
+
+    val transferTxByIdF: BaseFunction =
+      NativeFunction(
+        "transferTransactionById",
+        100,
+        TRANSFERTRANSACTIONBYID,
+        buildTransferTransactionType(proofsEnabled),
+        "Lookup transfer transaction",
+        ("id", BYTESTR, "transfer transaction id")
+      ) {
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          val transferTxO = env.transferTransactionById(id.arr).map(transactionObject(_, proofsEnabled))
+          Right(fromOptionCO(transferTxO))
+
+        case _ => ???
+      }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
       case addressType.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
@@ -377,8 +394,20 @@ object WavesContext {
       case _                                 => ???
     }
 
-    val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
-    val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
+    val blockInfoByHeightF: BaseFunction = NativeFunction(
+      "blockInfoByHeight",
+      100,
+      BLOCKINFOBYHEIGHT,
+      UNION(UNIT, blockInfo),
+      "lookup block by height and return info if it exists",
+      ("height", LONG, "block height")
+    ) {
+      case CONST_LONG(height: Long) :: Nil => Right(env.blockInfoByHeight(height.toInt).map(Bindings.buildLastBlockInfo))
+      case _                               => ???
+    }
+
+    val sellOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Sell)))
+    val buyOrdTypeCoeval:  Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Buy)))
 
     val scriptInputType =
       if (isTokenContext)
@@ -412,7 +441,6 @@ object WavesContext {
     )
 
     lazy val functions = Array(
-      txByIdF,
       txHeightByIdF,
       getIntegerFromStateF,
       getBooleanFromStateF,
@@ -440,25 +468,26 @@ object WavesContext {
                   List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType, blockInfo)
                 } else List.empty),
       commonVars ++ vars(version.id),
-      functions ++ (if (version == V3) {
-                      List(
-                        getIntegerFromStateF,
-                        getBooleanFromStateF,
-                        getBinaryFromStateF,
-                        getStringFromStateF,
-                        getIntegerFromArrayF,
-                        getBooleanFromArrayF,
-                        getBinaryFromArrayF,
-                        getStringFromArrayF,
-                        getIntegerByIndexF,
-                        getBooleanByIndexF,
-                        getBinaryByIndexF,
-                        getStringByIndexF,
-                        addressFromStringF
-                      ).map(withExtract) :+ assetInfoF
-                    } else {
-                      List()
-                    })
+      functions ++ (
+        version match {
+          case V1 | V2 => List(txByIdF)
+          case V3      => List(
+            getIntegerFromStateF,
+            getBooleanFromStateF,
+            getBinaryFromStateF,
+            getStringFromStateF,
+            getIntegerFromArrayF,
+            getBooleanFromArrayF,
+            getBinaryFromArrayF,
+            getStringFromArrayF,
+            getIntegerByIndexF,
+            getBooleanByIndexF,
+            getBinaryByIndexF,
+            getStringByIndexF,
+            addressFromStringF
+          ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF)
+        }
+      )
     )
   }
 

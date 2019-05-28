@@ -38,7 +38,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       .combineAll(
         Seq(
           PureContext.build(V1),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V1),
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
@@ -52,7 +52,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       .combineAll(
         Seq(
           PureContext.build(V2),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V2),
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -66,7 +66,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       .combineAll(
         Seq(
           PureContext.build(V3),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -74,7 +74,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
         ))
   }
 
-  private def getAllFuncExpression(): EXPR = {
+  private def getAllFuncExpression(version: StdLibVersion): EXPR = {
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
@@ -106,7 +106,12 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
       .right
       .get
 
-    Parser.parseExpr(scriptWithAllV1Functions(dtx, ttx)).get.value
+    val script = scriptWithAllV1Functions(dtx, ttx)
+    val adaptedScript =
+      if (version == V3) script.replace("transactionById", "transferTransactionById")
+      else script
+
+    Parser.parseExpr(adaptedScript).get.value
   }
 
   property("func complexity map size is equal stdLib SupportedVersions count") {
@@ -125,14 +130,14 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
     }
   }
 
-  property("estimate script with with all functions") {
-    val exprV1 = ExpressionCompiler(ctxV1.compilerContext, getAllFuncExpression()).explicitGet()._1
+  property("estimate script with all functions") {
+    val exprV1 = ExpressionCompiler(ctxV1.compilerContext, getAllFuncExpression(V1)).explicitGet()._1
     estimate(exprV1, ctxV1, utils.functionCosts(V1)) shouldBe Right(2317)
 
-    val exprV2 = ExpressionCompiler(ctxV2.compilerContext, getAllFuncExpression()).explicitGet()._1
+    val exprV2 = ExpressionCompiler(ctxV2.compilerContext, getAllFuncExpression(V2)).explicitGet()._1
     estimate(exprV2, ctxV2, utils.functionCosts(V2)) shouldBe Right(2317)
 
-    val exprV3 = ExpressionCompiler(ctxV3.compilerContext, getAllFuncExpression()).explicitGet()._1
-    estimate(exprV3, ctxV3, utils.functionCosts(V3)) shouldBe Right(2282)
+    val exprV3 = ExpressionCompiler(ctxV3.compilerContext, getAllFuncExpression(V3)).explicitGet()._1
+    estimate(exprV3, ctxV3, utils.functionCosts(V3)) shouldBe Right(1882)
   }
 }

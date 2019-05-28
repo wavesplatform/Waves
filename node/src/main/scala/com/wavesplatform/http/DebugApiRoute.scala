@@ -173,9 +173,7 @@ case class DebugApiRoute(ws: WavesSettings,
       .map {
         case Right(blocks) =>
           allChannels.broadcast(LocalScoreChanged(ng.score))
-          if (returnTransactionsToUtx) {
-            blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
-          }
+          if (returnTransactionsToUtx) blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
           miner.scheduleMining()
           Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
         case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
@@ -347,52 +345,90 @@ case class DebugApiRoute(ws: WavesSettings,
   def validate: Route = (path("validate") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        import ws.blockchainSettings.{functionalitySettings => fs}
+
         val h  = blockchain.height
         val t0 = System.nanoTime
         val tracedDiff = for {
           tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
           _  <- Verifier(blockchain, h)(tx)
-          ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
+          ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
-        val response  = Json.obj(
+        val response = Json.obj(
           "valid"          -> tracedDiff.resultE.isRight,
           "validationTime" -> timeSpent,
           "trace"          -> tracedDiff.trace.map(_.toString)
         )
         tracedDiff.resultE.fold(
           err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
-            _ => response
+          _ => response
         )
       }
     }
   }
 
-  @Path("/stateChanges")
+  def stateChanges: Route = stateChangesById ~ stateChangesByAddress
+
+  @Path("/stateChanges/info/{transactionId}")
   @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "query")
+      new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "path")
     ))
-  def stateChanges: Route = (get & path("stateChanges") & parameter("transactionId") & handleExceptions(jsonExceptionHandler)) { transactionId =>
-    val txEither = for {
-      txId <- Base58.tryDecodeWithLimit(transactionId).toEither.left.map(err => GenericError(s"Invalid Base58: ${err.getMessage}"))
-      tx <- blockchain.transactionInfo(txId).toRight(GenericError("Transaction not found"))
-    } yield tx._2
+  def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
+    blockchain.transactionInfo(transactionId) match {
+      case Some((_, tx: InvokeScriptTransaction)) =>
+        val resultE = blockchain
+          .invokeScriptResult(TransactionId(tx.id()))
+          .map(isr => Json.obj("transaction" -> tx, "stateChanges" -> isr))
+        complete(resultE)
 
-    txEither match {
-      case Right(tx: InvokeScriptTransaction) =>
-        val result = blockchain.invokeScriptResult(TransactionId(tx.id()))
-        complete(result)
-
-      case Left(error) =>
-        complete(error)
+      case None =>
+        complete(StatusCodes.NotFound)
 
       case _ =>
         complete(StatusCodes.NotImplemented)
     }
   }
+
+  @Path("/stateChanges/address/{address}/limit/{limit}")
+  @ApiOperation(value = "Transactions by address state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Limit", required = true, dataType = "integer", paramType = "path")
+    ))
+  def stateChangesByAddress: Route =
+    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?) & handleExceptions(jsonExceptionHandler)) {
+      (address, limit, afterOpt) =>
+        validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
+          import cats.implicits._
+          val resultE: Either[ValidationError, Seq[JsObject]] = for {
+            txs <- concurrent
+              .blocking(
+                blockchain.addressTransactions(address,
+                                               Set.empty[Byte],
+                                               limit,
+                                               afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption)))
+              .left
+              .map(GenericError(_))
+            jsons <- txs
+              .map {
+                case (height, tx: InvokeScriptTransaction) =>
+                  blockchain
+                    .invokeScriptResult(TransactionId(tx.id()))
+                    .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
+
+                case (height, tx) =>
+                  Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
+              }
+              .toList
+              .sequence
+          } yield jsons
+
+          complete(resultE)
+        }
+    }
 }
 
 object DebugApiRoute {

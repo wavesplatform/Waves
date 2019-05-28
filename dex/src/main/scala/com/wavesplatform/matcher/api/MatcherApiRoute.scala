@@ -15,14 +15,16 @@ import com.wavesplatform.matcher.AddressActor.GetOrderStatus
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.matcher.error.MatcherError.OrderRestrictionsNotFound
+import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher}
+import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher, RateCache}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -35,7 +37,7 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
-import scala.util.Failure
+import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -55,7 +57,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long,
-                           apiKeyHash: Option[Array[Byte]])
+                           apiKeyHash: Option[Array[Byte]],
+                           rateCache: RateCache)
     extends ApiRoute
     with ScorexLogging {
 
@@ -72,9 +75,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ orderRestrictionsInfo ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
+        getSettings ~ getRates ~ upsertRate ~ deleteRate ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
     }
   }
+
+  private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
 
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case Matcher.Status.Working  => pass
@@ -83,8 +88,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(Left(_)) => complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
-    case _             => pass
+    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
+    case None    => forceCheckOrderBook(p)
+  }
+
+  private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
+    case Success(_) => pass
+    case _          => complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
   }
 
   private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
@@ -99,6 +109,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           )
       case Left(e) => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
     }
+
+  private def withAsset(a: Asset): Directive1[Asset] = {
+    assetPairBuilder.validateAssetId(a) match {
+      case Right(_) => provide(a)
+      case Left(e)  => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
+    }
+  }
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
@@ -135,9 +152,56 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete(
       StatusCodes.OK -> Json.obj(
         "priceAssets" -> matcherSettings.priceAssets,
-        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee).value
+        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value
       )
     )
+  }
+
+  @Path("/settings/rates")
+  @ApiOperation(value = "Asset rates", notes = "Get current asset rates (asset cost in Waves)", httpMethod = "GET")
+  def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
+
+  @Path("/settings/rates/{assetId}")
+  @ApiOperation(value = "Add or update rate for the specified asset", httpMethod = "PUT")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "assetId", value = "Asset for which rate is added or updated", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "rate", value = "Rate associated with the specified asset", dataType = "double", paramType = "body")
+    )
+  )
+  def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
+    entity(as[Double]) { rate =>
+      withAsset(a) { asset =>
+        complete(
+          if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be changed")
+          else {
+            val assetStr = AssetPair.assetIdStr(asset)
+            rateCache.upsertRate(asset, rate) match {
+              case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
+              case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+            }
+          }
+        )
+      }
+    }
+  }
+
+  @Path("/settings/rates/{assetId}")
+  @ApiOperation(value = "Delete rate for the specified asset", httpMethod = "DELETE")
+  @ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
+  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
+    withAsset(a) { asset =>
+      complete(
+        if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
+        else {
+          val assetStr = AssetPair.assetIdStr(asset)
+          rateCache.deleteRate(asset) match {
+            case None     => StatusCodes.NotFound -> wrapMessage(s"Rate for the asset $assetStr is not specified")
+            case Some(pv) => StatusCodes.OK       -> wrapMessage(s"Rate for the asset $assetStr deleted, old value = $pv")
+          }
+        }
+      )
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
@@ -186,7 +250,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
       matcherSettings.orderRestrictions
         .get(pair)
-        .fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { restrictions =>
+        .fold { complete(InfoNotFound(OrderRestrictionsNotFound(pair))) } { restrictions =>
           complete(StatusCodes.OK -> restrictions.getJson.value)
         }
     }
@@ -249,7 +313,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>
-      handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+      assetPair.fold(pass)(unavailableOrderBookBarrier).apply {
+        handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+      }
     }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
@@ -273,8 +339,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
-    withAssetPair(p) { pair =>
-      handleCancelRequest(Some(pair))
+    unavailableOrderBookBarrier(p) {
+      withAssetPair(p) { pair =>
+        handleCancelRequest(Some(pair))
+      }
     }
   }
 
@@ -516,7 +584,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
       unavailableOrderBookBarrier(pair) {
-        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map(_ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")))
+        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
+          case None => NotImplemented(MatcherError.FeatureDisabled)
+          case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+        })
       }
     }
   }
@@ -549,8 +620,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Get the oldest snapshot's offset in the queue", notes = "", httpMethod = "GET")
   def getOldestSnapshotOffset: Route = (path("debug" / "oldestSnapshotOffset") & get & withAuth) {
     complete {
-      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
-        StatusCodes.OK -> x.offsets.valuesIterator.min
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
+        StatusCodes.OK -> response.offsets.valuesIterator.collect { case Some(x) => x }.min
       }
     }
   }
@@ -561,9 +632,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
         val js = Json.obj(
-          x.offsets.map {
-            case (assetPair, offset) =>
-              assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
+          x.offsets.collect {
+            case (assetPair, Some(offset)) => assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
           }.toSeq: _*
         )
 

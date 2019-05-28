@@ -30,7 +30,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       .combineAll(
         Seq(
           PureContext.build(V1),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V1),
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
@@ -95,7 +95,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       .combineAll(
         Seq(
           PureContext.build(V2),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V2),
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -160,7 +160,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       .combineAll(
         Seq(
           PureContext.build(V3),
-          CryptoContext.build(Global),
+          CryptoContext.build(Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -208,9 +208,6 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
 
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 2
-
-    val exprEnsure = FUNCTION_CALL(PureContext.ensure, List(TRUE))
-    est(exprEnsure).explicitGet() shouldBe 17
 
     val exprDataByIndex = LET_BLOCK(
       LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1"), REF("nil")))),

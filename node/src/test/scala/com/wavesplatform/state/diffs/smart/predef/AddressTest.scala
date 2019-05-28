@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.state.diffs._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class AddressTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -46,5 +47,13 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
         """.stripMargin
       runScript(script) shouldBe evaluated(Address.fromBytes(addressBytes.arr, chainId).explicitGet().bytes)
     }
+  }
+
+  property("should fails on illegal bytes length") {
+    val correctLength = Address.AddressLength
+    Address.fromBytes(ByteStr.empty) should produce ("Wrong addressBytes length")
+    Address.fromBytes(ByteStr.fromByteArray(Array(1))) should produce ("Wrong addressBytes length")
+    Address.fromBytes(ByteStr.fromByteArray(Array.fill(correctLength - 1)(1))) should produce ("Wrong addressBytes length")
+    Address.fromBytes(ByteStr.fromByteArray(Array.fill(correctLength + 1)(1))) should produce ("Wrong addressBytes length")
   }
 }

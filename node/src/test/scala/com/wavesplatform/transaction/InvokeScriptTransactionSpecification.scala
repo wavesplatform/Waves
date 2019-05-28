@@ -6,6 +6,8 @@ import com.wavesplatform.api.http.{InvokeScriptRequest, SignedInvokeScriptReques
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
@@ -24,7 +26,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       val bytes = transaction.bytes()
       val deser = InvokeScriptTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
-      deser.dappAddress shouldEqual transaction.dappAddress
+      deser.dAppAddressOrAlias shouldEqual transaction.dAppAddressOrAlias
       deser.funcCallOpt shouldEqual transaction.funcCallOpt
       deser.payment shouldEqual transaction.payment
       deser.fee shouldEqual transaction.fee
@@ -48,7 +50,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "dappAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
                          "call": {
                             "function" : "foo",
                              "args" : [
@@ -95,7 +97,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
                          "timestamp": 1526910778245,
                          "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
                          "version": 1,
-                         "dappAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
                          "payment" : [{
                             "amount" : 7,
                             "assetId" : "$publicKey"
@@ -130,7 +132,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(1, Waves))),
-      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
@@ -151,6 +153,44 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
+  }
+
+  property(s"can't call a func with non native(simple) args - ARR") {
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    InvokeScriptTransaction.create(
+      pk,
+      pk.toAddress,
+      Some(
+        Terms.FUNCTION_CALL(
+          FunctionHeader.User("foo"),
+          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
+        )),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
+  }
+
+  property(s"can't call a func with non native(simple) args - CaseObj") {
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
+    InvokeScriptTransaction.create(
+      pk,
+      pk.toAddress,
+      Some(
+        Terms.FUNCTION_CALL(
+          FunctionHeader.User("foo"),
+          List(CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
+        )),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
   }
 
   property("can't be more 5kb") {
@@ -177,7 +217,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(0, Waves))),
-      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
@@ -193,7 +233,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = Some(InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get)))),
       payment = Some(Seq(Payment(-1, Waves))),
-      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )

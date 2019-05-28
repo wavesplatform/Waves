@@ -130,14 +130,14 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                               = ???
+      override def putIfNew(tx: Transaction, b: Boolean)                   = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
       override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
       override def pessimisticPortfolio(addr: Address): Portfolio          = ???
       override def all                                                     = ???
       override def size                                                    = ???
       override def transactionById(transactionId: ByteStr)                 = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
       override def close(): Unit                                           = {}
     }
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")

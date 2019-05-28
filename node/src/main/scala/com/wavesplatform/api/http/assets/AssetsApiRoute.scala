@@ -17,7 +17,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -41,12 +41,12 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain, fs)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   private[this] val commonAssetsApi = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {
@@ -265,7 +265,7 @@ case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, 
           "assetId"        -> JsString(id.base58),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
-          "issuer"         -> JsString(tx.sender.toString),
+          "issuer"         -> JsString(tx.sender.address),
           "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
           "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
           "decimals"       -> JsNumber(tx.decimals.toInt),

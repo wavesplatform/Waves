@@ -26,7 +26,10 @@ object Types {
     List(
       "timestamp"           -> LONG,
       "height"              -> LONG,
-      "generationSignature" -> BYTESTR
+      "baseTarget"          -> LONG,
+      "generationSignature" -> BYTESTR,
+      "generator"           -> addressType,
+      "generatorPublicKey"  -> BYTESTR
     )
   )
 
@@ -112,11 +115,11 @@ object Types {
     "InvokeScriptTransaction",
     addProofsIfNeeded(
       List(
-        "dappAddress" -> addressType,
-        "payment"     -> optionPayment,
-        "feeAssetId"  -> optionByteVector,
-        "function"    -> STRING,
-        "args"        -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
+        "dApp"       -> addressOrAliasType,
+        "payment"    -> optionPayment,
+        "feeAssetId" -> optionByteVector,
+        "function"   -> STRING,
+        "args"       -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
       ) ++ header ++ proven,
       proofsEnabled
     )

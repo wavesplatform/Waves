@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.{Blockchain, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange._
@@ -13,14 +13,50 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scala.math.BigDecimal.RoundingMode
 
 object MatcherModel {
+
   type Price = Long
 
-  def toNormalized(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long = {
-    (BigDecimal.valueOf(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
+  def getAssetDecimals(blockchain: Blockchain, asset: Asset): Int = {
+    asset.fold(8) { issuedAsset =>
+      blockchain
+        .assetDescription(issuedAsset)
+        .map(_.decimals)
+        .getOrElse(throw new Exception("Can not get asset decimals since asset not found!"))
+    }
   }
 
-  def fromNormalized(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double = {
-    (BigDecimal.valueOf(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+  def getPairDecimals(blockchain: Blockchain, pair: AssetPair): (Int, Int) =
+    getAssetDecimals(blockchain, pair.amountAsset) -> getAssetDecimals(blockchain, pair.priceAsset)
+
+  object Normalization {
+
+    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Long =
+      (BigDecimal(value) * BigDecimal(10).pow(amountAssetDecimals)).toLong
+
+    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long =
+      (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
+
+    def normalizePrice(value: Double, blockchain: Blockchain, pair: AssetPair): Long = {
+      val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
+      normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+    }
+  }
+
+  object Denormalization {
+
+    def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
+
+    def denormalizeAmountAndFee(value: Long, blockchain: Blockchain, pair: AssetPair): Double =
+      denormalizeAmountAndFee(value, getAssetDecimals(blockchain, pair.amountAsset))
+
+    def denormalizePrice(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+
+    def denormalizePrice(value: Long, blockchain: Blockchain, pair: AssetPair): Double = {
+      val (amountAssetDecimals, priceAssetDecimals) = getPairDecimals(blockchain, pair)
+      denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+    }
   }
 }
 
@@ -44,7 +80,7 @@ sealed trait LimitOrder {
 
   def requiredBalance: Map[Asset, Long] = Monoid.combine(
     Map(spentAsset -> rawSpendAmount),
-    Map(feeAsset   -> (if (feeAsset != rcvAsset) fee else (fee - receiveAmount).max(0L)))
+    Map(feeAsset   -> (if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee))
   )
 
   def amountOfPriceAsset: Long                           = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
@@ -149,9 +185,9 @@ object Events {
     def submittedRemaining: LimitOrder = submitted.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
   }
 
-  case class OrderAdded(order: LimitOrder) extends Event
+  case class OrderAdded(order: LimitOrder, timestamp: Long) extends Event
 
-  case class OrderCanceled(limitOrder: LimitOrder, unmatchable: Boolean) extends Event
+  case class OrderCanceled(limitOrder: LimitOrder, unmatchable: Boolean, timestamp: Long) extends Event
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 

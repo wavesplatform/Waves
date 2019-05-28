@@ -14,7 +14,8 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
+import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
+import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -71,9 +72,13 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, val dbSettings: DBSettings)
+class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
+
+  // Only for tests
+  def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
+    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
@@ -198,7 +203,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override protected def loadActivatedFeatures(): Map[Short, Int] = {
     val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
-    stateFeatures ++ fs.preActivatedFeatures
+    stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
@@ -344,7 +349,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     for ((addressId, addressData) <- data) {
       rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
-      addressData.data.keys.toSeq
       val newKeys = (
         for {
           (key, value) <- addressData.data
@@ -355,6 +359,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           if isNew
         } yield key
       ).toSeq
+
       if (newKeys.nonEmpty) {
         val chunkCountKey = Keys.dataKeyChunkCount(addressId)
         val chunkCount    = rw.get(chunkCountKey)
@@ -384,11 +389,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
-    val activationWindowSize = fs.activationWindowSize(height)
+    val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
     if (height % activationWindowSize == 0) {
-      val minVotes = fs.blocksForFeatureActivation(height)
+      val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
       val newlyApprovedFeatures = featureVotes(height)
-        .filterNot { case (featureId, _) => fs.preActivatedFeatures.contains(featureId) }
+        .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
         .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
 
       if (newlyApprovedFeatures.nonEmpty) {
@@ -397,7 +402,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
         val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
 
-        activatedFeaturesCache = featuresToSave ++ fs.preActivatedFeatures
+        activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
         rw.put(Keys.activatedFeatures, featuresToSave)
       }
     }
@@ -882,11 +887,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  override def parent(block: Block, back: Int): Option[Block] = readOnly { db =>
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readOnly { db =>
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      block <- loadBlock(height, db)
+      (block, _) <- loadBlockHeaderAndSize(height, db)
     } yield block
   }
 
@@ -895,7 +900,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
-    fs.activationWindow(height)
+    settings.functionalitySettings
+      .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
         db.get(Keys.blockHeaderAndSizeAt(height))
