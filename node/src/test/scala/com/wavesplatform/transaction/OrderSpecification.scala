@@ -103,7 +103,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   }
 
   property("Order signature validation") {
-    val err = "proof doesn't validate as signature"
+    val err = "Proof doesn't validate as signature"
     forAll(orderGen, accountGen) {
       case (order, pka) =>
         val rndAsset = Array[Byte](32)

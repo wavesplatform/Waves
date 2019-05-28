@@ -175,7 +175,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
     val badProof = signedMassTransfer ++ Json.obj("proofs" -> Seq(fakeSignature))
-    assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "proof doesn't validate as signature")
+    assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "Proof doesn't validate as signature")
     nodes.foreach(_.ensureTxDoesntExist(id(badProof)))
 
     val withProof = signedMassTransfer

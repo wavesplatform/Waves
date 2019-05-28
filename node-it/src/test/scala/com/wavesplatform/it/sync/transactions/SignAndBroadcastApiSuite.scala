@@ -122,7 +122,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       "proofs"          -> List("A" * 64)
     )
 
-    assertBroadcastBadJson(jsonV2, "Script doesn't exist and proof doesn't validate")
+    assertBroadcastBadJson(jsonV2, "Proof doesn't validate")
 
     for (j <- List(jsonV1, jsonV2)) {
       assertBroadcastBadJson(j - "type", "failed to parse json message")

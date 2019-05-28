@@ -385,6 +385,50 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         .explicitGet()
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
+  def preconditionsAndSetContractWithVerifier(
+                                               verifier: DApp,
+                                               senderBindingToContract: String => Gen[DApp],
+                                               invokerGen: Gen[KeyPair] = accountGen,
+                                               masterGen: Gen[KeyPair] = accountGen,
+                                               payment: Option[Payment] = None,
+                                               feeGen: Gen[Long] = ciFee(1),
+                                               sponsored: Boolean = false,
+                                               isCIDefaultFunc: Boolean = false
+                                             )
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
+    for {
+      master  <- masterGen
+      invoker <- invokerGen
+      ts      <- timestampGen
+      genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- feeGen
+      arg         <- genBoundedString(1, 32)
+      funcBinding <- funcNameGen
+      contract    <- senderBindingToContract(funcBinding)
+      script      = ContractScript(V3, contract)
+      setVerifier = SetScriptTransaction.selfSigned(invoker, ContractScript(V3, verifier).toOption, fee, ts + 2).explicitGet()
+      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
+      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      fc = if (!isCIDefaultFunc)
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)))))
+      else
+        None
+      ci = InvokeScriptTransaction
+        .selfSigned(
+          invoker,
+          master,
+          fc,
+          payment.toSeq,
+          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
+          if (sponsored) {
+            IssuedAsset(issueTx.id())
+          } else { Waves },
+          ts + 3
+        )
+        .explicitGet()
+    } yield (List(genesis, genesis2), setVerifier, setContract, ci, master, issueTx, sponsorTx)
+
   def preconditionsAndSetContractWithAlias(senderBindingToContract: String => Gen[DApp],
                                            invokerGen: Gen[KeyPair] = accountGen,
                                            masterGen: Gen[KeyPair] = accountGen,
@@ -543,7 +587,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           TestBlock.create(Seq(ci.copy(proofs = proofs))),
           fs
         ) {
-          _ should produce("Script doesn't exist and proof doesn't validate as signature")
+          _ should produce("Proof doesn't validate as signature")
         }
     }
   }
@@ -1019,6 +1063,47 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci, count) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           _ should produce(s"takes 1 args but $count were(was) given")
+        }
+    }
+  }
+
+  property("dApp multisig verify") {
+    def multiSigCheckDApp(proofs: Int): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |
+             | {-# STDLIB_VERSION 3       #-}
+             | {-# CONTENT_TYPE   DAPP    #-}
+             | {-# SCRIPT_TYPE    ACCOUNT #-}
+             |
+             | @Verifier(tx)
+             | func verify() = {
+             |   ${0 until proofs map (i => s"sigVerify(tx.bodyBytes, tx.proofs[$i], tx.senderPublicKey)") mkString "&&"}
+             | }
+             |
+        """.stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr)
+    }
+
+    forAll(for {
+      proofsCount <- Gen.choose(2, 9)
+      r <- preconditionsAndSetContractWithVerifier(multiSigCheckDApp(proofsCount), writeSetWithKeyLength(_))
+    } yield (r._1, r._2, r._3, r._4, proofsCount)) {
+      case (genesis, setVerifier, setContract, ci, proofsCount) =>
+        val proof         = ci.proofs
+        val multiSigProof = ci.proofs.copy(proofs = List.fill(proofsCount)(proof.proofs.head))
+        val multiSigCi    = ci.copy(proofs = multiSigProof)
+
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ Seq(setVerifier, setContract))),
+          TestBlock.create(Seq(multiSigCi)),
+          fs
+        ) {
+          _ shouldBe 'right
         }
     }
   }

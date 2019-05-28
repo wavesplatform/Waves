@@ -45,7 +45,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
   }
 
   test("try to use proofs in assets script") {
-    val errProofMsg = "Reason: Script doesn't exist and proof doesn't validate as signature"
+    val errProofMsg = "Reason: Proof doesn't validate as signature"
     val assetWProofs = sender
       .issue(
         firstAddress,
