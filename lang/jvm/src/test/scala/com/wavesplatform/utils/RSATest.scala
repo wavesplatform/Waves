@@ -109,7 +109,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = PureContext.build(V3) |+| CryptoContext.build(Global, V3)
+    val ctx: CTX = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }

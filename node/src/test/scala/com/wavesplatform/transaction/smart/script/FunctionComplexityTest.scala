@@ -37,7 +37,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1),
+          PureContext.build(Global, V1),
           CryptoContext.build(Global, V1),
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet(),
@@ -51,7 +51,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V2),
+          PureContext.build(Global, V2),
           CryptoContext.build(Global, V2),
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
@@ -65,7 +65,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3),
+          PureContext.build(Global, V3),
           CryptoContext.build(Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet(),

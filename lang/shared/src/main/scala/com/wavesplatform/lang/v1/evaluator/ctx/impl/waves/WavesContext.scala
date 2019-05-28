@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain.Tx.Transfer
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 

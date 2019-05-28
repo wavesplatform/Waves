@@ -124,7 +124,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combineAll(Seq(PureContext.build(V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
@@ -324,7 +324,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext,
+      PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x"                -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -338,7 +338,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext,
+      PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -609,6 +609,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("math functions") {
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
+    eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
+    eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
+    eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
+    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe 'left
+    eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
+    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
+    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
   }
 
   property("concat empty list") {
