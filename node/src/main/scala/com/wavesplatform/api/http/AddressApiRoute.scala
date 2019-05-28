@@ -23,7 +23,6 @@ import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
@@ -275,10 +274,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       case None => complete(accountData(address))
       case Some(regex) =>
         complete(
-          Try(Pattern.compile(regex))
+          Try(regex.r)
             .fold(
-              err => ApiError.fromValidationError(GenericError(s"Cannot compile regex: ${err.getMessage}")),
-              accountData(address, _)
+              _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+              r => accountData(address, r.pattern)
             )
         )
 
