@@ -285,7 +285,7 @@ object Bindings {
       Map(
         "totalAmount"     -> sAInfo.totalAmount,
         "decimals"        -> sAInfo.decimals.toLong,
-        "issuer"          -> sAInfo.issuer,
+        "issuer"          -> mapRecipient(sAInfo.issuer)._2,
         "issuerPublicKey" -> sAInfo.issuerPk,
         "reissuable"      -> sAInfo.reissuable,
         "scripted"        -> sAInfo.scripted,

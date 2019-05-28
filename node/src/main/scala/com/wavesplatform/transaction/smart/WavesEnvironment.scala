@@ -98,7 +98,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
       ScriptAssetInfo(
         totalAmount = assetDesc.totalVolume.toLong,
         decimals    = assetDesc.decimals,
-        issuer      = assetDesc.issuer.toAddress.bytes,
+        issuer      = Address(assetDesc.issuer.toAddress.bytes),
         issuerPk    = assetDesc.issuer,
         reissuable  = assetDesc.reissuable,
         scripted    = assetDesc.script.nonEmpty,

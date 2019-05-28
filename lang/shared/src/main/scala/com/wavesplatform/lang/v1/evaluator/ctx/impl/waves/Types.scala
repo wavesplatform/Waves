@@ -14,7 +14,7 @@ object Types {
     List(
       "totalAmount"     -> LONG,
       "decimals"        -> LONG,
-      "issuer"          -> BYTESTR,
+      "issuer"          -> addressType,
       "issuerPublicKey" -> BYTESTR,
       "reissuable"      -> BOOLEAN,
       "scripted"        -> BOOLEAN,
