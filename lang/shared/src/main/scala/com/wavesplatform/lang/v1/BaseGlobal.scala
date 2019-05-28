@@ -129,6 +129,7 @@ object BaseGlobal {
   sealed trait Rounds
   case class RoundDown() extends Rounds
   case class RoundUp() extends Rounds
+  case class RoundHalfDown() extends Rounds
   case class RoundHalfUp() extends Rounds
   case class RoundHalfEven() extends Rounds
   case class RoundCeiling() extends Rounds

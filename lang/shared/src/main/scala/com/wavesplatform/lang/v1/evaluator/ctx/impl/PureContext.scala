@@ -507,7 +507,8 @@ object PureContext {
   val roundDown = CASETYPEREF("Down", List.empty)
   val roundUp = CASETYPEREF("Up", List.empty)
   val roundHalfUp = CASETYPEREF("HalfUp", List.empty)
-  val rounds = UNION(roundDown, roundUp, roundHalfUp, roundCeiling, roundFloor, roundHalfEven)
+  val roundHalfDown = CASETYPEREF("HalfDown", List.empty)
+  val rounds = UNION(roundDown, roundUp, roundHalfUp, roundHalfDown, roundCeiling, roundFloor, roundHalfEven)
 
   def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
     m match {
@@ -528,6 +529,7 @@ object PureContext {
     ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
     ("UP", ((roundUp, "'UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
     ("HALFUP", ((roundHalfUp, "'HALF_UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
+    ("HALFDOWN", ((roundHalfUp, "'HALF_DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfDown, Map.empty))))),
     ("DOWN", ((roundDown, "'DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundDown, Map.empty))))),
     ("HALFEVEN", ((roundHalfUp, "'HALF_EVEN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfEven, Map.empty))))),
     ("CEILING", ((roundHalfUp, "'CEILING' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundCeiling, Map.empty))))),

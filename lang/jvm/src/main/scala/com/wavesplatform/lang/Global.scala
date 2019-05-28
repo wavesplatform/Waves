@@ -47,6 +47,7 @@ object Global extends BaseGlobal {
     round match {
       case BaseGlobal.RoundUp() => RoundingMode.UP
       case BaseGlobal.RoundHalfUp() => RoundingMode.HALF_UP
+      case BaseGlobal.RoundHalfDown() => RoundingMode.HALF_DOWN
       case BaseGlobal.RoundDown() => RoundingMode.DOWN
       case BaseGlobal.RoundHalfEven() => RoundingMode.HALF_EVEN
       case BaseGlobal.RoundCeiling() => RoundingMode.CEILING
