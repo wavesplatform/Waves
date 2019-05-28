@@ -546,6 +546,7 @@ object PureContext {
       roundDown,
       roundUp,
       roundHalfUp,
+      roundHalfDown,
       roundHalfEven,
       roundCeiling,
       roundFloor,
