@@ -157,19 +157,15 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
       .foreach(afterRemove)
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    if (!transactions.containsKey(tx.id())) {
-      val diff = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
-      diff.resultE.foreach(pessimisticPortfolios.add(tx.id(), _))
-      val isNew = diff.map(_ => true)
+    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
+      .map { diff => pessimisticPortfolios.add(tx.id(), diff); true }
 
-      if (!verify || diff.resultE.isRight) {
-        transactions.put(tx.id(), tx)
-        PoolMetrics.addTransaction(tx)
+    if (!verify || isNew.resultE.isRight) {
+      transactions.put(tx.id(), tx)
+      PoolMetrics.addTransaction(tx)
+    }
 
-        if (diff.resultE.isRight) isNew else TracedResult(Right(true), diff.trace)
-      } else isNew
-
-    } else TracedResult.wrapValue(false)
+    isNew
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
