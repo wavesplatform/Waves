@@ -42,6 +42,7 @@ case class MatcherSettings(enable: Boolean,
                            balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
                            disableExtraFeeForScript: Boolean,
+                           whiteListOnly: Boolean,
                            allowedAssetPairs: Set[AssetPair],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings)
 
@@ -105,6 +106,7 @@ object MatcherSettings {
       res fold (ex => throw new Exception(ex.getMessage), identity)
     }
 
+    val whiteListOnly            = config.as[Boolean]("white-list-only")
     val allowedAssetPairs        = config.as[Set[String]]("allowed-asset-pairs").map(getAssetPairFromString)
     val disableExtraFeeForScript = config.as[Boolean]("disable-extra-fee-for-script")
     val broadcastUntilConfirmed  = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
@@ -135,6 +137,7 @@ object MatcherSettings {
       balanceWatchingBufferInterval,
       eventsQueue,
       disableExtraFeeForScript,
+      whiteListOnly,
       allowedAssetPairs,
       broadcastUntilConfirmed
     )
