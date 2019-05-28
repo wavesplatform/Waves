@@ -22,7 +22,7 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
                               broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, broadcast)
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, _) => broadcast(tx))
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi

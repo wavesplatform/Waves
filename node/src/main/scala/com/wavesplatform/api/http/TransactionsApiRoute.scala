@@ -33,7 +33,8 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
     with WithSettings {
 
   import com.wavesplatform.network._
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, allChannels.broadcastTx(_, None))
+
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, isNew) => if (isNew || settings.allowTxRebroadcasting) allChannels.broadcastTx(tx, None))
 
   override lazy val route =
     pathPrefix("transactions") {

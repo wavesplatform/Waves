@@ -13,7 +13,6 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    max-bytes-size = 100
         |    max-scripted-size = 100
         |    blacklist-sender-addresses = ["a"]
-        |    allow-rebroadcasting = true
         |    allow-blacklisted-transfer-to = ["b"]
         |    allow-transactions-from-smart-accounts = false
         |    allow-skip-checks = false
@@ -25,7 +24,6 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
     settings.maxBytesSize shouldBe 100L
     settings.maxScriptedSize shouldBe 100
     settings.blacklistSenderAddresses shouldBe Set("a")
-    settings.allowRebroadcasting shouldBe true
     settings.allowBlacklistedTransferTo shouldBe Set("b")
     settings.allowTransactionsFromSmartAccounts shouldBe false
     settings.allowSkipChecks shouldBe false
