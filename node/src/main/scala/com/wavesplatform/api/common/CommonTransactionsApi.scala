@@ -12,7 +12,7 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 
-private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, broadcast: VanillaTransaction => Unit) {
+private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, broadcast: (VanillaTransaction, Boolean) => Unit) {
 
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = {
     val iterator = blockchain.addressTransactions(address, Set.empty, fromId)
@@ -37,8 +37,8 @@ private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, w
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, VanillaTransaction] = {
     val result = for {
-      _ <- utx.putIfNew(tx)
-      _ = broadcast(tx)
+      isNew <- utx.putIfNew(tx)
+      _ = broadcast(tx, isNew)
     } yield tx
 
     result
