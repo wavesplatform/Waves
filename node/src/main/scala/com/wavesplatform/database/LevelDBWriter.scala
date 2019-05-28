@@ -12,6 +12,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
@@ -171,18 +172,28 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     Map.empty
   )
 
-  private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt, excludeNFT: Boolean) = loadLposPortfolio(db, addressId).copy(
+  private def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
+    assets = (for {
+      asset <- db.get(Keys.assetList(addressId))
+    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+  )
+
+  private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
     assets = (for {
       issuedAsset <- db.get(Keys.assetList(addressId))
       asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, itx: IssueTransaction) if !excludeNFT || !itx.isNFT => IssuedAsset(itx.assetId())
+        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
       }
     } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
   )
 
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    val excludeNFT = activatedFeatures.contains(BlockchainFeatures.ReduceNFTFee.id)
-    addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _, excludeNFT))
+    val excludeNFT = this.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
+
+    addressId(address).fold(Portfolio.empty) { addressId =>
+      if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)
+      else loadFullPortfolio(db, addressId)
+    }
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
@@ -299,12 +310,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
     for ((addressId, assets) <- assetBalances) {
-      val prevAssets = rw.get(Keys.assetList(addressId))
-      val newAssets  = assets.keySet.diff(prevAssets)
+      val prevAssets   = rw.get(Keys.assetList(addressId))
+      val prevAssetSet = prevAssets.toSet
+      val newAssets    = assets.keys.filter(prevAssetSet)
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
-      rw.put(Keys.assetList(addressId), prevAssets ++ assets.keySet)
+      rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
         expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
@@ -629,7 +641,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
 
-  override def portfolioNFT(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
+  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
     val assetIdStream: CloseableIterator[IssuedAsset] = db
       .get(Keys.addressId(address))
       .fold(CloseableIterator.empty[IssuedAsset]) { id =>

@@ -51,7 +51,7 @@ trait Blockchain {
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction]
+  def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction]
 
   def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)]
 

@@ -22,7 +22,7 @@ import scala.util.Try
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
-  def portfolioNFTFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
+  def nftListFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
     def transactionFromDiff(d: Diff, id: ByteStr): Option[Transaction] = {
       d.transactions.get(id).map(_._2)
     }
@@ -47,14 +47,14 @@ package object state {
         }
         .collect {
           case itx: IssueTransaction if itx.isNFT => itx
-        } ++ b.portfolioNFT(address, None)
+        } ++ b.nftList(address, None)
     }
 
-    d.fold(b.portfolioNFT(address, after)) { d =>
+    d.fold(b.nftList(address, after)) { d =>
       after match {
-        case None                                         => nftFromDiff(d, after) ++ b.portfolioNFT(address, after)
-        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ b.portfolioNFT(address, None)
-        case _                                            => b.portfolioNFT(address, after)
+        case None                                         => nftFromDiff(d, after) ++ b.nftList(address, after)
+        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ b.nftList(address, None)
+        case _                                            => b.nftList(address, after)
       }
     }
   }

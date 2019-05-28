@@ -43,7 +43,7 @@ class CommonAccountApi(blockchain: Blockchain) {
   }
 
   def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    val iterator = blockchain.portfolioNFT(address, from)
+    val iterator = blockchain.nftList(address, from)
     Observable.fromIterator(iterator, () => iterator.close())
   }
 
