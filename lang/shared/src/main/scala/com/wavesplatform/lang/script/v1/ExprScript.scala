@@ -23,9 +23,9 @@ object ExprScript {
   def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true, checkComplexity: Boolean = true): Either[String, Script] =
     for {
       scriptComplexity <- ScriptEstimator(varNames(version, Expression), functionCosts(version), x)
-      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxExprComplexityByVersion(version),
+      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxComplexityByVersion(version),
                        (),
-                       s"Script is too complex: $scriptComplexity > ${MaxExprComplexityByVersion(version)}")
+                       s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}")
       s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s

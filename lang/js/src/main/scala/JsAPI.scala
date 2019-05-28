@@ -122,9 +122,9 @@ object JsAPI {
   def contractLimits(ver: Int = 2): js.Dynamic = {
     val version = DirectiveDictionary[StdLibVersion].idMap(ver)
     js.Dynamic.literal(
-      "MaxExprComplexity"          -> ContractLimits.MaxExprComplexityByVersion(version),
+      "MaxExprComplexity"          -> ContractLimits.MaxComplexityByVersion(version),
       "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
-      "MaxContractComplexity"      -> ContractLimits.MaxContractComplexity,
+      "MaxContractComplexity"      -> ContractLimits.MaxComplexityByVersion(version),
       "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
       "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,

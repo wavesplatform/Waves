@@ -3,9 +3,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits.{MaxContractComplexity, MaxContractSizeInBytes}
+import com.wavesplatform.lang.v1.ContractLimits.{MaxContractSizeInBytes, MaxComplexityByVersion}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader, ScriptEstimator}
 import monix.eval.Coeval
 
 object ContractScript {
@@ -18,11 +18,11 @@ object ContractScript {
   def apply(version: StdLibVersion, contract: DApp): Either[String, Script] = {
     for {
       funcMaxComplexity <- estimateComplexityByFunction(version, contract)
-      tcf = funcMaxComplexity.find(_._2 > MaxContractComplexity)
+      tcf = funcMaxComplexity.find(_._2 > MaxComplexityByVersion(version))
       _ <- Either.cond(
         tcf.isEmpty,
         (),
-        s"Contract function (${tcf.get._1}) is too complex: ${tcf.get._2} > $MaxContractComplexity"
+        s"Contract function (${tcf.get._1}) is too complex: ${tcf.get._2} > ${MaxComplexityByVersion(version)}"
       )
       s = ContractScriptImpl(version, contract, funcMaxComplexity.toMap)
       _ <- validateBytes(s.bytes().arr)
