@@ -35,7 +35,7 @@ package object compiler {
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
   val compilerContext: CompilerContext = Monoid
     .combine(
-      PureContext.build(V3),
+      PureContext.build(Global, V3),
       CTX(
         Seq(pointType, Common.pointTypeA, Common.pointTypeB),
         Map(

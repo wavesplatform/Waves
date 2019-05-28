@@ -38,7 +38,15 @@ object Expressions {
 
   sealed trait PART[+T] extends Positioned
   object PART {
-    case class VALID[T](position: Pos, v: T)           extends PART[T]
+    case class VALID[T](position: Pos, v: T)           extends PART[T] {
+      override def equals(obj: Any): Boolean =
+        obj match {
+          case VALID(_, value) => value.equals(this.v)
+          case _               => false
+        }
+
+      override def hashCode: Int = v.hashCode
+    }
     case class INVALID(position: Pos, message: String) extends PART[Nothing]
 
     def toEither[T](part: PART[T]): Either[String, T] = part match {
