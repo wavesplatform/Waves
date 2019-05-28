@@ -412,31 +412,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
   }
 
-  property("ensure user function: success") {
-    val src =
-      """
-        |let x = true
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
-  }
-
-  property("ensure user function: fail") {
-    val src =
-      """
-        |let x = false
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Left("test fail")
-  }
-
   property("postfix syntax (one argument)") {
     val src =
       """
-        |let x = true
-        |x.ensure("test fail")
+        | let list = [1, 2, 3]
+        | list.getElement(1)
       """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
+
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(2))
   }
 
   property("postfix syntax (no arguments)") {
@@ -510,6 +493,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
+  property("extract Long from < 8 bytes (Buffer underflow)") {
+    val src =
+      """ "AAAAAAA".toBytes().toInt() """
+    eval[EVALUATED](src)  should produce("Buffer underflow")
+  }
+
   property("indexOf") {
     val src =
       """ "qweqwe".indexOf("we") """
@@ -578,6 +567,20 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
   }
 
+  property("parseIntValue Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseIntValue Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
   property("parseInt fail") {
     val src =
       """ "x42".parseInt() """
@@ -639,5 +642,34 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("concat empty list") {
+    val script =
+      s"""
+         | let l = if (true) then cons(1, nil) else nil
+         | let concat = 0 :: l
+         | concat == [0, 1]
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("matching parameterized types") {
+    val script =
+      s"""
+         | func dosSigVerify() = {
+         |    let result = if true then [DataEntry("a", "a")] else ""
+         |    let entry = match result[0] {
+         |        case r:DataEntry => r
+         |        case _ => throw("err")
+         |    }
+         |    WriteSet(result)
+         | }
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) should produce("expected: List[T], actual: List[DataEntry]|String")
   }
 }

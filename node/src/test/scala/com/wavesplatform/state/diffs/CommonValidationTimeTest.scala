@@ -25,7 +25,7 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
         withStateAndHistory(Enabled) { blockchain: Blockchain =>
-          val result = TransactionDiffer(Enabled, Some(prevBlockTs), blockTs, height)(blockchain, transfer1).resultE
+          val result = TransactionDiffer(Some(prevBlockTs), blockTs, height)(blockchain, transfer1).resultE
           result should produce("in the past relative to previous block timestamp")
         }
     }
@@ -46,7 +46,7 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
       case (prevBlockTs, blockTs, height, transfer1) =>
         val functionalitySettings = Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
         withStateAndHistory(functionalitySettings) { blockchain: Blockchain =>
-          TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(blockchain, transfer1).resultE should
+          TransactionDiffer(Some(prevBlockTs), blockTs, height)(blockchain, transfer1).resultE should
             produce("in the future relative to block timestamp")
         }
     }

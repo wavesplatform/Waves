@@ -12,13 +12,13 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -61,6 +61,7 @@ object ScriptsCountTest {
   }
 }
 
+//noinspection NameBooleanParameters
 class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -202,7 +203,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         case (_, state) =>
           txs.foldLeft(Diff.empty) { (diff, tx) =>
             val newState = CompositeBlockchain.composite(state, diff)
-            val newDiff  = TransactionDiffer(fs, Some(tx.timestamp), tx.timestamp, state.height)(newState, tx).resultE.explicitGet()
+            val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp, state.height)(newState, tx).resultE.explicitGet()
             val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
             if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
             Monoid.combine(diff, newDiff)
@@ -210,7 +211,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       }
 
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(txs), fs) {
-        case (blockDiff, newState) =>
+        case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 26
       }
     }) { x =>
@@ -330,8 +331,9 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         )),
         fs1
       ) {
-        case (blockDiff, newState) =>
+        case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
+          blockDiff.scriptsComplexity shouldBe (allAllowed.complexity * 31)
       }
     }) { x =>
       x

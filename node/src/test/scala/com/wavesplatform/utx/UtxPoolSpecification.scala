@@ -141,15 +141,7 @@ class UtxPoolSpecification
         time,
         bcu,
         ignoreSpendableBalanceChanged,
-        FunctionalitySettings.TESTNET,
-        UtxSettings(10,
-                    PoolDefaultMaxBytes,
-                    1000,
-                    Set.empty,
-                    allowRebroadcasting = true,
-                    Set.empty,
-                    allowTransactionsFromSmartAccounts = true,
-                    allowSkipChecks = false)
+        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
       )
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).explicitGet()
@@ -165,15 +157,7 @@ class UtxPoolSpecification
             time,
             bcu,
             ignoreSpendableBalanceChanged,
-            FunctionalitySettings.TESTNET,
-            UtxSettings(10,
-                        PoolDefaultMaxBytes,
-                        1000,
-                        Set.empty,
-                        allowRebroadcasting = true,
-                        Set.empty,
-                        allowTransactionsFromSmartAccounts = true,
-                        allowSkipChecks = false)
+            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
           )
         (sender, bcu, utxPool)
     }
@@ -186,17 +170,22 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
     val settings =
-      UtxSettings(10,
-                  PoolDefaultMaxBytes,
-                  1000,
-                  Set.empty,
-                  allowRebroadcasting = true,
-                  Set.empty,
-                  allowTransactionsFromSmartAccounts = true,
-                  allowSkipChecks = false)
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, settings)
+      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
     txs.foreach(utxPool.putIfNew(_))
     (sender, bcu, utxPool, time, settings)
+  }).label("withValidPayments")
+
+  private val withValidPaymentsNotAdded = (for {
+    (sender, senderBalance, bcu) <- stateGen
+    recipient <- accountGen
+    time = new TestTime()
+    txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
+  } yield {
+    val settings =
+      UtxSettings(txs.size, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
+    (sender, bcu, utxPool, txs, time, settings)
   }).label("withValidPayments")
 
   private val withBlacklisted = (for {
@@ -206,15 +195,8 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(10,
-                  PoolDefaultMaxBytes,
-                  1000,
-                  Set(sender.address),
-                  allowRebroadcasting = true,
-                  Set.empty,
-                  allowTransactionsFromSmartAccounts = true,
-                  allowSkipChecks = false)
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, settings)
+      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set(sender.address), Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
 
@@ -225,17 +207,14 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(
-        txs.length,
+      UtxSettings(txs.length,
         PoolDefaultMaxBytes,
         1000,
         Set(sender.address),
-        allowRebroadcasting = true,
         Set(recipient.address),
         allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false
-      )
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, settings)
+        allowSkipChecks = false)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
 
@@ -249,17 +228,14 @@ class UtxPoolSpecification
     } yield {
       val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
       val settings =
-        UtxSettings(
-          txs.length,
+        UtxSettings(txs.length,
           PoolDefaultMaxBytes,
           1000,
           Set(sender.address),
-          allowRebroadcasting = true,
           whitelist,
           allowTransactionsFromSmartAccounts = true,
-          allowSkipChecks = false
-        )
-      val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, settings)
+          allowSkipChecks = false)
+      val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
 
@@ -269,7 +245,7 @@ class UtxPoolSpecification
         val time = new TestTime()
 
         forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-          val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, utxSettings)
+          val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings)
           f(txs, utx, time)
         }
     }
@@ -287,15 +263,7 @@ class UtxPoolSpecification
         time,
         bcu,
         ignoreSpendableBalanceChanged,
-        FunctionalitySettings.TESTNET,
-        UtxSettings(10,
-                    PoolDefaultMaxBytes,
-                    1000,
-                    Set.empty,
-                    allowRebroadcasting = true,
-                    Set.empty,
-                    allowTransactionsFromSmartAccounts = true,
-                    allowSkipChecks = false)
+        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
       )
       (utx, time, tx1, tx2)
     }
@@ -324,21 +292,13 @@ class UtxPoolSpecification
       (sender, senderBalance, bcu) <- stateGen
       preconditions                <- preconditionsGen(bcu.lastBlockId.get, sender)
     } yield {
-      val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
+      // val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
       preconditions.foreach(b => bcu.processBlock(b).explicitGet())
       val utx = new UtxPoolImpl(
         new TestTime(),
         bcu,
         ignoreSpendableBalanceChanged,
-        smartAccountsFs,
-        UtxSettings(10,
-                    PoolDefaultMaxBytes,
-                    1000,
-                    Set.empty,
-                    allowRebroadcasting = true,
-                    Set.empty,
-                    allowTransactionsFromSmartAccounts = scEnabled,
-                    allowSkipChecks = false)
+        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false)
       )
 
       (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
@@ -354,27 +314,14 @@ class UtxPoolSpecification
 
   "UTX Pool" - {
     "does not add new transactions when full" in utxTest(
-      UtxSettings(1,
-                  PoolDefaultMaxBytes,
-                  1000,
-                  Set.empty,
-                  allowRebroadcasting = true,
-                  Set.empty,
-                  allowTransactionsFromSmartAccounts = true,
-                  allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head).resultE shouldBe 'right
-      all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool size limit")
+      UtxSettings(1, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)) {
+      (txs, utx, _) =>
+        utx.putIfNew(txs.head).resultE shouldBe 'right
+        all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool size limit")
     }
 
     "does not add new transactions when full in bytes" in utxTest(
-      UtxSettings(999999,
-                  152,
-                  1000,
-                  Set.empty,
-                  allowRebroadcasting = true,
-                  Set.empty,
-                  allowTransactionsFromSmartAccounts = true,
-                  allowSkipChecks = false)) { (txs, utx, _) =>
+      UtxSettings(999999, 152, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE shouldBe 'right
       all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool bytes size limit")
     }
@@ -392,15 +339,8 @@ class UtxPoolSpecification
           forAll(gen, Gen.choose(0, 1).label("allowSkipChecks")) {
             case ((headTransaction, vipTransaction), allowSkipChecks) =>
               val utxSettings =
-                UtxSettings(1,
-                            152,
-                            1,
-                            Set.empty,
-                            allowRebroadcasting = true,
-                            Set.empty,
-                            allowTransactionsFromSmartAccounts = true,
-                            allowSkipChecks = allowSkipChecks == 1)
-              val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, utxSettings)
+                UtxSettings(1, 152, 1, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = allowSkipChecks == 1)
+              val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings)
 
               utx.putIfNew(headTransaction).resultE shouldBe 'right
               utx.putIfNew(vipTransaction).resultE shouldBe (if (allowSkipChecks == 1) 'right else 'left)
@@ -409,29 +349,11 @@ class UtxPoolSpecification
     }
 
     "does not broadcast the same transaction twice if not allowed" in utxTest(
-      utxSettings = UtxSettings(20,
-                                PoolDefaultMaxBytes,
-                                1000,
-                                Set.empty,
-                                allowRebroadcasting = false,
-                                Set.empty,
-                                allowTransactionsFromSmartAccounts = true,
-                                allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head).resultE shouldBe 'right
-      utx.putIfNew(txs.head).resultE should matchPattern { case Right(false) => }
-    }
-
-    "broadcast transaction even if it already in pool if allowRebroadcasting == true" in utxTest(
-      utxSettings = UtxSettings(20,
-                                PoolDefaultMaxBytes,
-                                1000,
-                                Set.empty,
-                                allowRebroadcasting = true,
-                                Set.empty,
-                                allowTransactionsFromSmartAccounts = true,
-                                allowSkipChecks = false)) { (txs, utx, _) =>
-      utx.putIfNew(txs.head).resultE shouldBe 'right
-      utx.putIfNew(txs.head).resultE should matchPattern { case Right(true) => }
+      utxSettings =
+        UtxSettings(20, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)) {
+      (txs, utx, _) =>
+        utx.putIfNew(txs.head).resultE should matchPattern { case Right(true) => }
+        utx.putIfNew(txs.head).resultE should matchPattern { case Right(false) => }
     }
 
     "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) {
@@ -441,7 +363,7 @@ class UtxPoolSpecification
 
         val maxNumber             = Math.max(utx.all.size / 2, 3)
         val rest                  = limitByNumber(maxNumber)
-        val (packed, restUpdated) = utx.packUnconfirmed(rest)
+        val (packed, restUpdated) = utx.packUnconfirmed(rest, 5.seconds)
 
         packed.lengthCompare(maxNumber) should be <= 0
         if (maxNumber <= utx.all.size) restUpdated.isEmpty shouldBe true
@@ -454,7 +376,7 @@ class UtxPoolSpecification
 
         time.advance(maxAge + 1000.millis)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100))
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
         packed shouldBe 'empty
         utx.all shouldBe 'empty
     }
@@ -466,7 +388,7 @@ class UtxPoolSpecification
 
         time.advance(offset)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100))
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
         packed.size shouldBe 2
         utx.all.size shouldBe 2
     }
@@ -507,22 +429,14 @@ class UtxPoolSpecification
           ntpTime,
           d.blockchainUpdater,
           ignoreSpendableBalanceChanged,
-          FunctionalitySettings.TESTNET,
-          UtxSettings(9999999,
-                      PoolDefaultMaxBytes,
-                      999999,
-                      Set.empty,
-                      allowRebroadcasting = true,
-                      Set.empty,
-                      allowTransactionsFromSmartAccounts = true,
-                      allowSkipChecks = false)
+          UtxSettings(9999999, PoolDefaultMaxBytes, 999999, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
         )
         all((scripted ++ unscripted).map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
 
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber),
                           OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one)))
-        val (packed, _) = utx.packUnconfirmed(constraint)
+        val (packed, _) = utx.packUnconfirmed(constraint, 5.seconds)
         packed.size shouldBe (unscripted.size + 1)
         packed.count(scripted.contains) shouldBe 1
       }
@@ -553,7 +467,7 @@ class UtxPoolSpecification
           val poolSizeBefore  = utxPool.size
 
           time.advance(maxAge * 2)
-          utxPool.packUnconfirmed(limitByNumber(100))
+          utxPool.packUnconfirmed(limitByNumber(100), 5.seconds)
 
           poolSizeBefore should be > utxPool.size
           val portfolioAfter = utxPool.pessimisticPortfolio(sender)
@@ -571,6 +485,13 @@ class UtxPoolSpecification
           }
 
           pessimisticAssetIds shouldBe empty
+      }
+
+      "takes into account added txs" in forAll(for (pc <- withValidPaymentsNotAdded; verify <- Gen.choose(0, 1).map(_ == 1)) yield (pc, verify)) {
+        case ((sender, state, utxPool, txs, _, _), verify) =>
+          val emptyPf = utxPool.pessimisticPortfolio(sender)
+          all(txs.map(utxPool.putIfNew(_, verify).resultE)) shouldBe 'right
+          utxPool.pessimisticPortfolio(sender) should not be emptyPf
       }
 
       "takes into account unconfirmed transactions" in forAll(withValidPayments) {

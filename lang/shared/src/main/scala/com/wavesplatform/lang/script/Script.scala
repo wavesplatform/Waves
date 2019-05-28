@@ -18,6 +18,8 @@ trait Script {
   val expr: Expr
 
   val bytes: Coeval[ByteStr]
+
+  val complexityMap: Map[String, Long]
   val complexity: Long
 
   val containsBlockV2: Coeval[Boolean]

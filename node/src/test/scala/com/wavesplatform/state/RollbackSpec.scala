@@ -153,11 +153,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case (sender, initialBalance, recipient) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
+          d.blockchainUpdater.height shouldBe 1
           val genesisBlockId = d.lastBlockId
 
           val leaseAmount = initialBalance - 2
           val lt          = LeaseTransactionV1.selfSigned(sender, leaseAmount, 1, nextTs, recipient).explicitGet()
           d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)))
+          d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, true))
           d.portfolio(sender).lease.out shouldEqual leaseAmount

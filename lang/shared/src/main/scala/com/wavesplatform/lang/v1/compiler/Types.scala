@@ -14,8 +14,8 @@ object Types {
   }
   sealed trait PARAMETERIZED extends TYPE
 
-  case class TYPEPARAM(char: Byte)               extends PARAMETERIZED with SINGLE
-  case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE
+  case class TYPEPARAM(char: Byte)               extends PARAMETERIZED with SINGLE { override def toString: String = char.toChar.toString }
+  case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE { override def toString: String = s"List[$t]" }
   case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED
   case object NOTHING                            extends FINAL { override val name = "Nothing"; override val typeList = List() }
   case object LONG                               extends REAL { override val name = "Int"; override val typeList = List(this) }
@@ -23,12 +23,12 @@ object Types {
   case object BOOLEAN                            extends REAL { override val name = "Boolean"; override val typeList = List(this) }
   case object STRING                             extends REAL { override val name = "String"; override val typeList = List(this) }
   case class LIST(innerType: FINAL) extends REAL {
-    override lazy val name: String = "LIST(" ++ innerType.toString ++ ")"
-    override def typeList: List[REAL]     = List(this)
+    override lazy val name: String    = "List[" ++ innerType.toString ++ "]"
+    override def typeList: List[REAL] = List(this)
   }
   case class UNION(override val typeList: List[REAL], n: Option[String] = None) extends FINAL {
     override lazy val fields = typeList.map(_.fields.toSet).reduce(_ intersect _).toList
-    override val name        = if (n.nonEmpty) n.get else "UNION(" ++ typeList.sortBy(_.toString).mkString("|") ++ ")"
+    override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
   }
 
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)]) extends REAL {
@@ -48,10 +48,13 @@ object Types {
   object UNION {
     def create(l: Seq[FINAL], n: Option[String] = None): UNION = {
       UNION(l.flatMap {
-        case NOTHING      => List.empty
-        case UNION(inner, _) => inner
-        case s: REAL      => List(s)
-      }.toList.distinct, n)
+                case NOTHING         => List.empty
+                case UNION(inner, _) => inner
+                case s: REAL         => List(s)
+              }
+              .toList
+              .distinct,
+            n)
     }
     def apply(l: REAL*): UNION = create(l.toList)
 
@@ -80,9 +83,16 @@ object Types {
     def <=(l2: FINAL): Boolean = l2 >= l1
   }
 
-  val UNIT: CASETYPEREF = CASETYPEREF("Unit", List.empty)
-  val optionByteVector = UNION(BYTESTR, UNIT)
+  val UNIT: CASETYPEREF    = CASETYPEREF("Unit", List.empty)
+  val optionByteVector     = UNION(BYTESTR, UNIT)
   val optionLong           = UNION(LONG, UNIT)
   val listByteVector: LIST = LIST(BYTESTR)
-  val listString: LIST = LIST(STRING)
+  val listString: LIST     = LIST(STRING)
+
+  val nativeTypeList = List(
+    "Int",
+    "ByteVector",
+    "Boolean",
+    "String"
+  )
 }

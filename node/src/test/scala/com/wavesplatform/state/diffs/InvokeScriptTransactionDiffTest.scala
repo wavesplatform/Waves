@@ -9,7 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, DefaultFuncAnnotation, DefaultFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -20,7 +20,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -32,7 +31,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Proofs, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import monix.eval.Coeval
@@ -171,7 +170,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           DefaultFuncAnnotation(senderBinding),
           Terms.FUNC(
             funcName,
-            List(argName),
+            Nil,
             FUNCTION_CALL(
               User(FieldNames.TransferSet),
               List(payments)
@@ -234,7 +233,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
            | {-#SCRIPT_TYPE ACCOUNT#-}
            |
            | @Callable(i)
-           | func $funcName() = {
+           | func $funcName(b: ByteVector) = {
            |    WriteSet([
            |      $DataEntries
            |        ])
@@ -247,7 +246,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compileContractFromExpr(expr)
   }
 
-  def writeSetWithKeyLength(funcName: String, length: Int=1): DApp = {
+  def writeSetWithKeyLength(funcName: String, length: Int = 1): DApp = {
     val keyName = Array.fill(length)("a").mkString
 
     val expr = {
@@ -259,7 +258,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
            | {-#SCRIPT_TYPE ACCOUNT#-}
            |
            | @Callable(i)
-           | func $funcName() = {
+           | func $funcName(b: ByteVector) = {
            |    WriteSet([
            |      DataEntry("$keyName", 0)
            |        ])
@@ -294,7 +293,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                         masterGen: Gen[KeyPair] = accountGen,
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
-                                        sponsored: Boolean = false)
+                                        sponsored: Boolean = false,
+                                        invocationParamsCount: Int = 1
+                                       )
     : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
@@ -309,7 +310,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
-      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_STRING("Not-a-Number")))
+      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.fill(invocationParamsCount)(CONST_STRING("Not-a-Number")))
       ci = InvokeScriptTransaction
         .selfSigned(
           invoker,
@@ -350,15 +351,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                   payment: Option[Payment] = None,
                                   feeGen: Gen[Long] = ciFee(0),
                                   sponsored: Boolean = false,
-                                  isCIDefaultFunc: Boolean = false): Gen[
-    (List[GenesisTransaction],
-     SetScriptTransaction,
-     InvokeScriptTransaction,
-     KeyPair,
-     IssueTransaction,
-     SponsorFeeTransaction,
-     CreateAliasTransaction,
-     InvokeScriptTransaction)] =
+                                  isCIDefaultFunc: Boolean = false)
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -369,9 +363,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       arg         <- genBoundedString(1, 32)
       funcBinding <- funcNameGen
       contract    <- senderBindingToContract(funcBinding)
-      masterAlias = Alias.create("alias").explicitGet()
-      notAlias    = Alias.create("notalias").explicitGet()
-      aliasTx <- createAliasGen(master, masterAlias, fee, ts + 1)
       script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
@@ -392,20 +383,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           ts + 3
         )
         .explicitGet()
-      ciWithAlias = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          masterAlias,
-          fc,
-          payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else { Waves },
-          ts + 3
-        )
-        .explicitGet()
-    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx, aliasTx, ciWithAlias)
+    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithAlias(senderBindingToContract: String => Gen[DApp],
                                            invokerGen: Gen[KeyPair] = accountGen,
@@ -515,12 +493,57 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       a  <- accountGen
       am <- smallFeeGen
       contractGen = (defaultPaymentContractGen(a, am) _)
-      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
+        }
+    }
+  }
+
+  property("suitable verifier error message on incorrect proofs number") {
+    forAll(for {
+      proofCount <- Gen.oneOf(0, 2)
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (defaultPaymentContractGen(a, am) _)
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+    } yield (a, am, r._1, r._2, r._3, proofCount)) {
+      case (acc, amount, genesis, setScript, ci, proofCount) =>
+
+        val proofs = Proofs(
+          List.fill(proofCount)(ByteStr.fromBytes(1, 1))
+        )
+
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ Seq(setScript))),
+          TestBlock.create(Seq(ci.copy(proofs = proofs))),
+          fs
+        ) {
+          _ should produce("Transactions from non-scripted accounts must have exactly 1 proof")
+        }
+    }
+  }
+
+  property("suitable verifier error message on incorrect proof") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (defaultPaymentContractGen(a, am) _)
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), false, true)
+    } yield (a, am, r._1, r._2, r._3)) {
+      case (acc, amount, genesis, setScript, ci) =>
+
+        val proofs = Proofs(List(ByteStr.fromBytes(1, 1)))
+
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ Seq(setScript))),
+          TestBlock.create(Seq(ci.copy(proofs = proofs))),
+          fs
+        ) {
+          _ should produce("Script doesn't exist and proof doesn't validate as signature")
         }
     }
   }
@@ -984,6 +1007,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           _ shouldBe 'right
+        }
+    }
+  }
+
+  property("Function call args count should be equal @Callable func one") {
+    forAll(for {
+      invocationArgsCount <- Gen.oneOf(0, 2)
+      r                   <- simplePreconditionsAndSetContract(invocationParamsCount = invocationArgsCount)
+    } yield (r._1, r._2, r._3, invocationArgsCount)) {
+      case (genesis, setScript, ci, count) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce(s"takes 1 args but $count were(was) given")
         }
     }
   }
