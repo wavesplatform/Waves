@@ -98,10 +98,13 @@ class Matcher(actorSystem: ActorSystem,
 
   private def validateOrder(o: Order) =
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
-                                               blacklistedAddresses,
-                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get),
-                                               matcherSettings.allowedAssetPairs)(o)
+      _ <- OrderValidator.matcherSettingsAware(
+        matcherPublicKey,
+        blacklistedAddresses,
+        matcherSettings.whiteListOnly,
+        matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get),
+        matcherSettings.allowedAssetPairs
+      )(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.blockchainAware(
         blockchain,

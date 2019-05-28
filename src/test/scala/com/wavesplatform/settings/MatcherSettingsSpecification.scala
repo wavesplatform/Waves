@@ -37,6 +37,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    blacklisted-addresses = [
         |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
         |    ]
+        |    white-list-only = yes
         |    order-book-snapshot-http-cache {
         |      cache-timeout = 11m
         |      depth-ranges = [1, 5, 333]
@@ -95,6 +96,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
+    settings.whiteListOnly shouldBe true
     settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
       cacheTimeout = 11.minutes,
       depthRanges = List(1, 5, 333)
