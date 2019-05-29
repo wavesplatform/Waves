@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.wavesplatform.utils.ScorexLogging
 import kamon.metric.{Histogram, Timer}
 
 import scala.concurrent.{ExecutionContext, Future}
