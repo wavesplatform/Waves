@@ -5,7 +5,7 @@ import kamon.metric.{Histogram, Timer}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-package object metrics extends ScorexLogging {
+package object metrics {
   final implicit class HistogramExt(private val histogram: Histogram) extends AnyVal {
     def safeRecord(value: Long): Unit = histogram.record(Math.max(value, 0L))
   }
