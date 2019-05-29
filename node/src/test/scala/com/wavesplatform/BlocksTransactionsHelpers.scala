@@ -48,7 +48,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
       for {
         timestamp <- timestamp
-      } yield DataTransaction.selfSigned(from, List(StringDataEntry(dataKey, dataKey)), FeeAmount, timestamp).explicitGet()
+      } yield DataTransaction.selfSigned(from, List(StringDataEntry(dataKey, Gen.numStr.sample.get)), FeeAmount, timestamp).explicitGet()
   }
 
   object UnsafeBlocks {

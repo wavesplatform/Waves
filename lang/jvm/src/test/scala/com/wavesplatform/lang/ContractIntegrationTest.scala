@@ -23,7 +23,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
   val ctx: CTX =
-    PureContext.build(V3) |+|
+    PureContext.build(Global, V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         DirectiveSet(V3, Account, DApp).explicitGet(),

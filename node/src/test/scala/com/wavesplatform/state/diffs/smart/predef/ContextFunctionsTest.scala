@@ -305,12 +305,13 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | let aInfo = extract(aInfoOpt)
               | let totalAmount = aInfo.totalAmount == $quantity
               | let decimals = aInfo.decimals == $decimals
-              | let issuer = aInfo.issuer == base58'${issueTx.sender}'
+              | let issuer = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress.bytes}'
+              | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
               | let scripted = aInfo.scripted == ${assetScript.nonEmpty}
               | let reissuable = aInfo.reissuable == $reissuable
               | let sponsored = aInfo.sponsored == $sponsored
               |
-              | isDefined(aInfoOpt) && totalAmount && decimals && issuer && scripted && reissuable && sponsored
+              | isDefined(aInfoOpt) && totalAmount && decimals && issuer && issuerPublicKey && scripted && reissuable && sponsored
               |
               |
             """.stripMargin

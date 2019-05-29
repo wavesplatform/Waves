@@ -49,7 +49,11 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
     }
   }
 
-  property("should fails on empty bytes") {
+  property("should fails on illegal bytes length") {
+    val correctLength = Address.AddressLength
     Address.fromBytes(ByteStr.empty) should produce ("Wrong addressBytes length")
+    Address.fromBytes(ByteStr.fromByteArray(Array(1))) should produce ("Wrong addressBytes length")
+    Address.fromBytes(ByteStr.fromByteArray(Array.fill(correctLength - 1)(1))) should produce ("Wrong addressBytes length")
+    Address.fromBytes(ByteStr.fromByteArray(Array.fill(correctLength + 1)(1))) should produce ("Wrong addressBytes length")
   }
 }

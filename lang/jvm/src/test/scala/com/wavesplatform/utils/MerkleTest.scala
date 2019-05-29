@@ -56,7 +56,13 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
   property("FALSE on incorrect proof") {
     val (tree, leafs) = testData()
 
-    forAll(Gen.oneOf(leafs), Gen.oneOf(leafs)) { (l1, l2) =>
+    val twoLeafsGen: Gen[(LeafData, LeafData)] =
+      for {
+        l1 <- Gen.oneOf(leafs)
+        l2 <- Gen.oneOf(leafs).suchThat(_ != l1)
+      } yield (l1, l2)
+
+    forAll(twoLeafsGen) { case (l1, l2) =>
       val proof = tree
         .proofByElement(Leaf[Digest32](l1)(fastHash))
         .get
@@ -80,7 +86,7 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = PureContext.build(V3) |+| CryptoContext.build(Global, V3)
+    val ctx: CTX = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }

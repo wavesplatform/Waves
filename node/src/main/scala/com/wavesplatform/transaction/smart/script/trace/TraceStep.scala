@@ -31,7 +31,7 @@ case class AssetVerifierTrace(
     errorO: Option[ValidationError]
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
-    "address" -> id.base58,
+    "assetId" -> id.base58,
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")

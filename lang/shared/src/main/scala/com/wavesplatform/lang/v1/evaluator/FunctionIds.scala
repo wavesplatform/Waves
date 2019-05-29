@@ -15,6 +15,9 @@ object FunctionIds {
   val MOD_LONG: Short = 106
   val FRACTION: Short = 107
 
+  val POW: Short      = 108
+  val LOG: Short      = 109
+
   val SIZE_BYTES: Short = 200
   val TAKE_BYTES: Short = 201
   val DROP_BYTES: Short = 202

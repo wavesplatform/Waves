@@ -598,7 +598,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val Success(expr, _) = Parser.parseExpr(script)
     val ctx =
       PureContext
-        .build(V2) |+|
+        .build(Global, V2) |+|
         CryptoContext
           .build(Global, V2) |+|
         WavesContext
@@ -620,7 +620,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     val Success(expr, _) = Parser.parseExpr(script)
     val ctx =
-      PureContext.build(V2) |+|
+      PureContext.build(Global, V2) |+|
         CryptoContext
           .build(Global, V2) |+|
         WavesContext
