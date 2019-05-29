@@ -45,7 +45,6 @@ object FunctionIds {
   val INDEXOFN: Short   = 1204
   val SPLIT: Short      = 1205
   val PARSEINT: Short   = 1206
-  val PARSEINTV: Short  = 1207
 
   // Crypto
   val SIGVERIFY: Short = 500
