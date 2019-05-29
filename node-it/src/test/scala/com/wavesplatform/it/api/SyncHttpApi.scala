@@ -80,7 +80,7 @@ object SyncHttpApi extends Assertions {
     case _ => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime: FiniteDuration = 50.seconds
+  val RequestAwaitTime: FiniteDuration = 120.seconds//50.seconds
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
