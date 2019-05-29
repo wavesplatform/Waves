@@ -50,6 +50,8 @@ object UtilApp {
                      signTxOptions: SignTxOptions = SignTxOptions())
 
   def main(args: Array[String]): Unit = {
+    if (args.isEmpty) println(OParser.usage(commandParser))
+
     OParser.parse(commandParser, args, Command()) match {
       case Some(c) =>
         val inBytes = IO.readInput(c)
