@@ -21,8 +21,9 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
   import MatcherFeeAssetSuite._
 
   override protected def nodeConfigs: Seq[Config] =
-    Seq(configWithOrderFeeFixed().withFallback(Configs.head))
+    Seq(configWithOrderFeeFixedWaves(minMatcherFee).withFallback(Configs.head))
 
+  val minMatcherFee = 200000L
   val price = 100000000L
 
   val aliceAssetBase58: String = node
@@ -61,6 +62,12 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
     node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceAssetBase58), None, waitForTx = true).id
     node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceScriptedAssetBase58), None, waitForTx = true).id
 
+    "when has fixed-waves mode in config and orders placed" - {
+      "should accept orders if orders' matcherFeeAsset is WAVES" in {
+
+      }
+    }
+
     "when has some asset as fixed fee in config and orders placed" - {
       "should accept orders if orders' matcherFeeAsset equal to specified in config" in {
         for (fixedAssetMatcherFee <- Seq(
@@ -70,7 +77,8 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
           val fixedAssetMatcherFeeBase58 = fixedAssetMatcherFee.id.base58
           docker.restartNode(node,
             configWithOrderFeeFixed(
-              matcherFeeAssetId = fixedAssetMatcherFeeBase58
+              matcherFeeAssetId = fixedAssetMatcherFeeBase58,
+              minFee = minMatcherFee
             ))
 
           val someWavesPair = AssetPair(fixedAssetMatcherFee, Waves)
@@ -92,7 +100,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
                   price = price,
                   timestamp = ts,
                   expiration = expirationTimestamp,
-                  matcherFee = matcherFee,
+                  matcherFee = minMatcherFee,
                   version = 3,
                   matcherFeeAssetId = fixedAssetMatcherFee
                 ))
@@ -109,7 +117,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
                   price = price,
                   timestamp = ts,
                   expiration = expirationTimestamp,
-                  matcherFee = matcherFee,
+                  matcherFee = minMatcherFee,
                   version = 3,
                   matcherFeeAssetId = fixedAssetMatcherFee
                 ))
@@ -121,8 +129,8 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
 
           node.waitOrderInBlockchain(aliceOrderIdFill)
 
-          node.assetBalance(alice.address, fixedAssetMatcherFeeBase58).balance shouldBe aliceAssetBalanceBefore - matcherFee + orderAmount
-          node.assetBalance(bob.address, fixedAssetMatcherFeeBase58).balance shouldBe bobAssetBalanceBefore - matcherFee - orderAmount
+          node.assetBalance(alice.address, fixedAssetMatcherFeeBase58).balance shouldBe aliceAssetBalanceBefore - minMatcherFee + orderAmount
+          node.assetBalance(bob.address, fixedAssetMatcherFeeBase58).balance shouldBe bobAssetBalanceBefore - minMatcherFee - orderAmount
           node.balanceDetails(alice.address).available - 0.000000001.waves
           node.balanceDetails(bob.address).available + 0.000000001.waves
 
@@ -134,11 +142,22 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
         val expirationTimestamp = ts + Order.MaxLiveTime
         val amount              = 1
         val aliceWavesPair      = AssetPair(aliceAsset, Waves)
-        val buy                 = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, matcherFee, version = 3, Waves)
+        val buy                 = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
 
         assertBadRequestAndResponse(node
           .placeOrder(buy),
           f"Required $aliceScriptedAssetBase58 as asset fee, but given WAVES")
+      }
+
+      "should decline orders if orders' matcherFee less than specified minFee in config" in {
+        val ts                  = ntpTime.correctedTime()
+        val expirationTimestamp = ts + Order.MaxLiveTime
+        val amount              = 1
+        val aliceWavesPair      = AssetPair(aliceAsset, Waves)
+        val buy                 = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee - 1, version = 3, aliceScriptedAsset)
+
+        //TODO:add assert bad request
+        node.placeOrder(buy)
       }
     }
 
@@ -230,6 +249,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
       }
 
       "should decline orders if matcherFeeAsset not equal to amount/price/spending/receiving assets" in {
+        val minFeePercent = 10
         for (percentAssetType <- Seq(
           "amount",
           "price",
@@ -239,7 +259,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
           docker.restartNode(node,
             configWithOrderFeePercent(
               assetType = percentAssetType,
-              minFeePercent = 10
+              minFeePercent = minFeePercent
             ))
           val ts                  = ntpTime.correctedTime()
           val expirationTimestamp = ts + Order.MaxLiveTime - 10000
@@ -248,8 +268,8 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
 
           val (buy, sell, requiredBuyMatcherFeeAsset, requiredSellMatcherFeeAsset) = percentAssetType match {
             case "amount" =>
-              val buy                         = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, matcherFee, version = 3, Waves)
-              val sell                        = Order.sell(bob, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, matcherFee, version = 3, Waves)
+              val buy                         = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, amount * (minFeePercent / 100), version = 3, Waves)
+              val sell                        = Order.sell(bob, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, amount * (minFeePercent / 100), version = 3, Waves)
               val requiredBuyMatcherFeeAsset  = aliceAssetBase58
               val requiredSellMatcherFeeAsset = aliceAssetBase58
               (buy, sell, requiredBuyMatcherFeeAsset, requiredSellMatcherFeeAsset)
@@ -288,7 +308,7 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
       }
     }
     "when has insufficient funds in WAVES to pay ExchangeTx fee" in {
-      docker.restartNode(node, configWithOrderFeeFixed(matcherFeeAssetId = aliceAssetBase58))
+      docker.restartNode(node, configWithOrderFeeFixed(matcherFeeAssetId = aliceAssetBase58, matcherFee))
       val matcherWavesBalance = node.balanceDetails(matcher.address).available
       node.broadcastTransfer(matcher, alice.address, matcherWavesBalance - minFee, assetId = None, fee = minFee, feeAssetId = None, waitForTx = true)
 
@@ -345,16 +365,30 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
 
 object MatcherFeeAssetSuite {
 
-  def configWithOrderFeeFixed(matcherFeeAssetId: String = "WAVES"): Config = {
+  def configWithOrderFeeFixed(matcherFeeAssetId: String = "WAVES", minFee: Long): Config = {
     parseString(s"""
                    |waves.matcher {
                    | allow-order-v3 = yes
                    |  order-fee {
                    |    mode = "fixed"
                    |
-         |    fixed {
+                   |    fixed {
                    |      asset = "$matcherFeeAssetId"
-                   |      min-fee = 300000
+                   |      min-fee = "$minFee"
+                   |   }
+                   |  }
+                   |}""".stripMargin)
+  }
+
+  def configWithOrderFeeFixedWaves(minFee: Long): Config = {
+    parseString(s"""
+                   |waves.matcher {
+                   | allow-order-v3 = yes
+                   |  order-fee {
+                   |    mode = "dynamic"
+                   |
+                   |    dynamic {
+                   |      base-fee = "$minFee"
                    |   }
                    |  }
                    |}""".stripMargin)
@@ -367,10 +401,10 @@ object MatcherFeeAssetSuite {
                    |  order-fee {
                    |    mode = "percent"
                    |
-         |    percent {
+                   |    percent {
                    |        asset-type = "$assetType"
                    |
-         |        min-fee = "$minFeePercent"
+                   |        min-fee = "$minFeePercent"
                    |      }
                    |  }
                    |}""".stripMargin)
