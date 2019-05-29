@@ -4,8 +4,9 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -27,7 +28,12 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
-  (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
+
+  (utx.putIfNew _)
+    .when(*, *)
+    .onCall((_: Transaction, _: Boolean) => TracedResult(Right(true)))
+    .anyNumberOfTimes()
+
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 
   "/transfer" - {

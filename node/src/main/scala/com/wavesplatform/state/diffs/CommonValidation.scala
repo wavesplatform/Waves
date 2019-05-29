@@ -5,17 +5,18 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
@@ -25,6 +26,7 @@ object CommonValidation {
 
   val ScriptExtraFee = 400000L
   val FeeUnit        = 100000
+  val NFTMultiplier  = 0.001
 
   val FeeConstants: Map[Byte, Long] = Map(
     GenesisTransaction.typeId            -> 0,
@@ -46,10 +48,9 @@ object CommonValidation {
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          settings: FunctionalitySettings,
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
-    if (blockTime >= settings.allowTemporaryNegativeUntil) {
+    if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -98,7 +99,6 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             settings: FunctionalitySettings,
                                              height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
@@ -113,7 +113,7 @@ object CommonValidation {
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
-        ValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
+        TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
@@ -194,18 +194,26 @@ object CommonValidation {
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
     if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > settings.maxTransactionTimeForwardOffset.toMillis)
-      Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
+      Left(
+        Mistiming(
+          s"""Transaction timestamp ${tx.timestamp}
        |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
-       |relative to block timestamp $time""".stripMargin.replaceAll("\n", " ")))
+       |relative to block timestamp $time""".stripMargin
+            .replaceAll("\n", " ")
+            .replaceAll("\r", "")))
     else Right(tx)
   }
 
   def disallowTxFromPast[T <: Transaction](settings: FunctionalitySettings, prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
     prevBlockTime match {
       case Some(t) if (t - tx.timestamp) > settings.maxTransactionTimeBackOffset.toMillis =>
-        Left(Mistiming(s"""Transaction timestamp ${tx.timestamp}
+        Left(
+          Mistiming(
+            s"""Transaction timestamp ${tx.timestamp}
          |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
-         |relative to previous block timestamp $prevBlockTime""".stripMargin.replaceAll("\n", " ")))
+         |relative to previous block timestamp $prevBlockTime""".stripMargin
+              .replaceAll("\n", " ")
+              .replaceAll("\r", "")))
       case _ => Right(tx)
     }
 
@@ -219,17 +227,25 @@ object CommonValidation {
           case tx: DataTransaction =>
             val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
+          case itx: IssueTransaction =>
+            lazy val nftActivated = blockchain.activatedFeatures
+              .get(BlockchainFeatures.ReduceNFTFee.id)
+              .exists(_ <= height)
+
+            val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+
+            (baseFee * multiplier).toLong
           case _ => baseFee
         }
       }
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
     type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
     def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
         // This could be true for private blockchains
         feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
       } else
@@ -263,8 +279,8 @@ object CommonValidation {
     def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
       val (feeAssetInfo, feeAmount) = inputFee
       val assetsCount = tx match {
-        case tx: ExchangeTransaction => tx.checkedAssets().collect { case a @ IssuedAsset(_) => a }.count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
-        case _                       => tx.checkedAssets().collect { case a @ IssuedAsset(_) => a }.count(blockchain.hasAssetScript)
+        case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
+        case _                       => tx.checkedAssets().count(blockchain.hasAssetScript)
       }
       if (isSmartToken(inputFee)) {
         //Left(GenericError("Using smart asset for sponsorship is disabled."))
@@ -295,10 +311,10 @@ object CommonValidation {
       }
   }
 
-  def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
-        minAFee <- getMinFee(blockchain, fs, height, tx)
+        minAFee <- getMinFee(blockchain, height, tx)
         minWaves   = minAFee._3
         minFee     = minAFee._2
         feeAssetId = minAFee._1
@@ -306,7 +322,10 @@ object CommonValidation {
           minFee <= tx.assetFee._2,
           (),
           GenericError(
-            s"Fee in ${feeAssetId.fold("WAVES")(_.id.base58)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+            s"Fee for ${Constants.TransactionNames(tx.builder.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.id.base58)})" ++
+              " does not exceed minimal value of " ++
+              s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.id.base58}")}"
+          )
         )
       } yield ()
     } else {

@@ -234,4 +234,80 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |""".stripMargin
     parse(code)
   }
+
+  property("contract with comments in different places") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-} # comment
+        | {-# TEST_TEST 123 #-} # comment
+        | # comment
+        | # comment # comment
+        | func foo1 # comment
+        | ( # comment
+        | ) # comment
+        | = 42 + 42 - 1 # comment
+        | # comment
+        | @Callable(i) # comment
+        | func foo # comment
+        | ( # comment
+        | ) # comment
+        | = 42 + 42 - 1 # comment
+        | # comment
+        | @Ann # comment
+        | (  # comment
+        | x  # comment
+        | )  # comment
+        | func bar # comment
+        | ( # comment
+        | arg:ArgType, # comment
+        | arg2:ArgType # comment
+        | ) # comment
+        | = { # more comments
+        |   foo() # comment
+        | } # comment
+        | # comment
+        |""".stripMargin
+    parse(code)
+  }
+
+  property("disallow function declarations after annotated funcions.") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        | func baz(arg:Int) = {
+        |    4
+        | }
+        |""".stripMargin
+    Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
+  }
+
+  property("disallow value declarations after annotated funcions.") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        | let baz = 4
+        |
+        |""".stripMargin
+    Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
+  }
+
 }

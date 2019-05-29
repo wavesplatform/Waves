@@ -10,35 +10,63 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Pmt, ScriptTransfer}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import cats.implicits._
 
 object ContractEvaluator {
-  case class Invocation(fc: FUNCTION_CALL,
+
+  val DEFAULT_FUNC_NAME = "defaultFunction"
+
+  case class Invocation(funcCallOpt: Option[FUNCTION_CALL],
                         caller: Recipient.Address,
                         callerPk: ByteStr,
                         payment: Option[(Long, Option[ByteStr])],
-                        dappAddress: ByteStr)
+                        dappAddress: ByteStr,
+                        transactionId: ByteStr,
+                        fee: Long,
+                        feeAssetId: Option[ByteStr]
+                       )
 
-  def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
-    val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
-    c.cfs.find(_.u.name == functionName) match {
+  private def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
+    val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
+
+    val contractFuncAndCall =
+      if (i.funcCallOpt.nonEmpty)
+        c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCallOpt.get))
+      else
+        c.defaultFuncOpt.map(defFunc => (defFunc, FUNCTION_CALL(FunctionHeader.User(defFunc.u.name), List.empty)))
+
+    contractFuncAndCall match {
       case None =>
-        val otherFuncs = c.dec.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
+        val otherFuncs = c.decs.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
         val message =
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
-      case Some(f) =>
-        withDecls(
-          c.dec,
-          BLOCK(
-            LET(
-              f.annotation.invocationArgName,
-              Bindings
-                .buildInvocation(i.caller, i.callerPk, i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress))
-            ),
-            BLOCK(f.u, i.fc)
+
+      case Some((f, fc)) =>
+        val takingArgsNumber = f.u.args.size
+        val passedArgsNumber = fc.args.size
+        if (takingArgsNumber == passedArgsNumber)
+          withDecls(
+            c.decs,
+            BLOCK(
+              LET(
+                f.annotation.invocationArgName,
+                Bindings.buildInvocation(
+                    i.caller,
+                    i.callerPk,
+                    i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress),
+                    i.transactionId,
+                    i.fee,
+                    i.feeAssetId
+                  )
+              ),
+              BLOCK(f.u, fc)
+            )
           )
+        else raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](
+          s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
         )
     }
   }
@@ -58,6 +86,10 @@ object ContractEvaluator {
   def verify(decls: List[DECLARATION], v: VerifierFunction, ct: ScriptTransfer): EvalM[EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.scriptTransfer(ct)))
 
-  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[ExecutionError, ScriptResult] =
-    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ScriptResult.fromObj)
+  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[(ExecutionError, Log), ScriptResult] = {
+    val (log, result) = EvaluatorV1.evalWithLogging(ctx, eval(c, i))
+    result
+      .flatMap(ScriptResult.fromObj)
+      .leftMap((_, log))
+  }
 }

@@ -6,6 +6,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -14,9 +16,7 @@ import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}

@@ -23,7 +23,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   val CTX: CTX =
-    Monoid.combineAll(Seq(PureContext.build(V3), CryptoContext.build(Global)))
+    Monoid.combineAll(Seq(PureContext.build(Global, V3), CryptoContext.build(Global, V3)))
 
   val decompilerContext = CTX.decompilerContext
 
@@ -247,6 +247,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             )
           )
         )),
+      None,
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
     Decompiler(contract: DApp, decompilerContext) shouldEq
@@ -287,6 +288,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             )
           )
         )),
+      None,
       None
     )
     Decompiler(contract, decompilerContext) shouldEq

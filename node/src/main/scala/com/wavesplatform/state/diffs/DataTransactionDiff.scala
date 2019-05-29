@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{DataTransaction, ValidationError}
+import com.wavesplatform.transaction.DataTransaction
 
 object DataTransactionDiff {
 
@@ -11,8 +12,10 @@ object DataTransactionDiff {
       Diff(
         height,
         tx,
-        portfolios = Map(sender  -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-        accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap))
+        portfolios = Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
+        accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap)),
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
       ))
   }
 }

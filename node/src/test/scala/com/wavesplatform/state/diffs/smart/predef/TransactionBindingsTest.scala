@@ -266,8 +266,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("InvokeScriptTransaction binding") {
     forAll(invokeScriptGen) { t =>
-      val checkArgsScript = if (t.fc.args.nonEmpty) {
-        t.fc.args
+      val checkArgsScript = if (t.funcCallOpt.get.args.nonEmpty) {
+        t.funcCallOpt.get.args
       .collect {
         case CONST_LONG(i)    => i.toString
         case CONST_STRING(s)  => s""""$s""""
@@ -286,7 +286,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |match tx {
             | case t : InvokeScriptTransaction  =>
             |   ${provenPart(t)}
-            |   let dappAddress = t.dappAddress.bytes == base58'${t.dappAddress.bytes.base58}'
+            |   let dAppAddressBytes = match t.dApp {
+            |     case ad : Address => ad.bytes
+            |     case al : Alias => base58''
+            |   }
+            |   let dappAddress = dAppAddressBytes == base58'${t.dAppAddressOrAlias.bytes.base58}'
             |
             |   let paymentAmount = if(${t.payment.nonEmpty})
             |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
@@ -302,7 +306,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
             |      else isDefined(t.feeAssetId) == false
             |
-            |   let checkFunc = t.function == "${t.fc.function.funcName}"
+            |   let checkFunc = t.function == "${t.funcCallOpt.get.function.funcName}"
             |   $checkArgsScript
 
             |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId && checkFunc && checkArgs
@@ -594,9 +598,9 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val Success(expr, _) = Parser.parseExpr(script)
     val ctx =
       PureContext
-        .build(V2) |+|
+        .build(Global, V2) |+|
         CryptoContext
-          .build(Global) |+|
+          .build(Global, V2) |+|
         WavesContext
           .build(
             DirectiveSet(V2, Asset, Expression).explicitGet(),
@@ -616,9 +620,9 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     val Success(expr, _) = Parser.parseExpr(script)
     val ctx =
-      PureContext.build(V2) |+|
+      PureContext.build(Global, V2) |+|
         CryptoContext
-          .build(Global) |+|
+          .build(Global, V2) |+|
         WavesContext
           .build(
             DirectiveSet(V2, Account, Expression).explicitGet(),

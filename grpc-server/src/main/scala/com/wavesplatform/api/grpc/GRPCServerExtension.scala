@@ -33,20 +33,16 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
   }
 
   private[this] def startServer(settings: GRPCSettings): Server = {
-    implicit val apiScheduler = Scheduler(context.actorSystem.dispatcher)
+    implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
     val bindAddress = new InetSocketAddress(settings.host, settings.port)
     val server: Server = NettyServerBuilder
       .forAddress(bindAddress)
-      .addService(TransactionsApiGrpc.bindService(
-        new TransactionsApiGrpcImpl(context.settings.blockchainSettings.functionalitySettings,
-                                    context.wallet,
-                                    context.blockchain,
-                                    context.utx,
-                                    context.broadcastTx),
-        apiScheduler
-      ))
+      .addService(TransactionsApiGrpc.bindService(new TransactionsApiGrpcImpl(context.wallet, context.blockchain, context.utx, context.broadcastTx), apiScheduler))
       .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(context.blockchain), apiScheduler))
+      .addService(AccountsApiGrpc.bindService(new AccountsApiGrpcImpl(context.blockchain), apiScheduler))
+      .addService(AssetsApiGrpc.bindService(new AssetsApiGrpcImpl(context.blockchain), apiScheduler))
+      .addService(BlockchainApiGrpc.bindService(new BlockchainApiGrpcImpl(context.blockchain, context.settings.featuresSettings), apiScheduler))
       .build()
       .start()
 

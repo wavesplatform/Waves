@@ -40,7 +40,7 @@ object EvaluatorV1 {
   private def evalRef(key: String): EvalM[EVALUATED] =
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {
-        case Some(lzy) => liftTER[EVALUATED](lzy.value.value)
+        case Some(lzy) => liftTER[EVALUATED](lzy.value)
         case None      => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
       }
     }
@@ -74,7 +74,7 @@ fields.get(field) match {
               .traverse[EvalM, EVALUATED](evalExpr)
               .flatMap { args =>
                 val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
-                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l("(arg)" + argName)))
+                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l(s"$argName")))
                 }
                 local {
                   set(LoggedEvaluationContext.Lenses.lets.set(ctx)(letDefsWithArgs)).flatMap(_ => evalExpr(func.ev))
@@ -118,13 +118,13 @@ fields.get(field) match {
     case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
   }
 
-  def applywithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
+  def applyWithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
     val log = ListBuffer[LogItem]()
     val r   = ap(c, expr, (str: String) => (v: LetExecResult) => log.append((str, v)))
     (log.toList, r)
   }
 
-  def applywithLogging[A <: EVALUATED](
+  def applyWithLogging[A <: EVALUATED](
     c:    Either[ExecutionError, EvaluationContext],
     expr: EXPR
   ): (Log, Either[ExecutionError, A]) = {

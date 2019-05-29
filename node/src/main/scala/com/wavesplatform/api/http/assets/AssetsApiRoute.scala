@@ -10,20 +10,22 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory, ValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -43,6 +45,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
+
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
+  private[this] val commonAssetsApi = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {
     val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
@@ -97,7 +102,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case Right(asset) =>
           Task
             .eval(blockchain.assetDistribution(asset))
-            .map(dst => Json.toJson(dst): ToResponseMarshallable)
+            .map(dst => Json.toJson(dst)(com.wavesplatform.state.dstWrites): ToResponseMarshallable)
       }
 
       complete {
@@ -224,15 +229,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         "address" -> acc.address,
         "balances" -> JsArray(
           (for {
-            (asset @ IssuedAsset(assetId), balance) <- blockchain.portfolio(acc).assets
-            if balance > 0
-            assetInfo                               <- blockchain.assetDescription(asset)
-            (_, issueTransaction: IssueTransaction) <- blockchain.transactionInfo(assetId)
-            sponsorBalance = if (assetInfo.sponsorship != 0) {
-              Some(blockchain.wavesPortfolio(issueTransaction.sender).spendableBalance)
-            } else {
-              None
-            }
+            (asset @ IssuedAsset(assetId), balance) <- commonAccountApi.portfolio(acc) if balance > 0
+            CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) <- commonAssetsApi.fullInfo(asset)
           } yield
             Json.obj(
               "assetId"    -> assetId,
@@ -267,7 +265,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "assetId"        -> JsString(id.base58),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
-          "issuer"         -> JsString(tx.sender.toString),
+          "issuer"         -> JsString(tx.sender.address),
           "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
           "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
           "decimals"       -> JsNumber(tx.decimals.toInt),

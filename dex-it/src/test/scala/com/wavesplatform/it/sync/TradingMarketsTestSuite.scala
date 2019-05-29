@@ -13,6 +13,7 @@ class TradingMarketsTestSuite extends MatcherSuiteBase {
     "Trading markets have info about all asset pairs" in {
       val wctTxId = node.broadcastRequest(IssueWctTx.json()).id
       node.waitForTransaction(wctTxId)
+      node.waitForHeight(node.height + 1)
 
       val order = node.placeOrder(alice, wctWavesPair, BUY, amount, price, matcherFee).message.id
       node.waitOrderStatus(wctWavesPair, order, "Accepted")

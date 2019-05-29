@@ -49,11 +49,11 @@ object DataEntry {
       case t if t == Type.Integer.id => (IntegerDataEntry(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
       case t if t == Type.Boolean.id => (BooleanDataEntry(key, bytes(p + 1) != 0), p + 2)
       case t if t == Type.Binary.id =>
-        val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
+        val (blob, p1) = Deser.parseArrayWithLength(bytes, p + 1)
         (BinaryDataEntry(key, ByteStr(blob)), p1)
 
       case t if t == Type.String.id =>
-        val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
+        val (blob, p1) = Deser.parseArrayWithLength(bytes, p + 1)
         (StringDataEntry(key, new String(blob, UTF_8)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }

@@ -1,22 +1,23 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.script.ContractScript
+import monix.execution.Scheduler
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
 // [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.ContractScript
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -37,15 +38,7 @@ class AddressRouteSpec
   private val allAddresses = allAccounts.map(_.address)
   private val blockchain   = stub[Blockchain]
 
-  private val route = AddressApiRoute(
-    restAPISettings,
-    testWallet,
-    blockchain,
-    mock[UtxPool],
-    mock[ChannelGroup],
-    new TestTime,
-    TestFunctionalitySettings.Stub
-  ).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, blockchain, mock[UtxPool], mock[ChannelGroup], new TestTime)(Scheduler.global).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -156,7 +149,7 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ExprScript(TRUE).explicitGet()))
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: AddressOrAlias) => Some(ExprScript(TRUE).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
@@ -166,7 +159,7 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
 
-    (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: Address) => None)
+    (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: AddressOrAlias) => None)
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(2)
@@ -176,16 +169,16 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe 0
     }
 
-    val testContract = DApp(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    val testContract = DApp(List(), List(), None, Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: Address) => Some(ContractScript(V3, testContract).explicitGet()))
+      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, testContract).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AQAAAAZ2ZXJpZnkAAAAABiDCPeI="
-      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
+      (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),None,Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
 // [WAIT]                                           Decompiler(
 //      testContract,
 //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)

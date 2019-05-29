@@ -1,7 +1,8 @@
 package com.wavesplatform.account
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.TxValidationError._
 
 trait AddressOrAlias {
   def stringRepr: String
@@ -27,9 +28,9 @@ object AddressOrAlias {
         val addressBytes = bytes.slice(position, addressEnd)
         Address.fromBytes(addressBytes).map((_, addressEnd))
       case Alias.AddressVersion =>
-        val (_, aliasEnd) = Deser.parseArraySize(bytes, position + 2)
+        val (_, aliasEnd) = Deser.parseArrayWithLength(bytes, position + 2)
         Alias.fromBytes(bytes.slice(position, aliasEnd)).map((_, aliasEnd))
-      case _ => Left(ValidationError.InvalidAddress("Unknown address/alias version"))
+      case _ => Left(InvalidAddress("Unknown address/alias version"))
     }
   }
 

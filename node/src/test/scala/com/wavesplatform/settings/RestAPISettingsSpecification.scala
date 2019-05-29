@@ -8,18 +8,19 @@ import org.scalatest.{FlatSpec, Matchers}
 class RestAPISettingsSpecification extends FlatSpec with Matchers {
   "RestAPISettings" should "read values" in {
     val config   = ConfigFactory.parseString("""
-        |waves {
-        |  rest-api {
-        |    enable: yes
-        |    bind-address: "127.0.0.1"
-        |    port: 6869
-        |    api-key-hash: "BASE58APIKEYHASH"
-        |    cors: yes
-        |    api-key-different-host: yes
-        |    transactions-by-address-limit = 10000
-        |    distribution-address-limit = 10000
-        |  }
-        |}
+                                               |waves {
+                                               |  rest-api {
+                                               |    enable: yes
+                                               |    bind-address: "127.0.0.1"
+                                               |    port: 6869
+                                               |    api-key-hash: "BASE58APIKEYHASH"
+                                               |    cors: yes
+                                               |    api-key-different-host: yes
+                                               |    transactions-by-address-limit = 10000
+                                               |    distribution-address-limit = 10000
+                                               |    allow-tx-rebroadcasting = true
+                                               |  }
+                                               |}
       """.stripMargin)
     val settings = config.as[RestAPISettings]("waves.rest-api")
 
@@ -31,5 +32,6 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.apiKeyDifferentHost should be(true)
     settings.transactionsByAddressLimit shouldBe 10000
     settings.distributionAddressLimit shouldBe 10000
+    settings.allowTxRebroadcasting shouldBe true
   }
 }

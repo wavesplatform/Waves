@@ -33,7 +33,7 @@ class ExchangeTransactionCreatorSpecification
 
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV1]
       }
 
@@ -46,7 +46,7 @@ class ExchangeTransactionCreatorSpecification
 
               val bc = stub[Blockchain]
               (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
-              val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
+              val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
               tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()) should produce(
                 "Smart Account Trading feature has not been activated yet")
             }
@@ -61,7 +61,7 @@ class ExchangeTransactionCreatorSpecification
 
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV2]
       }
     }
@@ -86,7 +86,7 @@ class ExchangeTransactionCreatorSpecification
 
       forAll(preconditions) {
         case (buyOrder, sellOrder, orderSettings) =>
-          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, orderSettings)
+          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
           val tx = tc.createTransaction(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis).explicitGet()
 
           tx.buyMatcherFee shouldBe buyOrder.matcherFee
@@ -113,7 +113,7 @@ class ExchangeTransactionCreatorSpecification
 
       forAll(preconditions) {
         case (buyOrder, sellOrder, orderSettings) =>
-          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, orderSettings)
+          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
           val tx = tc.createTransaction(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
 
           tx shouldBe 'right

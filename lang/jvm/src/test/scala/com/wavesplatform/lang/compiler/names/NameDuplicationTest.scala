@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.Common
+import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -113,7 +114,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |
             |@Callable(x)
             |func some(i: Int) = WriteSet([DataEntry("a", "a")])
-            |""") should produce("Annotation bindings overrides already defined var")
+            |""") should produce("Annotation binding `x` overrides already defined var")
         }
 
         "constant and verifier annotation binding" in {
@@ -122,7 +123,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |
             |@Verifier(x)
             |func some() = true
-            |""") should produce("Annotation bindings overrides already defined var")
+            |""") should produce("Annotation binding `x` overrides already defined var")
         }
 
         "two user functions" in {
@@ -202,6 +203,20 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |""") should produce("override annotation bindings")
         }
 
+        "duplicating arguments with other arguments among them" in {
+          val separatingArgsCount = Gen.choose(1, 20)
+          forAll(separatingArgsCount) { c =>
+            compileOf(
+              s"""
+                 | func f(
+                 |      sameArg: Int,
+                 |      ${1 to c map (i => s"x$i: Int") mkString("", ", ", ",")}
+                 |      sameArg: Int
+                 |    ) = true
+             """
+            ) should produce("duplicating argument")
+          }
+        }
       }
     }
 

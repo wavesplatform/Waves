@@ -6,6 +6,7 @@ import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.description._
@@ -71,15 +72,15 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
 
   private def validateTxContent(tx: DataTransaction, txByteCountOpt: Option[Int] = None): Either[ValidationError, TransactionT] = {
     if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
-      Left(ValidationError.TooBigArray)
+      Left(TxValidationError.TooBigArray)
     } else if (tx.data.exists(_.key.isEmpty)) {
-      Left(ValidationError.GenericError("Empty key found"))
+      Left(TxValidationError.GenericError("Empty key found"))
     } else if (tx.data.map(_.key).distinct.lengthCompare(tx.data.size) < 0) {
-      Left(ValidationError.GenericError("Duplicate keys found"))
+      Left(TxValidationError.GenericError("Duplicate keys found"))
     } else if (tx.fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(TxValidationError.InsufficientFee())
     } else {
-      Either.cond(txByteCountOpt.getOrElse(tx.bytes().length) <= MaxBytes, tx, ValidationError.TooBigArray)
+      Either.cond(txByteCountOpt.getOrElse(tx.bytes().length) <= MaxBytes, tx, TxValidationError.TooBigArray)
     }
   }
 

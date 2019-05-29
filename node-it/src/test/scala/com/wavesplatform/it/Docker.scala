@@ -70,7 +70,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   private val genesisOverride = Docker.genesisOverride
 
   // a random network in 10.x.x.x range
-  private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
+  val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
   // 10.x.x.x/28 network will accommodate up to 13 nodes
   private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28"
 
@@ -136,6 +136,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     attempt(5)
   }
+
+  def createNetwork: Network = wavesNetwork
 
   def startNodes(nodeConfigs: Seq[Config]): Seq[DockerNode] = {
     log.trace(s"Starting ${nodeConfigs.size} containers")
@@ -284,6 +286,28 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       log.debug(s"Container $containerId has not connected to the network ${wavesNetwork.name()} yet, retry")
       Thread.sleep(1000)
       inspectContainer(containerId)
+    }
+  }
+
+  def stopContainer(node: DockerNode): String = {
+    val id = node.containerId
+    log.info(s"Stopping container with id: $id")
+    client.stopContainer(node.containerId, 10)
+    saveProfile(node)
+    saveLog(node)
+    val containerInfo = client.inspectContainer(node.containerId)
+    log.debug(s"""Container information for ${node.name}:
+                 |Exit code: ${containerInfo.state().exitCode()}
+                 |Error: ${containerInfo.state().error()}
+                 |Status: ${containerInfo.state().status()}
+                 |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+    id
+  }
+
+  def startContainer(id: String): Unit = {
+    client.startContainer(id)
+    nodes.asScala.find(_.containerId == id).foreach { node =>
+      node.nodeInfo = getNodeInfo(node.containerId, node.settings)
     }
   }
 

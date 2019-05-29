@@ -4,17 +4,18 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{KeyPair, PublicKey, Address}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.fields.FeaturesBlockField
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
@@ -184,6 +185,8 @@ case class Block private[block] (override val timestamp: Long,
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
 
+  def getHeader(): BlockHeader =
+    new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
 }
 
 object Block extends ScorexLogging {

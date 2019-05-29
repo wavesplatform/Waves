@@ -1,15 +1,18 @@
 package com.wavesplatform.lang.v1
 
-object ContractLimits {
-  val MaxExprComplexity  = 20 * 100
-  val MaxExprSizeInBytes = 8 * 1024
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, V3}
 
-  val MaxContractComplexity  = 10000
+object ContractLimits {
+  val MaxComplexityByVersion: StdLibVersion => Int = {
+    case V1 | V2 => 2000
+    case V3      => 4000
+  }
+  val MaxExprSizeInBytes     =  8 * 1024
   val MaxContractSizeInBytes = 32 * 1024
 
   // As in Scala
   val MaxInvokeScriptArgs = 22
-  val MaxCallableFunctionNameInBytes    = 255
+  val MaxAnnotatedFunctionNameInBytes    = 255
 
   // Data	0.001 per kilobyte, rounded up, fee for CI is 0.005
   val MaxInvokeScriptSizeInBytes = 5 * 1024

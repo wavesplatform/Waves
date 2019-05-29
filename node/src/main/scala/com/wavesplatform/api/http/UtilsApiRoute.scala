@@ -7,9 +7,10 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -19,7 +20,7 @@ import scala.concurrent.ExecutionContext
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with WithSettings {
+case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with WithSettings {
 
   import UtilsApiRoute._
 
@@ -56,7 +57,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
     (post & entity(as[String]) & withExecutionContext(decompilerExecutionContext)) { code =>
-      Script.fromBase64String(code, checkComplexity = false) match {
+      Script.fromBase64String(code.trim, checkComplexity = false) match {
         case Left(err) => complete(err)
         case Right(script) =>
           val (scriptText, meta) = Script.decompile(script)

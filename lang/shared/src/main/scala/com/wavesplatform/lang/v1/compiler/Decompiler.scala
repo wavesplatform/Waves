@@ -24,7 +24,7 @@ object Decompiler {
 
   private def pureOut(in: String, ident: Int): Coeval[String] = pure(out(in, ident))
 
-  private val NEWLINE = scala.util.Properties.lineSeparator
+  private val NEWLINE = "\n"
 
   private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[String] =
     e flatMap {
@@ -107,14 +107,14 @@ object Decompiler {
 
     import e._
 
-    val decls: Seq[Coeval[String]] = dec.map(expr => decl(pure(expr), ctx))
-    val callables: Seq[Coeval[String]] = cfs
+    val decls: Seq[Coeval[String]] = decs.map(expr => decl(pure(expr), ctx))
+    val callables: Seq[Coeval[String]] = callableFuncs
       .map {
         case CallableFunction(annotation, u) =>
           Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Callable(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
       }
 
-    val verifier: Seq[Coeval[String]] = vf.map {
+    val verifier: Seq[Coeval[String]] = verifierFuncOpt.map {
       case VerifierFunction(annotation, u) =>
         Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Verifier(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
     }.toSeq

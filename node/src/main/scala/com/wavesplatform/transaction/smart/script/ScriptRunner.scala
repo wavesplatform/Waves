@@ -5,10 +5,12 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
@@ -34,8 +36,8 @@ object ScriptRunner {
           false,
           Coeval(scriptContainerAddress)
         )
-        EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
-      case ContractScript.ContractScriptImpl(_, DApp(decls, _, Some(vf)), _) =>
+        EvaluatorV1.applyWithLogging[EVALUATED](ctx, s.expr)
+      case ContractScript.ContractScriptImpl(_, DApp(decls, _, _, Some(vf)), _) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,
@@ -52,12 +54,12 @@ object ScriptRunner {
         )
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
-      case ContractScript.ContractScriptImpl(_, DApp(_, _, None), _) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None), _) =>
         val t: Proven with Authorized =
           in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], _ => ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {
-          case Right(_) => Right(TRUE)
-          case Left(_)  => Right(FALSE)
+          case Right(_)                => Right(TRUE)
+          case Left(GenericError(err)) => Left(err)
         })
       case _ => (List.empty, "Unsupported script version".asLeft[EVALUATED])
     }

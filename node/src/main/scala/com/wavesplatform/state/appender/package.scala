@@ -4,11 +4,12 @@ import cats.implicits._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
-import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
@@ -74,13 +75,9 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       _ <- blockConsensusValidation(blockchainUpdater, settings, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, block.sender, parent)
+        val balance = blockchainUpdater.generatingBalance(block.sender, parent)
         Either.cond(
-          GeneratingBalanceProvider.isEffectiveBalanceValid(blockchainUpdater,
-                                                            settings.blockchainSettings.functionalitySettings,
-                                                            height,
-                                                            block,
-                                                            balance),
+          blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
           balance,
           s"generator's effective balance $balance is less that required for generation"
         )
@@ -93,7 +90,7 @@ package object appender extends ScorexLogging {
     blockchainUpdater.processBlock(block, verify).map { maybeDiscardedTxs =>
       utxStorage.removeAll(block.transactionData)
       maybeDiscardedTxs.map { discarded =>
-        discarded.foreach(utxStorage.putIfNew)
+        discarded.foreach(utxStorage.putIfNew(_, verify = false))
         blockchainUpdater.height
       }
     }
@@ -105,8 +102,8 @@ package object appender extends ScorexLogging {
 
     for {
       height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-      parent <- blockchain.parent(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
-      grandParent = blockchain.parent(parent, 2)
+      parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+      grandParent = blockchain.parentHeader(parent, 2)
       effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
       _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
       _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))

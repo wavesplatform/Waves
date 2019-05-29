@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
@@ -24,7 +24,7 @@ object Common {
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
   val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 
-  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
+  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
                          expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
 
@@ -70,7 +70,11 @@ object Common {
     override def inputEntity   = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+    override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
+    override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
+    override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???

@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import cats.data.{Validated, ValidatedNel}
 import cats.implicits._
 import cats.{Order => _}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.Try
@@ -22,7 +23,7 @@ package object validation {
       .condNel(
         fee > 0,
         fee,
-        ValidationError.InsufficientFee()
+        TxValidationError.InsufficientFee()
       )
   }
 
@@ -31,14 +32,14 @@ package object validation {
       .condNel(
         amount > 0,
         amount,
-        ValidationError.NonPositiveAmount(amount, of)
+        TxValidationError.NonPositiveAmount(amount, of)
       )
   }
 
   def validateSum(amounts: Seq[Long]): Validated[Long] = {
     Try(amounts.tail.fold(amounts.head)(Math.addExact))
       .fold[Validated[Long]](
-        _ => ValidationError.OverflowError.invalidNel,
+        _ => TxValidationError.OverflowError.invalidNel,
         _.validNel
       )
   }
@@ -48,7 +49,7 @@ package object validation {
       .condNel(
         name.length >= MinAssetNameLength && name.length <= MaxAssetNameLength,
         name,
-        ValidationError.InvalidName
+        TxValidationError.InvalidName
       )
   }
 
@@ -57,7 +58,7 @@ package object validation {
       .condNel(
         description.length <= MaxDescriptionLength,
         description,
-        ValidationError.TooBigArray
+        TxValidationError.TooBigArray
       )
   }
 
@@ -66,7 +67,7 @@ package object validation {
       .condNel(
         attachment.length <= TransferTransaction.MaxAttachmentSize,
         attachment,
-        ValidationError.TooBigArray
+        TxValidationError.TooBigArray
       )
   }
 
@@ -75,7 +76,7 @@ package object validation {
       .condNel(
         decimals >= 0 && decimals <= MaxDecimals,
         decimals,
-        ValidationError.TooBigArray
+        TxValidationError.TooBigArray
       )
   }
 }

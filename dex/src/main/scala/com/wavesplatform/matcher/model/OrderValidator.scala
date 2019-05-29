@@ -2,19 +2,21 @@ package com.wavesplatform.matcher.model
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{PublicKey, Address}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
+import com.wavesplatform.matcher.RateCache
 import com.wavesplatform.matcher.error._
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.matcher.model.MatcherModel.Normalization
+import com.wavesplatform.matcher.settings.OrderFeeSettings._
+import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.OrderFeeSettings._
-import com.wavesplatform.settings.{AssetType, DeviationsSettings, OrderAmountSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -41,6 +43,10 @@ object OrderValidator {
   val MaxActiveOrders: Int = 200
 
   val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+
+  private[matcher] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[matcher] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[matcher] def multiplyFeeByDouble(f: Long, d: Double): Long    = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): Result[Order] =
     Verifier.verifyAsEllipticCurveSignature(order).leftMap(x => MatcherError.OrderInvalidSignature(order.id(), x.toString))
@@ -82,7 +88,7 @@ object OrderValidator {
       blockchain.assetDescription(aid).map(_.decimals).toRight(MatcherError.AssetNotFound(aid))
     }
 
-  private def validateDecimals(blockchain: Blockchain, o: Order): Result[Int] =
+  private def validateDecimals(blockchain: Blockchain, o: Order): Result[(Int, Int)] =
     for {
       pd <- decimals(blockchain, o.assetPair.priceAsset)
       ad <- decimals(blockchain, o.assetPair.amountAsset)
@@ -92,36 +98,40 @@ object OrderValidator {
         (),
         MatcherError.PriceLastDecimalsMustBeZero(insignificantDecimals)
       )
-    } yield ad
+    } yield ad -> pd
 
-  private def validateOrderAmount(order: Order,
-                                  amountAssetDecimals: Int,
-                                  orderAmountRestrictions: Map[AssetPair, OrderAmountSettings]): Result[Order] = {
-    if (!(orderAmountRestrictions contains order.assetPair)) lift(order)
+  private def validateAmountAndPrice(order: Order,
+                                     decimalsPair: (Int, Int),
+                                     orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]): Result[Order] = {
+    if (!(orderRestrictions contains order.assetPair)) lift(order)
     else {
 
-      val amountSettings = orderAmountRestrictions(order.assetPair)
+      val (amountAssetDecimals, priceAssetDecimals) = decimalsPair
+      val restrictions                              = orderRestrictions(order.assetPair)
 
-      def normalizeByAmountAssetDecimals(value: Double): Long = {
-        (BigDecimal.valueOf(value) * BigDecimal(10).pow(amountAssetDecimals).toLongExact).toLong
-      }
+      def normalizeAmount(amt: Double): Long = Normalization.normalizeAmountAndFee(amt, amountAssetDecimals)
+      def normalizePrice(prc: Double): Long  = Normalization.normalizePrice(prc, amountAssetDecimals, priceAssetDecimals)
 
-      lift(order).ensure(MatcherError.OrderInvalidAmount(order, amountSettings)) { o =>
-        o.amount >= normalizeByAmountAssetDecimals(amountSettings.minAmount) &&
-        o.amount <= normalizeByAmountAssetDecimals(amountSettings.maxAmount) &&
-        BigDecimal.valueOf(o.amount).remainder(normalizeByAmountAssetDecimals(amountSettings.stepSize)) == 0
-      }
+      lift(order)
+        .ensure(MatcherError.OrderInvalidAmount(order, restrictions, amountAssetDecimals)) { o =>
+          normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
+          BigDecimal(o.amount).remainder(normalizeAmount(restrictions.stepSize).max(1)) == 0
+        }
+        .ensure(MatcherError.OrderInvalidPrice(order, restrictions, amountAssetDecimals, priceAssetDecimals)) { o =>
+          normalizePrice(restrictions.minPrice) <= o.price && o.price <= normalizePrice(restrictions.maxPrice) &&
+          (restrictions.mergeSmallPrices || BigDecimal(o.price).remainder(normalizePrice(restrictions.tickSize).max(1)) == 0)
+        }
     }
   }
 
-  def blockchainAware(
-      blockchain: Blockchain,
-      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
-      matcherAddress: Address,
-      time: Time,
-      orderFeeSettings: OrderFeeSettings,
-      orderAmountRestrictions: Map[AssetPair, OrderAmountSettings]
-  )(order: Order): Result[Order] = timer.measure {
+  def blockchainAware(blockchain: Blockchain,
+                      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
+                      matcherAddress: Address,
+                      time: Time,
+                      orderFeeSettings: OrderFeeSettings,
+                      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+                      rateCache: RateCache)(order: Order): Result[Order] = timer.measure {
+
     lazy val exchangeTx: Result[ExchangeTransaction] = {
       val fakeOrder: Order = order.updateType(order.orderType.opposite)
       transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map { x =>
@@ -138,26 +148,36 @@ object OrderValidator {
       else verifyAssetScript(matcherFeeAsset)
     }
 
-    for {
-      _ <- lift(order)
+    lazy val validateActivatedOrderFeatures =
+      lift(order)
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.SmartAccountTrading)) {
           _.version == 1 || blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)
         }
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.OrderV3)) {
-          _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)
+          _.version < 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)
         }
-      _ <- orderFeeSettings match {
-        case FixedWavesSettings(baseFee) =>
-          val mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee)
-          Either.cond(order.matcherFee >= mof, order, MatcherError.FeeNotEnough(mof, order.matcherFee, Waves))
-        case _ => lift(order)
-      }
-      amountAssetDecimals <- validateDecimals(blockchain, order)
-      _                   <- validateOrderAmount(order, amountAssetDecimals, orderAmountRestrictions)
-      _                   <- verifyOrderByAccountScript(blockchain, order.sender, order)
-      _                   <- verifyAssetScript(order.assetPair.amountAsset)
-      _                   <- verifyAssetScript(order.assetPair.priceAsset)
-      _                   <- verifyMatcherFeeAssetScript(order.matcherFeeAssetId)
+
+    /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
+    lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
+      case DynamicSettings(baseFee) =>
+        val mof =
+          multiplyFeeByDouble(
+            ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee),
+            rateCache.getRate(order.matcherFeeAssetId).get
+          )
+        Either.cond(order.matcherFee >= mof, order, MatcherError.FeeNotEnough(mof, order.matcherFee, Waves))
+      case _ => lift(order)
+    }
+
+    for {
+      _            <- validateActivatedOrderFeatures
+      _            <- validateOrderFeeByTransactionRequirements
+      decimalsPair <- validateDecimals(blockchain, order)
+      _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
+      _            <- verifyOrderByAccountScript(blockchain, order.sender, order)
+      _            <- verifyAssetScript(order.assetPair.amountAsset)
+      _            <- verifyAssetScript(order.assetPair.priceAsset)
+      _            <- verifyMatcherFeeAssetScript(order.matcherFeeAssetId)
     } yield order
   }
 
@@ -173,24 +193,38 @@ object OrderValidator {
     cond(negativeBalances.isEmpty, order, MatcherError.BalanceNotEnough(requiredForOrder, available))
   }
 
-  private[matcher] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings): Asset = orderFeeSettings match {
-    case _: FixedWavesSettings            => Waves
-    case FixedSettings(defaultAssetId, _) => defaultAssetId
-    case PercentSettings(assetType, _) =>
-      assetType match {
-        case AssetType.AMOUNT    => order.assetPair.amountAsset
-        case AssetType.PRICE     => order.assetPair.priceAsset
-        case AssetType.RECEIVING => order.getReceiveAssetId
-        case AssetType.SPENDING  => order.getSpendAssetId
-      }
-  }
+  private[matcher] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
+    orderFeeSettings match {
+      case _: DynamicSettings               => rateCache.getAllRates.keySet
+      case FixedSettings(defaultAssetId, _) => Set(defaultAssetId)
+      case PercentSettings(assetType, _) =>
+        Set(
+          assetType match {
+            case AssetType.AMOUNT    => order.assetPair.amountAsset
+            case AssetType.PRICE     => order.assetPair.priceAsset
+            case AssetType.RECEIVING => order.getReceiveAssetId
+            case AssetType.SPENDING  => order.getSpendAssetId
+          }
+        )
+    }
 
-  private[matcher] def getMinValidFeeForSettings(order: Order, orderFeeSettings: OrderFeeSettings, matchPrice: Long, multiplier: Double = 1): Long = {
-
-    def multiplyLongByDoubleRoundUp(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  /**
+    * Returns minimal valid fee that should be paid to the matcher when order is placed
+    *
+    * @param order            placed order
+    * @param orderFeeSettings matcher settings for the fee of orders
+    * @param matchPrice       price at which order is executed
+    * @param rateCache        assets rates (asset cost in Waves)
+    * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
+    */
+  private[matcher] def getMinValidFeeForSettings(order: Order,
+                                                 orderFeeSettings: OrderFeeSettings,
+                                                 matchPrice: Long,
+                                                 rateCache: RateCache,
+                                                 multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
-      case FixedWavesSettings(wavesMinFee) => wavesMinFee
+      case DynamicSettings(dynamicBaseFee) => multiplyFeeByDouble(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)
       case FixedSettings(_, fixedMinFee)   => fixedMinFee
       case PercentSettings(assetType, minFeeInPercent) =>
         lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
@@ -203,27 +237,28 @@ object OrderValidator {
           case AssetType.SPENDING  => spentAmount
         }
 
-        multiplyLongByDoubleRoundUp(amountFactor, multiplier * minFeeInPercent / 100)
+        multiplyAmountByDouble(amountFactor, multiplier * minFeeInPercent / 100)
     }
   }
 
-  private def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings): Result[Order] = {
+  private def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
     if (order.version < 3) lift(order)
     else {
 
-      lazy val requiredFeeAssetId = getValidFeeAssetForSettings(order, orderFeeSettings)
-      lazy val requiredFee        = getMinValidFeeForSettings(order, orderFeeSettings, order.price)
+      lazy val requiredFeeAssetIds = getValidFeeAssetForSettings(order, orderFeeSettings, rateCache)
+      lazy val requiredFee         = getMinValidFeeForSettings(order, orderFeeSettings, order.price, rateCache)
 
       lift(order)
-        .ensure(MatcherError.UnexpectedFeeAsset(requiredFeeAssetId, order.matcherFeeAssetId))(_.matcherFeeAssetId == requiredFeeAssetId)
-        .ensure(MatcherError.FeeNotEnough(requiredFee, order.matcherFee, requiredFeeAssetId))(_.matcherFee >= requiredFee)
+        .ensure(MatcherError.UnexpectedFeeAsset(requiredFeeAssetIds, order.matcherFeeAssetId))(o => requiredFeeAssetIds contains o.matcherFeeAssetId)
+        .ensure(MatcherError.FeeNotEnough(requiredFee, order.matcherFee, order.matcherFeeAssetId))(_.matcherFee >= requiredFee)
     }
   }
 
   def matcherSettingsAware(matcherPublicKey: PublicKey,
                            blacklistedAddresses: Set[Address],
                            blacklistedAssets: Set[IssuedAsset],
-                           matcherSettings: MatcherSettings)(order: Order): Result[Order] = {
+                           matcherSettings: MatcherSettings,
+                           rateCache: RateCache)(order: Order): Result[Order] = {
 
     def validateBlacklistedAsset(assetId: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       assetId.fold(success)(x => cond(!blacklistedAssets(x), (), e(x)))
@@ -239,21 +274,32 @@ object OrderValidator {
       _ <- validateBlacklistedAsset(order.assetPair.amountAsset, MatcherError.AmountAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.assetPair.priceAsset, MatcherError.PriceAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.matcherFeeAssetId, MatcherError.FeeAssetBlacklisted)
-      _ <- validateOrderFee(order, matcherSettings.orderFee)
+      _ <- validateOrderFee(order, matcherSettings.orderFee, rateCache)
     } yield order
   }
 
+  /**
+    * Checks if price is in deviation bounds
+    *
+    *   For BUY orders:  (1 - p) * best bid <= price <= (1 + l) * best ask
+    *   For SELL orders: (1 - l) * best bid <= price <= (1 + p) * best ask,
+    *
+    * where:
+    *
+    *   p = max price deviation profit,
+    *   l = max price deviation loss,
+    *   best bid = highest price of buy
+    *   best ask = lowest price of sell
+    */
   private def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): Result[Order] = {
-
-    def multiplyLongByDoubleRoundFloor(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.FLOOR).toLong
 
     def isPriceInDeviationBounds(subtractedPercent: Double, addedPercent: Double): Boolean = marketStatus forall { ms =>
       lazy val isPriceHigherThanMinDeviation = ms.bestBid forall { bestBid =>
-        order.price >= multiplyLongByDoubleRoundFloor(bestBid.price, 1 - (subtractedPercent / 100))
+        order.price >= multiplyPriceByDouble(bestBid.price, 1 - (subtractedPercent / 100))
       }
 
       lazy val isPriceLessThanMaxDeviation = ms.bestAsk forall { bestAsk =>
-        order.price <= multiplyLongByDoubleRoundFloor(bestAsk.price, 1 + (addedPercent / 100))
+        order.price <= multiplyPriceByDouble(bestAsk.price, 1 + (addedPercent / 100))
       }
 
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
@@ -265,21 +311,34 @@ object OrderValidator {
     }
   }
 
+  /**
+    * Checks if fee is in deviation bounds. Only applicable for the percent order fee settings
+    *
+    *   For BUY orders:  fee >= fee percent * (1 - f) * best ask * amount
+    *   For SELL orders: fee >= fee percent * (1 - f) * best bid * amount,
+    *
+    * where:
+    *
+    *   f = max fee deviation
+    *   best bid = highest price of buy
+    *   best ask = lowest price of sell
+    */
   private def validateFeeDeviation(order: Order,
                                    deviationSettings: DeviationsSettings,
                                    orderFeeSettings: OrderFeeSettings,
-                                   marketStatus: Option[MarketStatus]): Result[Order] = {
+                                   marketStatus: Option[MarketStatus],
+                                   rateCache: RateCache): Result[Order] = {
 
     def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Boolean = orderFeeSettings match {
       case percentSettings: PercentSettings =>
-        order.matcherFee >= getMinValidFeeForSettings(order, percentSettings, matchedPrice, 1 - (deviationSettings.maxPriceFee / 100))
+        order.matcherFee >= getMinValidFeeForSettings(order, percentSettings, matchedPrice, rateCache, 1 - (deviationSettings.maxFeeDeviation / 100))
       case _ => true
     }
 
     val isFeeInDeviationBounds = marketStatus forall { ms =>
       (order.orderType, ms.bestAsk.isDefined, ms.bestBid.isDefined) match {
-        case (OrderType.BUY, true, _)  => isFeeInDeviationBoundsForMatchedPrice(ms.bestAsk.get.price)
-        case (OrderType.SELL, _, true) => isFeeInDeviationBoundsForMatchedPrice(ms.bestBid.get.price)
+        case (OrderType.BUY, true, _)  => isFeeInDeviationBoundsForMatchedPrice(ms.bestAsk.get.price) // validate fee for the best (lowest) sell price
+        case (OrderType.SELL, _, true) => isFeeInDeviationBoundsForMatchedPrice(ms.bestBid.get.price) // validate fee for the best (highest) buy price
         case _                         => true
       }
     }
@@ -287,12 +346,14 @@ object OrderValidator {
     Either.cond(isFeeInDeviationBounds, order, MatcherError.DeviantOrderMatcherFee(order, deviationSettings))
   }
 
-  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
-      order: Order): Result[Order] = {
+  def marketAware(orderFeeSettings: OrderFeeSettings,
+                  deviationSettings: DeviationsSettings,
+                  marketStatus: Option[MarketStatus],
+                  rateCache: RateCache)(order: Order): Result[Order] = {
     if (deviationSettings.enabled) {
       for {
         _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
-        _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
+        _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus, rateCache)
       } yield order
     } else lift(order)
   }

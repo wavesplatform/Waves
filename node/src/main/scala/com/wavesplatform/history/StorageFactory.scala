@@ -12,21 +12,9 @@ import org.iq80.leveldb.DB
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 4
 
-  def apply(settings: WavesSettings,
-            db: DB,
-            time: Time,
-            spendableBalanceChanged: Observer[(Address, Asset)],
-            storeTransactionsByAddress: Boolean): BlockchainUpdater with NG = {
+  def apply(settings: WavesSettings, db: DB, time: Time, spendableBalanceChanged: Observer[(Address, Asset)]): BlockchainUpdater with NG = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(
-      db,
-      spendableBalanceChanged,
-      settings.blockchainSettings.functionalitySettings,
-      settings.dbSettings.maxCacheSize,
-      settings.dbSettings.maxRollbackDepth,
-      settings.dbSettings.rememberBlocks.toMillis,
-      storeTransactionsByAddress
-    )
+    val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings)
     new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time)
   }
 

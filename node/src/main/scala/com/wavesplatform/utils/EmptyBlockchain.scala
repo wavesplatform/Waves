@@ -1,19 +1,23 @@
 package com.wavesplatform.utils
 
 import cats.kernel.Monoid
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 
-object EmptyBlockchain extends Blockchain {
+case object EmptyBlockchain extends Blockchain {
+  override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
+
   override def height: Int = 0
 
   override def score: BigInt = 0
@@ -40,7 +44,7 @@ object EmptyBlockchain extends Blockchain {
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = None
 
-  override def parent(block: Block, back: Int): Option[Block] = None
+  override def parentHeader(block: BlockHeader, back: Int): Option[Block] = None
 
   override def totalFee(height: Int): Option[Long] = None
 
@@ -57,8 +61,9 @@ object EmptyBlockchain extends Blockchain {
 
   override def transactionHeight(id: ByteStr): Option[Int] = None
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    Right(Seq.empty)
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = CloseableIterator.empty
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
@@ -81,6 +86,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
+  override def accountDataKeys(acc: Address): Seq[String] = Seq.empty
+
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
@@ -93,7 +100,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
-  override def allActiveLeases: Set[LeaseTransaction] = Set.empty
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = CloseableIterator.empty
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,
                                          height: Int,
@@ -105,4 +112,6 @@ object EmptyBlockchain extends Blockchain {
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
+
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 }

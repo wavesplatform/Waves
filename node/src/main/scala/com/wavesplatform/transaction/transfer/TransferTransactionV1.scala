@@ -2,10 +2,11 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -95,7 +96,7 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       LongBytes(tailIndex(7), "Amount"),
       LongBytes(tailIndex(8), "Fee"),
       AddressOrAliasBytes(tailIndex(9), "Recipient"),
-      BytesArrayUndefinedLength(tailIndex(10), "Attachment")
+      BytesArrayUndefinedLength(tailIndex(10), "Attachment", TransferTransaction.MaxAttachmentSize)
     ) mapN {
       case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
         require(txId == typeId, s"Signed tx id is not match")

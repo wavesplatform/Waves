@@ -160,6 +160,21 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     parse("base64'mid-size'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "can't parse Base64 string"))
   }
 
+  property("valid empty base16 definition") {
+    parse("base16''") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr.empty))
+  }
+
+  property("valid non-empty base16 definition") {
+    parse("base16'0123456789abcdef123456789ABCDEF0ABCDEFfabcde'") shouldBe
+        CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Array[Short](
+          0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xAB, 0xCD, 0xEF, 0xfa, 0xbc, 0xde).map(_.toByte))))
+  }
+
+  property("invalid base16 definition") {
+    parse("base16'mid-size'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "m isn't base16/hex digit"))
+    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "Need internal bytes number"))
+  }
+
   property("literal too long") {
     import Global.MaxLiteralLength
     val longLiteral = "A" * (MaxLiteralLength + 1)
@@ -1267,11 +1282,15 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
                                       BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), DIV_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
                                       MUL_OP,
                                       REF(AnyPos, PART.VALID(AnyPos, "c")))
+
     parse("a<b==c>=d") shouldBe BINARY_OP(
       AnyPos,
-      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), LT_OP, REF(AnyPos, PART.VALID(AnyPos, "a"))),
-      EQ_OP,
-      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "c")), GE_OP, REF(AnyPos, PART.VALID(AnyPos, "d")))
+      BINARY_OP(AnyPos,
+                BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), EQ_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))),
+                LT_OP,
+                REF(AnyPos, PART.VALID(AnyPos, "a"))),
+      GE_OP,
+      REF(AnyPos, PART.VALID(AnyPos, "d"))
     )
   }
 

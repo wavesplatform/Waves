@@ -2,7 +2,16 @@ package com.wavesplatform.matcher.queue
 
 import com.google.common.primitives.Longs
 
-case class QueueEventWithMeta(offset: QueueEventWithMeta.Offset, timestamp: Long, event: QueueEvent)
+case class QueueEventWithMeta(offset: QueueEventWithMeta.Offset, timestamp: Long, event: QueueEvent) {
+  override def toString: String = {
+    val eventStr = event match {
+      case QueueEvent.Placed(o)           => s"Placed(${o.idStr()})"
+      case QueueEvent.Canceled(_, id)     => s"Canceled($id)"
+      case QueueEvent.OrderBookDeleted(p) => s"OrderBookDeleted(${p.key})"
+    }
+    s"QueueEventWithMeta(offset=$offset, ts=$timestamp, $eventStr)"
+  }
+}
 
 object QueueEventWithMeta {
   type Offset = Long

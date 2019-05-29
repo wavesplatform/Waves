@@ -1,14 +1,14 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import org.scalacheck.Gen
 import play.api.libs.json._
 
@@ -59,7 +59,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
         AddressScheme.current.chainId,
         accountA,
         IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
-        Some(ContractScript(V3, DApp(List.empty, List.empty, None)).explicitGet()),
+        Some(ContractScript(V3, DApp(List.empty, List.empty, None, None)).explicitGet()),
         1222,
         System.currentTimeMillis(),
         Proofs.empty

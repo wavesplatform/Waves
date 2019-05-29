@@ -3,17 +3,19 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorRef, Props}
+import akka.persistence.serialization.Snapshot
 import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.AlreadyProcessed
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.OrderAdded
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.matcher.queue.QueueEvent.Canceled
+import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -25,13 +27,25 @@ import scala.util.Random
 
 class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
-  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings.orderFee).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
-  private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
+  private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = obcTestWithPrepare(_ => ()) { (pair, actor, probe) =>
+    probe.expectMsg(OrderBookRecovered(pair, None))
+    f(pair, actor, probe)
+  }
+
+  private def obcTestWithTickSize(normalizedTickSize: Option[Long])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+    obcTestWithPrepare(_ => (), normalizedTickSize) { (pair, actor, probe) =>
+      probe.expectMsg(OrderBookRecovered(pair, None))
+      f(pair, actor, probe)
+    }
+
+  private def obcTestWithPrepare(prepare: AssetPair => Unit, normalizedTickSize: Option[Long] = None)(
+      f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
     val b = ByteStr(new Array[Byte](32))
@@ -39,6 +53,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
     val tp   = TestProbe()
     val pair = AssetPair(IssuedAsset(b), Waves)
+    prepare(pair)
     val actor = system.actorOf(
       Props(
         new OrderBookActor(
@@ -47,17 +62,27 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           pair,
           update(pair),
           p => Option(md.get(p)),
-          _ => {},
           txFactory,
-          ntpTime
+          ntpTime,
+          normalizedTickSize
         ) with RestartableActor))
-
-    tp.expectMsg(OrderBookSnapshotUpdated(pair, -1))
 
     f(pair, actor, tp)
   }
 
   "OrderBookActor" should {
+    "recover from snapshot - 1" in obcTestWithPrepare(_ => ()) { (pair, _, tp) =>
+      tp.expectMsg(OrderBookRecovered(pair, None))
+    }
+
+    "recover from snapshot - 2" in obcTestWithPrepare { p =>
+      SnapshotUtils.provideSnapshot(
+        OrderBookActor.name(p),
+        Snapshot(OrderBookActor.Snapshot(Some(50), OrderBook.empty.snapshot))
+      )
+    } { (pair, _, tp) =>
+      tp.expectMsg(OrderBookRecovered(pair, Some(50)))
+    }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, orderBook, tp) =>
       val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
@@ -71,7 +96,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       orderBook ! RestartActor
 
-      tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o)))
+      tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o), o.timestamp))
     }
 
     "execute partial market orders and preserve remaining after restart" in obcTest { (pair, actor, tp) =>
@@ -88,12 +113,13 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! RestartActor
 
       tp.expectMsg(
-        OrderAdded(
-          SellLimitOrder(
-            ord2.amount - ord1.amount,
-            ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
-            ord2
-          )))
+        OrderAdded(SellLimitOrder(
+                     ord2.amount - ord1.amount,
+                     ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
+                     ord2
+                   ),
+                   ord2.timestamp)
+      )
     }
 
     "execute one order fully and other partially and restore after restart" in obcTest { (pair, actor, tp) =>
@@ -112,12 +138,13 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(
-          BuyLimitOrder(
-            restAmount,
-            ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-            ord2
-          )))
+        OrderAdded(BuyLimitOrder(
+                     restAmount,
+                     ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+                     ord2
+                   ),
+                   ord2.timestamp)
+      )
     }
 
     "match multiple best orders at once and restore after restart" in obcTest { (pair, actor, tp) =>
@@ -143,7 +170,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
             restAmount,
             ord2.matcherFee - LimitOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2
-          )))
+          ),
+          ord2.timestamp
+        ))
     }
 
     "place orders and restart without waiting for response" in obcTest { (pair, actor, tp) =>
@@ -217,6 +246,16 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       actor ! SaveSnapshot(10)
       tp.expectMsgType[OrderBookSnapshotUpdated]
+    }
+
+    "cancel order in merge small prices mode" in obcTestWithTickSize(Some(100)) { (pair, orderBook, tp) =>
+      val buyOrder = buy(pair, 100000000, 0.0000041)
+
+      orderBook ! wrap(1, buyOrder)
+      tp.expectMsgType[OrderAdded]
+
+      orderBook ! wrap(2, Canceled(buyOrder.assetPair, buyOrder.id()))
+      tp.expectMsgType[OrderCanceled]
     }
   }
 }

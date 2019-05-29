@@ -8,7 +8,6 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
@@ -58,16 +57,8 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         """.stripMargin
 
     // set script
-    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(notMiner.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
-
-    val setScriptId = notMiner
-      .signedBroadcast(setScriptTransaction.json())
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
+    notMiner.setScript(notMiner.address, Some(script), setScriptFee, waitForTx = true).id
 
     notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false
 
@@ -88,9 +79,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val accountSig = ByteStr(crypto.sign(notMiner.privateKey, unsigned.bodyBytes()))
     val signed     = unsigned.copy(proofs = Proofs(Seq(accountSig)))
-    val toUsersID  = notMiner.signedBroadcast(signed.json()).id
-
-    nodes.waitForHeightAriseAndTxPresent(toUsersID)
+    val toUsersID  = notMiner.signedBroadcast(signed.json(), waitForTx = true).id
 
     //make transfer with incorrect time
     val heightBefore = notMiner.height
@@ -126,8 +115,6 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val accountSigToGov = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGovSecond.bodyBytes()))
     val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
-    val massTransferID  = notMiner.signedBroadcast(signedToGovGood.json()).id
-
-    nodes.waitForHeightAriseAndTxPresent(massTransferID)
+    notMiner.signedBroadcast(signedToGovGood.json(), waitForTx = true).id
   }
 }

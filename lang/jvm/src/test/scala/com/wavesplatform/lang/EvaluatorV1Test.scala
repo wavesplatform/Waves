@@ -7,9 +7,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -33,9 +33,11 @@ import scala.util.Try
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private val pureContext = PureContext.build(V1)
+  val version = V3
 
-  private val defaultCryptoContext = CryptoContext.build(Global)
+  private val pureContext = PureContext.build(Global, version)
+
+  private val defaultCryptoContext = CryptoContext.build(Global, version)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) (BLOCK.apply _) else (LET_BLOCK.apply _))
 
@@ -44,13 +46,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       defaultCryptoContext,
       pureContext,
       WavesContext.build(
-        DirectiveSet(V1, Account, Expression).explicitGet(),
+        DirectiveSet(version, Account, Expression).explicitGet(),
         environment
       )
     )
   )
 
-  private val pureEvalContext: EvaluationContext = PureContext.build(V1).evaluationContext
+  private val pureEvalContext: EvaluationContext = PureContext.build(Global, version).evaluationContext
 
   private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
@@ -65,7 +67,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = EvaluatorV1.applywithLogging[EVALUATED](
+      val (log, Left(err)) = EvaluatorV1.applyWithLogging[EVALUATED](
         pureEvalContext,
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -505,6 +507,19 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
+  property("from/to Base16(String)") {
+    val gen = for {
+      len <- Gen.choose(0, 512)
+      xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
+    } yield xs
+
+    forAll(gen) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE16), List(FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(xs)))))
+      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      actual shouldBe evaluated(ByteStr(xs))
+    }
+  }
+
   property("addressFromPublicKey works as the native one") {
     val environment = emptyBlockchainEnvironment()
     val ctx         = defaultFullContext(environment)
@@ -732,7 +747,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
    """.stripMargin
 
     val r = EvaluatorV1
-      .applywithLogging[EVALUATED](context.evaluationContext,
+      .applyWithLogging[EVALUATED](context.evaluationContext,
                                    ExpressionCompiler
                                      .compile(script, context.compilerContext)
                                      .explicitGet())

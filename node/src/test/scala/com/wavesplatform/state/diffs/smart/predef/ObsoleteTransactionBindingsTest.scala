@@ -4,14 +4,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
-import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

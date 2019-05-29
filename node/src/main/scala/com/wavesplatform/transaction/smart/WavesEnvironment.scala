@@ -1,14 +1,17 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
@@ -31,6 +34,13 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
       .transactionInfo(ByteStr(id))
       .map(_._2)
       .map(RealTransactionWrapper(_))
+
+  override def transferTransactionById(id: Array[Byte]): Option[Tx] =
+    blockchain
+      .transactionInfo(ByteStr(id))
+      .map(_._2)
+      .filter(_.isInstanceOf[TransferTransaction])
+      .map(t => RealTransactionWrapper.mapTransferTx(t.asInstanceOf[TransferTransaction]))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {
@@ -82,4 +92,35 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
 
   override def tthis: Address = Recipient.Address(address())
+
+  override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
+    blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
+      ScriptAssetInfo(
+        totalAmount = assetDesc.totalVolume.toLong,
+        decimals    = assetDesc.decimals,
+        issuer      = Address(assetDesc.issuer.toAddress.bytes),
+        issuerPk    = assetDesc.issuer,
+        reissuable  = assetDesc.reissuable,
+        scripted    = assetDesc.script.nonEmpty,
+        sponsored   = assetDesc.sponsorship != 0
+      )
+    }
+  }
+
+  override def lastBlockOpt(): Option[BlockInfo] =
+    blockchain.lastBlock.map(block => toBlockInfo(block.getHeader(), height.toInt))
+
+  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
+    blockchain.blockHeaderAndSize(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize._1, blockHeight))
+
+  private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
+    BlockInfo(
+      timestamp = blockH.timestamp,
+      height = bHeight,
+      baseTarget = blockH.consensusData.baseTarget,
+      generationSignature = blockH.consensusData.generationSignature,
+      generator = blockH.signerData.generator.toAddress.bytes,
+      generatorPublicKey = ByteStr(blockH.signerData.generator)
+    )
+  }
 }

@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.AccountBalanceError
+import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.{Left, Right}

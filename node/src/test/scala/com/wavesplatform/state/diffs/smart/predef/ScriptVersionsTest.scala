@@ -1,8 +1,10 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.parser.Parser
@@ -10,8 +12,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
+import com.wavesplatform.utils.EmptyBlockchain
 import fastparse.core.Parsed.Success
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -43,6 +44,20 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
 
   val orderTypeBindings = "let t = Buy; t == Buy"
 
+  private val txById =
+    """
+      | let t = transactionById(base64'')
+      | !isDefined(t)
+      |
+    """.stripMargin
+
+  private val transferTxById =
+    """
+      | let t = transferTransactionById(base64'')
+      | !isDefined(t)
+      |
+    """.stripMargin
+
   "ScriptV1 allows duplicate names" in {
     forAll(transferV2Gen.flatMap(tx => Gen.oneOf(V1, V2).map(v => (tx, v)))) {
       case (tx, v) =>
@@ -50,8 +65,14 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
     }
   }
 
-  "ScriptV1 - does not have bindings defined in V2" in {
-    eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+  "ScriptV1" - {
+    "does not have bindings defined in V2" in {
+      eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+    }
+
+    "allow transactionById" in {
+      eval[EVALUATED](txById, V2) shouldBe Testing.evaluated(true)
+    }
   }
 
   "ScriptV2" - {
@@ -65,5 +86,18 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       eval[EVALUATED](orderTypeBindings, V2) shouldBe Testing.evaluated(true)
     }
 
+    "allow transactionById" in {
+      eval[EVALUATED](txById, V2) shouldBe Testing.evaluated(true)
+    }
+  }
+
+  "ScriptV3" - {
+    "disallow transactionById" in {
+        eval[EVALUATED](txById, V3) should produce("Can't find a function 'transactionById'")
+    }
+
+    "add transferTransactionById" in {
+      eval[EVALUATED](transferTxById, V3) shouldBe Testing.evaluated(true)
+    }
   }
 }

@@ -13,9 +13,9 @@ object JavaAdapter {
   lazy val ctx =
     Monoid.combineAll(
       Seq(
-        CryptoContext.compilerContext(com.wavesplatform.lang.Global),
+        CryptoContext.compilerContext(Global, version),
         WavesContext.build(???, null).compilerContext,
-        PureContext.build(version).compilerContext
+        PureContext.build(Global, version).compilerContext
       ))
 
   def compile(input: String): EXPR = {

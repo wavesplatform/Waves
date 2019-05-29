@@ -1,22 +1,19 @@
 package com.wavesplatform.features.api
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.{FeaturesSettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
-import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
-import com.wavesplatform.utils.ScorexLogging
 
 @Path("/activation")
 @Api(value = "activation")
-case class ActivationApiRoute(settings: RestAPISettings,
-                              functionalitySettings: FunctionalitySettings,
-                              featuresSettings: FeaturesSettings,
-                              blockchain: Blockchain)
+case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: FeaturesSettings, blockchain: Blockchain)
     extends ApiRoute
     with CommonApiFunctions
     with WithSettings
@@ -33,15 +30,14 @@ case class ActivationApiRoute(settings: RestAPISettings,
       new ApiResponse(code = 200, message = "Json activation status")
     ))
   def status: Route = (get & path("status")) {
-
     val height = blockchain.height
 
     complete(
       Json.toJson(ActivationStatus(
         height,
-        functionalitySettings.activationWindowSize(height),
-        functionalitySettings.blocksForFeatureActivation(height),
-        functionalitySettings.activationWindow(height).last,
+        blockchain.settings.functionalitySettings.activationWindowSize(height),
+        blockchain.settings.functionalitySettings.blocksForFeatureActivation(height),
+        blockchain.settings.functionalitySettings.activationWindow(height).last,
         (blockchain.featureVotes(height).keySet ++
           blockchain.approvedFeatures.keySet ++
           BlockchainFeatures.implemented).toSeq.sorted.map(id => {

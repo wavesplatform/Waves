@@ -1,8 +1,9 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
@@ -40,9 +41,9 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     ))
-  override def checkedAssets(): Seq[Asset] = {
+  override def checkedAssets(): Seq[IssuedAsset] = {
     val pair = buyOrder.assetPair
-    Seq(pair.priceAsset, pair.amountAsset)
+    Seq(pair.priceAsset, pair.amountAsset) collect { case a:IssuedAsset => a }
   }
 }
 
@@ -72,9 +73,9 @@ object ExchangeTransaction {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
+      Left(InsufficientFee())
     } else if (amount <= 0) {
-      Left(ValidationError.NonPositiveAmount(amount, "assets"))
+      Left(NonPositiveAmount(amount, "assets"))
     } else if (amount > Order.MaxAmount) {
       Left(GenericError("amount too large"))
     } else if (price <= 0) {

@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
@@ -72,34 +73,47 @@ object Bindings {
 
   }
 
-  def orderObject(ord: Ord, proofsEnabled: Boolean): CaseObj =
+  def orderObject(ord: Ord, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     CaseObj(
       buildOrderType(proofsEnabled),
-      Map(
-        "id"                -> ord.id,
-        "sender"            -> senderObject(ord.sender),
-        "senderPublicKey"   -> ord.senderPublicKey,
-        "matcherPublicKey"  -> ord.matcherPublicKey,
-        "assetPair"         -> assetPair(ord.assetPair),
-        "orderType"         -> ordType(ord.orderType),
-        "amount"            -> ord.amount,
-        "price"             -> ord.price,
-        "timestamp"         -> ord.timestamp,
-        "expiration"        -> ord.expiration,
-        "matcherFee"        -> ord.matcherFee,
-        "bodyBytes"         -> ord.bodyBytes,
-        "matcherFeeAssetId" -> ord.matcherFeeAssetId,
-        proofsPart(ord.proofs)
+      combine(
+        Map(
+          "id"                -> ord.id,
+          "sender"            -> senderObject(ord.sender),
+          "senderPublicKey"   -> ord.senderPublicKey,
+          "matcherPublicKey"  -> ord.matcherPublicKey,
+          "assetPair"         -> assetPair(ord.assetPair),
+          "orderType"         -> ordType(ord.orderType),
+          "amount"            -> ord.amount,
+          "price"             -> ord.price,
+          "timestamp"         -> ord.timestamp,
+          "expiration"        -> ord.expiration,
+          "matcherFee"        -> ord.matcherFee,
+          "bodyBytes"         -> ord.bodyBytes,
+          "matcherFeeAssetId" -> ord.matcherFeeAssetId
+        ),
+        if (proofsEnabled || version != V3) Map(proofsPart(ord.proofs)) else Map.empty
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, callerPk: ByteStr, payment: Option[Pmt], dappAddress: Recipient.Address) =
+  def buildInvocation(
+      caller: Recipient.Address,
+      callerPk: ByteStr,
+      payment: Option[Pmt],
+      dappAddress: Recipient.Address,
+      transactionId: ByteStr,
+      fee: Long,
+      feeAssetId: Option[ByteStr]
+  ) =
     CaseObj(
       invocationType,
       Map(
         "caller"          -> mapRecipient(caller)._2,
         "callerPublicKey" -> callerPk,
-        "payment"         -> buildPayment(payment)
+        "payment"         -> buildPayment(payment),
+        "transactionId"   -> transactionId,
+        "fee"             -> fee,
+        "feeAssetId"      -> feeAssetId
       )
     )
 
@@ -122,7 +136,7 @@ object Bindings {
       false
     )
 
-  def transactionObject(tx: Tx, proofsEnabled: Boolean): CaseObj =
+  def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
         CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
@@ -176,17 +190,19 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment, feeAssetId, funcName, funcArgs) =>
+      case CI(p, addressOrAlias, maybePayment, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled),
-          combine(Map(
-                    "dappAddress" -> mapRecipient(address)._2,
-                    "payment"     -> buildPayment(maybePayment),
-                    "feeAssetId"  -> feeAssetId,
-                    "function"    -> funcName,
-                    "args"        -> funcArgs
-                  ),
-                  provenTxPart(p, proofsEnabled))
+          combine(
+            Map(
+              "dApp"       -> mapRecipient(addressOrAlias)._2,
+              "payment"    -> buildPayment(maybePayment),
+              "feeAssetId" -> feeAssetId,
+              "function"   -> funcName,
+              "args"       -> funcArgs
+            ),
+            provenTxPart(p, proofsEnabled)
+          )
         )
 
       case Lease(p, amount, recipient) =>
@@ -254,8 +270,8 @@ object Bindings {
           buildExchangeTransactionType(proofsEnabled),
           combine(
             Map(
-              "buyOrder"       -> orderObject(buyOrder, proofsEnabled),
-              "sellOrder"      -> orderObject(sellOrder, proofsEnabled),
+              "buyOrder"       -> orderObject(buyOrder, proofsEnabled, version),
+              "sellOrder"      -> orderObject(sellOrder, proofsEnabled, version),
               "amount"         -> amount,
               "price"          -> price,
               "buyMatcherFee"  -> buyMatcherFee,
@@ -266,4 +282,30 @@ object Bindings {
         )
     }
 
+  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
+    CaseObj(
+      assetType,
+      Map(
+        "totalAmount"     -> sAInfo.totalAmount,
+        "decimals"        -> sAInfo.decimals.toLong,
+        "issuer"          -> mapRecipient(sAInfo.issuer)._2,
+        "issuerPublicKey" -> sAInfo.issuerPk,
+        "reissuable"      -> sAInfo.reissuable,
+        "scripted"        -> sAInfo.scripted,
+        "sponsored"       -> sAInfo.sponsored
+      )
+    )
+
+  def buildLastBlockInfo(blockInf: BlockInfo) =
+    CaseObj(
+      blockInfo,
+      Map(
+        "timestamp"           -> blockInf.timestamp,
+        "height"              -> blockInf.height.toLong,
+        "baseTarget"          -> blockInf.baseTarget,
+        "generationSignature" -> blockInf.generationSignature,
+        "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
+        "generatorPublicKey"  -> blockInf.generatorPublicKey
+      )
+    )
 }

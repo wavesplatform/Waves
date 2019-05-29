@@ -1,26 +1,17 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.DataRequest._
-import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
-import com.wavesplatform.api.http.assets.SponsorFeeRequest._
-import com.wavesplatform.api.http.assets._
-import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -35,20 +26,15 @@ import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(settings: RestAPISettings,
-                                functionalitySettings: FunctionalitySettings,
-                                wallet: Wallet,
-                                blockchain: Blockchain,
-                                utx: UtxPool,
-                                allChannels: ChannelGroup,
-                                time: Time)(implicit sc: Scheduler)
+case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(implicit sc: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions
     with WithSettings {
 
   import com.wavesplatform.network._
-  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels.broadcastTx(_, None))
+
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, isNew) => if (isNew || settings.allowTxRebroadcasting) allChannels.broadcastTx(tx, None))
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -178,7 +164,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     pathEndOrSingleSlash {
       handleExceptions(jsonExceptionHandler) {
         json[JsObject] { jsv =>
-          signTransaction((jsv \ "sender").as[String], jsv)
+          TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
         }
       }
     } ~ signWithSigner
@@ -199,52 +185,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                            paramType = "body",
                            value = "Transaction data including <a href='transaction-types.html'>type</a>")
     ))
-  def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
-    handleExceptions(jsonExceptionHandler) {
-      json[JsObject] { jsv =>
-        signTransaction(signerAddress, jsv)
-      }
-    }
-  }
-
-  private def signTransaction(signerAddress: String, jsv: JsObject): ToResponseMarshallable = {
-    val typeId = (jsv \ "type").as[Byte]
-
-    (jsv \ "version").validateOpt[Byte](versionReads) match {
-      case JsError(errors) => WrongJson(None, errors)
-      case JsSuccess(value, _) =>
-        val version = value getOrElse (1: Byte)
-        val txJson  = jsv ++ Json.obj("version" -> version)
-
-        (TransactionParsers.by(typeId, version) match {
-          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
-          case Some(x) =>
-            x match {
-              case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
-              case IssueTransactionV2       => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
-              case TransferTransactionV1    => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], wallet, signerAddress, time)
-              case TransferTransactionV2    => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], wallet, signerAddress, time)
-              case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
-              case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
-              case BurnTransactionV1        => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
-              case BurnTransactionV2        => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
-              case MassTransferTransaction  => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
-              case LeaseTransactionV1       => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
-              case LeaseTransactionV2       => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
-              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
-              case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
-              case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
-              case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
-              case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
-              case InvokeScriptTransaction =>
-                TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
-              case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
-              case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
-              case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
-              case _                         => Left(ValidationError.UnsupportedTransactionType)
-            }
-        }).fold(ApiError.fromValidationError, _.json())
-    }
+  def signWithSigner: Route = (pathPrefix(Segment) & handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { (signerAddress, jsv) =>
+    val result = TransactionFactory.parseRequestAndSign(wallet, signerAddress, time, jsv)
+    complete(result)
   }
 
   @Path("/broadcast")
@@ -262,11 +205,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route =
     (pathPrefix("broadcast") & post) {
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
-        val result: Either[ApiError, VanillaTransaction] = TransactionFactory
-          .fromSignedRequest(transactionJson)
-          .flatMap(commonApi.broadcastTransaction)
-          .left
-          .map(ApiError.fromValidationError)
+        val result: TracedResult[ApiError, VanillaTransaction] =
+          TracedResult(TransactionFactory.fromSignedRequest(transactionJson))
+            .flatMap(commonApi.broadcastTransaction)
+            .leftMap(ApiError.fromValidationError)
 
         complete(result)
       }
@@ -278,15 +220,17 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case lease: LeaseTransaction =>
         import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
       case t => t.json()
     }
   }
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = (concurrent.blocking(blockchain.aliasesOfAddress(address) :+ address)).toSet
+      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 
       /**
         * Produces compact representation for large transactions by stripping unnecessary data.

@@ -7,10 +7,11 @@ import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
+import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
@@ -22,7 +23,7 @@ import scala.reflect.ClassTag
 abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with ScorexLogging {
   import Caches._
 
-  protected def maxCacheSize: Int
+  val dbSettings: DBSettings
 
   @volatile
   private var current = (loadHeight(), loadScore(), loadLastBlock())
@@ -98,8 +99,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
   }
 
-  protected def rememberBlocksInterval: Long
-
   private val blocksTs                               = new util.TreeMap[Int, Long] // Height -> block timestamp, assume sorted by key.
   private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
@@ -121,39 +120,40 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       0 -> Long.MaxValue
     }
     oldestStoredBlockTimestamp = oldestTs
-    val bts = lastBlock.fold(0L)(_.timestamp) - rememberBlocksInterval
+    val bts = lastBlock.fold(0L)(_.timestamp) - dbSettings.rememberBlocks.toMillis
     blocksTs.entrySet().removeIf(_.getValue < bts)
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
-  private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(maxCacheSize, loadLeaseBalance)
+  private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(dbSettings.maxCacheSize, loadLeaseBalance)
   protected def loadLeaseBalance(address: Address): LeaseBalance
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
-  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize / 4, loadPortfolio)
+  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
   protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
   override def portfolio(a: Address): Portfolio = {
     portfolioCache.get(a)
   }
 
-  private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] = observedCache(maxCacheSize * 16, spendableBalanceChanged, loadBalance)
-  protected def discardBalance(key: (Address, Asset)): Unit                 = balancesCache.invalidate(key)
-  override def balance(address: Address, mayBeAssetId: Asset): Long         = balancesCache.get(address -> mayBeAssetId)
+  private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
+    observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
+  protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
+  override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long
 
-  private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
+  private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
   protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription]
   protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset)
 
-  private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(maxCacheSize, loadVolumeAndFee)
+  private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
   protected def discardVolumeAndFee(orderId: ByteStr): Unit       = volumeAndFeeCache.invalidate(orderId)
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
 
-  private val scriptCache: LoadingCache[Address, Option[Script]] = cache(maxCacheSize, loadScript)
+  private val scriptCache: LoadingCache[Address, Option[Script]] = cache(dbSettings.maxCacheSize, loadScript)
   protected def loadScript(address: Address): Option[Script]
   protected def hasScriptBytes(address: Address): Boolean
   protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
@@ -162,7 +162,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[Script]] = cache(maxCacheSize, loadAssetScript)
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[Script]] = cache(dbSettings.maxCacheSize, loadAssetScript)
   protected def loadAssetScript(asset: IssuedAsset): Option[Script]
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
@@ -177,7 +177,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
 
-  private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(maxCacheSize, loadAddressId)
+  private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
   protected def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
@@ -191,6 +191,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
+  //noinspection ScalaStyle
   protected def doAppend(block: Block,
                          carry: Long,
                          newAddresses: Map[Address, BigInt],
@@ -206,7 +207,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[IssuedAsset, Sponsorship],
-                         totalFee: Long): Unit
+                         totalFee: Long,
+                         scriptResults: Map[ByteStr, InvokeScriptResult]): Unit
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
@@ -308,7 +310,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.accountData.map { case (address, data) => addressId(address) -> data },
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship,
-      totalFee
+      totalFee,
+      diff.scriptResults
     )
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))

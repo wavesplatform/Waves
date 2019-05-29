@@ -3,9 +3,11 @@ package com.wavesplatform.network
 import java.util
 
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.Message._
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled._
@@ -15,7 +17,7 @@ import io.netty.handler.codec.{ByteToMessageCodec, DecoderException}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration) extends ByteToMessageCodec[RawBytes] with ScorexLogging {
+class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration) extends ByteToMessageCodec[Any] with ScorexLogging {
 
   import BasicMessagesRepo.specsByCodes
   import LegacyFrameCodec._
@@ -68,7 +70,13 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
         in.resetReaderIndex() // Cancels subsequent read tries, see Netty decode() documentation
     }
 
-  override def encode(ctx: ChannelHandlerContext, msg: RawBytes, out: ByteBuf): Unit = {
+  override def encode(ctx: ChannelHandlerContext, msg1: Any, out: ByteBuf): Unit = {
+    val msg = msg1 match {
+      case rb: RawBytes => rb
+      case tx: Transaction => RawBytes.from(tx)
+      case block: Block => RawBytes.from(block)
+    }
+
     out.writeInt(Magic)
     out.writeByte(msg.code)
     if (msg.data.length > 0) {

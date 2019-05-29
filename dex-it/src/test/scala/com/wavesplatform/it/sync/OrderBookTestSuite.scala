@@ -14,6 +14,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   {
     val xs = Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_))
     xs.foreach(x => node.waitForTransaction(x.id))
+    node.waitForHeight(node.height + 1)
   }
 
   case class ReservedBalances(wct: Long, usd: Long, waves: Long)

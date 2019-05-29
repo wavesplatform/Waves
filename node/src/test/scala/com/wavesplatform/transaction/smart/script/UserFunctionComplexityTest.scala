@@ -3,17 +3,16 @@ package com.wavesplatform.transaction.smart.script
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.utils
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
@@ -30,8 +29,8 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1),
-          CryptoContext.build(Global),
+          PureContext.build(Global, V1),
+          CryptoContext.build(Global, V1),
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
@@ -95,8 +94,8 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V2),
-          CryptoContext.build(Global),
+          PureContext.build(Global, V2),
+          CryptoContext.build(Global, V2),
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -160,8 +159,8 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3),
-          CryptoContext.build(Global),
+          PureContext.build(Global, V3),
+          CryptoContext.build(Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
@@ -209,9 +208,6 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
 
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 2
-
-    val exprEnsure = FUNCTION_CALL(PureContext.ensure, List(TRUE))
-    est(exprEnsure).explicitGet() shouldBe 17
 
     val exprDataByIndex = LET_BLOCK(
       LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1"), REF("nil")))),

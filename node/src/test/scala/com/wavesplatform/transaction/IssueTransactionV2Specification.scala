@@ -1,21 +1,22 @@
 package com.wavesplatform.transaction
 
+import cats.kernel.Monoid
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.lang.v1.compiler
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.transaction.smart.script.ContractScript
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import cats.kernel.Monoid
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.{TransactionGen, WithDB, utils}
+import com.wavesplatform.utils.EmptyBlockchain
+import com.wavesplatform.{TransactionGen, WithDB}
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -104,11 +105,11 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(V3),
-            CryptoContext.build(Global),
+            PureContext.build(Global, V3),
+            CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), utils.EmptyBlockchain, Coeval(???))
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
             )
           ))
     }

@@ -6,16 +6,20 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.utils.CloseableIterator
 
-class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
+final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff], newBlock: Option[Block] = None, carry: Long = 0) extends Blockchain {
+  override val settings: BlockchainSettings = inner.settings
 
   private def diff = maybeDiff.getOrElse(Diff.empty)
 
@@ -90,10 +94,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       .map(_._1)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
+  override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    addressTransactionsFromDiff(inner, maybeDiff)(address, types, count, fromId)
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
+    addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -101,16 +107,14 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = {
+  override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keys
-      .map { id =>
-        diff.transactions(id)._2
-      }
+    val fromDiff = active.keysIterator
+      .map(id => diff.transactions(id)._2)
       .collect { case lt: LeaseTransaction => lt }
-      .toSet
+
     val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
-    fromDiff ++ fromInner
+    CloseableIterator.seq(fromDiff, fromInner)
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
@@ -122,6 +126,21 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
+  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = {
+    diff.scriptResults
+      .get(txId)
+      .toRight(GenericError("InvokeScript result not found"))
+      .orElse(inner.invokeScriptResult(txId))
+  }
+
+  /* override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
+    val typeSet = ofTypes.toSet
+    val diffTransactions = diff.transactions.valuesIterator
+      .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
+
+    CloseableIterator.seq(diffTransactions, inner.transactionsIterator(ofTypes, reverse))
+  } */
+
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
@@ -131,7 +150,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
-      val bs = BalanceSnapshot(height, portfolio(address))
+      val balance = this.balance(address)
+      val lease   = this.leaseBalance(address)
+      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
       if (inner.height > 0 && from < this.height) bs +: inner.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
@@ -150,6 +171,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       case Some(None)    => false
       case Some(Some(_)) => true
     }
+  }
+
+  override def accountDataKeys(acc: Address): Seq[String] = {
+    val fromInner = inner.accountDataKeys(acc)
+    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    (fromInner ++ fromDiff).distinct
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
@@ -199,7 +226,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 
-  override def lastBlock: Option[Block] = inner.lastBlock
+  override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)
 
   override def carryFee: Long = carry
 
@@ -210,12 +237,17 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def heightOf(blockId: ByteStr): Option[Int] = inner.heightOf(blockId)
 
   /** Returns the most recent block IDs, starting from the most recent  one */
-  override def lastBlockIds(howMany: Int): Seq[ByteStr] = inner.lastBlockIds(howMany)
+  override def lastBlockIds(howMany: Int): Seq[ByteStr] =
+    newBlock.map(_.uniqueId).toSeq ++ inner.lastBlockIds(howMany)
 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = inner.blockIdsAfter(parentSignature, howMany)
+  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] =
+    for {
+      ids <- inner.blockIdsAfter(parentSignature, howMany)
+      newId = newBlock.filter(_.reference == parentSignature).map(_.uniqueId).fold(Seq.empty[ByteStr])(Seq(_))
+    } yield newId ++ ids
 
-  override def parent(block: Block, back: Int): Option[Block] = inner.parent(block, back)
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
 
   override def totalFee(height: Int): Option[Long] = inner.totalFee(height)
 
@@ -228,6 +260,16 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 }
 
 object CompositeBlockchain {
-  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain          = new CompositeBlockchain(inner, diff)
-  def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): Blockchain = new CompositeBlockchain(inner, Some(diff), carryFee)
+  def composite(inner: Blockchain, diff: Option[Diff]): CompositeBlockchain             = wrap(inner, diff, None)
+  def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): CompositeBlockchain = wrap(inner, Some(diff), None).copy(carry = carryFee)
+
+  def withLastBlock(inner: Blockchain, block: Block): CompositeBlockchain = wrap(inner, None, Some(block))
+
+  def wrap(inner: Blockchain, diff: Option[Diff], block: Option[Block]): CompositeBlockchain = inner match {
+    case CompositeBlockchain(inner, leftDiff, leftBlock, leftCarry) =>
+      CompositeBlockchain(inner, Monoid.combine(leftDiff, diff), block.orElse(leftBlock), leftCarry)
+
+    case _ =>
+      CompositeBlockchain(inner, diff, block)
+  }
 }

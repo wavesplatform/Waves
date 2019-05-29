@@ -1,36 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration>
+<configuration scan="true" scanPeriod="30 seconds">
     <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n"/>
     <property name="logback.file.final-directory" value="${logback.file.directory:-${waves.directory}/log}"/>
-
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <target>System.out</target>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${logback.stdout.level:-INFO}</level>
-        </filter>
-        <encoder>
-            <pattern>${logback.pattern:-${default.pattern}}</pattern>
-        </encoder>
-    </appender>
-
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${logback.file.level:-DEBUG}</level>
-        </filter>
-        <file>${logback.file.final-directory}/waves.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <!-- daily rollover -->
-            <fileNamePattern>${logback.file.final-directory}/waves.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
-
-            <!-- keep 30 days' worth of history capped at 1GB total size -->
-            <maxHistory>30</maxHistory>
-            <totalSizeCap>1GB</totalSizeCap>
-        </rollingPolicy>
-
-        <encoder>
-            <pattern>${default.pattern}</pattern>
-        </encoder>
-    </appender>
 
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="INFO"/>
@@ -51,8 +22,54 @@
 
     <logger name="io.grpc.netty" level="ERROR"/>
 
-    <root level="TRACE">
-        <appender-ref ref="STDOUT"/>
-        <appender-ref ref="FILE"/>
-    </root>
+    <root level="TRACE"/>
+
+    <property name="logback.file.enabled" value="true"/>
+    <property name="logback.stdout.enabled" value="true"/>
+
+    <include optional="true" file="${waves.config.directory:-.}/logback.xml"/>
+
+    <if condition='property("logback.stdout.enabled").contains("true")'>
+        <then>
+            <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+                <target>System.out</target>
+                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                    <level>${logback.stdout.level:-INFO}</level>
+                </filter>
+                <encoder>
+                    <pattern>${logback.pattern:-${default.pattern}}</pattern>
+                </encoder>
+            </appender>
+            <root>
+                <appender-ref ref="STDOUT"/>
+            </root>
+        </then>
+    </if>
+
+    <if condition='property("logback.file.enabled").contains("true")'>
+        <then>
+            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                    <level>${logback.file.level:-DEBUG}</level>
+                </filter>
+                <file>${logback.file.final-directory}/waves.log</file>
+                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                    <!-- daily rollover -->
+                    <fileNamePattern>${logback.file.final-directory}/waves.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+
+                    <!-- keep 30 days' worth of history capped at 1GB total size -->
+                    <maxHistory>30</maxHistory>
+                    <totalSizeCap>1GB</totalSizeCap>
+                </rollingPolicy>
+
+                <encoder>
+                    <pattern>${default.pattern}</pattern>
+                </encoder>
+            </appender>
+
+            <root>
+                <appender-ref ref="FILE"/>
+            </root>
+        </then>
+    </if>
 </configuration>

@@ -9,11 +9,11 @@ trait Tx
 
 object Tx {
   case class ScriptTransfer(assetId: Option[ByteStr],
-                              sender: Recipient.Address,
-                              recipient: Recipient.Address,
-                              amount: Long,
-                              timestamp: Long,
-                              id: ByteStr)
+                            sender: Recipient.Address,
+                            recipient: Recipient.Address,
+                            amount: Long,
+                            timestamp: Long,
+                            id: ByteStr)
 
   case class Header(id: ByteStr, fee: Long, timestamp: Long, version: Long)
   case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteStr, senderPk: ByteStr, proofs: IndexedSeq[ByteStr])
@@ -30,12 +30,12 @@ object Tx {
   case class Burn(p: Proven, quantity: Long, assetId: ByteStr)                         extends Tx
 
   case class CI(
-      p:            Proven,
-      dappAddress:  Recipient,
+      p: Proven,
+      dAppAddressOrAlias: Recipient,
       maybePayment: Option[Pmt],
-      feeAssetId:   Option[ByteStr],
-      funcName:     String,
-      funcArgs:     List[EVALUATED]
+      feeAssetId: Option[ByteStr],
+      funcName: Option[String],
+      funcArgs: List[EVALUATED]
   ) extends Tx
 
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                 extends Tx

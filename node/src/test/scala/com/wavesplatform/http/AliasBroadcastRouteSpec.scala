@@ -5,7 +5,8 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
@@ -22,7 +23,11 @@ class AliasBroadcastRouteSpec
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
+  (utx.putIfNew _)
+    .when(*, *)
+    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
+    .anyNumberOfTimes()
+
 
   "returns StateCheckFiled" - {
     val route = AliasBroadcastApiRoute(restAPISettings, utx, allChannels).route

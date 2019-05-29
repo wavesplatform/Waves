@@ -124,7 +124,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combineAll(Seq(PureContext.build(V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
@@ -324,7 +324,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext,
+      PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x"                -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -338,7 +338,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext,
+      PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -411,31 +411,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
   }
 
-  property("ensure user function: success") {
-    val src =
-      """
-        |let x = true
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
-  }
-
-  property("ensure user function: fail") {
-    val src =
-      """
-        |let x = false
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Left("test fail")
-  }
-
   property("postfix syntax (one argument)") {
     val src =
       """
-        |let x = true
-        |x.ensure("test fail")
+        | let list = [1, 2, 3]
+        | list.getElement(1)
       """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
+
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(2))
   }
 
   property("postfix syntax (no arguments)") {
@@ -495,6 +478,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
+  property("extract Long from < 8 bytes (Buffer underflow)") {
+    val src =
+      """ "AAAAAAA".toBytes().toInt() """
+    eval[EVALUATED](src)  should produce("Buffer underflow")
+  }
+
   property("indexOf") {
     val src =
       """ "qweqwe".indexOf("we") """
@@ -525,10 +514,38 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
   }
 
+  property("parseInt Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseInt Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
   property("parseIntValue") {
     val src =
-      """ "42".parseInt() """
+      """ "42".parseIntValue() """
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseIntValue Long.MaxValue") {
+    val num = Long.MaxValue - 1
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
+  }
+
+  property("parseIntValue Long.MinValue") {
+    val num = Long.MinValue
+    val src =
+      s""" "${num.toString}".parseIntValue() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(num))
   }
 
   property("parseInt fail") {
@@ -554,5 +571,84 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
       """.stripMargin
     eval[EVALUATED](sampleScript, None) should produce("all possible types are List(Int, String)")
+  }
+
+  property("big let assignment chain") {
+    val count = 5000
+    val script =
+      s"""
+         | let a0 = 1
+         | ${1 to count map (i => s"let a$i = a${i - 1}") mkString "\n"}
+         | a$count == a$count
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("big function assignment chain") {
+    val count = 2000
+    val script =
+      s"""
+         | func a0() = {
+         |   1 + 1
+         | }
+         | ${1 to count map (i => s"func a$i() = a${i - 1}()") mkString "\n"}
+         | a$count() == a$count()
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("big let assignment chain with function") {
+    val count = 5000
+    val script =
+      s"""
+         | let a0 = 1
+         | ${1 to count map (i => s"let a$i = a${i - 1} + 1") mkString "\n"}
+         | a$count == a$count
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("math functions") {
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
+    eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
+    eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
+    eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
+    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe 'left
+    eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
+    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
+    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
+  }
+
+  property("concat empty list") {
+    val script =
+      s"""
+         | let l = if (true) then cons(1, nil) else nil
+         | let concat = 0 :: l
+         | concat == [0, 1]
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("matching parameterized types") {
+    val script =
+      s"""
+         | func dosSigVerify() = {
+         |    let result = if true then [DataEntry("a", "a")] else ""
+         |    let entry = match result[0] {
+         |        case r:DataEntry => r
+         |        case _ => throw("err")
+         |    }
+         |    WriteSet(result)
+         | }
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) should produce("expected: List[T], actual: List[DataEntry]|String")
   }
 }

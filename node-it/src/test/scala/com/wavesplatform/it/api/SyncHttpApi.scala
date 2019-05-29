@@ -13,13 +13,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.asynchttpclient.Response
@@ -198,6 +198,10 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
 
+    def debugStateChange(transactionId:String): DebugStateChanges ={
+      sync(async(n).debugStateChange(transactionId))
+    }
+
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       sync(async(n).payment(sourceAddress, recipient, amount, fee))
 
@@ -212,6 +216,9 @@ object SyncHttpApi extends Assertions {
 
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
+
+    def scriptDecompile(code: String): DecompiledScript =
+      sync(async(n).scriptDecompile(code))
 
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
@@ -263,7 +270,7 @@ object SyncHttpApi extends Assertions {
                  fee: Long,
                  assetId: Option[String] = None,
                  feeAssetId: Option[String] = None,
-                 version: Byte = 1,
+                 version: Byte = 2,
                  waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version)), waitForTx)
     }
@@ -418,7 +425,7 @@ object SyncHttpApi extends Assertions {
 
     def invokeScript(caller: String,
                      dappAddress: String,
-                     func: String,
+                     func: Option[String],
                      args: List[Terms.EXPR] = List.empty,
                      payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
                      fee: Long = 500000,

@@ -12,11 +12,11 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ValidationError.AliasDoesNotExist
+import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
@@ -153,11 +153,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case (sender, initialBalance, recipient) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
+          d.blockchainUpdater.height shouldBe 1
           val genesisBlockId = d.lastBlockId
 
           val leaseAmount = initialBalance - 2
           val lt          = LeaseTransactionV1.selfSigned(sender, leaseAmount, 1, nextTs, recipient).explicitGet()
           d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)))
+          d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, true))
           d.portfolio(sender).lease.out shouldEqual leaseAmount

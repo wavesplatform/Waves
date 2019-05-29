@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.collection.JavaConverters._
@@ -26,7 +26,11 @@ object DocExport {
           override def chainId: Byte                                                                                   = 66
           override def inputEntity: Environment.InputEntity                                                            = ???
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+          override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+          override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
+          override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
+          override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
@@ -34,7 +38,7 @@ object DocExport {
         }
       )
 
-      val cryptoContext = CryptoContext.build(Global)
+      val cryptoContext = CryptoContext.build(Global, version)
 
       abstract class TypeDoc {
         val name: String
@@ -67,7 +71,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
+      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(Global, version), cryptoContext, wavesContext))
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 

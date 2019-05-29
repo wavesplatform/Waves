@@ -24,6 +24,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
+//noinspection ScalaStyle
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
 
@@ -83,6 +84,8 @@ object Explorer extends ScorexLogging {
     "address-transaction-seq-nr",
     "address-transaction-height-type-and-nums",
     "transaction-height-and-nums-by-id",
+    "block-transactions-fee",
+    "invoke-script-result"
   )
 
   def main(args: Array[String]): Unit = {
@@ -97,7 +100,7 @@ object Explorer extends ScorexLogging {
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
     val db               = openDB(settings.dbSettings.directory)
-    val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, maxCacheSize = settings.dbSettings.maxCacheSize, maxRollbackDepth = settings.dbSettings.maxRollbackDepth, rememberBlocksInterval = settings.dbSettings.rememberBlocks.toMillis, false)
+    val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")

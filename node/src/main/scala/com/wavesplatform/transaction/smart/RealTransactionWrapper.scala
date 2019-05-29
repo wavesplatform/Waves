@@ -60,16 +60,8 @@ object RealTransactionWrapper {
 
   def apply(tx: Transaction): Tx = {
     tx match {
-      case g: GenesisTransaction => Tx.Genesis(header(g), g.amount, g.recipient)
-      case t: TransferTransaction =>
-        Tx.Transfer(
-          proven(t),
-          feeAssetId = t.feeAssetId.compatId,
-          assetId = t.assetId.compatId,
-          amount = t.amount,
-          recipient = t.recipient,
-          attachment = ByteStr(t.attachment)
-        )
+      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient)
+      case t: TransferTransaction => mapTransferTx(t)
       case i: IssueTransaction =>
         Tx.Issue(proven(i), i.quantity, ByteStr(i.name), ByteStr(i.description), i.reissuable, i.decimals, i.script.map(_.bytes()))
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable)
@@ -104,12 +96,22 @@ object RealTransactionWrapper {
       case ci: InvokeScriptTransaction =>
         Tx.CI(
           proven(ci),
-          ci.dappAddress,
+          ci.dAppAddressOrAlias,
           ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)),
           ci.feeAssetId.compatId,
-          ci.fc.function.funcName,
-          ci.fc.args.map(_.asInstanceOf[EVALUATED])
+          ci.funcCallOpt.map(_.function.funcName),
+          ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
         )
     }
   }
+
+  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
+    Tx.Transfer(
+      proven(t),
+      feeAssetId = t.feeAssetId.compatId,
+      assetId = t.assetId.compatId,
+      amount = t.amount,
+      recipient = t.recipient,
+      attachment = ByteStr(t.attachment)
+    )
 }

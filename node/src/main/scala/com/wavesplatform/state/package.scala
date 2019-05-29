@@ -5,12 +5,12 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, GenericError}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
-import com.wavesplatform.utils.Paged
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.utils.{CloseableIterator, Paged}
 import play.api.libs.json._
 import supertagged.TaggedType
 
@@ -21,40 +21,33 @@ package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsFromDiff(
-      b: Blockchain,
-      d: Option[Diff])(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
+  def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
-    def transactionsFromDiff(d: Diff): Seq[(Int, Transaction, Set[Address])] = d.transactions.values.view.toSeq.reverse
+    def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
+      d.transactions.values.toSeq.reverseIterator
 
-    def withPagination(s: Seq[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction, Set[Address])] =
+    def withPagination(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction, Set[Address])] =
       fromId match {
-        case None     => s
-        case Some(id) => s.dropWhile(_._2.id() != id).drop(1)
+        case None     => txs
+        case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: Seq[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction)] =
+    def withFilterAndLimit(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction)] =
       txs
-        .collect {
-          case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
-        }
-        .take(count)
+        .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
 
-    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Either[String, Seq[(Int, Transaction)]] =
-      s.length match {
-        case `count`        => Right(s)
-        case l if l < count => b.addressTransactions(address, types, count - l, None).map(s ++ _)
-        case _              => Right(s.take(count))
-      }
+    def transactions: Diff => Iterator[(Int, Transaction)] =
+      withFilterAndLimit _ compose withPagination compose transactionsFromDiff
 
-    def transactions: Diff => Either[String, Seq[(Int, Transaction)]] =
-      withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
-
-    d.fold(b.addressTransactions(address, types, count, fromId)) { diff =>
+    d.fold(b.addressTransactions(address, types, fromId)) { diff =>
       fromId match {
-        case Some(id) if !diff.transactions.contains(id) =>
-          b.addressTransactions(address, types, count, fromId)
-        case _ => transactions(diff)
+        case Some(id) if !diff.transactions.contains(id) => b.addressTransactions(address, types, fromId)
+        case _ =>
+          val diffTxs = transactions(diff).map(kv => (Height(kv._1), kv._2))
+          CloseableIterator.seq(diffTxs, b.addressTransactions(address, types, None))
       }
     }
   }
@@ -74,7 +67,7 @@ package object state {
     }
   }
 
-  implicit class BlockchainExt(blockchain: Blockchain) {
+  implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
@@ -116,16 +109,14 @@ package object state {
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
-    def aliasesOfAddress(address: Address): Seq[Alias] =
+    def aliasesOfAddress(address: Address): CloseableIterator[Alias] =
       blockchain
-        .addressTransactions(address, Set(CreateAliasTransactionV1.typeId), Int.MaxValue, None)
-        .explicitGet()
+        .addressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None)
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
 
-    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
+    def activeLeases(address: Address): CloseableIterator[(Int, LeaseTransaction)] =
       blockchain
-        .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-        .explicitGet()
+        .addressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None)
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
 
     def unsafeHeightOf(id: ByteStr): Int =
@@ -138,6 +129,16 @@ package object state {
       blockchain.leaseBalance(address),
       Map.empty
     )
+
+    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
+
+    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
+
+
+    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
+      GeneratingBalanceProvider.balance(blockchain, account, blockId)
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]
