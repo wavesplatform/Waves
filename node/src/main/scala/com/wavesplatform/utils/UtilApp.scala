@@ -38,7 +38,7 @@ object UtilApp {
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "")
 
-  case class Command(mode: Command.Mode = Command.CompileScript,
+  case class Command(mode: Command.Mode = null,
                      inputData: Option[String] = None,
                      inputFile: Option[String] = None,
                      outputFile: Option[String] = None,
@@ -50,8 +50,7 @@ object UtilApp {
                      signTxOptions: SignTxOptions = SignTxOptions())
 
   def main(args: Array[String]): Unit = {
-    if (args.isEmpty) println(OParser.usage(commandParser))
-    else OParser.parse(commandParser, args, Command()) match {
+    OParser.parse(commandParser, args, Command()) match {
       case Some(c) =>
         val inBytes = IO.readInput(c)
         val result = {
@@ -162,7 +161,11 @@ object UtilApp {
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
           )
       ),
-      help("help").hidden()
+      help("help").hidden(),
+      checkConfig(_.mode match {
+        case null => failure("Command should be provided")
+        case _ => success
+      })
     )
   }
 
