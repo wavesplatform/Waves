@@ -194,7 +194,7 @@ object Verifier extends ScorexLogging {
       case p :: Nil =>
         Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender),
                     pt,
-                    GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
+                    GenericError(s"Proof doesn't validate as signature for $pt"))
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 
