@@ -16,7 +16,7 @@ object ContractEvaluator {
 
   val DEFAULT_FUNC_NAME = "default"
 
-  case class Invocation(funcCallOpt: Option[FUNCTION_CALL],
+  case class Invocation(funcCall: FUNCTION_CALL,
                         caller: Recipient.Address,
                         callerPk: ByteStr,
                         payment: Option[(Long, Option[ByteStr])],
@@ -26,15 +26,9 @@ object ContractEvaluator {
                         feeAssetId: Option[ByteStr])
 
   private def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
-    val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
+    val functionName = i.funcCall.function.funcName
 
-    val contractFuncAndCallOpt =
-      c.callableFuncs
-        .find(_.u.name == functionName)
-        .map { func =>
-          val res = (func, i.funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(DEFAULT_FUNC_NAME), List.empty)))
-          Either.cond(i.funcCallOpt.nonEmpty || func.u.args.isEmpty, res, s"Default function at address ${i.dappAddress} must have 0 arguments")
-        }
+    val contractFuncAndCallOpt = c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCall))
 
     contractFuncAndCallOpt match {
       case None =>
@@ -45,9 +39,7 @@ object ContractEvaluator {
           else s"@Callable function '$functionName doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
 
-      case Some(Left(errMsg)) => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](errMsg)
-
-      case Some(Right((f, fc))) =>
+      case Some((f, fc)) =>
         val takingArgsNumber = f.u.args.size
         val passedArgsNumber = fc.args.size
         if (takingArgsNumber == passedArgsNumber) {

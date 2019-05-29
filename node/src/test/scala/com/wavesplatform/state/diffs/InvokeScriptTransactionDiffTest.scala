@@ -752,12 +752,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(dAppAddress, functionOpt, Right(ScriptResult(_, transactions))),
+                InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResult(_, transactions))),
                 AssetVerifierTrace(allowedAssetId, None),
                 AssetVerifierTrace(bannedAssetId, Some(TransactionNotAllowedByScript(_, _)))
                 ) =>
               dAppAddress shouldBe ci.dAppAddressOrAlias
-              functionOpt shouldBe ci.funcCallOpt
+              functionCall shouldBe ci.funcCall
 
               allowedAssetId shouldBe asset1.id.value
               bannedAssetId shouldBe asset2.id.value
@@ -1015,18 +1015,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
-  property("Default function should not accept arguments") {
+  property("Default function invocation should produce error if contract default function has arguments") {
     forAll(for {
-      a          <- accountGen
-      am         <- smallFeeGen
+      a             <- accountGen
+      am            <- smallFeeGen
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
-      contractGen <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "default", a, am, List(Waves))))
-      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+      contractGen   <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "default", a, am, List(Waves))))
+      r             <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce(s"must have 0 arguments")
+          _ should produce(s"takes 1 args but 0 were(was) given")
         }
     }
   }
