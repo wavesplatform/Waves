@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -182,5 +182,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     matcherFee: Long          <- maxWavesAmountGen
     orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte)
   } yield SellLimitOrder(amount, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+
+  val limitOrderGenerator: Gen[LimitOrder] = Gen.oneOf(sellLimitOrderGenerator, buyLimitOrderGenerator)
 
 }

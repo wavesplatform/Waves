@@ -68,7 +68,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       matcherNode.waitOrderStatus(wctUsdPair, sellOrder, "Cancelled")
     }
 
-    "orderbook was really deleted" in {
+    "orderbook was deleted" in {
       withClue("orderBook") {
         val orderBook = matcherNode.orderBook(wctUsdPair)
         orderBook.bids shouldBe empty

@@ -45,10 +45,9 @@ class AddressActor(
   private val pendingCancellation = MutableMap.empty[ByteStr, Promise[Resp]]
   private val pendingPlacement    = MutableMap.empty[ByteStr, Promise[Resp]]
 
-  private val activeOrders  = MutableMap.empty[Order.Id, LimitOrder]
-  private val openVolume    = MutableMap.empty[Option[AssetId], Long].withDefaultValue(0L)
-  private val expiration    = MutableMap.empty[ByteStr, Cancellable]
-  private var latestOrderTs = 0L
+  private val activeOrders = MutableMap.empty[Order.Id, LimitOrder]
+  private val openVolume   = MutableMap.empty[Option[AssetId], Long].withDefaultValue(0L)
+  private val expiration   = MutableMap.empty[ByteStr, Cancellable]
 
   private def reserve(limitOrder: LimitOrder): Unit = {
     activeOrders += limitOrder.order.id() -> limitOrder
@@ -67,10 +66,6 @@ class AddressActor(
       log.trace(s"id=${limitOrder.order.id()}: $prevReserved - $b = $updatedReserved of ${assetIdStr(assetId)}")
       openVolume += assetId -> updatedReserved
     }
-
-  private def updateTimestamp(newTimestamp: Long): Unit = if (newTimestamp > latestOrderTs) {
-    latestOrderTs = newTimestamp
-  }
 
   private def tradableBalance(assetId: Option[AssetId]): Long = spendableBalance(assetId) - openVolume(assetId)
 
@@ -98,7 +93,6 @@ class AddressActor(
           validator(o) match {
             case Left(error) => Future.successful(api.OrderRejected(error))
             case Right(_) =>
-              updateTimestamp(o.timestamp)
               reserve(LimitOrder(o))
               storePlaced(o)
           }
@@ -200,7 +194,6 @@ class AddressActor(
   private def handleExecutionEvents: Receive = {
     case OrderAdded(submitted) if submitted.order.sender.toAddress == owner =>
       log.trace(s"OrderAdded(${submitted.order.id()})")
-      updateTimestamp(submitted.order.timestamp)
       release(submitted.order.id())
       handleOrderAdded(submitted)
 
@@ -237,7 +230,6 @@ class AddressActor(
   }
 
   private def handleOrderExecuted(remaining: LimitOrder): Unit = if (remaining.order.sender.toAddress == owner) {
-    updateTimestamp(remaining.order.timestamp)
     release(remaining.order.id())
     if (remaining.isValid) {
       handleOrderAdded(remaining)

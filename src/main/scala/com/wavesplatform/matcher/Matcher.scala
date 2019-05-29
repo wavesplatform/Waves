@@ -15,9 +15,15 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
-import com.wavesplatform.matcher.db.{AssetPairsDB, OrderDB}
+import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
+import com.wavesplatform.matcher.market.{
+  ExchangeTransactionBroadcastActor,
+  MatcherActor,
+  MatcherTransactionWriter,
+  OrderBookActor,
+  OrderBookSnapshotStoreActor
+}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
@@ -76,6 +82,7 @@ class Matcher(actorSystem: ActorSystem,
   private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
     matcherActor,
     addressActors,
+    orderBookSnapshotStore,
     pair,
     updateOrderBookCache(pair),
     marketStatuses.put(pair, _),
@@ -139,6 +146,13 @@ class Matcher(actorSystem: ActorSystem,
   private val snapshotsRestore = Promise[Unit]()
 
   private lazy val assetPairsDb = AssetPairsDB(db)
+
+  private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+
+  lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
+    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
+    "order-book-snapshot-store"
+  )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
