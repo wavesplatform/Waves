@@ -107,7 +107,9 @@ object Importer extends ScorexLogging {
             inputStream.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
-          case Failure(_) => log.error(s"Failed to open file '$blockchainFile")
+
+          case Failure(error) =>
+            log.error(s"Failed to open file '$blockchainFile", error)
         }
 
         time.close()
