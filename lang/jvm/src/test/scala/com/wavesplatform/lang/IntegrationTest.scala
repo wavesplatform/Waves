@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
@@ -615,6 +616,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
     eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("q:we"), CONST_STRING("q;we:x;q.we"))))
+  }
+
+  property("split separate correctly") {
+    val src =
+      """ "str1;str2;str3;str4".split(";") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING("str3"), CONST_STRING("str4"))))
+  }
+
+  property("split separator at the end") {
+    val src =
+      """ "str1;str2;".split(";") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING(""))))
+  }
+
+  property("split double separator") {
+    val src =
+      """ "str1;;str2;str3".split(";") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING(""), CONST_STRING("str2"), CONST_STRING("str3"))))
   }
 
   property("parseInt") {
