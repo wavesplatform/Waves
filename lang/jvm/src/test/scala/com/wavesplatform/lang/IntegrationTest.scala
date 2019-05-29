@@ -473,7 +473,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       s""" arr.toInt(65528) """
     eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("arr" -> ((BYTESTR, "max sized ByteVector"), LazyVal(EitherT.pure(CONST_BYTESTR(array))))), Array())
+      Map("arr" -> ((BYTESTR -> "max sized ByteVector") -> LazyVal(EitherT.pure(CONST_BYTESTR(array))))), Array())
     ) shouldBe Right(CONST_LONG(0x0101010101010101L))
   }
 
@@ -560,7 +560,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ str.indexOf("z", 32766) """
     eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("str" -> ((STRING, "max sized String"), LazyVal(EitherT.pure(CONST_STRING(str))))), Array())
+      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str))))), Array())
     ) shouldBe Right(CONST_LONG(32766L))
   }
 
