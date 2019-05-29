@@ -662,10 +662,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
        """.stripMargin
 
-    eval(script("extractWithMessage", error = false)) shouldBe Right(CONST_LONG(1))
-    eval(script("extractWithMessage", error = true))  shouldBe Left(message)
+    eval(script("extractWithErrorMessage", error = false)) shouldBe Right(CONST_LONG(1))
+    eval(script("extractWithErrorMessage", error = true))  shouldBe Left(message)
 
-    eval(script("valueWithMessage", error = false))   shouldBe Right(CONST_LONG(1))
-    eval(script("valueWithMessage", error = true))    shouldBe Left(message)
+    eval(script("valueWithErrorMessage", error = false))   shouldBe Right(CONST_LONG(1))
+    eval(script("valueWithErrorMessage", error = true))    shouldBe Left(message)
   }
 }

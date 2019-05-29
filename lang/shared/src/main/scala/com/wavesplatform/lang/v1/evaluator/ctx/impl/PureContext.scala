@@ -127,8 +127,8 @@ object PureContext {
       )
     }
 
-  lazy val extractWithMessage: BaseFunction = extractWithMessageF("extractWithMessage")
-  lazy val valueWithMessage: BaseFunction   = extractWithMessageF("valueWithMessage")
+  lazy val extractWithMessage: BaseFunction = extractWithMessageF("extractWithErrorMessage")
+  lazy val valueWithMessage: BaseFunction   = extractWithMessageF("valueWithErrorMessage")
 
   lazy val isDefined: BaseFunction =
     UserFunction(
@@ -429,7 +429,7 @@ object PureContext {
     ) {
       val parseO = FUNCTION_CALL(Native(PARSEINT), List(REF("str")))
       FUNCTION_CALL(
-        User("extractWithMessage"),
+        User("extractWithErrorMessage"),
         List(parseO, CONST_STRING("Error while parsing string to integer"))
       )
     }
