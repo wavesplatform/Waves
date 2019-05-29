@@ -40,7 +40,6 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     Gen
       .oneOf(
         NONE,
-        MD2,
         MD5,
         SHA1,
         SHA224,
@@ -56,7 +55,6 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
   def scriptSrc(alg: DigestAlgorithm, msg: Array[Byte], sig: Array[Byte], pub: Array[Byte]): String = {
     val algStr = alg match {
       case NONE    => "NOALG"
-      case MD2     => "MD2"
       case MD5     => "MD5"
       case SHA1    => "SHA1"
       case SHA224  => "SHA224"
@@ -111,7 +109,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = PureContext.build(V3) |+| CryptoContext.build(Global, V3)
+    val ctx: CTX = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }

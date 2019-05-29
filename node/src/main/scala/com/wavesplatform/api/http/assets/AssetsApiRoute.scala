@@ -41,7 +41,8 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)(
+  implicit ec: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -56,7 +57,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
+      balance ~ balances ~ nft ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -176,6 +177,41 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         complete(assetDetails(id, full.getOrElse(false)))
       }
     }
+
+  @Path("/nft/{address}/limit/{limit}")
+  @ApiOperation(value = "NFTs", notes = "Account's NFTs balance", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
+    ))
+  def nft: Route = (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
+    val response: Either[ApiError, Future[JsArray]] = for {
+      addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
+      limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
+      maybeAfter <- maybeAfterParam match {
+        case Some(v) =>
+          ByteStr
+            .decodeBase58(v)
+            .fold(
+              _ => Left(CustomValidationError(s"Unable to decode asset id $v")),
+              id => Right(Some(IssuedAsset(id)))
+            )
+        case None => Right(None)
+      }
+    } yield {
+      commonAccountApi
+        .portfolioNFT(addr, maybeAfter)
+        .take(limit)
+        .map(_.json())
+        .toListL
+        .map(lst => JsArray(lst))
+        .runAsync
+    }
+
+    complete(response)
+  }
 
   def transfer: Route =
     processRequest[TransferRequests](

@@ -16,7 +16,6 @@ import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 object CryptoContext {
 
   private val none    = CASETYPEREF("NOALG", List.empty)
-  private val md2     = CASETYPEREF("MD2", List.empty)
   private val md5     = CASETYPEREF("MD5", List.empty)
   private val sha1    = CASETYPEREF("SHA1", List.empty)
   private val sha224  = CASETYPEREF("SHA224", List.empty)
@@ -29,13 +28,12 @@ object CryptoContext {
   private val sha3512 = CASETYPEREF("SHA3512", List.empty)
 
   private val digestAlgorithmType =
-    UNION(none, md2, md5, sha1, sha224, sha256, sha384, sha512, sha3224, sha3256, sha3384, sha3512)
+    UNION(none, md5, sha1, sha224, sha256, sha384, sha512, sha3224, sha3256, sha3384, sha3512)
 
   private def algFromCO(obj: Terms.CaseObj): Either[String, DigestAlgorithm] = {
     import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
     obj match {
       case CaseObj(`none`, _)    => Right(NONE)
-      case CaseObj(`md2`, _)     => Right(MD2)
       case CaseObj(`md5`, _)     => Right(MD5)
       case CaseObj(`sha1`, _)    => Right(SHA1)
       case CaseObj(`sha224`, _)  => Right(SHA224)
@@ -168,7 +166,6 @@ object CryptoContext {
 
     val v3Vars: Map[String, ((FINAL, String), LazyVal)] = Map(
       ("NOALG", ((none, "NONE digest algorithm"), digestAlgValue(none))),
-      ("MD2", ((md2, "MD2 digest algorithm"), digestAlgValue(md2))),
       ("MD5", ((md5, "MD5 digest algorithm"), digestAlgValue(md5))),
       ("SHA1", ((sha1, "SHA1 digest algorithm"), digestAlgValue(sha1))),
       ("SHA224", ((sha224, "SHA224 digest algorithm"), digestAlgValue(sha224))),

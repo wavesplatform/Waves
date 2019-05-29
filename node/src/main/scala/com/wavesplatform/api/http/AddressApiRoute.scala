@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
+import java.util.regex.Pattern
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
@@ -12,6 +13,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -266,9 +268,30 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
-  @ApiImplicitParams(Array(new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")))
-  def getData: Route = (path("data" / Segment) & get) { address =>
-    complete(accountData(address))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "matches",
+        value = "URL encoded (percent-encoded) regular expression to filter keys (https://www.tutorialspoint.com/scala/scala_regular_expressions.htm)",
+        required = false,
+        dataType = "string",
+        paramType = "query"
+      )
+    ))
+  def getData: Route = (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
+    maybeRegex match {
+      case None => complete(accountData(address))
+      case Some(regex) =>
+        complete(
+          Try(regex.r)
+            .fold(
+              _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+              r => accountData(address, r.pattern)
+            )
+        )
+
+    }
   }
 
   @Path("/data/{address}/{key}")
@@ -278,9 +301,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")
     ))
-  def getDataItem: Route = (path("data" / Segment / Segment.?) & get) {
-    case (address, keyOpt) =>
-      complete(accountData(address, keyOpt.getOrElse("")))
+  def getDataItem: Route = (path("data" / Segment / Segment) & get) {
+    case (address, key) =>
+      complete(accountData(address, key))
   }
 
   @Path("/")
@@ -374,6 +397,21 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .fromString(address)
       .map { acc =>
         ToResponseMarshallable(commonAccountApi.dataStream(acc).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
+      }
+      .getOrElse(InvalidAddress)
+  }
+
+  private def accountData(address: String, regex: Pattern): ToResponseMarshallable = {
+    Address
+      .fromString(address)
+      .map { addr =>
+        val result: ToResponseMarshallable = commonAccountApi
+          .dataStream(addr, k => regex.matcher(k).matches())
+          .toListL
+          .runAsyncLogErr
+          .map(_.sortBy(_.key))
+
+        result
       }
       .getOrElse(InvalidAddress)
   }

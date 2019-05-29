@@ -101,7 +101,7 @@ trait ScriptGen {
 
   def LETgen(gas: Int): Gen[LET] =
     for {
-      name       <- Gen.identifier
+      name       <- Gen.identifier.filter(!keywords(_))
       (value, _) <- BOOLgen((gas - 3) / 3)
     } yield LET(AnyPos, PART.VALID(AnyPos, name), value, Seq.empty)
 
