@@ -55,7 +55,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |  WriteSet([DataEntry("a", a), DataEntry("sender", inv.caller.bytes)])
         | }
         |
-        | @Default(inv)
+        | @Callable(inv)
         | func default() = {
         |  WriteSet([DataEntry("a", "b"), DataEntry("sender", "senderId")])
         | }

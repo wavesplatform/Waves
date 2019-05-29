@@ -2,11 +2,11 @@ package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import org.scalacheck._
 
 trait TypedScriptGen {
@@ -18,9 +18,10 @@ trait TypedScriptGen {
       expr <- exprGen
     } yield Terms.LET(name, expr)
 
-  private def funcGen(withArgs: Boolean = true) =
+  private def funcGen(nameGen: Gen[String] = Gen.alphaStr.filter(_.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes),
+                      withArgs: Boolean = true) =
     for {
-      name <- Gen.alphaStr.filter(_.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes)
+      name <- nameGen
       arg0 <- Gen.alphaStr
       args <- Gen.listOf(Gen.alphaStr)
       allArgs = if (withArgs) arg0 +: args else List.empty
@@ -36,8 +37,8 @@ trait TypedScriptGen {
   private def defaultFuncGen =
     for {
       binding <- Gen.alphaStr
-      fnc     <- funcGen(false)
-    } yield DefaultFunction(DefaultFuncAnnotation(binding), fnc)
+      fnc     <- funcGen(Gen.const("default"), false)
+    } yield CallableFunction(CallableAnnotation(binding), fnc)
 
   private def verifierGen =
     for {
@@ -56,7 +57,7 @@ trait TypedScriptGen {
       callables   <- Gen.listOfN(nCallables, callableGen)
       defaultFunc <- Gen.option(defaultFuncGen)
       verifier    <- Gen.option(verifierGen)
-      c = DApp(lets ++ funcs, callables, defaultFunc, verifier)
+      c = DApp(lets ++ funcs, callables ++ defaultFunc, verifier)
       if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
     } yield c
 

@@ -4,13 +4,14 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ProvenTransaction
 
 private[diffs] object DiffsCommon {
   def verifierComplexity(script: Script): Long = script match {
-    case ContractScriptImpl(_, DApp(_, _, _, Some(vf)), cm) if cm.contains(vf.u.name) => cm(vf.u.name)
-    case _ => script.complexity
+    case ContractScriptImpl(_, DApp(_, _, Some(vf)), cm) if cm.contains(vf.u.name) => cm(vf.u.name)
+    case _                                                                         => script.complexity
   }
 
   def functionComplexity(script: Script, maybeCall: Option[FUNCTION_CALL]): Long = maybeCall match {
@@ -19,7 +20,12 @@ private[diffs] object DiffsCommon {
 
     case None =>
       script.expr match {
-        case DApp(_, _, Some(df), _) if script.complexityMap.contains(df.u.name) => script.complexityMap(df.u.name)
+        case DApp(_, cFuncs, _) =>
+          cFuncs
+            .find(f => (f.u.name == DEFAULT_FUNC_NAME) && f.u.args.isEmpty)
+            .flatMap(f => script.complexityMap.get(f.u.name))
+            .getOrElse(script.complexity)
+
         case _ => script.complexity
       }
   }

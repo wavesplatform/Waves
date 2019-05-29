@@ -36,7 +36,6 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   private val fee: Int                    = 1000 * 1000
   private val feeAssetId: Option[ByteStr] = None
 
-
   property("Simple call") {
     parseCompileAndEvaluate(
       """
@@ -121,9 +120,9 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     inside(evalResult) {
       case Left((error, log)) =>
         error shouldBe "exception message"
-        log should contain allOf(
-          ("a",       Right(CONST_LONG(1))),
-          ("b",       Right(CONST_LONG(2))),
+        log should contain allOf (
+          ("a", Right(CONST_LONG(1))),
+          ("b", Right(CONST_LONG(2))),
           ("isError", Right(TRUE))
         )
     }
@@ -153,7 +152,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       ctx.evaluationContext,
       compiled,
       Invocation(
-        Some(Terms.FUNCTION_CALL(FunctionHeader.User(func), args)),
+        Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
         Recipient.Address(callerAddress),
         callerPublicKey,
         None,

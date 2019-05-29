@@ -43,7 +43,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
-          | @Default(invocation)
+          | @Callable(invocation)
           | func default() = {
           |   let sender0 = invocation.caller.bytes
           |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
@@ -61,29 +61,29 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val expectedResult = Right(
       DApp(
         List.empty,
-        List(CallableFunction(
-          CallableAnnotation("invocation"),
-          Terms.FUNC(
-            "foo",
-            List("a"),
-            LET_BLOCK(
-              LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
-              FUNCTION_CALL(
-                User(FieldNames.WriteSet),
-                List(FUNCTION_CALL(
-                  Native(1100),
-                  List(
-                    FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                    FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
-                  )
-                ))
+        List(
+          CallableFunction(
+            CallableAnnotation("invocation"),
+            Terms.FUNC(
+              "foo",
+              List("a"),
+              LET_BLOCK(
+                LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
+                FUNCTION_CALL(
+                  User(FieldNames.WriteSet),
+                  List(FUNCTION_CALL(
+                    Native(1100),
+                    List(
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
+                    )
+                  ))
+                )
               )
             )
-          )
-        )),
-        Some(
-          DefaultFunction(
-            DefaultFuncAnnotation("invocation"),
+          ),
+          CallableFunction(
+            CallableAnnotation("invocation"),
             Terms.FUNC(
               "default",
               List.empty,
@@ -125,7 +125,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val expr = {
       val script =
         """
-          | @Default(invocation)
+          | @Callable(invocation)
           | func default() = {
           |   let sender0 = invocation.caller.bytes
           |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
@@ -137,10 +137,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val expectedResult = Right(
       DApp(
         List.empty,
-        List.empty,
-        Some(
-          DefaultFunction(
-            DefaultFuncAnnotation("invocation"),
+        List(
+          CallableFunction(
+            CallableAnnotation("invocation"),
             Terms.FUNC(
               "default",
               List.empty,
@@ -304,25 +303,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Verifier(arg)
           | func foo(a: Int) = {
           |  true
-          | }
-        """.stripMargin
-      Parser.parseContract(script).get.value
-    }
-    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
-  }
-
-  property("default function must have 0 arguments") {
-    val ctx = Monoid.combine(compilerContext, cmpCtx)
-    val expr = {
-      val script =
-        """
-          | {-# STDLIB_VERSION 3 #-}
-          | {-# CONTENT_TYPE DAPP #-}
-          |
-          | @Default(invocation)
-          | func default(a: Int) = {
-          |   let sender0 = invocation.caller.bytes
-          |   WriteSet([DataEntry("a", "b"), DataEntry("sender", sender0)])
           | }
         """.stripMargin
       Parser.parseContract(script).get.value
