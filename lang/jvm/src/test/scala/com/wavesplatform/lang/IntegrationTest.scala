@@ -532,13 +532,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("split separator at the end") {
     val src =
       """ "str1;str2;".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), unit)))
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING(""))))
   }
 
   property("split double separator") {
     val src =
       """ "str1;;str2;str3".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), unit, CONST_STRING("str2"), CONST_STRING("str3"))))
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING(""), CONST_STRING("str2"), CONST_STRING("str3"))))
   }
 
   property("parseInt") {
