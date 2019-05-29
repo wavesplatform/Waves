@@ -35,7 +35,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   val version = V3
 
-  private val pureContext = PureContext.build(version)
+  private val pureContext = PureContext.build(Global, version)
 
   private val defaultCryptoContext = CryptoContext.build(Global, version)
 
@@ -52,7 +52,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
   )
 
-  private val pureEvalContext: EvaluationContext = PureContext.build(version).evaluationContext
+  private val pureEvalContext: EvaluationContext = PureContext.build(Global, version).evaluationContext
 
   private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)

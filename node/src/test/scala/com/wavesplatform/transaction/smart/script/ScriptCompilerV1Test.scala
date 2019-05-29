@@ -195,19 +195,20 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
          |   let c1 = c0 + c0
          |   let c2 = c0 + c0
          |   let c3 = c0 + c0
-         |   a$assigns == a$assigns && true && true && true && true
+         |   let c4 = c0 + c0
+         |   a$assigns == a$assigns && true && true && true
          | }
          |
       """.stripMargin
 
-    val count = 343
+    val count = 136
 
     inside(ScriptCompiler.compile(scriptWithHighComplexity(count))) {
-      case Right((_, complexity)) => complexity shouldBe 10000
+      case Right((_, complexity)) => complexity shouldBe 4000
     }
 
     inside(ScriptCompiler.compile(scriptWithHighComplexity(count + 1))) {
-      case Left(msg) => msg shouldBe "Contract function (verify) is too complex: 10029 > 10000"
+      case Left(msg) => msg shouldBe "Contract function (verify) is too complex: 4029 > 4000"
     }
   }
 

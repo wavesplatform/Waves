@@ -4,6 +4,7 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.{AorBorC, NoShrink, addCtx, sampleTypes}
 import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CaseObj, EVALUATED}
@@ -27,7 +28,7 @@ class SplitFunctionTest
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combineAll(Seq(PureContext.build(V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
