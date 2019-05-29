@@ -371,7 +371,7 @@ object Application {
       case "import"  => Importer.main(args.tail)
       case "explore" => Explorer.main(args.tail)
       case "util"    => UtilApp.main(args.tail)
-      case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | util")
+      case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
       case _         => startNode(args.headOption)
     }
   }
