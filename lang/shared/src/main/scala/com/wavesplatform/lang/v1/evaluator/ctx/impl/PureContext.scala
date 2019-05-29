@@ -17,6 +17,7 @@ import java.nio.charset.MalformedInputException
 import java.nio.{BufferUnderflowException, ByteBuffer}
 
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
@@ -109,6 +110,25 @@ object PureContext {
         REF("@a")
       )
     }
+
+  private def extractWithMessageF(name: String): BaseFunction =
+    UserFunction(
+      name,
+      13,
+      TYPEPARAM('T'),
+      "Extract value from option or fail with message",
+      ("@a",   PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value"),
+      ("@msg", STRING, "Error message")
+    ) {
+      IF(
+        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(throwWithMessage, List(REF("@msg"))),
+        REF("@a")
+      )
+    }
+
+  lazy val extractWithMessage: BaseFunction = extractWithMessageF("extractWithMessage")
+  lazy val valueWithMessage: BaseFunction   = extractWithMessageF("valueWithMessage")
 
   lazy val isDefined: BaseFunction =
     UserFunction(
@@ -400,9 +420,18 @@ object PureContext {
     }
 
   lazy val parseIntVal: BaseFunction =
-    NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
-      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).toEither.left.map(_.toString)
-      case xs                      => notImplemented("parseInt(STRING)", xs)
+    UserFunction(
+      "parseIntValue",
+      20,
+      LONG,
+      "parse string to integer with fail on errors",
+      ("str", STRING, "String for parsing")
+    ) {
+      val parseO = FUNCTION_CALL(Native(PARSEINT), List(REF("str")))
+      FUNCTION_CALL(
+        User("extractWithMessage"),
+        List(parseO, CONST_STRING("Error while parsing string to integer"))
+      )
     }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
@@ -613,7 +642,16 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(value, listConstructor, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal, pow, log)
+            Array(
+              value, valueWithMessage, extractWithMessage,
+              listConstructor,
+              toUtf8String,
+              toLong, toLongOffset,
+              indexOf, indexOfN,
+              splitStr,
+              parseInt, parseIntVal,
+              pow, log
+            )
           )
         )
     }
