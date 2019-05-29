@@ -245,7 +245,7 @@ object UtilApp {
                   .continually(StdIn.readLine())
                   .grouped(2)
                   .takeWhile {
-                    case Seq("", "") => false
+                    case Seq("", "") | Seq(null) | Seq(_, null) => false
                     case _           => true
                   }
                   .flatten
