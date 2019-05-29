@@ -239,12 +239,12 @@ object UtilApp {
               def readLinesUntil2Blank(): Iterator[String] =
                 Iterator
                   .continually(StdIn.readLine())
-                  .sliding(2)
+                  .grouped(2)
                   .takeWhile {
                     case Seq("", "") => false
                     case _           => true
                   }
-                  .map(_.last)
+                  .flatten
 
               readLinesUntil2Blank().mkString("\n").getBytes(StandardCharsets.UTF_8)
           }
