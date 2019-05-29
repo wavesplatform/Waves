@@ -7,8 +7,10 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.{CloseableIterator, Paged}
 import play.api.libs.json._
@@ -20,11 +22,47 @@ import scala.util.Try
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
+  def nftListFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
+    def transactionFromDiff(d: Diff, id: ByteStr): Option[Transaction] = {
+      d.transactions.get(id).map(_._2)
+    }
+
+    def assetStreamFromDiff(d: Diff): Iterator[IssuedAsset] = {
+      d.portfolios
+        .get(address)
+        .toIterator
+        .flatMap(_.assets.keysIterator)
+    }
+
+    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Iterator[IssueTransaction] = {
+      after
+        .fold(assetStreamFromDiff(diff)) { after =>
+          assetStreamFromDiff(diff)
+            .dropWhile(_ != after)
+            .drop(1)
+        }
+        .map { asset =>
+          transactionFromDiff(diff, asset.id)
+            .orElse(b.transactionInfo(asset.id).map(_._2))
+        }
+        .collect {
+          case itx: IssueTransaction if itx.isNFT => itx
+        } ++ b.nftList(address, None)
+    }
+
+    d.fold(b.nftList(address, after)) { d =>
+      after match {
+        case None                                         => nftFromDiff(d, after) ++ b.nftList(address, after)
+        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ b.nftList(address, None)
+        case _                                            => b.nftList(address, after)
+      }
+    }
+  }
+
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(
-      address: Address,
-      types: Set[TransactionParser],
-      fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+  def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(address: Address,
+                                                                  types: Set[TransactionParser],
+                                                                  fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
     def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
       d.transactions.values.toSeq.reverseIterator
@@ -135,7 +173,6 @@ package object state {
 
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
-
 
     def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
