@@ -151,7 +151,7 @@ object Importer extends ScorexLogging {
       opt[Boolean]('n', "no-verify")
         .text("Disable signatures verification")
         .action((n, c) => c.copy(verify = !n)),
-      help("help")
+      help("help").hidden()
     )
   }
 }

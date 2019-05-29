@@ -24,7 +24,8 @@ object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFilename, outputFileNamePrefix, exportHeight, format) =>
-        val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(configFilename)))
+        val cfg = Try(ConfigFactory.parseFile(configFilename)).getOrElse(ConfigFactory.empty())
+        val settings = WavesSettings.fromRootConfig(loadConfig(cfg))
         AddressScheme.current = new AddressScheme {
           override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
         }
@@ -125,7 +126,6 @@ object Exporter extends ScorexLogging {
       programName("waves export"),
       head("Waves Blockchain Exporter", Version.VersionString),
       opt[File]('c', "config")
-        .required()
         .text("Config file name")
         .action((f, c) => c.copy(configFileName = f)),
       opt[String]("output-prefix")
@@ -140,7 +140,7 @@ object Exporter extends ScorexLogging {
           case f if Set("BINARY", "BINARY_OLD", "JSON").contains(f.toUpperCase) => success
           case f                                                                => failure(s"Unsupported format: $f")
         },
-      help("help")
+      help("help").hidden()
     )
   }
 }

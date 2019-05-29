@@ -161,7 +161,7 @@ object UtilApp {
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
           )
       ),
-      help("help")
+      help("help").hidden()
     )
   }
 
