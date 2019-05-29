@@ -68,30 +68,28 @@ object PBCachedTransaction {
 
       val serializedSize = {
         val bodySize =
-          if (bodyBytes.nonEmpty) 1 + _root_.com.google.protobuf.CodedOutputStream.computeUInt32SizeNoTag(bodyBytes.length) + bodyBytes.length else 0
-        val proofsSize = proofs.map { __item =>
-          val __value = __item
-          _root_.com.google.protobuf.CodedOutputStream.computeBytesSize(2, __value)
+          if (bodyBytes.nonEmpty) 1 + CodedOutputStream.computeUInt32SizeNoTag(bodyBytes.length) + bodyBytes.length else 0
+        val proofsSize = proofs.map { proof =>
+          CodedOutputStream.computeBytesSize(2, proof)
         }.sum
         bodySize + proofsSize
       }
 
       val outArray  = new Array[Byte](serializedSize)
-      val _output__ = CodedOutputStream.newInstance(outArray)
+      val outputStream = CodedOutputStream.newInstance(outArray)
 
       if (bodyBytes.nonEmpty) {
-        _output__.writeTag(1, 2)
+        outputStream.writeTag(1, 2)
         // _output__.writeUInt32NoTag(__m.serializedSize)
         // __m.writeTo(_output__)
-        _output__.writeUInt32NoTag(bodyBytes.length)
-        _output__.write(bodyBytes, 0, bodyBytes.length)
+        outputStream.writeUInt32NoTag(bodyBytes.length)
+        outputStream.write(bodyBytes, 0, bodyBytes.length)
       }
-      proofs.foreach { __v =>
-        val __m = __v
-        _output__.writeBytes(2, __m)
+      proofs.foreach { proof =>
+        outputStream.writeBytes(2, proof)
       }
-      _output__.flush()
-      _output__.checkNoSpaceLeft()
+      outputStream.flush()
+      outputStream.checkNoSpaceLeft()
       outArray
     }
     override private[transaction] val transactionCoeval: Coeval[PBSignedTransaction] = Coeval.evalOnce {
@@ -118,8 +116,7 @@ object PBCachedTransaction {
         var done             = false
         var result           = Option.empty[ByteString]
         while (!done) {
-          val tag = codedInputStream.readTag()
-          tag match {
+          codedInputStream.readTag() match {
             case 0 => done = true
             case 10 =>
               result = Some(codedInputStream.readBytes())
@@ -133,18 +130,17 @@ object PBCachedTransaction {
     private[transaction] val proofsCoeval = Coeval.evalOnce(underlying match {
       case ms: PBSerializable.PBMessageSerializable => ms.underlyingMessage.asInstanceOf[PBSignedTransaction].proofs
       case _ =>
-        val _input__ = CodedInputStream.newInstance(underlying.toBytes)
-        val __proofs = _root_.scala.collection.immutable.Vector.newBuilder[_root_.com.google.protobuf.ByteString]
-        var _done__  = false
-        while (!_done__) {
-          val _tag__ = _input__.readTag()
-          _tag__ match {
-            case 0   => _done__ = true
-            case 18  => __proofs += _input__.readBytes()
-            case tag => _input__.skipField(tag)
+        val inputStream = CodedInputStream.newInstance(underlying.toBytes)
+        val proofsBuilder = Vector.newBuilder[ByteString]
+        var done = false
+        while (!done) {
+          inputStream.readTag() match {
+            case 0 => done = true
+            case 18 => proofsBuilder += inputStream.readBytes()
+            case tag => inputStream.skipField(tag)
           }
         }
-        __proofs.result()
+        proofsBuilder.result()
     })
 
     override private[transaction] val bytesCoeval: Coeval[Array[Byte]] =

@@ -75,49 +75,44 @@ object PBCachedBlock {
       val header = Option(headerBytesCoeval()._1).filter(_.nonEmpty)
 
       val serializedSize = {
-        var __size = 0
+        var size = 0
         if (header.isDefined) {
-          val __value = header.get
-          __size += 1 + _root_.com.google.protobuf.CodedOutputStream.computeUInt32SizeNoTag(__value.length) + __value.length
+          val headerValue = header.get
+          size += 1 + CodedOutputStream.computeUInt32SizeNoTag(headerValue.length) + headerValue.length
         }
 
         {
-          val __value = signature
-          if (__value.nonEmpty) {
-            __size += _root_.com.google.protobuf.CodedOutputStream.computeByteArraySize(2, __value)
+          if (signature.nonEmpty) {
+            size += CodedOutputStream.computeByteArraySize(2, signature)
           }
         }
-        transactions.foreach { __item =>
-          val __value = __item
-          __size += 1 + _root_.com.google.protobuf.CodedOutputStream.computeUInt32SizeNoTag(__value.serializedSize) + __value.serializedSize
+        transactions.foreach { tx =>
+          size += 1 + CodedOutputStream.computeUInt32SizeNoTag(tx.serializedSize) + tx.serializedSize
         }
-        __size
+        size
       }
 
       val outArray  = new Array[Byte](serializedSize)
-      val _output__ = CodedOutputStream.newInstance(outArray)
+      val outputStream = CodedOutputStream.newInstance(outArray)
 
-      header.foreach { __v =>
-        val __m = __v
-        _output__.writeTag(1, 2)
-        _output__.writeByteArrayNoTag(__m)
+      header.foreach { header =>
+        outputStream.writeTag(1, 2)
+        outputStream.writeByteArrayNoTag(header)
       }
 
       {
-        val __v = signature
-        if (__v.nonEmpty) {
-          _output__.writeByteArray(2, __v)
+        if (signature.nonEmpty) {
+          outputStream.writeByteArray(2, signature)
         }
       }
 
-      transactions.foreach { __v =>
-        val __m = __v
-        _output__.writeTag(3, 2)
-        _output__.writeByteArrayNoTag(__m.toBytes)
+      transactions.foreach { tx =>
+        outputStream.writeTag(3, 2)
+        outputStream.writeByteArrayNoTag(tx.toBytes)
       }
 
-      _output__.flush()
-      _output__.checkNoSpaceLeft()
+      outputStream.flush()
+      outputStream.checkNoSpaceLeft()
       outArray
     }
   }
@@ -133,40 +128,38 @@ object PBCachedBlock {
         (block.getHeader.toByteArray, block.signature.toByteArray)
 
       case _ =>
-        val _input__    = CodedInputStream.newInstance(underlying.toBytes)
-        var __header    = Array.emptyByteArray
-        var __signature = Array.emptyByteArray
-        var _done__     = false
-        while (!_done__) {
-          val _tag__ = _input__.readTag()
-          _tag__ match {
-            case 0 => _done__ = true
+        val inputStream = CodedInputStream.newInstance(underlying.toBytes)
+        var header = Array.emptyByteArray
+        var signature = Array.emptyByteArray
+        var done = false
+        while (!done) {
+          inputStream.readTag() match {
+            case 0 => done = true
             case 10 =>
-              __header = _input__.readByteArray()
+              header = inputStream.readByteArray()
             case 18 =>
-              __signature = _input__.readByteArray()
-            case tag => _input__.skipField(tag)
+              signature = inputStream.readByteArray()
+            case tag => inputStream.skipField(tag)
           }
         }
-        (__header, __signature)
+        (header, signature)
     })
     override private[block] val bytesCoeval = Coeval.evalOnce(underlying.toBytes)
     override private[block] val transactionsBytesCoeval = Coeval.evalOnce(underlying match {
       case ms: PBSerializable.PBMessageSerializable => ms.underlyingMessage.asInstanceOf[PBBlock].transactions.map(PBUtils.encodeDeterministic)
       case _ =>
-        val _input__       = CodedInputStream.newInstance(underlying.toBytes)
-        val __transactions = _root_.scala.collection.immutable.Vector.newBuilder[Array[Byte]]
-        var _done__        = false
-        while (!_done__) {
-          val _tag__ = _input__.readTag()
-          _tag__ match {
-            case 0 => _done__ = true
+        val inputStream = CodedInputStream.newInstance(underlying.toBytes)
+        val transactions = Vector.newBuilder[Array[Byte]]
+        var done = false
+        while (!done) {
+          inputStream.readTag() match {
+            case 0 => done = true
             case 26 =>
-              __transactions += _input__.readByteArray()
-            case tag => _input__.skipField(tag)
+              transactions += inputStream.readByteArray()
+            case tag => inputStream.skipField(tag)
           }
         }
-        __transactions.result()
+        transactions.result()
     })
   }
 }
