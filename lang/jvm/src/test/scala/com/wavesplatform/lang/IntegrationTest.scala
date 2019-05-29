@@ -479,7 +479,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("toInt by offset (partial)") {
     val src =
       """ base58'2EtvziXsJaBRS'.toInt(2) """
-    eval[EVALUATED](src) should produce("Buffer underflow")
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
   property("toInt by offset (out of bounds)") {
@@ -515,7 +515,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("toInt from < 8 bytes by zero offset (Buffer underflow)") {
     val src =
       """ "AAAAAAA".toBytes().toInt(0) """
-    eval[EVALUATED](src) should produce("Buffer underflow")
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
   property("toInt from 0 bytes (Buffer underflow)") {
@@ -527,7 +527,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("toInt from 0 bytes by zero offset (Buffer underflow)") {
     val src =
       """ "".toBytes().toInt(0) """
-    eval[EVALUATED](src) should produce("Buffer underflow")
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
   property("toInt from 0 bytes by offset (IndexOutOfBounds)") {
@@ -578,37 +578,37 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("indexOf from empty string with offset") {
     val src =
       """ "".indexOf("!", 1) """
-    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+    eval[EVALUATED](src) shouldBe Right(unit)
   }
 
   property("indexOf from string with Long.MaxValue offset") {
     val src =
       s""" "abc".indexOf("c", ${Long.MaxValue}) """
-    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+    eval[EVALUATED](src) shouldBe Right(unit)
   }
 
   property("indexOf from string with negative offset") {
     val src =
       """ "abc".indexOf("a", -1) """
-    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+    eval[EVALUATED](src) shouldBe Right(unit)
   }
 
   property("indexOf from string with negative Long.MinValue offset") {
     val src =
       s""" "abc".indexOf("a", ${Long.MinValue}) """
-    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+    eval[EVALUATED](src) shouldBe Right(unit)
   }
 
   property("indexOf empty string from non-empty string") {
     val src =
       """ "abc".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(unit)
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
   }
 
   property("indexOf empty string from empty string") {
     val src =
       """ "".indexOf("") """
-    eval[EVALUATED](src) shouldBe Right(unit)
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
   }
 
   property("split") {
