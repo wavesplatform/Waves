@@ -246,7 +246,7 @@ object UtilApp {
                   .grouped(2)
                   .takeWhile {
                     case Seq("", "") | Seq(null) | Seq(_, null) => false
-                    case _           => true
+                    case _ => true
                   }
                   .flatten
 
