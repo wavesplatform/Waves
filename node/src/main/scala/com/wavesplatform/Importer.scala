@@ -143,14 +143,14 @@ object Importer extends ScorexLogging {
       opt[String]('f', "format")
         .text("Blockchain data file format")
         .action((f, c) => c.copy(format = f))
-        .valueName("<BINARY|BINARY_OLD>")
+        .valueName("<BINARY|BINARY_OLD> (default is BINARY_OLD)")
         .validate {
           case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
           case f                                                        => failure(s"Unsupported format: $f")
         },
-      opt[Boolean]('n', "no-verify")
+      opt[Unit]('n', "no-verify")
         .text("Disable signatures verification")
-        .action((n, c) => c.copy(verify = !n)),
+        .action((n, c) => c.copy(verify = false)),
       help("help").hidden()
     )
   }

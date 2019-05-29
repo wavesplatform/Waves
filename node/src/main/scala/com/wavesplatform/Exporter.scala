@@ -128,13 +128,12 @@ object Exporter extends ScorexLogging {
       opt[File]('c', "config")
         .text("Config file name")
         .action((f, c) => c.copy(configFileName = f)),
-      opt[String]("output-prefix")
-        .abbr("op")
+      opt[String]('o', "output-prefix")
         .text("Output file name prefix")
         .action((p, c) => c.copy(outputFileNamePrefix = p)),
       opt[String]('f', "format")
         .text("Output file format")
-        .valueName("<BINARY|BINARY_OLD|JSON>")
+        .valueName("<BINARY|BINARY_OLD|JSON> (default is BINARY_OLD)")
         .action((f, c) => c.copy(format = f))
         .validate {
           case f if Set("BINARY", "BINARY_OLD", "JSON").contains(f.toUpperCase) => success
