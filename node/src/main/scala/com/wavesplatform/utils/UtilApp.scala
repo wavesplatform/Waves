@@ -160,7 +160,8 @@ object UtilApp {
               .text("Signer address")
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
           )
-      )
+      ),
+      help("help")
     )
   }
 

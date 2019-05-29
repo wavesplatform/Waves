@@ -133,6 +133,7 @@ object Importer extends ScorexLogging {
         .text("Config file name")
         .action((f, c) => c.copy(configFile = f)),
       opt[File]('i', "input-file")
+        .required()
         .text("Blockchain data file name")
         .action((f, c) => c.copy(blockchainFile = f)),
       opt[Int]('h', "height")
@@ -149,7 +150,8 @@ object Importer extends ScorexLogging {
         },
       opt[Boolean]('n', "no-verify")
         .text("Disable signatures verification")
-        .action((n, c) => c.copy(verify = !n))
+        .action((n, c) => c.copy(verify = !n)),
+      help("help")
     )
   }
 }
