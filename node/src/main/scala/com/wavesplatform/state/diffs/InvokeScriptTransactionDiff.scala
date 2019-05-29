@@ -45,7 +45,7 @@ object InvokeScriptTransactionDiff {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
-    val functioncall  = tx.funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(DEFAULT_FUNC_NAME), List.empty))
+    val functioncall  = tx.funcCall
 
     accScriptEi match {
       case Right(Some(sc @ ContractScriptImpl(_, contract, _))) =>
@@ -76,7 +76,7 @@ object InvokeScriptTransactionDiff {
                 Monoid
                   .combineAll(
                     Seq(
-                      PureContext.build(V3),
+                      PureContext.build(Global, V3),
                       CryptoContext.build(Global, V3),
                       WavesContext.build(directives, environment)
                     )
