@@ -1,13 +1,16 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.state.StringDataEntry
 import monix.execution.Scheduler
+
+import scala.util.Random
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
@@ -179,11 +182,54 @@ class AddressRouteSpec
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
       (response \ "scriptText").as[String] shouldBe "DApp(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
-// [WAIT]                                           Decompiler(
-//      testContract,
-//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
+      // [WAIT]                                           Decompiler(
+      //      testContract,
+      //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+    }
+  }
+
+  routePath(s"/data/${allAddresses(1)}?matches=regex") in {
+    val testData: Map[String, String] = (
+      (1 to 10).map(i => s"SomeKey#$i") ++
+        (1 to 10).map(i => s"OtherKey#$i")
+    ).map { k =>
+      k -> Random.nextString(16)
+    }.toMap
+
+    (blockchain.accountDataKeys _)
+      .when(allAccounts(1).toAddress)
+      .returning(testData.keys.toList)
+      .anyNumberOfTimes()
+
+    testData.foreach {
+      case (k, v) =>
+        (blockchain
+          .accountData(_: Address, _: String))
+          .when(allAccounts(1).toAddress, k)
+          .returning(Some(StringDataEntry(k, v)))
+          .anyNumberOfTimes()
+    }
+
+    val regex = """^Some.*$"""
+
+    Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+      val kvs = responseAs[JsArray].value.map { json =>
+        ((json \ "key").as[String], (json \ "value").as[String])
+      }.toList
+
+      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
+    }
+
+    val urlEncRegex = """%5ESome.%2A%24"""
+
+    Get(routePath(s"""/data/${allAddresses(1)}?matches=$urlEncRegex""")) ~> route ~> check {
+      val kvs = responseAs[JsArray].value.map { json =>
+        ((json \ "key").as[String], (json \ "value").as[String])
+      }.toList
+
+      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
     }
   }
 }

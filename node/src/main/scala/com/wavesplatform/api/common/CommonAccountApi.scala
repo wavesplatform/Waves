@@ -6,6 +6,7 @@ import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import monix.reactive.Observable
 
@@ -39,6 +40,11 @@ class CommonAccountApi(blockchain: Blockchain) {
   def portfolio(address: Address): Map[Asset, Long] = {
     val portfolio = blockchain.portfolio(address)
     portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
+  }
+
+  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
+    val iterator = blockchain.nftList(address, from)
+    Observable.fromIterator(iterator, () => iterator.close())
   }
 
   def script(address: Address): AddressScriptInfo = {

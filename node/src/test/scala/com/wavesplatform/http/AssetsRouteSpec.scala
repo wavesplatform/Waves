@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
@@ -12,6 +13,7 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{RequestGen, TestTime}
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
+import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Writes
@@ -37,7 +39,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 
   "/transfer" - {
-    val route = AssetsApiRoute(restAPISettings, wallet, utx, allChannels, state, new TestTime()).route
+    val route: Route = AssetsApiRoute(restAPISettings, wallet, utx, allChannels, state, new TestTime())(Scheduler(executor)).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 

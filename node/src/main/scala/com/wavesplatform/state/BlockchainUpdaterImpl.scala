@@ -21,6 +21,7 @@ import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
@@ -462,8 +463,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   }
 
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
-    val diffPf = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
-    val lease = blockchain.leaseBalance(a)
+    val diffPf  = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
+    val lease   = blockchain.leaseBalance(a)
     val balance = blockchain.balance(a)
     Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
@@ -476,6 +477,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       .map(t => (t._1, t._2))
       .orElse(blockchain.transactionInfo(id))
   }
+
+  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
+    readLock {
+      nftListFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, from)
+    }
 
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
