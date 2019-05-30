@@ -94,12 +94,15 @@ class MatcherActor(settings: MatcherSettings,
       case Some(Right(ob)) => f(s, ob)
       case Some(Left(_))   => s ! OrderBookUnavailable
       case None =>
-        if (autoCreate) {
+        if (context.child(OrderBookActor.name(assetPair)).nonEmpty) {
+          log.error(s"OrderBook for $assetPair is stopped, but it is not observed in orderBook")
+          s ! OrderBookUnavailable
+        } else if (autoCreate) {
           val ob = createOrderBook(assetPair)
           assetPairsDB.add(assetPair)
           f(s, ob)
         } else {
-          log.warn(s"OrderBook fro $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
+          log.warn(s"OrderBook for $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
           s ! OrderBookUnavailable
         }
     }
