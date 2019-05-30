@@ -18,6 +18,9 @@ object PBAmounts {
     case _ => throw new IllegalArgumentException
   }
 
+  def waves(amount: Long): Amount =
+    fromAssetAndAmount(Asset.Waves, amount)
+
   def fromAssetAndAmount(asset: Asset, amount: Long): Amount =
     Amount(Some(toPBAssetId(asset)), amount)
 
