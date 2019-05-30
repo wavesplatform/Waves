@@ -30,12 +30,12 @@ object TxValidator {
   private[this] object V {
     type Validation = Either[ValidationError, Unit]
 
-    def is(f: => Boolean, ve: => ValidationError): Validation = Either.cond(f, (), ve)
+    def is(condition: => Boolean, error: => ValidationError): Validation = Either.cond(condition, (), error)
 
-    def not(f: => Boolean, ve: => ValidationError): Validation = Either.cond(!f, (), ve)
+    def not(condition: => Boolean, error: => ValidationError): Validation = Either.cond(!condition, (), error)
 
     def hasFee(tx: PBCachedTransaction): Validation =
-      Either.cond(tx.transaction.getTransaction.getFee.amount <= 0, (), TxValidationError.InsufficientFee())
+      Either.cond(tx.transaction.getTransaction.getFee.amount > 0, (), TxValidationError.InsufficientFee())
 
     def bytesFits(tx: PBCachedTransaction, maxSize: Int): Validation = {
       if (tx.transaction.getTransaction.version <= 2)
