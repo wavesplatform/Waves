@@ -349,8 +349,11 @@ object AsyncHttpApi extends Assertions {
                  "version"  -> version))
     }
 
-    def debugStateChange(invokeScriptTransactionId: String): Future[DebugStateChanges] =
+    def debugStateChanges(invokeScriptTransactionId: String): Future[DebugStateChanges] =
       get(s"/debug/stateChanges/info/$invokeScriptTransactionId").as[DebugStateChanges]
+
+    def debugStateChangesByAddress(address: String, limit: Int = 10000): Future[Seq[DebugStateChanges]] =
+      get(s"/debug/stateChanges/address/$address/limit/$limit").as[Seq[DebugStateChanges]]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
