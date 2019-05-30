@@ -38,11 +38,10 @@ object PBTransactionsDSL {
     // TODO: Other types
 
     def result(): PBCachedTransaction =
-      PBTransactionsDSL(
-        PBSignedTransaction(
-          Some(PBTransaction(AddressScheme.current.chainId, baseFields.sender, Some(baseFields.fee), baseFields.timestamp, version)),
-          baseFields.proofs.map(ByteString.copyFrom(_))
-        ))
+      PBSignedTransaction(
+        Some(PBTransaction(AddressScheme.current.chainId, baseFields.sender, Some(baseFields.fee), baseFields.timestamp, version)),
+        baseFields.proofs.map(ByteString.copyFrom(_))
+      )
   }
 
   object Matchers {
