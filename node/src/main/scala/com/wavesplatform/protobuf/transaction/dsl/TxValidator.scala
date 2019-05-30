@@ -25,7 +25,7 @@ object TxValidator {
         } else if (tx.transaction.getTransaction.getFee.amount <= 0) {
           Left(TxValidationError.InsufficientFee())
         } else {
-          Either.cond(Legacy.getTxSize(tx) <= MaxBytes, (), TxValidationError.TooBigArray)
+          Legacy.validateTxSize(tx, MaxBytes)
         }
 
       case _ =>
@@ -34,10 +34,11 @@ object TxValidator {
   }
 
   private[this] object Legacy {
-    def getTxSize(tx: PBCachedTransaction): Int = {
-      import com.wavesplatform.common.utils._
-      if (tx.transaction.getTransaction.version <= 2) PBTransactions.vanilla(tx, unsafe = true).explicitGet().bytes().length
-      else tx.serializedSize
+    def validateTxSize(tx: PBCachedTransaction, maxSize: Int): Either[ValidationError, Unit] = {
+      if (tx.transaction.getTransaction.version <= 2)
+        PBTransactions.vanilla(tx, unsafe = true).filterOrElse(_.bytes().length <= maxSize, TxValidationError.TooBigArray).map(_ => ())
+      else
+        Either.cond(tx.serializedSize <= maxSize, (), TxValidationError.TooBigArray)
     }
   }
 }
