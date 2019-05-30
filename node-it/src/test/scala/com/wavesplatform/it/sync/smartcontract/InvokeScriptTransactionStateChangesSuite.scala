@@ -1,15 +1,14 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api
-import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo}
+import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo, TransfersInfoResponse}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.setScriptFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
-import com.wavesplatform.state._
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -18,8 +17,23 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   private val caller = pkByAddress(secondAddress)
   private val recipient = pkByAddress(thirdAddress)
 
-  test("write") {
-    val simpleAsset = sender.issue(contract.address, "simple", "", 1000, 0)
+  var simpleAsset: String = ""
+  var assetSponsoredByDApp: String = ""
+  var assetSponsoredByRecipient: String = ""
+  var initCallerTxs: Long = 0
+  var initDAppTxs: Long = 0
+  var initCallerStateChanges: Long = 0
+  var initDAppStateChanges: Long = 0
+
+  test("prepare") {
+    simpleAsset = sender.issue(contract.address, "simple", "", 9000, 0).id
+    assetSponsoredByDApp = sender.issue(contract.address, "DApp asset", "", 9000, 0).id
+    assetSponsoredByRecipient = sender.issue(recipient.address, "Recipient asset", "", 9000, 0, waitForTx = true).id
+    sender.massTransfer(contract.address, List(Transfer(caller.address, 3000), Transfer(recipient.address, 3000)), 0.01.waves, Some(simpleAsset))
+    sender.massTransfer(contract.address, List(Transfer(caller.address, 3000), Transfer(recipient.address, 3000)), 0.01.waves, Some(assetSponsoredByDApp))
+    sender.massTransfer(recipient.address, List(Transfer(caller.address, 3000), Transfer(contract.address, 3000)), 0.01.waves, Some(assetSponsoredByRecipient))
+    sender.sponsorAsset(contract.address, assetSponsoredByDApp, 1)
+    sender.sponsorAsset(recipient.address, assetSponsoredByRecipient, 5)
 
     val script = ScriptCompiler.compile(
       """
@@ -28,8 +42,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
         |{-# SCRIPT_TYPE ACCOUNT #-}
         |
         |@Callable(i)
-        |func write(text: String) = {
-        |    WriteSet([DataEntry("result", text)])
+        |func write(value: Int) = {
+        |    WriteSet([DataEntry("result", value)])
         |}
         |
         |@Callable(i)
@@ -43,32 +57,32 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
         |}
         |
         |@Callable(i)
-        |func writeAndSendWaves(text: String, recipient: String, amount: Int) = {
+        |func writeAndSendWaves(value: Int, recipient: String, amount: Int) = {
         |    ScriptResult(
-        |        WriteSet([DataEntry("result", text)]),
+        |        WriteSet([DataEntry("result", value)]),
         |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
         |    )
         |}
         |
         |@Callable(i)
-        |func writeAndSendAsset(text: String, recipient: String, amount: Int, assetId: String) = {
+        |func writeAndSendAsset(value: Int, recipient: String, amount: Int, assetId: String) = {
         |    ScriptResult(
-        |        WriteSet([DataEntry("result", text)]),
+        |        WriteSet([DataEntry("result", value)]),
         |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, assetId.fromBase58String())])
         |    )
         |}
       """.stripMargin).explicitGet()._1.bytes().base64
-    sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true)
 
-    val initCallerTxs = sender.transactionsByAddress(caller.address, 100).length
-    val initDAppTxs = sender.transactionsByAddress(contract.address, 100).length
-    val initCallerStateChanges = sender.debugStateChangesByAddress(caller.address, 100).length
-    val initDAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100).length
+    initCallerTxs = sender.transactionsByAddress(caller.address, 100).length
+    initDAppTxs = sender.transactionsByAddress(contract.address, 100).length
+    initCallerStateChanges = sender.debugStateChangesByAddress(caller.address, 100).length
+    initDAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100).length
     initCallerTxs shouldBe initCallerStateChanges
     initDAppTxs shouldBe initDAppStateChanges
+  }
 
-
-
+  test("write") {
     val writeTx = sender.invokeScript(
       caller.address,
       contract.address,
@@ -98,42 +112,78 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     dAppStateChanges.head.stateChanges.get shouldBe expected
   }
 
-  /*test("contract caller invokes a default function on a contract") {
-
-
-    val _ = sender.invokeScript(
+  test("sponsored by dApp") {
+    val writeTx = sender.invokeScript(
       caller.address,
       contract.address,
-      func = None,
-      payment = Seq(),
-      fee = 1.waves,
+      func = Some("sendAsset"),
+      args = List(CONST_STRING(recipient.address), CONST_LONG(10), CONST_STRING(simpleAsset)),
+      fee = 5,
+      feeAssetId = Some(assetSponsoredByDApp),
       waitForTx = true
     )
-    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "b")
-    sender.getData(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
+
+    val txInfo = sender.transactionInfo(writeTx.id)
+    val callerTxs = sender.transactionsByAddress(caller.address, 100)
+    val dAppTxs = sender.transactionsByAddress(contract.address, 100)
+    val txStateChanges = sender.debugStateChanges(writeTx.id)
+    val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
+    val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
+
+    callerTxs.length shouldBe initCallerTxs + 2
+    callerTxs.length shouldBe callerStateChanges.length
+    dAppTxs.length shouldBe initDAppTxs + 2
+    dAppTxs.length shouldBe dAppStateChanges.length
+
+    txInfoShouldBeEqual(txInfo, txStateChanges)
+    txInfoShouldBeEqual(callerTxs.head, txStateChanges)
+    txInfoShouldBeEqual(dAppTxs.head, txStateChanges)
+    txInfoShouldBeEqual(txInfo, callerStateChanges.head)
+    txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
+
+    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient.address, Some(simpleAsset), 10)))
+    txStateChanges.stateChanges.get shouldBe expected
+    callerStateChanges.head.stateChanges.get shouldBe expected
+    dAppStateChanges.head.stateChanges.get shouldBe expected
   }
 
-  test("verifier works") {
+  test("sponsored by recipient") {
+    val writeTx = sender.invokeScript(
+      caller.address,
+      contract.address,
+      func = Some("writeAndSendAsset"),
+      args = List(CONST_LONG(7), CONST_STRING(caller.address), CONST_LONG(10), CONST_STRING(simpleAsset)),
+      fee = 25,
+      feeAssetId = Some(assetSponsoredByRecipient),
+      waitForTx = true
+    )
 
-    val tx =
-      DataTransaction
-        .create(
-          sender = contract,
-          data = List(StringDataEntry("a", "OOO")),
-          feeAmount = 1.waves,
-          timestamp = System.currentTimeMillis(),
-          proofs = Proofs.empty
-        )
-        .explicitGet()
+    val txInfo = sender.transactionInfo(writeTx.id)
+    val callerTxs = sender.transactionsByAddress(caller.address, 100)
+    val dAppTxs = sender.transactionsByAddress(contract.address, 100)
+    val txStateChanges = sender.debugStateChanges(writeTx.id)
+    val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
+    val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
 
-    val dataTxId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
-      .id
+    callerTxs.length shouldBe initCallerTxs + 3
+    callerTxs.length shouldBe callerStateChanges.length
+    dAppTxs.length shouldBe initDAppTxs + 3
+    dAppTxs.length shouldBe dAppStateChanges.length
 
-    nodes.waitForHeightAriseAndTxPresent(dataTxId)
+    txInfoShouldBeEqual(txInfo, txStateChanges)
+    txInfoShouldBeEqual(callerTxs.head, txStateChanges)
+    txInfoShouldBeEqual(dAppTxs.head, txStateChanges)
+    txInfoShouldBeEqual(txInfo, callerStateChanges.head)
+    txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
 
-    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
-  }*/
+    val expected = StateChangesDetails(
+      Seq(DataResponse("integer", 7, "result")),
+      Seq(TransfersInfoResponse(caller.address, Some(simpleAsset), 10))
+    )
+    txStateChanges.stateChanges.get shouldBe expected
+    callerStateChanges.head.stateChanges.get shouldBe expected
+    dAppStateChanges.head.stateChanges.get shouldBe expected
+  }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges) {
     info.`type` shouldBe stateChanges.`type`
