@@ -6,13 +6,14 @@ import com.wavesplatform.protobuf.transaction.dsl.PBTransactionsDSL.Matchers
 import com.wavesplatform.transaction.DataTransaction.MaxEntryCount
 import com.wavesplatform.transaction.TxValidationError
 
-trait TxVerifier {
-  def verify(tx: PBCachedTransaction): Either[ValidationError, Unit]
+trait TxValidator {
+  def validate(tx: PBCachedTransaction): Either[ValidationError, Unit]
 }
 
-object TxVerifier {
-  implicit object Default extends TxVerifier {
-    override def verify(tx: PBCachedTransaction): Either[ValidationError, Unit] = tx match {
+object TxValidator {
+
+  implicit object Default extends TxValidator {
+    override def validate(tx: PBCachedTransaction): Either[ValidationError, Unit] = tx match {
       case Matchers.Data(bf, dataEntries) =>
         val MaxBytes = 150 * 1024
 

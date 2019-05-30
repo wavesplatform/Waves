@@ -74,20 +74,21 @@ object PBTransactionsDSL {
 
   object Implicits {
     implicit class PBCachedTransactionExt(private val tx: PBCachedTransaction) extends AnyVal {
-      def verified(implicit verifier: TxVerifier): Either[ValidationError, PBCachedTransaction] = verifier.verify(tx).map(_ => tx)
+      def validated(implicit verifier: TxValidator): Either[ValidationError, PBCachedTransaction] = verifier.validate(tx).map(_ => tx)
     }
   }
+
+  def newBuilder: Builder = Builder()
 
   import Implicits._
 
   // Example
-  val tx = PBTransactionsDSL
-    .Builder()
+  val tx = PBTransactionsDSL.newBuilder
     .withBaseFields(timestamp = 123)
     .withTransfer(PBRecipients.create(Address.fromString("123").right.get), PBAmounts.waves(123), Base58.decode("123"))
     .result()
 
-  tx.verified match {
+  tx.validated match {
     case Right(Matchers.Data(_, de)) =>
       println(de)
 
