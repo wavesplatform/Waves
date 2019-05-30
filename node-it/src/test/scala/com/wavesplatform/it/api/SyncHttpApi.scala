@@ -212,10 +212,10 @@ object SyncHttpApi extends Assertions {
     def transactionInfo(txId: String): TransactionInfo =
       sync(async(n).transactionInfo(txId))
 
-    def transactionsByAddress(address: String, limit: Int): Seq[Seq[TransactionInfo]] =
+    def transactionsByAddress(address: String, limit: Int): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit))
 
-    def transactionsByAddress(address: String, limit: Int, after: String): Seq[Seq[TransactionInfo]] =
+    def transactionsByAddress(address: String, limit: Int, after: String): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit, after))
 
     def scriptCompile(code: String): CompiledScript =

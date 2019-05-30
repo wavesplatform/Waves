@@ -92,8 +92,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
-    val expected = StateChangesDetails(Seq(DataResponse("string", 10, "result")), Seq())
-    txStateChanges.stateChanges.get.data shouldBe expected
+    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq())
+    txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
   }

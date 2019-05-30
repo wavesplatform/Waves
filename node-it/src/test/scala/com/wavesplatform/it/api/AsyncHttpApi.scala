@@ -193,11 +193,11 @@ object AsyncHttpApi extends Assertions {
 
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
-    def transactionsByAddress(address: String, limit: Int): Future[Seq[Seq[TransactionInfo]]] =
-      get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]]
+    def transactionsByAddress(address: String, limit: Int): Future[Seq[TransactionInfo]] =
+      get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]].map(_.flatten)
 
-    def transactionsByAddress(address: String, limit: Int, after: String): Future[Seq[Seq[TransactionInfo]]] = {
-      get(s"/transactions/address/$address/limit/$limit?after=$after").as[Seq[Seq[TransactionInfo]]]
+    def transactionsByAddress(address: String, limit: Int, after: String): Future[Seq[TransactionInfo]] = {
+      get(s"/transactions/address/$address/limit/$limit?after=$after").as[Seq[Seq[TransactionInfo]]].map(_.flatten)
     }
 
     def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None): Future[AssetDistributionPage] = {
