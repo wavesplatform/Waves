@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.{AssetId, Proofs}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -70,14 +70,20 @@ object OrderJson {
     )
   }
 
-  def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
-    AssetPair(amountAsset.flatten.map(ByteStr(_)), priceAsset.flatten.map(ByteStr(_)))
+  private val assetIdReads: Reads[Option[AssetId]] = {
+    case JsNull | JsString("") => JsSuccess(None)
+    case JsString(s) =>
+      AssetPair.extractAssetId(s) match {
+        case Failure(_)       => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
+        case Success(assetId) => JsSuccess(assetId)
+      }
+    case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
   }
 
   implicit val assetPairReads: Reads[AssetPair] = {
-    val r = (JsPath \ "amountAsset").readNullable[Option[Array[Byte]]] and
-      (JsPath \ "priceAsset").readNullable[Option[Array[Byte]]]
-    r(readAssetPair _)
+    val r = (JsPath \ "amountAsset").readWithDefault[Option[AssetId]](None)(assetIdReads) and
+      (JsPath \ "priceAsset").readWithDefault[Option[AssetId]](None)(assetIdReads)
+    r(AssetPair(_, _))
   }
 
   implicit val orderTypeReads: Reads[OrderType] =
