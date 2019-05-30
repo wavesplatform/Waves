@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlocks, PBCachedBlock}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
@@ -82,7 +82,7 @@ object Importer extends ScorexLogging {
                   } else {
                     val Right(block) =
                       if (format == "BINARY_OLD") Block.parseBytes(buffer).toEither
-                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
+                      else PBBlocks.vanilla(PBCachedBlock.fromBytes(buffer), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
