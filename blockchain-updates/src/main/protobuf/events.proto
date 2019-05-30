@@ -14,7 +14,7 @@ message BlockchainUpdated {
             SignedMicroBlock micro_block = 2;
         }
         StateUpdate state_update = 11;
-        repeated StateUpdate transactions_state_updates = 12;
+        repeated StateUpdate transaction_state_updates = 12;
     }
 
     enum Rollback {
@@ -23,8 +23,8 @@ message BlockchainUpdated {
     }
 
     oneof update {
-        Append append = 3;
-        Rollback rollback = 4;
+        Append append = 11;
+        Rollback rollback = 12;
     }
 }
 
@@ -33,18 +33,18 @@ message StateUpdate {
         bytes address = 1;
         Amount amount = 2;
     }
-    repeated BalanceUpdate balances = 3;
+    repeated BalanceUpdate balances = 1;
 
     message LeasingUpdate {
         bytes address = 1;
         int64 in = 2;
         int64 out = 3;
     }
-    repeated LeasingUpdate leases = 4;
+    repeated LeasingUpdate leases = 2;
 
     message DataEntryUpdate {
         bytes address = 1;
         DataTransactionData.DataEntry data_entry = 2;
     }
-    repeated DataEntryUpdate data_entries = 5;
+    repeated DataEntryUpdate data_entries = 3;
 }

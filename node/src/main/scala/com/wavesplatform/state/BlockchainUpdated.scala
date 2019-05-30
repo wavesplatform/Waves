@@ -15,12 +15,12 @@ final case class StateUpdate(balances: Seq[(Address, Asset, Long)], leases: Seq[
 }
 
 sealed trait BlockchainUpdated
-final case class BlockAppended(block: Block, height: Int, blockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
+final case class BlockAppended(block: Block, height: Int, blockStateUpdate: StateUpdate, transactionStateUpdates: Seq[StateUpdate])
     extends BlockchainUpdated
 final case class MicroBlockAppended(microBlock: MicroBlock,
                                     height: Int,
                                     microBlockStateUpdate: StateUpdate,
-                                    transactionsStateUpdates: Seq[StateUpdate])
+                                    transactionStateUpdates: Seq[StateUpdate])
     extends BlockchainUpdated
 final case class RollbackCompleted(to: ByteStr, height: Int)           extends BlockchainUpdated
 final case class MicroBlockRollbackCompleted(to: ByteStr, height: Int) extends BlockchainUpdated

@@ -33,9 +33,9 @@ object PBEvents {
 
   def protobuf(event: VanillaBlockchainUpdated): PBBlockchainUpdated =
     event match {
-      case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
+      case BlockAppended(block, height, blockStateUpdate, transactionStateUpdates) =>
         val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdated)
-        val txsUpdates  = transactionsStateUpdates.map(protobufStateUpdated)
+        val txsUpdates  = transactionStateUpdates.map(protobufStateUpdated)
 
         PBBlockchainUpdated(
           id = block.uniqueId,
@@ -43,14 +43,14 @@ object PBEvents {
           update = PBBlockchainUpdated.Update.Append(
             PBAppend(
               stateUpdate = blockUpdate,
-              transactionsStateUpdates = txsUpdates,
+              transactionStateUpdates = txsUpdates,
               body = PBAppend.Body.Block(PBBlocks.protobuf(block))
             )
           )
         )
-      case MicroBlockAppended(microBlock, height, microBlockStateUpdate, transactionsStateUpdates) =>
+      case MicroBlockAppended(microBlock, height, microBlockStateUpdate, transactionStateUpdates) =>
         val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdated)
-        val txsUpdates       = transactionsStateUpdates.map(protobufStateUpdated)
+        val txsUpdates       = transactionStateUpdates.map(protobufStateUpdated)
 
         PBBlockchainUpdated(
           id = microBlock.totalResBlockSig,
@@ -58,7 +58,7 @@ object PBEvents {
           update = PBBlockchainUpdated.Update.Append(
             PBAppend(
               stateUpdate = microBlockUpdate,
-              transactionsStateUpdates = txsUpdates,
+              transactionStateUpdates = txsUpdates,
               body = PBAppend.Body.MicroBlock(PBMicroBlocks.protobuf(microBlock))
             )
           )
