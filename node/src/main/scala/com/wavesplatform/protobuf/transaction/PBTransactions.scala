@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -12,9 +13,11 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+import com.wavesplatform.protobuf.transaction.{Script => PBScript}
+
 
 object PBTransactions {
-
   private[this] val NoChainId: Byte = 0: Byte
 
   def create(sender: com.wavesplatform.account.PublicKey = PublicKey.empty,
@@ -672,6 +675,7 @@ object PBTransactions {
   }
 
   def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[_] = {
+    import DataTransactionData.DataEntry.Value._
 
     de.value match {
       case IntValue(num)      => IntegerDataEntry(de.key, num)
