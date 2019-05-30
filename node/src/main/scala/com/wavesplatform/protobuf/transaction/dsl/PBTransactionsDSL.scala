@@ -1,5 +1,6 @@
 package com.wavesplatform.protobuf.transaction.dsl
 
+import cats.data.{Validated, ValidatedNel}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -73,7 +74,7 @@ object PBTransactionsDSL {
 
   object Implicits {
     implicit class PBCachedTransactionExt(private val tx: PBCachedTransaction) extends AnyVal {
-      def validated(implicit verifier: TxValidator): Either[ValidationError, PBCachedTransaction] = verifier.validate(tx).map(_ => tx)
+      def validated(implicit verifier: TxValidator): ValidatedNel[ValidationError, PBCachedTransaction] = verifier.validate(tx).map(_ => tx)
     }
   }
 
@@ -88,10 +89,10 @@ object PBTransactionsDSL {
     .result()
 
   tx.validated match {
-    case Right(Matchers.Data(_, de)) =>
+    case Validated.Valid(Matchers.Data(_, de)) =>
       println(de)
 
-    case Right(Matchers.Transfer(_, recipient, amount, _)) =>
+    case Validated.Valid(Matchers.Transfer(_, recipient, amount, _)) =>
       println(recipient + " " + amount)
   }
 }
