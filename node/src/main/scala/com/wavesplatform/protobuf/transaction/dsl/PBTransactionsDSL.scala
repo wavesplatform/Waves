@@ -74,7 +74,9 @@ object PBTransactionsDSL {
 
   object Implicits {
     implicit class PBCachedTransactionExt(private val tx: PBCachedTransaction) extends AnyVal {
-      def validated(implicit verifier: TxValidator): ValidatedNel[ValidationError, PBCachedTransaction] = verifier.validate(tx).map(_ => tx)
+      def validated(implicit v: TxValidator): ValidatedNel[ValidationError, PBCachedTransaction] = v.validate(tx).map(_ => tx)
+
+      def validatedE(implicit v: TxValidator): Either[ValidationError, PBCachedTransaction] = validated.toEither.left.map(_.head)
     }
   }
 
@@ -94,5 +96,8 @@ object PBTransactionsDSL {
 
     case Validated.Valid(Matchers.Transfer(_, recipient, amount, _)) =>
       println(recipient + " " + amount)
+
+    case Validated.Invalid(errs) =>
+      println(errs)
   }
 }
