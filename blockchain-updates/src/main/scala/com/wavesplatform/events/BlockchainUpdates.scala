@@ -29,7 +29,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
 
   private[this] var maybeProducer: Option[KafkaProducer[Int, BlockchainUpdated]] = None
 
-  private[this] def getLastHeight(timeout: Duration = 10.seconds): Option[Int] = {
+  private def getLastHeight(timeout: Duration = 10.seconds): Int = {
     import scala.collection.JavaConverters._
 
     val props = new Properties()
@@ -40,7 +40,6 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "10000")
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1")
 
-    // read height and whether last event in Kafka is MicroBlock or MicroBlockRollback
     val consumer = new KafkaConsumer[Unit, Int](
       props,
       new Deserializer[Unit] {
@@ -48,7 +47,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
         override def deserialize(topic: String, data: Array[Byte]): Unit           = {}
         override def close(): Unit                                                 = {}
       },
-      new Deserializer[Int] {
+      new Deserializer[Int] { // height of last event
         override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {}
         override def deserialize(topic: String, data: Array[Byte]): Int =
           PBBlockchainUpdated.parseFrom(data).height
@@ -56,62 +55,50 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
       }
     )
 
-    try {
-      consumer.partitionsFor(settings.topic).asScala.headOption.flatMap { partition =>
-        val tp = new TopicPartition(settings.topic, partition.partition)
-        consumer.assign(util.Arrays.asList(tp))
-        consumer.seek(tp, consumer.endOffsets(util.Arrays.asList(tp)).asScala.apply(tp) - 1)
+    val partition = consumer.partitionsFor(settings.topic).asScala.head
+    val tp = new TopicPartition(settings.topic, partition.partition)
 
-        val records = consumer.poll(JDuration.ofMillis(timeout.toMillis))
+    consumer.assign(util.Arrays.asList(tp))
+    consumer.seek(tp, consumer.endOffsets(util.Arrays.asList(tp)).asScala.apply(tp) - 1)
 
-        if (records.isEmpty) None
-        else records.records(tp).asScala.lastOption.map(_.value)
-      }
-    } catch { case _: Throwable => None }
+    val records = consumer.poll(JDuration.ofMillis(timeout.toMillis))
+
+    if (records.isEmpty) 0
+    else records.records(tp).asScala.last.value
   }
 
-  @throws[IllegalStateException]("if events in Kafka are different from node state and it's impossible to recover")
   private[this] def startupCheck(): Unit = {
-    // if kafkaHeight <= blockchainHeight — rollback node with event sending to Kafka. If rollback fails — fail
-    // if kafkaHeight > blockchainHeight — fail. This should not happen
+    // if kafkaHeight <= (blockchainHeight + 1) — rollback node with event sending to Kafka. If rollback fails — fail
+    // if kafkaHeight > (blockchainHeight + 1) — fail. This should not happen
+    // if kafka is empty, but blockchain is further than genesis block — fail
+    // if both kafka and blockchain are empty — OK
 
-    // For later (maybe):, blockchain consistency can be checked better using Kafka view of blocks with signatures
+    // Idea for better checks: maintain Kafka view of blocks with signatures and check for (and recover from) forks.
+    // The view can be maintained via transaction writes
 
     val blockchainHeight = context.blockchain.height
-    getLastHeight() match {
-      case Some(kafkaHeight) =>
-        if (kafkaHeight <= (blockchainHeight + 1)) {
-          /*
-          Always rollback node on startup at least 1 block, since node loses ngState
-          and it's hard to tell whether the block in Kafka is full or not.
+    val kafkaHeight      = getLastHeight()
 
-          Rollback node to (kafkaHeight - 1) to be sure, since previous block is guaranteed to be solid.
-           */
+    if (kafkaHeight == 0 && blockchainHeight > 1)
+      throw new IllegalStateException("No events in Kafka, but blockchain is neither empty nor on genesis block.")
 
-          val heightToRollbackTo = Math.max(kafkaHeight - 1, 1)
+    if (kafkaHeight > blockchainHeight + 1)
+      throw new IllegalStateException(s"""Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight.
+                                         |This should never happen. Manual correction of even full system restart might be necessary.""".stripMargin)
 
-          context.blockchain
-            .blockHeaderAndSize(heightToRollbackTo)
-            .toRight(new IllegalStateException(s"No block at height $heightToRollbackTo"))
-            .map(_._1.signerData.signature)
-            .flatMap { sigToRollback =>
-              log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollbackTo")
-              context.blockchain.removeAfter(sigToRollback)
-            } match {
-            case Right(_) =>
-            case Left(_) =>
-              throw new IllegalStateException(
-                s"Unable to rollback Node to Kafka state. Kafka is at $kafkaHeight, while node is at $blockchainHeight.")
-          }
-        } else
-          throw new IllegalStateException(s"""Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight.
-               |This should never happen. Manual correction of even full system restart might be necessary.""".stripMargin)
+    if (kafkaHeight != 0) {
+      val heightToRollbackTo = Math.max(kafkaHeight - 1, 1)
+      val sigToRollback = context.blockchain
+        .blockHeaderAndSize(heightToRollbackTo)
+        .map(_._1.signerData.signature)
+        .get // guaranteed not to fail by previous checks on heights
 
-      // Genesis block gets applied before extension starts, so it's possible to have no events in Kafka, but blockchainHeight == 1.
-      case None if blockchainHeight > 1 =>
-        throw new IllegalStateException("No events in Kafka, but blockchain is neither empty nor on genesis block.")
-
-      case _ => ()
+      log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollbackTo")
+      context.blockchain.removeAfter(sigToRollback) match {
+        case Right(_) =>
+        case Left(_) =>
+          throw new IllegalStateException(s"Unable to rollback Node to Kafka state. Kafka is at $kafkaHeight, while node is at $blockchainHeight.")
+      }
     }
   }
 
