@@ -5,7 +5,7 @@ import com.wavesplatform.protobuf.utils.PBUtils
 import monix.eval.Coeval
 import scalapb.GeneratedMessage
 
-private[protobuf] sealed trait PBSerializable {
+private[protobuf] trait PBSerializable {
   def serializedSize: Int
   def toBytes: Array[Byte]
 }
