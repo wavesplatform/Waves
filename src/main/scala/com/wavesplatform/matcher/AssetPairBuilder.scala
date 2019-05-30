@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher
 
+import cats.syntax.either._
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics._
@@ -21,7 +22,7 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
   private[this] val create   = timer.refine("action" -> "create")
   private[this] val validate = timer.refine("action" -> "validate")
 
-  private def isCorrectlyOrdered(pair: AssetPair): Boolean =
+  def isCorrectlyOrdered(pair: AssetPair): Boolean =
     (indices.get(pair.priceAssetStr), indices.get(pair.amountAssetStr)) match {
       case (None, None)         => pair.priceAsset < pair.amountAsset
       case (Some(_), None)      => true
@@ -37,12 +38,17 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
     cond(assetId.forall(isNotBlacklisted) && !blacklistedAssetIds(AssetPair.assetIdStr(assetId)), assetId, errorMsg(AssetPair.assetIdStr(assetId)))
 
   def validateAssetPair(pair: AssetPair): Either[String, AssetPair] =
-    validate.measure(for {
-      _ <- cond(pair.amountAsset != pair.priceAsset, (), "Amount and price assets must be different")
-      _ <- cond(isCorrectlyOrdered(pair), pair, "Pair should be reverse")
-      _ <- validateAssetId(pair.priceAsset)
-      _ <- validateAssetId(pair.amountAsset)
-    } yield pair)
+    validate.measure {
+      if (settings.allowedAssetPairs.contains(pair)) pair.asRight[String]
+      else if (settings.whiteListOnly) Left(s"Trading is not allowed for the pair: $pair")
+      else
+        for {
+          _ <- cond(pair.amountAsset != pair.priceAsset, (), "Amount and price assets must be different")
+          _ <- cond(isCorrectlyOrdered(pair), pair, "Pair should be reverse")
+          _ <- validateAssetId(pair.priceAsset)
+          _ <- validateAssetId(pair.amountAsset)
+        } yield pair
+    }
 
   def createAssetPair(a1: String, a2: String): Either[String, AssetPair] =
     create.measure(for {

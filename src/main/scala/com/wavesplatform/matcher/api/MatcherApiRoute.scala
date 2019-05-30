@@ -510,15 +510,16 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
-  def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
-    withAssetPair(p) { pair =>
-      unavailableOrderBookBarrier(pair) {
-        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
-          case None => SavingEventsDisabled
-          case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
-        })
-      }
-    }
+  def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { pair =>
+    if (assetPairBuilder.isCorrectlyOrdered(pair))
+      orderBook(pair) match {
+        case Some(Right(_)) =>
+          complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
+            case None => SavingEventsDisabled
+            case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+          })
+        case _ => complete(OrderBookUnavailable)
+      } else complete(OrderBookUnavailable)
   }
 
   @Path("/transactions/{orderId}")

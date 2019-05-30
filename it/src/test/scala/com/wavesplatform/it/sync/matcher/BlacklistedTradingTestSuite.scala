@@ -37,9 +37,10 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
       docker.restartNode(
         matcher,
         configWithBlacklisted(
-          assets = Array(WctId.toString),
+          assets = Array(WctId.toString, BtcId.toString),
           names = Array("ETH.*"),
-          addresses = Array(bob.address)
+          addresses = Array(bob.address),
+          allowedAssetPairs = Array(wavesBtcPair.toString)
         )
       )
 
@@ -76,6 +77,10 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
       And("orders for other assets are still available")
       matcher.orderStatus(usdOrder, wavesUsdPair).status shouldBe "Accepted"
+
+      And("order can be placed on allowed pair with blacklisted asset")
+      val newBtcOrder = matcher.placeOrder(alice.privateKey, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
+      matcher.waitOrderStatus(wavesBtcPair, newBtcOrder, "Accepted")
     }
 
     "And now if all blacklists are cleared" in {
@@ -104,13 +109,18 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
 object BlacklistedTradingTestSuite {
 
-  def configWithBlacklisted(assets: Array[String] = Array(), names: Array[String] = Array(), addresses: Array[String] = Array()): Config = {
+  def configWithBlacklisted(assets: Array[String] = Array.empty,
+                            names: Array[String] = Array.empty,
+                            addresses: Array[String] = Array.empty,
+                            allowedAssetPairs: Array[String] = Array.empty): Config = {
     def toStr(array: Array[String]): String = if (array.length == 0) "" else array.mkString("\"", "\", \"", "\"")
     parseString(s"""
                 |waves.matcher {
                 |  blacklisted-assets = [${toStr(assets)}]
                 |  blacklisted-names = [${toStr(names)}]
                 |  blacklisted-addresses = [${toStr(addresses)}]
+                |  allowed-asset-pairs = [${toStr(allowedAssetPairs)}]
+                |  white-list-only = no
                 |}
     """.stripMargin)
   }
