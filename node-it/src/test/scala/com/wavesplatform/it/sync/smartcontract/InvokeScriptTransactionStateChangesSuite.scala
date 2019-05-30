@@ -47,11 +47,6 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
         |}
         |
         |@Callable(i)
-        |func sendWaves(recipient: String, amount: Int) = {
-        |    TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
-        |}
-        |
-        |@Callable(i)
         |func sendAsset(recipient: String, amount: Int, assetId: String) = {
         |    TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, assetId.fromBase58String())])
         |}
@@ -61,14 +56,6 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
         |    ScriptResult(
         |        WriteSet([DataEntry("result", value)]),
         |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
-        |    )
-        |}
-        |
-        |@Callable(i)
-        |func writeAndSendAsset(value: Int, recipient: String, amount: Int, assetId: String) = {
-        |    ScriptResult(
-        |        WriteSet([DataEntry("result", value)]),
-        |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, assetId.fromBase58String())])
         |    )
         |}
       """.stripMargin).explicitGet()._1.bytes().base64
@@ -151,8 +138,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     val writeTx = sender.invokeScript(
       caller.address,
       contract.address,
-      func = Some("writeAndSendAsset"),
-      args = List(CONST_LONG(7), CONST_STRING(caller.address), CONST_LONG(10), CONST_STRING(simpleAsset)),
+      func = Some("writeAndSendWaves"),
+      args = List(CONST_LONG(7), CONST_STRING(caller.address), CONST_LONG(10)),
       fee = 25,
       feeAssetId = Some(assetSponsoredByRecipient),
       waitForTx = true
@@ -178,7 +165,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     val expected = StateChangesDetails(
       Seq(DataResponse("integer", 7, "result")),
-      Seq(TransfersInfoResponse(caller.address, Some(simpleAsset), 10))
+      Seq(TransfersInfoResponse(caller.address, None, 10))
     )
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
