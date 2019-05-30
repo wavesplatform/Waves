@@ -31,9 +31,9 @@ object PureContext {
   lazy val MaxBytesResult              = 65536
 
   lazy val mulLong: BaseFunction =
-    createTryOp(MUL_OP, LONG, LONG, MUL_LONG, "Integer multiplication", "multiplyer", "multiplyer")((a, b) => Math.multiplyExact(a, b))
+    createTryOp(MUL_OP, LONG, LONG, MUL_LONG, "Integer multiplication", "multiplier", "multiplier")((a, b) => Math.multiplyExact(a, b))
   lazy val divLong: BaseFunction =
-    createTryOp(DIV_OP, LONG, LONG, DIV_LONG, "Integer devision", "divisible", "divisor")((a, b) => Math.floorDiv(a, b))
+    createTryOp(DIV_OP, LONG, LONG, DIV_LONG, "Integer division", "divisible", "divisor")((a, b) => Math.floorDiv(a, b))
   lazy val modLong: BaseFunction =
     createTryOp(MOD_OP, LONG, LONG, MOD_LONG, "Modulo", "divisible", "divisor")((a, b) => Math.floorMod(a, b))
   lazy val sumLong: BaseFunction =
@@ -41,7 +41,7 @@ object PureContext {
   lazy val subLong: BaseFunction =
     createTryOp(SUB_OP, LONG, LONG, SUB_LONG, "Integer substitution", "term", "term")((a, b) => Math.subtractExact(a, b))
   lazy val sumString: BaseFunction =
-    createRawOp(SUM_OP, STRING, STRING, SUM_STRING, "Limited strings concatination", "prefix", "suffix", 10) {
+    createRawOp(SUM_OP, STRING, STRING, SUM_STRING, "Limited strings concatenation", "prefix", "suffix", 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
         lazy val al = a.length
         lazy val bl = b.length
@@ -49,16 +49,16 @@ object PureContext {
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction =
-    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited bytes vectors concatination", "prefix", "suffix", 10) {
+    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited bytes vectors concatenation", "prefix", "suffix", 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
         lazy val al = a.arr.length
         lazy val bl = b.arr.length
         Either.cond(al + bl <= MaxBytesResult, CONST_BYTESTR(a ++ b), "ByteStr is too large")
       case _ => ???
     }
-  lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer grater or equal comparation", "term", "term")(_ >= _)
+  lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer greater or equal comparison", "term", "term")(_ >= _)
   lazy val gt: BaseFunction =
-    createOp(GT_OP, LONG, BOOLEAN, GT_LONG, "Integer grater comparation", "term", "term")(_ > _)
+    createOp(GT_OP, LONG, BOOLEAN, GT_LONG, "Integer greater comparison", "term", "term")(_ > _)
 
   lazy val eq: BaseFunction =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "Equality", ("a", TYPEPARAM('T'), "value"), ("b", TYPEPARAM('T'), "value")) {
@@ -146,9 +146,9 @@ object PureContext {
     1,
     FRACTION,
     LONG,
-    "Multiply and dividion with big integer intermediate representation",
-    ("value", LONG, "multiplyer"),
-    ("numerator", LONG, "multiplyer"),
+    "Multiply and division with big integer intermediate representation",
+    ("value", LONG, "multiplier"),
+    ("numerator", LONG, "multiplier"),
     ("denominator", LONG, "divisor")
   ) {
     case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: Nil =>
@@ -198,7 +198,7 @@ object PureContext {
       case _                      => ???
     }
 
-  lazy val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "Scting size in characters", ("xs", STRING, "string")) {
+  lazy val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "String size in characters", ("xs", STRING, "string")) {
     case CONST_STRING(bv) :: Nil => Right(CONST_LONG(bv.length.toLong))
     case xs                      => notImplemented("size(String)", xs)
   }
@@ -264,7 +264,7 @@ object PureContext {
   private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
 
   lazy val takeString: BaseFunction =
-    NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "sctring"), ("number", LONG, "prefix size in characters")) {
+    NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size in characters")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.take(trimLongToInt(number))))
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
@@ -284,7 +284,7 @@ object PureContext {
     }
 
   lazy val dropString: BaseFunction =
-    NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
+    NativeFunction("drop", 1, DROP_STRING, STRING, "Remove string prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.drop(trimLongToInt(number))))
       case xs                                            => notImplemented("drop(xs: String, number: Long)", xs)
     }
@@ -328,7 +328,7 @@ object PureContext {
   lazy val toUtf8String: BaseFunction =
     NativeFunction("toUtf8String", 20, UTF8STRING, STRING, "Convert UTF8 bytes to string", ("u", BYTESTR, "utf8")) {
       case CONST_BYTESTR(u) :: Nil => Try(CONST_STRING(UTF8Decoder.decode(ByteBuffer.wrap(u.arr)).toString)).toEither.left.map {
-        case _:MalformedInputException => "Input contents invalid UTD8 sequence"
+        case _:MalformedInputException => "Input contents invalid UTF8 sequence"
         case e => e.toString
       }
       case xs                      => notImplemented("toUtf8String(u: byte[])", xs)
@@ -344,7 +344,7 @@ object PureContext {
     }
 
   lazy val toLongOffset: BaseFunction =
-    NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offet", LONG, "bytes offset")) {
+    NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offset", LONG, "bytes offset")) {
       case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil => if( o >= 0 && o <= u.size - 8) {
           Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map {
              case _:BufferUnderflowException => "Buffer underflow"
@@ -370,7 +370,7 @@ object PureContext {
     }
 
   lazy val indexOfN: BaseFunction =
-    NativeFunction("indexOf", 20, INDEXOFN, optionLong, "index of substring after offset", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
+    NativeFunction("indexOf", 20, INDEXOFN, optionLong, "index of substring after offset", ("str", STRING, "String for analyze"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right( if(off >= 0 && off <= m.length) {
          val i = m.indexOf(sub, off.toInt)
          if( i != -1 ) {
