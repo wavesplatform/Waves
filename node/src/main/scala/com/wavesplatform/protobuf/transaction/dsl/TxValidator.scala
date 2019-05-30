@@ -13,7 +13,7 @@ trait TxValidator {
 object TxValidator {
   implicit object Default extends TxValidator {
     override def validate(tx: PBCachedTransaction): Either[ValidationError, Unit] = tx match {
-      case Matchers.Data(bf, dataEntries) =>
+      case Matchers.Data(_, dataEntries) =>
         V.seq(
           V.not(dataEntries.lengthCompare(MaxEntryCount) > 0 || dataEntries.exists(!_.valid), TxValidationError.TooBigArray),
           V.not(dataEntries.exists(_.key.isEmpty), TxValidationError.GenericError("Empty key found")),
