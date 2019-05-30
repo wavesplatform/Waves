@@ -787,6 +787,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 
+  property("list type inferrer") {
+    val script =
+      s"""
+         | let l = if (true) then [1] else ["str"]
+         | let n = "qqq" :: l
+         | match n[1] {
+         |   case i: Int => i == 1
+         |   case s: String => false
+         | } &&
+         | match n[0] {
+         |   case i: Int => false
+         |   case s: String => s == "qqq"
+         | }
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+
   property("matching parameterized types") {
     val script =
       s"""
