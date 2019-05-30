@@ -1,9 +1,8 @@
 package com.wavesplatform.protobuf.transaction.dsl
 
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.transaction.dsl.PBTransactionsDSL.Matchers
-import com.wavesplatform.protobuf.transaction.dsl.TxValidator.V
+import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBTransactions}
 import com.wavesplatform.transaction.DataTransaction.MaxEntryCount
 import com.wavesplatform.transaction.{DataTransaction, TxValidationError}
 
