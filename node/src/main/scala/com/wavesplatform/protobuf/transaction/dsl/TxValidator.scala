@@ -3,6 +3,7 @@ package com.wavesplatform.protobuf.transaction.dsl
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.transaction.dsl.PBTransactionsDSL.Matchers
+import com.wavesplatform.protobuf.transaction.dsl.TxValidator.V
 import com.wavesplatform.transaction.DataTransaction.MaxEntryCount
 import com.wavesplatform.transaction.{DataTransaction, TxValidationError}
 
@@ -14,13 +15,13 @@ object TxValidator {
   implicit object Default extends TxValidator {
     override def validate(tx: PBCachedTransaction): Either[ValidationError, Unit] = tx match {
       case Matchers.Data(bf, dataEntries) =>
-        for {
-          _ <- V.not(dataEntries.lengthCompare(MaxEntryCount) > 0 || dataEntries.exists(!_.valid), TxValidationError.TooBigArray)
-          _ <- V.not(dataEntries.exists(_.key.isEmpty), TxValidationError.GenericError("Empty key found"))
-          _ <- V.not(dataEntries.map(_.key).distinct.lengthCompare(dataEntries.size) < 0, TxValidationError.GenericError("Duplicate keys found"))
-          _ <- V.hasFee(tx)
-          _ <- V.bytesFits(tx, DataTransaction.MaxBytes)
-        } yield ()
+        V.seq(
+          V.not(dataEntries.lengthCompare(MaxEntryCount) > 0 || dataEntries.exists(!_.valid), TxValidationError.TooBigArray),
+          V.not(dataEntries.exists(_.key.isEmpty), TxValidationError.GenericError("Empty key found")),
+          V.not(dataEntries.map(_.key).distinct.lengthCompare(dataEntries.size) < 0, TxValidationError.GenericError("Duplicate keys found")),
+          V.hasFee(tx),
+          V.bytesFits(tx, DataTransaction.MaxBytes)
+        )
 
       case _ =>
         Left(TxValidationError.GenericError("todo"))
@@ -42,6 +43,11 @@ object TxValidator {
         PBTransactions.vanilla(tx, unsafe = true).filterOrElse(_.bytes().length <= maxSize, TxValidationError.TooBigArray).map(_ => ())
       else
         Either.cond(tx.serializedSize <= maxSize, (), TxValidationError.TooBigArray)
+    }
+
+    def seq(vs: Validation*): Validation = {
+      import cats.implicits._
+      vs.toList.sequence.map(_ => ())
     }
   }
 }
