@@ -87,13 +87,13 @@ object TypeInferrer {
     case (NOTHING, t2)        => t2
     case (t1, t2) if t1 == t2 => t1
 
-    case (r @ LIST(it1), a @ LIST(it2)) =>
+    case (LIST(it1), LIST(it2)) => LIST(findCommonType(it1, it2))
       findCommonType(it1, it2) match {
         case NOTHING    => NOTHING
         case u: UNION   => LIST(u)
         case p: SINGLE  => LIST(p)
       }
-    case (p1: SINGLE, p2: SINGLE) => if (p1 == p2) p1 else UNION.create(List(p1, p2))
+    case (p1: SINGLE, p2: SINGLE) => UNION.create(List(p1, p2))
     case (r: UNION, a: UNION)     => UNION.create((r.typeList.toSet ++ a.typeList.toSet).toSeq)
     case (u: UNION, t: SINGLE)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
     case (t: SINGLE, u: UNION)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
