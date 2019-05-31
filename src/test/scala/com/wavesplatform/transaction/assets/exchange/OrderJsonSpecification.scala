@@ -121,13 +121,13 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val pk        = PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
-    val json = Json.parse(s"""
+    def mkJson(priceAsset: String): String = s"""
         {
           "senderPublicKey": "$pubKeyStr",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
            "assetPair": {
              "amountAsset": "",
-             "priceAsset": ""
+             "priceAsset": $priceAsset
            },
           "orderType": "sell",
           "amount": 0,
@@ -136,16 +136,24 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"
-        } """)
+        } """
 
-    json.validate[Order] match {
-      case e: JsError =>
-        fail("Error: " + JsError.toJson(e).toString())
-      case s: JsSuccess[Order] =>
-        val o = s.get
-        o.assetPair.amountAsset shouldBe empty
-        o.assetPair.priceAsset shouldBe empty
+    val jsons = Seq(""" "" """, "null", """ "WAVES" """).map { x =>
+      x -> mkJson(x)
+    }
 
+    jsons.foreach {
+      case (priceAssetStr, rawJson) =>
+        withClue(priceAssetStr) {
+          Json.parse(rawJson).validate[Order] match {
+            case e: JsError =>
+              fail("Error: " + JsError.toJson(e).toString())
+            case s: JsSuccess[Order] =>
+              val o = s.get
+              o.assetPair.amountAsset shouldBe empty
+              o.assetPair.priceAsset shouldBe empty
+          }
+        }
     }
   }
 }

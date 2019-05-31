@@ -19,44 +19,70 @@ class TradersTestSuite extends MatcherSuiteBase {
   private def orderVersion                        = (Random.nextInt(2) + 1).toByte
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  "Verifications of tricky ordering cases" - {
-    // Alice issues new asset
-    val aliceAsset =
-      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2).id
-    matcherNode.waitForTransaction(aliceAsset)
+  // Alice issues new asset
+  private val aliceAsset =
+    aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2).id
+  matcherNode.waitForTransaction(aliceAsset)
 
-    // Wait for balance on Alice's account
-    matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
-    matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
-    matcherNode.assertAssetBalance(bobAcc.address, aliceAsset, 0)
+  // Wait for balance on Alice's account
+  matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
+  matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
+  matcherNode.assertAssetBalance(bobAcc.address, aliceAsset, 0)
 
-    // Bob issues a new asset
-    val bobAssetQuantity = 10000
-    val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, smartIssueFee, 2).id
-    matcherNode.waitForTransaction(bobNewAsset)
+  // Bob issues a new asset
+  private val bobAssetQuantity = 10000
+  private val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, smartIssueFee, 2).id
+  matcherNode.waitForTransaction(bobNewAsset)
 
-    val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get
-    val aliceAssetId = ByteStr.decodeBase58(aliceAsset).get
+  private val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get
+  private val aliceAssetId = ByteStr.decodeBase58(aliceAsset).get
 
-    val bobWavesPair = AssetPair(
+  private val bobWavesPair = AssetPair(
+    amountAsset = Some(bobAssetId),
+    priceAsset = None
+  )
+
+  private val twoAssetsPair =
+    if (MatcherActor.compare(Some(bobAssetId.arr), Some(aliceAssetId.arr)) < 0)
+      AssetPair(
+        amountAsset = Some(aliceAssetId),
+        priceAsset = Some(bobAssetId)
+      )
+    else
+      AssetPair(
+        amountAsset = Some(bobAssetId),
+        priceAsset = Some(aliceAssetId)
+      )
+
+  matcherNode.assertAssetBalance(bobAcc.address, bobNewAsset, bobAssetQuantity)
+
+  "AssetPair BOB/WAVES vs BOB/NULL" in {
+    val trickyBobWavesPairWB58 = AssetPair(
       amountAsset = Some(bobAssetId),
-      priceAsset = None
+      priceAsset = Some(ByteStr.decodeBase58("WAVES").get)
     )
 
-    val twoAssetsPair =
-      if (MatcherActor.compare(Some(bobAssetId.arr), Some(aliceAssetId.arr)) < 0)
-        AssetPair(
-          amountAsset = Some(aliceAssetId),
-          priceAsset = Some(bobAssetId)
-        )
-      else
-        AssetPair(
-          amountAsset = Some(bobAssetId),
-          priceAsset = Some(aliceAssetId)
-        )
+    val trickyBobWavesPairWS = AssetPair(
+      amountAsset = Some(bobAssetId),
+      priceAsset = Some(ByteStr("WAVES".getBytes()))
+    )
 
-    matcherNode.assertAssetBalance(bobAcc.address, bobNewAsset, bobAssetQuantity)
+    val trickyBobOrderWB58 = matcherNode.prepareOrder(bobAcc, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+    matcherNode.expectIncorrectOrderPlacement(trickyBobOrderWB58, 400, "OrderRejected")
 
+    val trickyBobOrderWS = matcherNode.prepareOrder(bobAcc, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+    matcherNode.expectIncorrectOrderPlacement(trickyBobOrderWS, 400, "OrderRejected")
+
+    val correctBobOrder   = matcherNode.prepareOrder(bobAcc, bobWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+    val correctBobOrderId = matcherNode.placeOrder(correctBobOrder).message.id
+    matcherNode.waitOrderStatus(bobWavesPair, correctBobOrderId, "Accepted")
+
+    matcherNode.orderBook(bobWavesPair).bids shouldNot be(empty)
+    matcherNode.cancelOrder(bobAcc, bobWavesPair, correctBobOrderId)
+    matcherNode.waitOrderStatus(bobWavesPair, correctBobOrderId, "Cancelled")
+  }
+
+  "Verifications of tricky ordering cases" - {
     "owner moves assets/waves to another account and order become an invalid" - {
       // Could not work sometimes because of NODE-546
       "order with assets" - {
