@@ -1,7 +1,10 @@
 package com.wavesplatform.utils
+
+import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
+import com.google.common.io.ByteStreams
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Version
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
@@ -13,9 +16,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, Json}
 import scopt.OParser
-
-import scala.io.StdIn
-import scala.util.Try
 
 //noinspection ScalaStyle
 // TODO: Consider remove implemented methods from REST API
@@ -39,10 +39,12 @@ object UtilApp {
   case class SignTxOptions(signerAddress: String = "")
 
   case class Command(mode: Command.Mode = null,
+                     configFile: Option[String] = None,
                      inputData: Option[String] = None,
                      inputFile: Option[String] = None,
                      outputFile: Option[String] = None,
-                     format: String = "plain",
+                     inFormat: String = "plain",
+                     outFormat: String = "plain",
                      compileOptions: CompileOptions = CompileOptions(),
                      signOptions: SignOptions = SignOptions(),
                      verifyOptions: VerifyOptions = VerifyOptions(),
@@ -51,10 +53,11 @@ object UtilApp {
 
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
-      case Some(c) =>
-        val inBytes = IO.readInput(c)
+      case Some(cmd) =>
+        lazy val nodeState = new NodeState(cmd)
+        val inBytes = IO.readInput(cmd)
         val result = {
-          val doF = c.mode match {
+          val doAction = cmd.mode match {
             case Command.CompileScript   => Actions.doCompile _
             case Command.DecompileScript => Actions.doDecompile _
             case Command.SignBytes       => Actions.doSign _
@@ -62,14 +65,14 @@ object UtilApp {
             case Command.CreateKeyPair   => Actions.doCreateKeyPair _
             case Command.Hash            => Actions.doHash _
             case Command.SerializeTx     => Actions.doSerializeTx _
-            case Command.SignTx          => Actions.doSignTx _
+            case Command.SignTx => Actions.doSignTx(nodeState) _
           }
-          doF(c, inBytes)
+          doAction(cmd, inBytes)
         }
 
         result match {
           case Left(value)     => System.err.println(s"Error executing command: $value")
-          case Right(outBytes) => IO.writeOutput(c, outBytes)
+          case Right(outBytes) => IO.writeOutput(cmd, outBytes)
         }
 
       case None =>
@@ -86,26 +89,36 @@ object UtilApp {
       programName("waves util"),
       head("Waves Util", Version.VersionString),
       OParser.sequence(
-        opt[String]('s', name = "data")
+        opt[String]('d', name = "data")
           .text("Literal input data")
           .action((s, c) => c.copy(inputData = Some(s))),
         opt[String]('i', "input-file")
-          .action((f, c) => c.copy(inputFile = Some(f)))
-          .text("Input file name")
+          .action((f, c) => c.copy(inputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
+          .text("Input file name (- for stdin)")
           .validate {
             case fs if fs.nonEmpty && Files.isRegularFile(Paths.get(fs)) => success
             case fs                                                      => failure(s"Invalid file: $fs")
           },
         opt[String]('o', "output-file")
-          .action((f, c) => c.copy(outputFile = Some(f)))
-          .text("Output file name"),
-        opt[String]('f', "format")
-          .action((f, c) => c.copy(format = f))
+          .action((f, c) => c.copy(outputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
+          .text("Output file name (- for stdout)"),
+        opt[String]("in-format")
+          .action((f, c) => c.copy(inFormat = f))
+          .text("Input data format (plain/base58/base64)")
+          .validate {
+            case "base64" | "base58" | "plain" => success
+            case fs => failure(s"Invalid format: $fs")
+          },
+        opt[String]('f', "out-format")
+          .action((f, c) => c.copy(outFormat = f))
           .text("Output data format (plain/base58/base64)")
           .validate {
             case "base64" | "base58" | "plain" => success
             case fs                            => failure(s"Invalid format: $fs")
-          }
+          },
+        opt[String]('c', "config")
+          .action((cf, c) => c.copy(configFile = Some(cf).filter(_.nonEmpty)))
+          .text("Node config file path")
       ),
       cmd("script").children(
         cmd("compile")
@@ -118,6 +131,7 @@ object UtilApp {
       cmd("hash")
         .children(
           opt[String]('m', "mode")
+            .valueName("<fast|secure>")
             .action((m, c) => c.copy(hashOptions = c.hashOptions.copy(mode = m)))
         )
         .action((_, c) => c.copy(mode = Command.Hash)),
@@ -156,8 +170,8 @@ object UtilApp {
           .text("Sign JSON transaction")
           .action((_, c) => c.copy(mode = Command.SignTx))
           .children(
-            opt[String]('s', "signer")
-              .text("Signer address")
+            opt[String]('a', "signer-address")
+              .text("Signer address (requires corresponding key in wallet.dat)")
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
           )
       ),
@@ -169,8 +183,8 @@ object UtilApp {
     )
   }
 
-  private[this] object NodeState {
-    lazy val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
+  private[this] final class NodeState(c: Command) {
+    lazy val settings = WavesSettings.fromRootConfig(c.configFile.fold(ConfigFactory.load())(cf => com.wavesplatform.settings.loadConfig(ConfigFactory.parseFile(new File(cf)))))
     lazy val wallet   = Wallet(settings.walletSettings)
     lazy val time     = new NTP(settings.ntpServer)
   }
@@ -221,9 +235,9 @@ object UtilApp {
         .map(_.bytes())
     }
 
-    def doSignTx(c: Command, data: Array[Byte]): ActionResult =
+    def doSignTx(ns: NodeState)(c: Command, data: Array[Byte]): ActionResult =
       TransactionFactory
-        .parseRequestAndSign(NodeState.wallet, c.signTxOptions.signerAddress, NodeState.time, Json.parse(data).as[JsObject])
+        .parseRequestAndSign(ns.wallet, c.signTxOptions.signerAddress, ns.time, Json.parse(data).as[JsObject])
         .left
         .map(_.toString)
         .map(tx => Json.toBytes(tx.json()))
@@ -231,37 +245,28 @@ object UtilApp {
 
   private[this] object IO {
     def readInput(c: Command): Array[Byte] = {
-      val inputBytes = c.inputData match {
+      val inputStream = c.inputData match {
         case Some(value) =>
-          value.getBytes
+          new ByteArrayInputStream(value.getBytes)
+
         case None =>
           c.inputFile match {
-            case Some(file) =>
-              Files.readAllBytes(Paths.get(file))
-
-            case None =>
-              def readLinesUntil2Blank(): Iterator[String] =
-                Iterator
-                  .continually(StdIn.readLine())
-                  .grouped(2)
-                  .takeWhile {
-                    case Seq("", "") | Seq(null) | Seq(_, null) => false
-                    case _ => true
-                  }
-                  .flatten
-
-              readLinesUntil2Blank().mkString("\n").getBytes(StandardCharsets.UTF_8)
+            case Some(file) => new FileInputStream(file)
+            case None => System.in
           }
       }
-      tryDecode(inputBytes)
+
+      toPlainBytes(c.inFormat, ByteStreams.toByteArray(inputStream))
     }
 
-    def writeOutput(c: Command, result: Array[Byte]): Unit = c.outputFile match {
-      case Some(value) =>
-        Files.write(Paths.get(value), encode(result, c.format))
+    def writeOutput(c: Command, result: Array[Byte]): Unit = {
+      val outputStream = c.outputFile match {
+        case Some(file) => new FileOutputStream(file)
+        case None => System.out
+      }
 
-      case None =>
-        println(new String(encode(result, c.format)))
+      val encodedBytes = encode(result, c.outFormat)
+      outputStream.write(encodedBytes)
     }
 
     private[this] def encode(v: Array[Byte], format: String) = format match {
@@ -271,9 +276,13 @@ object UtilApp {
       case _        => sys.error(s"Invalid format $format")
     }
 
-    private[this] def tryDecode(v: Array[Byte]) =
-      Try(FastBase58.decode(new String(v).replaceAll("\\s+", "")))
-        .orElse(Try(Base64.decode(new String(v).replaceAll("\\s+", ""))))
-        .getOrElse(v)
+    private[this] def toPlainBytes(inFormat: String, encodedBytes: Array[Byte]) = {
+      lazy val strWithoutSpaces = new String(encodedBytes).replaceAll("\\s+", "")
+      inFormat match {
+        case "plain" => encodedBytes
+        case "base58" => FastBase58.decode(strWithoutSpaces)
+        case "base64" => Base64.decode(strWithoutSpaces)
+      }
+    }
   }
 }
