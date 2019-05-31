@@ -9,7 +9,7 @@ sealed trait PBCachedTransaction {
   def transaction: SignedTransaction
 
   def proofs: Seq[Array[Byte]]
-  def bodyBytes: Array[Byte]
+  def bodyBytes: Array[Byte] // Not equals to vanilla tx bodyBytes
   def bytes: Array[Byte]
   val id: Coeval[ByteStr] = Coeval.evalOnce(FastHashId.create(this.bodyBytes))
 

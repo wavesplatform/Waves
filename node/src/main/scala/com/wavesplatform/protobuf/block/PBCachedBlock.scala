@@ -2,9 +2,8 @@ package com.wavesplatform.protobuf.block
 import com.google.protobuf.{ByteString, CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.PBSerializable
+import com.wavesplatform.protobuf.transaction.PBCachedTransaction
 import com.wavesplatform.protobuf.transaction.PBCachedTransaction.PBCachedTransactionSerializable
-import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBSignedTransaction}
-import com.wavesplatform.protobuf.utils.PBUtils
 import monix.eval.Coeval
 
 sealed trait PBCachedBlock {
@@ -16,7 +15,6 @@ sealed trait PBCachedBlock {
   def signature: Array[Byte]
 
   def transactions: Seq[PBCachedTransaction]
-  def transactionsBytes: Seq[Array[Byte]]
   def bytes: Array[Byte]
 }
 
@@ -24,7 +22,7 @@ object PBCachedBlock {
   implicit def apply(block: PBBlock): PBCachedBlock = new PBCachedBlockImplWithBytes(block)
 
   def create(header: PBBlock.Header, signature: Array[Byte] = Array.emptyByteArray, transactions: Seq[PBCachedTransaction] = Nil): PBCachedBlock =
-    new PBCachedBlockImplWithHeaderAndTransactions(header, signature, transactions.map(tx => tx: PBSerializable))
+    new PBCachedBlockImplWithHeaderAndTransactions(header, signature, transactions)
 
   def fromBytes(bytes: Array[Byte]): PBCachedBlock = new PBCachedBlockImplWithBytes(bytes)
 
@@ -34,15 +32,15 @@ object PBCachedBlock {
         new PBCachedBlockImplWithHeaderAndTransactions(whtxs.headerV, signature, whtxs.transactionsSz)
 
       case _ =>
-        new PBCachedBlockImplWithHeaderAndTransactions(block.headerBytes, signature, block.transactionsBytes.map(tx => tx: PBSerializable))
+        new PBCachedBlockImplWithHeaderAndTransactions(block.headerBytes, signature, block.transactions)
     }
 
-    def withTransactions(transactions: Seq[PBSignedTransaction]): PBCachedBlock = block match {
+    def withTransactions(transactions: Seq[PBCachedTransaction]): PBCachedBlock = block match {
       case whtxs: PBCachedBlockImplWithHeaderAndTransactions =>
-        new PBCachedBlockImplWithHeaderAndTransactions(whtxs.headerV, whtxs.signatureBs, transactions.map(tx => tx: PBSerializable))
+        new PBCachedBlockImplWithHeaderAndTransactions(whtxs.headerV, whtxs.signatureBs, transactions)
 
       case _ =>
-        new PBCachedBlockImplWithHeaderAndTransactions(block.headerBytes, block.signature, transactions.map(tx => tx: PBSerializable))
+        new PBCachedBlockImplWithHeaderAndTransactions(block.headerBytes, block.signature, transactions)
     }
   }
 
@@ -51,7 +49,6 @@ object PBCachedBlock {
     private[block] val headerCoeval: Coeval[PBBlock.Header]
     private[block] val headerBytesCoeval: Coeval[(Array[Byte], Array[Byte])]
     private[block] val transactionsCoeval: Coeval[Seq[PBCachedTransaction]]
-    private[block] val transactionsBytesCoeval: Coeval[Seq[Array[Byte]]]
     private[block] val bytesCoeval: Coeval[Array[Byte]]
 
     override def block: PBBlock = blockCoeval()
@@ -64,14 +61,12 @@ object PBCachedBlock {
 
     override def transactions: Seq[PBCachedTransaction] = transactionsCoeval()
 
-    override def transactionsBytes: Seq[Array[Byte]] = transactionsBytesCoeval()
-
     override def bytes: Array[Byte] = bytesCoeval()
   }
 
   private class PBCachedBlockImplWithHeaderAndTransactions(val headerV: PBSerializable,
                                                            val signatureBs: Array[Byte],
-                                                           val transactionsSz: Seq[PBSerializable])
+                                                           val transactionsSz: Seq[PBCachedTransaction])
       extends PBCachedBlockImpl {
 
     override private[block] val headerCoeval = Coeval.evalOnce(headerV match {
@@ -80,12 +75,7 @@ object PBCachedBlock {
     })
     override private[block] val headerBytesCoeval = Coeval.evalOnce((headerV.toBytes, signatureBs))
 
-    override private[block] val transactionsCoeval = Coeval.evalOnce(transactionsSz.collect {
-      case txs: PBCachedTransactionSerializable => txs.transaction
-      case ms: PBSerializable.PBMessageSerializable => PBCachedTransaction(ms.underlyingMessage.asInstanceOf[PBSignedTransaction])
-      case tx => PBCachedTransaction(PBSignedTransaction.parseFrom(tx.toBytes))
-    })
-    override private[block] val transactionsBytesCoeval = Coeval.evalOnce(transactionsSz.map(_.toBytes))
+    override private[block] val transactionsCoeval = Coeval.evalOnce(transactionsSz)
 
     override private[block] val blockCoeval = Coeval.evalOnce {
       PBBlock(Some(headerCoeval()), ByteString.copyFrom(signatureBs), transactionsCoeval().map(_.transaction))
@@ -166,18 +156,19 @@ object PBCachedBlock {
         (header, signature)
     })
     override private[block] val bytesCoeval = Coeval.evalOnce(underlying.toBytes)
-    override private[block] val transactionsCoeval = blockCoeval.map(_.transactions.map(PBCachedTransaction(_)))
-    override private[block] val transactionsBytesCoeval = Coeval.evalOnce(underlying match {
-      case ms: PBSerializable.PBMessageSerializable => ms.underlyingMessage.asInstanceOf[PBBlock].transactions.map(PBUtils.encodeDeterministic)
+    override private[block] val transactionsCoeval = Coeval.evalOnce(underlying match {
+      case ms: PBSerializable.PBMessageSerializable =>
+        ms.underlyingMessage.asInstanceOf[PBBlock].transactions.map(PBCachedTransaction(_))
+
       case _ =>
         val inputStream = CodedInputStream.newInstance(underlying.toBytes)
-        val transactions = Vector.newBuilder[Array[Byte]]
+        val transactions = Vector.newBuilder[PBCachedTransaction]
         var done = false
         while (!done) {
           inputStream.readTag() match {
             case 0 => done = true
             case 26 =>
-              transactions += inputStream.readByteArray()
+              transactions += PBCachedTransaction.fromBytes(inputStream.readByteArray())
             case tag => inputStream.skipField(tag)
           }
         }
