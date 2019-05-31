@@ -8,15 +8,15 @@ import com.wavesplatform.transaction.DataTransaction.MaxEntryCount
 import com.wavesplatform.transaction.{DataTransaction, TxValidationError}
 
 trait TxValidator {
-  def validate(tx: PBCachedTransaction): TxValidator.ValidationsList
+  def validate(tx: PBCachedTransaction): TxValidator.ValidationList
 }
 
 object TxValidator {
   type Validation = Validated[ValidationError, Unit]
-  type ValidationsList = ValidatedNel[ValidationError, Unit]
+  type ValidationList = ValidatedNel[ValidationError, Unit]
 
   implicit object Default extends TxValidator {
-    override def validate(tx: PBCachedTransaction): ValidationsList = tx match {
+    override def validate(tx: PBCachedTransaction): ValidationList = tx match {
       case Matchers.Data(_, dataEntries) =>
         V.seq(
           V.not(dataEntries.lengthCompare(MaxEntryCount) > 0 || dataEntries.exists(!_.valid), TxValidationError.TooBigArray),
@@ -46,9 +46,11 @@ object TxValidator {
         Either.cond(tx.serializedSize <= maxSize, (), TxValidationError.TooBigArray)
     }
 
-    def seq(vs: Validation*): ValidationsList = {
+    def seq(vs: ValidationList*): ValidationList = {
       import cats.implicits._
-      vs.map(_.toValidatedNel).fold(Validated.validNel(()))(_ combine _)
+      vs.fold(Validated.validNel(()))(_ combine _)
     }
   }
+
+  private[this] implicit def validationAsList(v: Validation): ValidationList = v.toValidatedNel
 }
