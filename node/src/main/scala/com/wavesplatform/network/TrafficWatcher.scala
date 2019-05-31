@@ -1,28 +1,28 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.metrics.WavesKamon
 import com.wavesplatform.network.message.{Message => ScorexMessage}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
-import kamon.Kamon
 import kamon.metric.{Histogram, MeasurementUnit}
 
 @Sharable
-class TrafficWatcher extends ChannelDuplexHandler {
+final class TrafficWatcher extends ChannelDuplexHandler {
 
   import BasicMessagesRepo.specsByCodes
 
-  private val outgoing: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map {
+  private[this] val outgoing: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map {
     case (code, spec) =>
       code -> createHistogram("outgoing", spec)
   }
 
-  private val incoming: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map {
+  private[this] val incoming: Map[ScorexMessage.MessageCode, Histogram] = specsByCodes.map {
     case (code, spec) =>
       code -> createHistogram("incoming", spec)
   }
 
-  private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec): Histogram =
-    Kamon
+  private[this] def createHistogram(dir: String, spec: BasicMessagesRepo.Spec): Histogram =
+    WavesKamon
       .histogram("traffic", MeasurementUnit.information.bytes)
       .refine(
         "type" -> spec.messageName,
@@ -46,5 +46,4 @@ class TrafficWatcher extends ChannelDuplexHandler {
 
     super.channelRead(ctx, msg)
   }
-
 }

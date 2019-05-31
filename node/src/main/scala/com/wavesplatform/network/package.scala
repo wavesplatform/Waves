@@ -6,6 +6,7 @@ import java.util.concurrent.Callable
 import cats.Eq
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.metrics.WavesKamon
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}

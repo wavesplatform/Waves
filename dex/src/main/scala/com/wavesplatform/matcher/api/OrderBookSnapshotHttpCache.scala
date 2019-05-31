@@ -41,7 +41,7 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
       }
     })
 
-  private val statsScheduler: ScheduledFuture[_] = {
+  private[this] val statsScheduler: Option[ScheduledFuture[_]] = if (WavesKamon.isEnabled) Some {
     val period       = 3.seconds
     val requestStats = WavesKamon.histogram("matcher.http.ob.cache.req")
     val hitStats     = WavesKamon.histogram("matcher.http.ob.cache.hit")
@@ -57,7 +57,7 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
         period.toSeconds,
         period.unit
       )
-  }
+  } else None
 
   def get(pair: AssetPair, depth: Option[Int]): HttpResponse = {
     val nearestDepth = depth
@@ -73,7 +73,7 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
   }
 
   override def close(): Unit = {
-    statsScheduler.cancel(true)
+    statsScheduler.foreach(_.cancel(true))
   }
 }
 
