@@ -62,13 +62,13 @@ scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable f
 // Logback creates a "waves.directory_UNDEFINED" without this option.
 bashScriptExtraDefines ++= Seq(
   s"""addJava "-Dwaves.network-name=${network.value}"""",
-  s"""addJava "-Dwaves.defaults.${network.value}.directory=/var/lib/${(Universal / normalizedName).value}"""", // TODO: Test that logback uses correct directory
+  s"""addJava "-Dwaves.defaults.${network.value}.directory=/var/lib/${(Universal / normalizedName).value}"""",
   s"""addJava "-Dwaves.defaults.${network.value}.config.directory=/etc/${(Universal / normalizedName).value}""""
 )
 
 inConfig(Universal)(
   Seq(
-    mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
+    // mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
     mappings := {
       val linuxScriptPattern = "bin/(.+)".r
       val batScriptPattern   = "bin/([^.]+)\\.bat".r
@@ -97,7 +97,9 @@ inConfig(Universal)(
       "-J-XX:+ParallelRefProcEnabled",
       "-J-XX:+UseStringDeduplication",
       // JVM default charset for proper and deterministic getBytes behaviour
-      "-J-Dfile.encoding=UTF-8"
+      "-J-Dfile.encoding=UTF-8",
+      "-J-XX:+UseStringDeduplication",
+      s"-J-Dwaves.network-name=${network.value}"
     )
   )
 )
