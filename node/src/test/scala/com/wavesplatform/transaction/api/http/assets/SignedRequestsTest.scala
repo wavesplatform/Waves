@@ -41,7 +41,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.fee shouldBe 100000L
     tx.quantity shouldBe 100000L
     tx.timestamp shouldBe 1484064349669L
-    tx.signature.base58 shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
+    tx.signature.toString shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
   }
 
   test("AssetReissueRequest json parsing works") {
@@ -65,13 +65,13 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    tx.asset.id.base58 shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    tx.asset.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.reissuable shouldBe true
     tx.fee shouldBe 100000L
     tx.quantity shouldBe 100000L
     tx.timestamp shouldBe 1234L
     tx.reissuable shouldBe true
-    tx.signature.base58 shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
+    tx.signature.toString shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
   }
 
   test("AssetTransfer json parsing works") {
@@ -105,7 +105,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.assetId.maybeBase58Repr.get shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
-    tx.signature.base58 shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
+    tx.signature.toString shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
   }
 
   test("AssetTransfer with a fee in an asset json parsing works") {
@@ -142,7 +142,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.feeAssetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000
     tx.fee shouldBe 100
-    tx.signature.base58 shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
+    tx.signature.toString shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
   }
 
   test("AssetBurnRequest json parsing works") {
@@ -259,7 +259,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.timestamp shouldBe 1520945679531L
 
     val tx = req.toTx.explicitGet()
-    tx.asset.id.base58 shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    tx.asset.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.script shouldBe Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet())
     tx.fee shouldBe 100000L
     tx.timestamp shouldBe 1520945679531L

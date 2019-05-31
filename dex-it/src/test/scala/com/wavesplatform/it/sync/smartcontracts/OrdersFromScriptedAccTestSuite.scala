@@ -40,7 +40,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     )
     .explicitGet()
 
-  private val aliceAsset     = aliceAssetTx.id().base58
+  private val aliceAsset = aliceAssetTx.id().toString
   private val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
   override protected def beforeAll(): Unit = {

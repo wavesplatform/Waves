@@ -79,7 +79,7 @@ class HistoryRouterSpecification
   def denormalizePrice(value: Long, pair: AssetPair): Double        = Denormalization.denormalizePrice(value, wavesDecimals, assetDecimals)
 
   implicit class LimitOrderOps(limitOrder: LimitOrder) {
-    def orderId: String         = limitOrder.order.id().base58
+    def orderId: String = limitOrder.order.id().toString
     def senderPublicKey: String = limitOrder.order.senderPublicKey.toString
   }
 

@@ -102,7 +102,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     script = tx.script.map(_.bytes().base64),
     fee = tx.fee,
     timestamp = tx.timestamp,
-    proofs = tx.proofs.proofs.map(_.base58)(collection.breakOut)
+    proofs = tx.proofs.proofs.map(_.toString)(collection.breakOut)
   )
 
 }

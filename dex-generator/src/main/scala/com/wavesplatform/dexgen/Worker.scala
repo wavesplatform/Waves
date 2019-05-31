@@ -3,14 +3,12 @@ package com.wavesplatform.dexgen
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{KeyPair, PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PublicKey}
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.dexgen.Worker._
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
-import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, Transaction, UnexpectedStatusCodeException}
-import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.transaction.Asset
@@ -68,7 +66,7 @@ class Worker(workerSettings: Settings,
       }
       orderHistory <- to(matcherSettings.endpoint).orderHistory(buyer)
       orderbook    <- to(matcherSettings.endpoint).orderBook(pair)
-      orderStatus  <- to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
+      orderStatus <- to(matcherSettings.endpoint).orderStatus(order.id().toString, pair)
     } yield placeOrder
     (order, response)
   }
@@ -84,7 +82,7 @@ class Worker(workerSettings: Settings,
       }
       orderHistory <- to(matcherSettings.endpoint).orderHistory(seller)
       orderbook    <- to(matcherSettings.endpoint).orderBook(pair)
-      orderStatus  <- to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
+      orderStatus <- to(matcherSettings.endpoint).orderStatus(order.id().toString, pair)
     } yield placeOrder
     (order, response)
   }
@@ -140,7 +138,7 @@ class Worker(workerSettings: Settings,
         case Left(e) => throw new RuntimeException(s"[$tag] Generated transaction is wrong: $e")
         case Right(txRequest) =>
           log.info(
-            s"[$tag] ${assetId.compatId.fold("Waves")(_.base58)} balance of ${sender.address}: $balance, sending $transferAmount to ${recipient.address}")
+            s"[$tag] ${assetId.compatId.fold("Waves")(_.toString)} balance of ${sender.address}: $balance, sending $transferAmount to ${recipient.address}")
           val signedTx = createSignedTransferRequest(txRequest)
           to(endpoint).broadcastRequest(signedTx).flatMap { tx =>
             to(endpoint).waitForTransaction(tx.id)

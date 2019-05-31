@@ -22,7 +22,7 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
     jsonBase() ++ Json.obj(
       "version"    -> version,
       "chainId"    -> chainByte,
-      "assetId"    -> asset.id.base58,
+      "assetId" -> asset.id.toString,
       "quantity"   -> quantity,
       "reissuable" -> reissuable
     ))

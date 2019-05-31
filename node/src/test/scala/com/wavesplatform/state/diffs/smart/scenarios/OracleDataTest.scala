@@ -51,7 +51,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
                                    |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
-                                   |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.base58}'
+                                   |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.toString}'
                                    |   let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
                                    |   long && bool && bin && str
                                    |}""".stripMargin

@@ -22,7 +22,7 @@ trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction
       "version"   -> version,
       "fee"       -> fee,
       "timestamp" -> timestamp,
-      "leaseId"   -> leaseId.base58
+      "leaseId" -> leaseId.toString
     ))
   protected val bytesBase = Coeval.evalOnce(Bytes.concat(sender, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr))
 

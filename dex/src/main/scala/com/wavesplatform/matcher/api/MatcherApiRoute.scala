@@ -400,7 +400,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         StatusCodes.OK -> orders.map {
           case (id, oi) =>
             Json.obj(
-              "id"        -> id.base58,
+              "id" -> id.toString,
               "type"      -> oi.side.toString,
               "amount"    -> oi.amount,
               "price"     -> oi.price,

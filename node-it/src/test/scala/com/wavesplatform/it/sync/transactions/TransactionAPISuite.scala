@@ -48,7 +48,7 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
         .explicitGet()
     }).toList
 
-  val transactionIds = transactions.map(_.id().base58)
+  val transactionIds = transactions.map(_.id().toString)
 
   "should accept transactions" in {
     transactions.foreach { tx =>
@@ -93,7 +93,7 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
           .drop(limit - 1)
           .head
           .id()
-          .base58
+          .toString
 
       val received =
         sender

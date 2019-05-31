@@ -65,7 +65,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
                        |{-# CONTENT_TYPE EXPRESSION #-}
                        |{-# SCRIPT_TYPE ASSET #-}
                        |
-                       |this.bytes == base58'${asset.id.base58}'
+                       |this.bytes == base58'${asset.id.toString}'
                        |
         """.stripMargin
 

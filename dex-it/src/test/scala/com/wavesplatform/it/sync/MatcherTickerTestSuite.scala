@@ -6,7 +6,6 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -193,5 +192,5 @@ object MatcherTickerTestSuite {
     priceAsset = UsdId
   )
 
-  private val updatedMatcherConfig = parseString(s"""waves.matcher.price-assets = ["${UsdId.id.base58}", "WAVES"]""".stripMargin)
+  private val updatedMatcherConfig = parseString(s"""waves.matcher.price-assets = ["${UsdId.id.toString}", "WAVES"]""".stripMargin)
 }

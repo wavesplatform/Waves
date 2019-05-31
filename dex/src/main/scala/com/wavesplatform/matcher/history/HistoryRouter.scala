@@ -42,9 +42,9 @@ object HistoryRouter {
       val order = this.limitOrder.order
       Set(
         OrderRecord(
-          id = order.id().base58,
+          id = order.id().toString,
           senderAddress = order.sender.address,
-          senderPublicKey = order.senderPublicKey.base58,
+          senderPublicKey = order.senderPublicKey.toString,
           amountAssetId = order.assetPair.amountAssetStr,
           priceAssetId = order.assetPair.priceAssetStr,
           side = if (order.orderType == OrderType.BUY) buySide else sellSide,
@@ -73,7 +73,7 @@ object HistoryRouter {
           Set(submitted -> e.submittedRemainingAmount, counter -> e.counterRemainingAmount) map {
             case (limitOrder, remainingAmount) =>
               EventRecord(
-                orderId = limitOrder.order.id().base58,
+                orderId = limitOrder.order.id().toString,
                 eventType = eventTrade,
                 timestamp = toLocalDateTime(timestamp),
                 price = denormalizePrice(limitOrder.order.price, assetPair),
@@ -86,7 +86,7 @@ object HistoryRouter {
         case OrderCanceled(submitted, _, timestamp) =>
           Set(
             EventRecord(
-              orderId = submitted.order.id().base58,
+              orderId = submitted.order.id().toString,
               eventType = eventCancel,
               timestamp = toLocalDateTime(timestamp),
               price = denormalizePrice(submitted.order.price, submitted.order.assetPair),

@@ -39,10 +39,10 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     )
 
   private val priceAssets = ConfigFactory.parseString(s"""waves.matcher {
-       |  blacklisted-assets = [${Asset3.id.base58}]
-       |  blacklisted-names = ["name$$"]
-       |  price-assets = [${predefinedPriceAssets.map(_.id.base58).mkString(",")}]
-       |}""".stripMargin)
+                                                         |  blacklisted-assets = [${Asset3.id.toString}]
+                                                         |  blacklisted-names = ["name$$"]
+                                                         |  price-assets = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
+                                                         |}""".stripMargin)
   private val settings    = loadConfig(priceAssets).as[MatcherSettings]("waves.matcher")
   private val blockchain  = stub[Blockchain]
 
@@ -50,16 +50,16 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
   private val pairs = Table(
     ("amount", "price", "result"),
-    (WAVES, WUSD.id.base58, Right(())),
-    (WUSD.id.base58, WAVES, Left("Pair should be reverse")),
-    (WBTC.id.base58, WEUR.id.base58, Left("Pair should be reverse")),
-    (WEUR.id.base58, WBTC.id.base58, Right(())),
-    (Asset1.id.base58, WAVES, Right(())),
-    (WAVES, Asset1.id.base58, Left("Pair should be reverse")),
-    (Asset2.id.base58, Asset1.id.base58, Right(())),
-    (Asset1.id.base58, Asset2.id.base58, Left("Pair should be reverse")),
-    (Asset1.id.base58, WBTC.id.base58, Right(())),
-    (WEUR.id.base58, Asset1.id.base58, Left("Pair should be reverse")),
+    (WAVES, WUSD.id.toString, Right(())),
+    (WUSD.id.toString, WAVES, Left("Pair should be reverse")),
+    (WBTC.id.toString, WEUR.id.toString, Left("Pair should be reverse")),
+    (WEUR.id.toString, WBTC.id.toString, Right(())),
+    (Asset1.id.toString, WAVES, Right(())),
+    (WAVES, Asset1.id.toString, Left("Pair should be reverse")),
+    (Asset2.id.toString, Asset1.id.toString, Right(())),
+    (Asset1.id.toString, Asset2.id.toString, Left("Pair should be reverse")),
+    (Asset1.id.toString, WBTC.id.toString, Right(())),
+    (WEUR.id.toString, Asset1.id.toString, Left("Pair should be reverse")),
   )
 
   "AssetPairBuilder" - {
