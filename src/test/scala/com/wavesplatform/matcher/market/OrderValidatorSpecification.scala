@@ -139,75 +139,6 @@ class OrderValidatorSpecification
           }
       }
 
-      "whiteListOnly is enabled" in {
-        def validate(allowedAssetPairs: Set[AssetPair]): Order => OrderValidator.ValidationResult =
-          OrderValidator.matcherSettingsAware(MatcherAccount, Set.empty, whiteListOnly = true, Set.empty, allowedAssetPairs)
-
-        forAll(orderGenerator) {
-          case (order, _) =>
-            validate(Set.empty[AssetPair])(order) should produce(s"Trading is not allowed for the pair: ${order.assetPair}")
-
-            validate(Set(order.assetPair))(order) shouldBe 'right
-
-            validate(Set(AssetPair.createAssetPair("A1", "A2").get))(order) should produce(
-              s"Trading is not allowed for the pair: ${order.assetPair}"
-            )
-
-            OrderValidator.matcherSettingsAware(
-              MatcherAccount,
-              blacklistedAddresses = Set(order.senderPublicKey.toAddress),
-              whiteListOnly = true,
-              blacklistedAssets = Set.empty,
-              allowedAssetPairs = Set(order.assetPair)
-            )(order) should produce("Invalid address")
-
-            OrderValidator.matcherSettingsAware(
-              MatcherAccount,
-              blacklistedAddresses = Set.empty,
-              whiteListOnly = true,
-              blacklistedAssets = Set(order.assetPair.amountAsset, order.assetPair.priceAsset),
-              allowedAssetPairs = Set(order.assetPair)
-            )(order) shouldBe 'right
-        }
-      }
-
-      "whiteListOnly is disabled" in {
-        def validate(allowedAssetPairs: Set[AssetPair]): Order => OrderValidator.ValidationResult =
-          OrderValidator.matcherSettingsAware(MatcherAccount, Set.empty, whiteListOnly = false, Set.empty, allowedAssetPairs)
-
-        forAll(orderGenerator) {
-          case (order, _) =>
-            validate(Set.empty[AssetPair])(order) shouldBe 'right
-            validate(Set(order.assetPair))(order) shouldBe 'right
-
-            validate(Set(AssetPair.createAssetPair("A1", "A2").get))(order) shouldBe 'right
-
-            OrderValidator.matcherSettingsAware(
-              MatcherAccount,
-              blacklistedAddresses = Set(order.senderPublicKey.toAddress),
-              whiteListOnly = false,
-              blacklistedAssets = Set.empty,
-              allowedAssetPairs = Set(order.assetPair)
-            )(order) should produce("Invalid address")
-
-            OrderValidator.matcherSettingsAware(
-              MatcherAccount,
-              blacklistedAddresses = Set.empty,
-              whiteListOnly = false,
-              blacklistedAssets = Set(order.assetPair.amountAsset, order.assetPair.priceAsset),
-              allowedAssetPairs = Set(order.assetPair)
-            )(order) shouldBe 'right
-
-            OrderValidator.matcherSettingsAware(
-              MatcherAccount,
-              blacklistedAddresses = Set.empty,
-              whiteListOnly = false,
-              blacklistedAssets = Set(order.assetPair.amountAsset),
-              allowedAssetPairs = Set.empty
-            )(order) should produce("Invalid amount asset")
-        }
-      }
-
       "matcherFee is not enough" in {
         def setScriptsAndValidate(amountAssetScript: Option[Script], priceAssetScript: Option[Script], matcherAccountScript: Option[Script])(
             disableExtraFeeForScript: Boolean)(order: Order): OrderValidator.ValidationResult = {
@@ -443,5 +374,5 @@ class OrderValidatorSpecification
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus)(o))
 
   private def msa(ba: Set[Address], o: Order) =
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, whiteListOnly = false, Set.empty, matcherSettings.allowedAssetPairs) _
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba) _
 }

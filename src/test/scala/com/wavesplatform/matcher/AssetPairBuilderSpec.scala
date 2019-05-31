@@ -36,9 +36,11 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     )
 
   private val priceAssets = ConfigFactory.parseString(s"""waves.matcher {
-       |  blacklisted-assets = [$Asset3]
-       |  blacklisted-names = ["name$$"]
-       |  price-assets = [${predefinedPriceAssets.mkString(",")}]
+       |  blacklisted-assets  = [$Asset3]
+       |  blacklisted-names   = ["name$$"]
+       |  price-assets        = [${predefinedPriceAssets.mkString(",")}]
+       |  white-list-only     = no
+       |  allowed-asset-pairs = [WAVES-$Asset3]
        |}""".stripMargin)
   private val settings    = MatcherSettings.fromRootConfig(loadConfig(priceAssets))
   private val blockchain  = stub[Blockchain]
@@ -57,16 +59,18 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     (Asset1.base58, Asset2.base58, Left("Pair should be reverse")),
     (Asset1.base58, WBTC.base58, Right(())),
     (WEUR.base58, Asset1.base58, Left("Pair should be reverse")),
+    (WAVES, Asset3.base58, Right(())),
   )
 
   "AssetPairBuilder" - {
-    "correctly orders pairs when assets IDs are valid" in {
+    "correctly ordered and assets IDs are valid" in {
       for (id <- predefinedPriceAssets) {
         (blockchain.assetDescription _).when(id).returns(mkAssetDescription())
       }
 
       (blockchain.assetDescription _).when(Asset1).returns(mkAssetDescription())
       (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription())
+      (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription())
 
       forAll(pairs) {
         case (amountAsset, priceAsset, isValid) =>
@@ -100,6 +104,11 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
       }
       "amount and price assets are the same" in {
         builder.validateAssetPair(AssetPair(Some(WUSD), Some(WUSD))) should produce("Amount and price assets must be different")
+      }
+      "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
+        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), blockchain)
+        val assetPair = AssetPair(None, Some(ByteStr.decodeBase58(WUSD.base58).get))
+        builder.validateAssetPair(assetPair) should produce(s"Trading is not allowed for the pair: $assetPair")
       }
     }
   }

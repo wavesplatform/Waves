@@ -62,9 +62,11 @@ class TradersTestSuite extends MatcherSuiteBase {
       priceAsset = Some(ByteStr.decodeBase58("WAVES").get)
     )
 
+    trickyBobWavesPairWB58.key shouldBe bobWavesPair.key
+
     val trickyBobWavesPairWS = AssetPair(
-      amountAsset = Some(bobAssetId),
-      priceAsset = Some(ByteStr("WAVES".getBytes()))
+      priceAsset = Some(ByteStr("WAVES".getBytes())),
+      amountAsset = Some(bobAssetId)
     )
 
     val trickyBobOrderWB58 = matcherNode.prepareOrder(bobAcc, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
@@ -76,6 +78,20 @@ class TradersTestSuite extends MatcherSuiteBase {
     val correctBobOrder   = matcherNode.prepareOrder(bobAcc, bobWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
     val correctBobOrderId = matcherNode.placeOrder(correctBobOrder).message.id
     matcherNode.waitOrderStatus(bobWavesPair, correctBobOrderId, "Accepted")
+
+    val markets = matcherNode.tradingMarkets().markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
+
+    withClue("hasTrickyBobWavesPairWB58Market") {
+      markets.contains(trickyBobWavesPairWB58.key) shouldBe true
+    }
+
+    withClue("hasTrickyBobWavesPairWSMarket") {
+      markets.contains(trickyBobWavesPairWS.key) shouldBe false
+    }
+
+    withClue("bobWavesPair") {
+      markets.contains(bobWavesPair.key) shouldBe true
+    }
 
     matcherNode.orderBook(bobWavesPair).bids shouldNot be(empty)
     matcherNode.cancelOrder(bobAcc, bobWavesPair, correctBobOrderId)
