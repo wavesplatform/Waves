@@ -89,10 +89,12 @@ object UtilApp {
       programName("waves util"),
       head("Waves Util", Version.VersionString),
       OParser.sequence(
-        opt[String]('d', name = "data")
+        opt[String](name = "input-str")
+          .abbr("is")
           .text("Literal input data")
           .action((s, c) => c.copy(inputData = Some(s))),
-        opt[String]('i', "input-file")
+        opt[String]("input-file")
+          .abbr("if")
           .action((f, c) => c.copy(inputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
           .text("Input file name (- for stdin)")
           .validate {
@@ -103,13 +105,15 @@ object UtilApp {
           .action((f, c) => c.copy(outputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
           .text("Output file name (- for stdout)"),
         opt[String]("in-format")
+          .abbr("fi")
           .action((f, c) => c.copy(inFormat = f))
           .text("Input data format (plain/base58/base64)")
           .validate {
             case "base64" | "base58" | "plain" => success
             case fs => failure(s"Invalid format: $fs")
           },
-        opt[String]('f', "out-format")
+        opt[String]("out-format")
+          .abbr("fo")
           .action((f, c) => c.copy(outFormat = f))
           .text("Output data format (plain/base58/base64)")
           .validate {
@@ -170,7 +174,8 @@ object UtilApp {
           .text("Sign JSON transaction")
           .action((_, c) => c.copy(mode = Command.SignTx))
           .children(
-            opt[String]('a', "signer-address")
+            opt[String]("signer-address")
+              .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
           )
