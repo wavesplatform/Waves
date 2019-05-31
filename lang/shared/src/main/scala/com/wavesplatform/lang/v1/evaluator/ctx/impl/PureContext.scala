@@ -228,7 +228,7 @@ object PureContext {
     }
 
   lazy val dropRightBytes: BaseFunction =
-    UserFunction("dropRight", "dropRightBytes", 19, BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cuting size")) {
+    UserFunction("dropRight", "dropRightBytes", 19, BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cutting size")) {
       FUNCTION_CALL(
         takeBytes,
         List(
@@ -357,7 +357,7 @@ object PureContext {
     }
 
   lazy val indexOf: BaseFunction =
-    NativeFunction("indexOf", 20, INDEXOF, optionLong, "index of substring", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching")) {
+    NativeFunction("indexOf", 20, INDEXOF, optionLong, "index of substring", ("str", STRING, "String for analyze"), ("substr", STRING, "String for searching")) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right({
         val i = m.indexOf(sub)
          if( i != -1 ) {
