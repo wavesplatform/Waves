@@ -98,7 +98,7 @@ object UtilApp {
           .action((f, c) => c.copy(inputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
           .text("Input file name (- for stdin)")
           .validate {
-            case fs if fs.nonEmpty && Files.isRegularFile(Paths.get(fs)) => success
+            case fs if fs.isEmpty || fs == "-" || Files.isRegularFile(Paths.get(fs)) => success
             case fs                                                      => failure(s"Invalid file: $fs")
           },
         opt[String]('o', "output-file")
