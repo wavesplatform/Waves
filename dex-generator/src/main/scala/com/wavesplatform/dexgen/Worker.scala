@@ -9,6 +9,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.dexgen.Worker._
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
+import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, Transaction, UnexpectedStatusCodeException}
+import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.transaction.Asset
