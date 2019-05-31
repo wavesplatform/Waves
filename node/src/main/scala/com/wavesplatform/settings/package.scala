@@ -57,23 +57,21 @@ package object settings {
   }
 
   def loadConfig(maybeUserConfig: Option[Config]): Config = {
-    val defaults = ConfigFactory.defaultOverrides()
+    import scala.collection.JavaConverters._
+    val sysProps = ConfigFactory.defaultOverrides()
+
     val external = maybeUserConfig
-      .fold(defaults)(defaults.withFallback)
+      .fold(sysProps)(sysProps.withFallback)
+      .withFallback(ConfigFactory.parseMap(Map("waves.directory" -> defaultDirectory).asJava))
 
-    val withApp = external
-      .withFallback(ConfigFactory.defaultApplication())
-      .withFallback(ConfigFactory.defaultReference())
-      .resolve()
-
-    val cmdDefaults =
-      Try(withApp.getConfig("waves.defaults"))
-        .getOrElse(ConfigFactory.empty())
-        .atPath("waves")
+    val networkDefaults = {
+      val withAppConf = external.withFallback(ConfigFactory.defaultApplication())
+      val network = withAppConf.getString("waves.network-name")
+      withAppConf.getConfig(s"waves.defaults.$network")
+    }
 
     external
-      .withFallback(cmdDefaults)
-      .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(withApp)}"))
+      .withFallback(networkDefaults)
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
