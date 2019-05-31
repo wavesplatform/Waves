@@ -11,10 +11,8 @@ import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransact
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
-import kamon.Kamon
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
@@ -37,8 +35,8 @@ class OrderBookActor(owner: ActorRef,
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
   private var lastProcessedOffset     = Option.empty[QueueEventWithMeta.Offset]
 
-  private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
-  private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
+  private val addTimer    = WavesKamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
+  private val cancelTimer = WavesKamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
   private var orderBook   = OrderBook.empty
 
   private var lastTrade = Option.empty[LastTrade]

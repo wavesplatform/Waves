@@ -22,7 +22,6 @@ import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
@@ -299,17 +298,17 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
   }
 
   private[this] object PoolMetrics {
-    private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
-    private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
-    val putTimeStats             = Kamon.timer("utx.put-if-new")
-    val putRequestStats          = Kamon.counter("utx.put-if-new.requests")
-    val packTimeStats            = Kamon.timer("utx.pack-unconfirmed")
+    private[this] val sizeStats  = WavesKamon.rangeSampler("utx.pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+    private[this] val bytesStats = WavesKamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
+    val putTimeStats             = WavesKamon.timer("utx.put-if-new")
+    val putRequestStats          = WavesKamon.counter("utx.put-if-new.requests")
+    val packTimeStats            = WavesKamon.timer("utx.pack-unconfirmed")
 
-    val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable")
-    val checkAlias            = Kamon.timer("utx.check.alias")
-    val checkCanReissue       = Kamon.timer("utx.check.can-reissue")
-    val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted")
-    val checkScripted         = Kamon.timer("utx.check.scripted")
+    val checkIsMostProfitable = WavesKamon.timer("utx.check.is-most-profitable")
+    val checkAlias            = WavesKamon.timer("utx.check.alias")
+    val checkCanReissue       = WavesKamon.timer("utx.check.can-reissue")
+    val checkNotBlacklisted   = WavesKamon.timer("utx.check.not-blacklisted")
+    val checkScripted         = WavesKamon.timer("utx.check.scripted")
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()

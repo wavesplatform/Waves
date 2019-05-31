@@ -1,7 +1,6 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.database.Key
-import kamon.Kamon
 import kamon.metric.{HistogramMetric, MeasurementUnit}
 
 object LevelDBStats {
@@ -15,7 +14,7 @@ object LevelDBStats {
       h.refine("key", tag).record(totalBytes)
   }
 
-  val miss  = Kamon.histogram("node.db.cachemiss")
-  val read  = Kamon.histogram("node.db.read", MeasurementUnit.information.bytes)
-  val write = Kamon.histogram("node.db.write", MeasurementUnit.information.bytes)
+  val miss  = WavesKamon.histogram("node.db.cachemiss")
+  val read  = WavesKamon.histogram("node.db.read", MeasurementUnit.information.bytes)
+  val write = WavesKamon.histogram("node.db.write", MeasurementUnit.information.bytes)
 }

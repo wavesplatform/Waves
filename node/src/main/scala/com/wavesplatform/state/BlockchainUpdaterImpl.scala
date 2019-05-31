@@ -24,7 +24,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
-import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
@@ -702,11 +701,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   }
 
   private[this] object metrics {
-    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
-    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
-    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork")
-    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height")
-    val forgeBlockTimeStats       = Kamon.timer("blockchain-updater.forge-block-time")
+    val blockMicroForkStats       = WavesKamon.counter("blockchain-updater.block-micro-fork")
+    val microMicroForkStats       = WavesKamon.counter("blockchain-updater.micro-micro-fork")
+    val microBlockForkStats       = WavesKamon.counter("blockchain-updater.micro-block-fork")
+    val microBlockForkHeightStats = WavesKamon.histogram("blockchain-updater.micro-block-fork-height")
+    val forgeBlockTimeStats       = WavesKamon.timer("blockchain-updater.forge-block-time")
   }
 }
 

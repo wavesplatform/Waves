@@ -9,13 +9,12 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
 import com.wavesplatform.transaction.BlockchainUpdater
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
-import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 
@@ -72,7 +71,7 @@ object BlockAppender extends ScorexLogging {
   }
 
   private[this] object metrics {
-    val blockReceivingLag        = Kamon.histogram("block-appender.receiving-lag")
-    val blockProcessingTimeStats = Kamon.timer("block-appender.processing-time")
+    val blockReceivingLag        = WavesKamon.histogram("block-appender.receiving-lag")
+    val blockProcessingTimeStats = WavesKamon.timer("block-appender.processing-time")
   }
 }

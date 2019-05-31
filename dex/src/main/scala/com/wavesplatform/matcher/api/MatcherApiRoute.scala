@@ -22,7 +22,6 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher, RateCache}
-import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -30,7 +29,6 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 
@@ -67,7 +65,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private implicit val timeout: Timeout = matcherSettings.actorResponseTimeout
 
-  private val timer      = Kamon.timer("matcher.api-requests")
+  private val timer      = WavesKamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
 
   override lazy val route: Route = pathPrefix("matcher") {

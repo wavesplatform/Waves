@@ -4,6 +4,9 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
@@ -14,15 +17,11 @@ import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Transaction
-import kamon.Kamon
 
 import scala.concurrent.duration._
 
 package object network extends ScorexLogging {
-  private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
+  private val broadcastTimeStats = WavesKamon.timer("network-broadcast-time")
 
   def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
     val uri = new URI(s"node://$addr")

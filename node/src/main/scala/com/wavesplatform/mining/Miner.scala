@@ -20,7 +20,6 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
-import kamon.Kamon
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
@@ -349,14 +348,14 @@ class MinerImpl(allChannels: ChannelGroup,
       result
     }
 
-    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
-    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
+    val blockBuildTimeStats      = WavesKamon.timer("miner.pack-and-forge-block-time")
+    val microBlockBuildTimeStats = WavesKamon.timer("miner.forge-microblock-time")
   }
 }
 
 object Miner {
-  val blockMiningStarted = Kamon.counter("block-mining-started")
-  val microMiningStarted = Kamon.counter("micro-mining-started")
+  val blockMiningStarted = WavesKamon.counter("block-mining-started")
+  val microMiningStarted = WavesKamon.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 500
 

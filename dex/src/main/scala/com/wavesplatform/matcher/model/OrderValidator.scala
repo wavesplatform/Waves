@@ -16,7 +16,6 @@ import com.wavesplatform.matcher.model.MatcherModel.Normalization
 import com.wavesplatform.matcher.settings.OrderFeeSettings._
 import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
-import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -26,7 +25,6 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.Time
-import kamon.Kamon
 import shapeless.Coproduct
 
 import scala.Either.cond
@@ -37,7 +35,7 @@ object OrderValidator {
 
   type Result[T] = Either[MatcherError, T]
 
-  private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
+  private val timer = WavesKamon.timer("matcher.validation").refine("type" -> "blockchain")
 
   val MinExpiration: Long  = 60 * 1000L
   val MaxActiveOrders: Int = 200

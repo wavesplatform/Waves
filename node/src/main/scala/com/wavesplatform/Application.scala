@@ -24,7 +24,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
-import com.wavesplatform.metrics.Metrics
+import com.wavesplatform.metrics.{Metrics, WavesKamon}
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
@@ -390,12 +390,20 @@ object Application {
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
 
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
-
     val log = LoggerFacade(LoggerFactory.getLogger(getClass))
     log.info("Starting...")
+
+    if (config.getBoolean("kamon.enable")) {
+      log.info("Aggregated metrics are enabled")
+      // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+      //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+      Kamon.reconfigure(config)
+      Kamon.addReporter(new InfluxDBReporter())
+      SystemMetrics.startCollecting()
+    } else {
+      WavesKamon.disable()
+    }
+
     sys.addShutdownHook {
       SystemInformationReporter.report(config)
     }
@@ -405,12 +413,6 @@ object Application {
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
-
-    if (config.getBoolean("kamon.enable")) {
-      log.info("Aggregated metrics are enabled")
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
     }
 
     val time             = new NTP(settings.ntpServer)

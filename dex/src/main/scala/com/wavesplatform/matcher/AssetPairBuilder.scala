@@ -8,7 +8,6 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import kamon.Kamon
 
 class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
   import AssetPairBuilder._
@@ -19,7 +18,7 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
   private[this] val indices             = settings.priceAssets.zipWithIndex.toMap
   private[this] val blacklistedAssetIds = settings.blacklistedAssets
 
-  private[this] val timer    = Kamon.timer("matcher.asset-pair-builder")
+  private[this] val timer    = WavesKamon.timer("matcher.asset-pair-builder")
   private[this] val create   = timer.refine("action" -> "create")
   private[this] val validate = timer.refine("action" -> "validate")
 

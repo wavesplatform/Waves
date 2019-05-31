@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.matcher.model.{OrderBook, OrderBookResult}
+import com.wavesplatform.metrics.WavesKamon
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Time
 import kamon.Kamon
@@ -42,8 +43,8 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
 
   private val statsScheduler: ScheduledFuture[_] = {
     val period       = 3.seconds
-    val requestStats = Kamon.histogram("matcher.http.ob.cache.req")
-    val hitStats     = Kamon.histogram("matcher.http.ob.cache.hit")
+    val requestStats = WavesKamon.histogram("matcher.http.ob.cache.req")
+    val hitStats     = WavesKamon.histogram("matcher.http.ob.cache.hit")
     Kamon
       .scheduler()
       .scheduleWithFixedDelay(

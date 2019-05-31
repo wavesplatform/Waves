@@ -7,9 +7,7 @@ import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
-import kamon.Kamon
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
@@ -17,8 +15,8 @@ import play.api.libs.json._
 class EventSerializers extends SerializerWithStringManifest {
   import EventSerializers._
 
-  private val serializationTimer = Kamon.timer("matcher.serialization.encode")
-  private val bytesWritten       = Kamon.histogram("matcher.serialization.bytes-written")
+  private val serializationTimer = WavesKamon.timer("matcher.serialization.encode")
+  private val bytesWritten       = WavesKamon.histogram("matcher.serialization.bytes-written")
 
   private def encodeAndMeasure[A: Writes](manifest: String, v: A): Array[Byte] =
     encodeAndMeasure(manifest, Json.toJson(v).toString().getBytes)

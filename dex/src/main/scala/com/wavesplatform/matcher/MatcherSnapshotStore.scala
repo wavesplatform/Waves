@@ -11,9 +11,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.Config
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
-import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.utils.ScorexLogging
-import kamon.Kamon
 
 import scala.concurrent.Future
 import scala.util._
@@ -21,8 +19,8 @@ import scala.util._
 class MatcherSnapshotStore(config: Config) extends SnapshotStore {
   import MatcherSnapshotStore._
 
-  private val saveTimer      = Kamon.timer("matcher.snapshot.save")
-  private val serializeTimer = Kamon.timer("matcher.snapshot.serialize")
+  private val saveTimer      = WavesKamon.timer("matcher.snapshot.save")
+  private val serializeTimer = WavesKamon.timer("matcher.snapshot.serialize")
 
   private val streamDispatcher = context.system.dispatchers.lookup(config.getString("stream-dispatcher"))
 
