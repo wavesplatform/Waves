@@ -272,15 +272,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
-    updateHistory(rw, rw.get(key), key, threshold, kf)
-
-  private def updateHistory(rw: RW, history: Seq[Int], key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] = {
-    val (c1, c2) = history.partition(_ > threshold)
-    rw.put(key, (height +: c1) ++ c2.headOption)
-    c2.drop(1).map(kf(_).keyBytes)
-  }
-
   //noinspection ScalaStyle
   override protected def doAppend(block: Block,
                                   carry: Long,
@@ -333,7 +324,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
     val threshold        = height - dbSettings.maxRollbackDepth
-    val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
     val newAddressesForWaves = ArrayBuffer.empty[Long]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
