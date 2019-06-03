@@ -185,7 +185,7 @@ object InvokeScriptTransactionDiff {
             assetsComplexity + accountComplexity + funcComplexity
           }
 
-          _ <- foldScriptTransfers(blockchain, tx, dAppAddress)(ps, dataAndPaymentDiff)
+          _ <- foldScriptTransfers(blockchain, height, tx, dAppAddress)(ps, dataAndPaymentDiff)
         } yield {
           val paymentReceiversMap: Map[Address, Portfolio] = Monoid
             .combineAll(pmts)
@@ -244,7 +244,7 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
+  private def foldScriptTransfers(blockchain: Blockchain, currentBlockHeight: Int, tx: InvokeScriptTransaction, dAppAddress: Address)(
       ps: List[(Recipient.Address, Long, Option[ByteStr])],
       dataDiff: Diff): TracedResult[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount) {
@@ -272,7 +272,7 @@ object InvokeScriptTransactionDiff {
                 nextDiff.asRight[ValidationError]
               case Some(script) =>
                 val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
-                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
+                  d => validateScriptTransferWithSmartAssetScript(blockchain, currentBlockHeight, tx)(d, addressRepr, amount, asset, nextDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                 TracedResult(
@@ -289,7 +289,7 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
+  private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, currentBlockHeight: Int, tx: InvokeScriptTransaction)(
       totalDiff: Diff,
       addressRepr: Recipient.Address,
       amount: Long,
@@ -298,7 +298,7 @@ object InvokeScriptTransactionDiff {
       script: Script): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
-        blockchain.height,
+        currentBlockHeight,
         Coproduct[TxOrd](
           ScriptTransfer(
             asset,

@@ -30,7 +30,7 @@ object TransferTransactionDiff {
       recipient <- blockchain.resolveAlias(tx.recipient)
       _         <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
 
-      _ <- validateOverflow(blockchain, tx)
+      _ <- validateOverflow(blockchain, height, tx)
       portfolios = (tx.assetId match {
         case Waves =>
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
@@ -73,8 +73,8 @@ object TransferTransactionDiff {
         scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx))
   }
 
-  private def validateOverflow(blockchain: Blockchain, tx: TransferTransaction) = {
-    if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+  private def validateOverflow(blockchain: Blockchain, height: Int, tx: TransferTransaction) = {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)) {
       Right(()) // lets transaction validates itself
     } else {
       Try(Math.addExact(tx.fee, tx.amount))
