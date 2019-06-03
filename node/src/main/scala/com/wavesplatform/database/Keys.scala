@@ -86,9 +86,9 @@ object Keys {
   def dataKeyChunk(addressId: Long, chunkNo: Int): Key[Seq[String]] =
     Key("data-key-chunk", addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
-  def dataHistory(addressId: Long, key: String): Key[Seq[Int]] = historyKey("data-history", 33, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)))
+  val DataPrefix: Short = 34
   def data(addressId: Long, key: String)(height: Int): Key[Option[DataEntry[_]]] =
-    Key.opt("data", hBytes(34, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
+    Key.opt("data", hBytes(DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
 
   val SponsorshipPrefix: Short = 36
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =

@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import java.nio.ByteBuffer
 
 import cats.Monoid
+import com.google.common.base.Charsets.UTF_8
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
@@ -157,7 +158,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
     addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
-      db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+      db.iterateOverStreamReverse(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)))
+        .map(e => DataEntry.parseValue(new String(e.getKey, UTF_8), e.getValue, 0)._1)
+        .closeAfter(_.toStream.headOption)
     }
   }
 
@@ -401,10 +404,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val newKeys = (
         for {
           (key, value) <- addressData.data
-          kdh   = Keys.dataHistory(addressId, key)
-          isNew = rw.get(kdh).isEmpty
+          isNew = rw.iterateOverStreamReverse(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))).closeAfter(_.hasNext)
           _     = rw.put(Keys.data(addressId, key)(height), Some(value))
-          _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
           if isNew
         } yield key
       ).toSeq
@@ -518,7 +519,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
               rw.delete(Keys.data(addressId, k)(currentHeight))
-              rw.filterHistory(Keys.dataHistory(addressId, k), currentHeight)
             }
 
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))
