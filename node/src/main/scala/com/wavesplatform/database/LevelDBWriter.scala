@@ -193,6 +193,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .getOrElse(0L)
   }
 
+  private[this] def removeAllFromHeight(rw: DB)(prefix: Short, height: Int): Unit = {
+    val prefixBytes = Shorts.toByteArray(prefix)
+    rw.iterateOverStreamReverse(Array.emptyByteArray, prefixBytes)
+      .dropWhile(e => !e.getKey.startsWith(prefixBytes))
+      .takeWhile(e => e.getKey.startsWith(prefixBytes) && Ints.fromByteArray(e.getKey.takeRight(4)) == height)
+      .closeAfter(_.foreach(e => rw.delete(e.getKey)))
+  }
+
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
     addressId(req._1).fold(0L) { addressId =>
       loadBalanceForId(db)(addressId, req._2)
