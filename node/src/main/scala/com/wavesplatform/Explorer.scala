@@ -100,7 +100,7 @@ object Explorer extends ScorexLogging {
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
     val db               = openDB(settings.dbSettings.directory)
-    val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -130,16 +130,19 @@ object Explorer extends ScorexLogging {
             val v             = kVolumeAndFee.parse(bytes1)
             log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: Volume = ${v.volume}, Fee = ${v.fee}")
 
-            val kVolumeAndFeeHistory = Keys.filledVolumeAndFeeHistory(orderId.get)
-            val bytes2               = db.get(kVolumeAndFeeHistory.keyBytes)
-            val value2               = kVolumeAndFeeHistory.parse(bytes2)
-            val value2Str            = value2.mkString("[", ", ", "]")
-            log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: History = $value2Str")
-            value2.foreach { h =>
-              val k = Keys.filledVolumeAndFee(orderId.get)(h)
-              val v = k.parse(db.get(k.keyBytes))
-              log.info(s"\t h = $h: Volume = ${v.volume}, Fee = ${v.fee}")
-            }
+            db.iterateOverStreamReverse(
+                Bytes.concat(Shorts.toByteArray(Keys.FilledVolumeAndFeePrefix), orderId.get.arr.map(b => if (b == 0xFF) b else (b + 1).toByte)),
+                Bytes.concat(Shorts.toByteArray(Keys.FilledVolumeAndFeePrefix),
+                             orderId.get.arr.map(b =>
+                               if (b == 0xFF) b
+                               else (b + 1).toByte))
+              )
+              .filter { e =>
+                val (_, bs, _) = Keys.parseBytesHeight(e.getKey)
+                ByteStr(bs) == orderId.get
+              }
+              .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), com.wavesplatform.database.readVolumeAndFee(e.getValue)))
+              .foreach { case (h, v) => log.info(s"\t h = $h: Volume = ${v.volume}, Fee = ${v.fee}") }
           } else log.error("No order ID was provided")
 
         case "A" =>
@@ -148,7 +151,10 @@ object Explorer extends ScorexLogging {
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
 
-          db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId)))
+          db.iterateOverStreamReverse(
+              Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId + 1)),
+              Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId))
+            )
             .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
             .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
@@ -183,7 +189,10 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
-          db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
+          db.iterateOverStreamReverse(
+              Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)),
+              Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId))
+            )
             .filter { e =>
               val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
               ByteStr(assetId) == asset.id
@@ -262,7 +271,11 @@ object Explorer extends ScorexLogging {
           for {
             seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
             addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-            balance = db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId)))
+            balance = db
+              .iterateOverStreamReverse(
+                Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId + 1)),
+                Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId))
+              )
               .map(e => Longs.fromByteArray(e.getValue))
               .closeAfter(_.toStream.headOption)
               .getOrElse(0L)
@@ -286,8 +299,12 @@ object Explorer extends ScorexLogging {
               println(s"\n$assetId:")
               1 to db.get(Keys.addressesForAssetSeqNr(asset))
             }
-            addressId    <- db.get(Keys.addressesForAsset(asset, seqNr))
-            balance = db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
+            addressId <- db.get(Keys.addressesForAsset(asset, seqNr))
+            balance = db
+              .iterateOverStreamReverse(
+                Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)),
+                Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId))
+              )
               .filter { e =>
                 val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
                 ByteStr(assetId) == asset.id
