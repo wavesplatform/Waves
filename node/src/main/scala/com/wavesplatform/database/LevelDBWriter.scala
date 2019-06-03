@@ -111,30 +111,34 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
     addressId(address).fold(Option.empty[Script]) { addressId =>
-      addressScriptIterator(addressId).closeAfter(_.toStream.headOption)
+      getAddressScript(addressId).map(_())
     }
   }
 
   override protected def hasScriptBytes(address: Address): Boolean = readOnly { db =>
     addressId(address).fold(false) { addressId =>
-      addressScriptIterator(addressId).closeAfter(_.hasNext)
+      getAddressScript(addressId).isDefined
     }
   }
 
-  private[this] def addressScriptIterator(address: Long): CloseableIterator[Script] = readStream { db =>
+  private[this] def getAddressScript(address: Long): Option[() => Script] = readOnly { db =>
     db.iterateOverStreamReverse(Keys.AddressScriptPrefix, AddressId.toBytes(address))
-      .map(e => ScriptReader.fromBytes(e.getValue).explicitGet())
+      .map(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
+      .closeAfter(_.toStream.headOption)
+      .flatten
   }
 
   override protected def loadAssetScript(asset: IssuedAsset): Option[Script] =
-    assetScriptIterator(asset).closeAfter(_.toStream.headOption)
+    getAssetScript(asset).map(_())
 
   override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean =
-    assetScriptIterator(asset).closeAfter(_.hasNext)
+    getAssetScript(asset).isDefined
 
-  private[this] def assetScriptIterator(asset: IssuedAsset): CloseableIterator[Script] = readStream { db =>
-    db.iterateOverStreamReverse(Keys.AssetScriptPrefix)
-      .map(e => ScriptReader.fromBytes(e.getValue).explicitGet())
+  private[this] def getAssetScript(asset: IssuedAsset): Option[() => Script] = readOnly { db =>
+    db.iterateOverStreamReverse(Keys.AssetScriptPrefix, asset.id)
+      .map(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
+      .closeAfter(_.toStream.headOption)
+      .flatten
   }
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
@@ -389,13 +393,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.leaseStatus(leaseId)(height), state)
     }
 
-    for ((addressId, script) <- scripts) {
-      script.foreach(s => rw.put(Keys.addressScript(addressId)(height), Some(s)))
-    }
+    for ((addressId, script) <- scripts)
+      rw.put(Keys.addressScript(addressId)(height), script)
 
-    for ((asset, script) <- assetScripts) {
-      script.foreach(s => rw.put(Keys.assetScript(asset)(height), Some(s)))
-    }
+    for ((asset, script) <- assetScripts)
+      rw.put(Keys.assetScript(asset)(height), script)
 
     for ((addressId, addressData) <- data) {
       rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)

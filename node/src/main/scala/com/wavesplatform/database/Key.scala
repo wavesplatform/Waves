@@ -29,5 +29,5 @@ object Key {
   }
 
   def opt[V](name: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-    apply[Option[V]](name, key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
+    apply[Option[V]](name, key, bs => Option(bs).map(parser), _.fold[Array[Byte]](Array.emptyByteArray)(encoder))
 }
