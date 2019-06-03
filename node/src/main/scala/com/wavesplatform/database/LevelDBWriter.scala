@@ -332,11 +332,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       for ((assetId, balance) <- assets) {
         val issueTransactionId = TransactionId @@ assetId.id
 
-        val maybeHNFromState           = rw.get(Keys.transactionHNById(issueTransactionId))
+        lazy val maybeHNFromState           = rw.get(Keys.transactionHNById(issueTransactionId))
         lazy val maybeHNFromNewTransactions = transactions.get(issueTransactionId).map { case (_, n) => (Height @@ height, n) }
 
-        maybeHNFromState
-          .orElse(maybeHNFromNewTransactions)
+
+        maybeHNFromNewTransactions
+          .orElse(maybeHNFromState)
           .foreach {
             case (h, n) =>
               rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
