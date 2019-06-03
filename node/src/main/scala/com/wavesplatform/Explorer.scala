@@ -12,7 +12,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.{AddressId, Height, TxNum}
+import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -100,7 +100,7 @@ object Explorer extends ScorexLogging {
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
     val db               = openDB(settings.dbSettings.directory)
-    val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -192,7 +192,8 @@ object Explorer extends ScorexLogging {
           val abh  = kabh.parse(db.get(kabh.keyBytes))
 
           val balances = abh.map { h =>
-            val k = Keys.assetBalance(addressId, asset)(h)
+            val (txH, txN) = db.get(Keys.transactionHNById(TransactionId @@ asset.id)).get
+            val k          = Keys.assetBalance(addressId, txH, txN)(h)
             h -> k.parse(db.get(k.keyBytes))
           }
           balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
@@ -293,7 +294,10 @@ object Explorer extends ScorexLogging {
             }
             addressId    <- db.get(Keys.addressesForAsset(asset, seqNr))
             actualHeight <- db.get(Keys.assetBalanceHistory(addressId, asset)).headOption
-            balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
+            balance = db.get(Keys.transactionHNById(TransactionId @@ asset.id))
+              .fold(0L) { case (h, n) =>
+                db.get(Keys.assetBalance(addressId, h, n)(actualHeight))
+              }
             if balance > 0
           } yield {
             val addr = db.get(Keys.idToAddress(addressId))

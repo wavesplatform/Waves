@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -29,8 +29,24 @@ object Keys {
   def assetBalanceHistory(addressId: AddressId, asset: IssuedAsset): Key[Seq[Int]] =
     historyKey("asset-balance-history", 8, writeAddressId(addressId) ++ asset.id.arr)
 
-  def assetBalance(addressId: AddressId, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key("asset-balance", hBytes(9, height, writeAddressId(addressId) ++ asset.id.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+  val AssetBalancePrefix: Short = 9
+  def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Long] = {
+    val keyBytes =
+      hBytes(
+        AssetBalancePrefix,
+        height,
+        Bytes.concat(
+          writeAddressId(addressId),
+          Ints.toByteArray(issueTxHeight),
+          Shorts.toByteArray(issueTxNum)
+        )
+      )
+
+    val balanceDecoder = (arr: Array[Byte]) => Option(arr).fold(0L)(Longs.fromByteArray)
+    val balanceEncoder = (b: Long) => Longs.toByteArray(b)
+
+    Key("asset-balance", keyBytes, balanceDecoder, balanceEncoder)
+  }
 
   def assetInfoHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-info-history", 10, asset.id.arr)
   def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
@@ -51,7 +67,8 @@ object Keys {
 
   def changedAddresses(height: Int): Key[Seq[AddressId]] = Key("changed-addresses", h(21, height), readAddressIdSeq, writeAddressIdSeq)
 
-  def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), readAddressId, writeAddressId)
+  def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] =
+    Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), readAddressId, writeAddressId)
 
   val lastAddressId: Key[Option[AddressId]] = Key.opt("last-address-id", Array[Byte](0, 24), readAddressId, writeAddressId)
 
