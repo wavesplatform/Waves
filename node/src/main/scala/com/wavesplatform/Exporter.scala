@@ -20,11 +20,24 @@ import scopt.OParser
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
+  private[wavesplatform] object Formats {
+    val Binary   = "BINARY_STD"
+    val Protobuf = "PROTOBUF"
+    val Json     = "JSON"
+
+    def list         = Seq(Binary, Protobuf, Json)
+    def importerList = Seq(Binary, Protobuf)
+    def default      = Binary
+
+    def isSupported(f: String)           = list.contains(f.toUpperCase)
+    def isSupportedInImporter(f: String) = importerList.contains(f.toUpperCase)
+  }
+
   //noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFilename, outputFileNamePrefix, exportHeight, format) =>
-        val cfg = Try(ConfigFactory.parseFile(configFilename)).getOrElse(ConfigFactory.empty())
+        val cfg      = Try(ConfigFactory.parseFile(configFilename)).getOrElse(ConfigFactory.empty())
         val settings = WavesSettings.fromRootConfig(loadConfig(cfg))
         AddressScheme.current = new AddressScheme {
           override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
@@ -47,7 +60,7 @@ object Exporter extends ScorexLogging {
             exportedBytes += IO.writeHeader(bos, format)
             (2 to height).foreach { h =>
               exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, blockchain, h)
-                                else IO.exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
+                                else IO.exportBlockToBinary(bos, blockchain, h, format == Formats.Binary))
               if (h % (height / 10) == 0)
                 log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
             }
@@ -114,7 +127,7 @@ object Exporter extends ScorexLogging {
   private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
                                                  outputFileNamePrefix: String = "blockchain",
                                                  exportHeight: Option[Int] = None,
-                                                 format: String = "BINARY_OLD")
+                                                 format: String = Formats.Binary)
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -133,11 +146,11 @@ object Exporter extends ScorexLogging {
         .action((p, c) => c.copy(outputFileNamePrefix = p)),
       opt[String]('f', "format")
         .text("Output file format")
-        .valueName("<BINARY|BINARY_OLD|JSON> (default is BINARY_OLD)")
+        .valueName(s"<${Formats.list.mkString("|")}> (default is ${Formats.default})")
         .action((f, c) => c.copy(format = f))
         .validate {
-          case f if Set("BINARY", "BINARY_OLD", "JSON").contains(f.toUpperCase) => success
-          case f                                                                => failure(s"Unsupported format: $f")
+          case f if Formats.isSupported(f.toUpperCase) => success
+          case f                                       => failure(s"Unsupported format: $f")
         },
       help("help").hidden()
     )

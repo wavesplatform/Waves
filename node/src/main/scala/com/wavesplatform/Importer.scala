@@ -4,6 +4,7 @@ import java.io._
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -39,15 +40,16 @@ object Importer extends ScorexLogging {
 
         implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
-          override def putIfNew(tx: Transaction, b: Boolean)                               = ???
-          override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-          override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
-          override def pessimisticPortfolio(addr: Address): Portfolio          = ???
-          override def all                                                     = ???
-          override def size                                                    = ???
-          override def transactionById(transactionId: ByteStr)                 = ???
-          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
-          override def close(): Unit                                           = {}
+          override def putIfNew(tx: Transaction, b: Boolean)                 = ???
+          override def removeAll(txs: Traversable[Transaction]): Unit        = {}
+          override def spendableBalance(addr: Address, assetId: Asset): Long = ???
+          override def pessimisticPortfolio(addr: Address): Portfolio        = ???
+          override def all                                                   = ???
+          override def size                                                  = ???
+          override def transactionById(transactionId: ByteStr)               = ???
+          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
+                                       maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
+          override def close(): Unit                                                                                = {}
         }
 
         val time = new NTP(settings.ntpServer)
@@ -81,7 +83,7 @@ object Importer extends ScorexLogging {
                     blocksToSkip -= 1
                   } else {
                     val Right(block) =
-                      if (format == "BINARY_OLD") Block.parseBytes(buffer).toEither
+                      if (format == Formats.Binary) Block.parseBytes(buffer).toEither
                       else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
@@ -119,7 +121,7 @@ object Importer extends ScorexLogging {
   private[this] final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
                                                blockchainFile: File = new File("blockchain"),
                                                importHeight: Int = Int.MaxValue,
-                                               format: String = "BINARY_OLD",
+                                               format: String = Formats.Binary,
                                                verify: Boolean = true)
 
   private[this] lazy val commandParser = {
@@ -145,10 +147,10 @@ object Importer extends ScorexLogging {
       opt[String]('f', "format")
         .text("Blockchain data file format")
         .action((f, c) => c.copy(format = f))
-        .valueName("<BINARY|BINARY_OLD> (default is BINARY_OLD)")
+        .valueName(s"<${Formats.importerList.mkString("|")}> (default is ${Formats.default})")
         .validate {
-          case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
-          case f                                                        => failure(s"Unsupported format: $f")
+          case f if Formats.isSupportedInImporter(f) => success
+          case f                                     => failure(s"Unsupported format: $f")
         },
       opt[Unit]('n', "no-verify")
         .text("Disable signatures verification")
