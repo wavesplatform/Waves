@@ -33,18 +33,18 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
-  def iterateOverStreamReverse(seekKey: Array[Byte], prefix: Array[Byte]): CloseableIterator[DBEntry] =
-    db.iterateOverStreamReverse(seekKey, prefix)
-
   def iterateOverStreamReverse(prefix: Short, bytes: Array[Byte]): CloseableIterator[DBEntry] = {
     val prefixBytes = Shorts.toByteArray(prefix)
-    val incBytes = new Array[Byte](bytes.length)
-    bytes.zipWithIndex.foreach { case (b, i) => incBytes(i) = if (java.lang.Byte.toUnsignedInt(b) == 0xFF) b else (b + 1).toByte }
-    db.iterateOverStreamReverse(Bytes.concat(prefixBytes, incBytes), Bytes.concat(prefixBytes, bytes))
+    val filterBytes = Bytes.concat(prefixBytes, bytes)
+    db.iterateOverStreamReverse(prefixBytes, bytes)
+      .dropWhile(e => !e.getKey.startsWith(filterBytes))
+      .takeWhile(e => e.getKey.startsWith(filterBytes))
   }
 
   def iterateOverStreamReverse(prefix: Short): CloseableIterator[DBEntry] =
-    db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort), Shorts.toByteArray(prefix))
+    db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort))
+      .dropWhile(e => Shorts.fromByteArray(e.getKey.take(2)) != prefix)
+      .takeWhile(e => Shorts.fromByteArray(e.getKey.take(2)) == prefix)
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator

@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.TxNum
+import com.wavesplatform.state.{AddressId, TxNum}
 
 object KeyHelpers {
   def h(prefix: Short, height: Int): Array[Byte] =
@@ -16,11 +16,11 @@ object KeyHelpers {
   def bytes(prefix: Short, bytes: Array[Byte]) =
     ByteBuffer.allocate(2 + bytes.length).putShort(prefix).put(bytes).array()
 
-  def addr(prefix: Short, addressId: BigInt) = bytes(prefix, addressId.toByteArray)
+  def addr(prefix: Short, addressId: Long) = bytes(prefix, AddressId.toBytes(addressId))
 
   def hash(prefix: Short, hashBytes: ByteStr) = bytes(prefix, hashBytes.arr)
 
-  def hAddr(prefix: Short, addressId: BigInt, height: Int): Array[Byte] = hBytes(prefix, addressId.toByteArray, height)
+  def hAddr(prefix: Short, addressId: Long, height: Int): Array[Byte] = hBytes(prefix, AddressId.toBytes(addressId), height)
 
   def hNum(prefix: Short, height: Int, num: TxNum): Array[Byte] = hBytes(prefix, Shorts.toByteArray(num), height)
 

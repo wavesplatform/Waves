@@ -42,7 +42,7 @@ object LevelDBWriter {
     db.iterateOverStreamReverse(Keys.LeaseStatusPrefix)
       .closeAfter(
         _.find { e =>
-          val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
+          val (_, bs, _) = Keys.parseBytesHeight(e.getKey)
           ByteStr(bs) == leaseId
         }.exists(e => e.getValue.headOption.contains(1: Byte))
       )
@@ -164,13 +164,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[this] def readFromEndForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
-    val prefixBytes = Shorts.toByteArray(prefix)
-    db.iterateOverStreamReverse(Bytes.concat(prefixBytes, AddressId.toBytes(addressId + 1)), Bytes.concat(prefixBytes, AddressId.toBytes(addressId)))
+    db.iterateOverStreamReverse(prefix, AddressId.toBytes(addressId))
   }
 
   private[this] def readLastForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
-    val prefixBytes = Shorts.toByteArray(prefix)
-    db.iterateOverStreamReverse(Bytes.concat(prefixBytes, AddressId.toBytes(addressId + 1)), Bytes.concat(prefixBytes, AddressId.toBytes(addressId)))
+    readFromEndForAddress(db)(prefix, addressId)
       .closeAfter(_.toStream.headOption.map(_.getValue))
   }
 
@@ -180,13 +178,16 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .closeAfter(_.toStream.headOption)
 
   private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: Long, asset: Asset) = {
-    val (prefix, lastBytes) = asset match {
+    val (prefix, assetBytes) = asset match {
       case IssuedAsset(asset) => (Keys.AssetBalancePrefix, asset.arr)
       case Waves              => (Keys.WavesBalancePrefix, Array.emptyByteArray)
     }
 
     readFromEndForAddress(db)(prefix, addressId)
-      .filter(_.getKey.drop(Ints.BYTES).endsWith(lastBytes))
+      .filter { e =>
+        val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
+        ByteStr(bs) == ByteStr(assetBytes)
+      }
       .map(e => Longs.fromByteArray(e.getValue))
       .closeAfter(_.toStream.headOption)
       .getOrElse(0L)
@@ -393,7 +394,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val newKeys = (
         for {
           (key, value) <- addressData.data
-          isNew = rw.iterateOverStreamReverse(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))).closeAfter(_.hasNext)
+          isNew = rw.iterateOverStreamReverse(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))).closeAfter(!_.hasNext)
           _     = rw.put(Keys.data(addressId, key)(height), Some(value))
           if isNew
         } yield key

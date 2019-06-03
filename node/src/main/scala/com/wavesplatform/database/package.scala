@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Shorts}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
@@ -439,14 +439,22 @@ package object database {
       }
     }
 
-    def iterateOverStreamReverse(seekKey: Array[Byte], prefix: Array[Byte]): CloseableIterator[DBEntry] = {
+    def iterateOverStreamReverse(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = {
       val dbIter = db.iterator()
       try {
+        val seekKey = {
+          val seekSuffix = new Array[Byte](suffix.length)
+          val ffBytes = suffix.takeWhile(_ == 0xff)
+          ffBytes.copyToArray(seekSuffix)
+          if (ffBytes.length < seekSuffix.length) seekSuffix(ffBytes.length) = (suffix(ffBytes.length) + 1).toByte
+          Bytes.concat(prefix, seekSuffix)
+        }
+
         dbIter.seek(seekKey)
         CloseableIterator(
           new AbstractIterator[DBEntry] {
-            override def hasNext: Boolean = dbIter.hasPrev && dbIter.peekPrev().getKey.startsWith(prefix)
-            override def next(): DBEntry = dbIter.prev()
+            override def hasNext: Boolean = dbIter.hasPrev
+            override def next(): DBEntry  = dbIter.prev()
           },
           () => dbIter.close()
         )
