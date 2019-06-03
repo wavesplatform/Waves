@@ -162,7 +162,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
     addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
       db.iterateOverStreamReverse(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)))
-        .map(e => DataEntry.parseValue(new String(e.getKey, UTF_8), e.getValue, 0)._1)
+        .map { e =>
+          val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
+          DataEntry.parseValue(new String(bs, UTF_8), e.getValue, 0)._1
+        }
         .closeAfter(_.toStream.headOption)
     }
   }

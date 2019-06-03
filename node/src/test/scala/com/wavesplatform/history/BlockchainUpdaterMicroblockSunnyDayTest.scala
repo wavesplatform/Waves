@@ -28,8 +28,8 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     fee    <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransactionV1 <- wavesTransferGeneratorP(master, alice)
-    aliceToBob  = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts).explicitGet()
-    aliceToBob2 = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts + 1).explicitGet()
+    aliceToBob  = createWavesTransfer(alice, bob, masterToAlice.amount - fee, fee, ts).explicitGet()
+    aliceToBob2 = createWavesTransfer(alice, bob, masterToAlice.amount - fee, fee, ts + 1).explicitGet()
   } yield (genesis, masterToAlice, aliceToBob, aliceToBob2)
 
   property("all txs in different blocks: B0 <- B1 <- B2 <- B3!") {
