@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
 import org.iq80.leveldb.{DB, ReadOptions}
 
+import scala.collection.AbstractIterator
 import scala.util.control.NonFatal
 
 package object database {
@@ -429,6 +430,24 @@ package object database {
         dbIter.seek(prefix)
         CloseableIterator(
           dbIter.asScala.takeWhile(_.getKey.startsWith(prefix)),
+          () => dbIter.close()
+        )
+      } catch {
+        case NonFatal(err) =>
+          dbIter.close()
+          throw new IOException("Couldn't create DB iterator", err)
+      }
+    }
+
+    def iterateOverStreamReverse(seekKey: Array[Byte], prefix: Array[Byte]): CloseableIterator[DBEntry] = {
+      val dbIter = db.iterator()
+      try {
+        dbIter.seek(seekKey)
+        CloseableIterator(
+          new AbstractIterator[DBEntry] {
+            override def hasNext: Boolean = dbIter.hasPrev && dbIter.peekPrev().getKey.startsWith(prefix)
+            override def next(): DBEntry = dbIter.prev()
+          },
           () => dbIter.close()
         )
       } catch {

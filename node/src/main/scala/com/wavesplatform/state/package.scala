@@ -1,12 +1,14 @@
 package com.wavesplatform
 
 import cats.kernel.Monoid
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.database.{readIntSeq, writeIntSeq}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -215,7 +217,13 @@ package object state {
   object TxNum extends TaggedType[Short]
   type TxNum = TxNum.Type
 
-  object AddressId extends TaggedType[BigInt]
+  object AddressId extends TaggedType[Long] {
+    def toBytes(addrId: Long) = Ints.toByteArray(addrId.toInt)
+    def fromBytes(bs: Array[Byte]) = apply(Integer.toUnsignedLong(Ints.fromByteArray(bs)))
+
+    def readSeq = readIntSeq _ andThen (_.map(Integer.toUnsignedLong))
+    def writeSeq = ((_: Seq[Long]).map(_.toInt)) andThen writeIntSeq
+  }
   type AddressId = AddressId.Type
 
   object TransactionId extends TaggedType[ByteStr]

@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -14,7 +14,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -37,9 +37,12 @@ import scala.collection.{immutable, mutable}
 import scala.util.{Success, Try}
 
 object LevelDBWriter {
-
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
-    db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
+    db.iterateOverStreamReverse(Keys.LeaseStatusPrefix)
+      .closeAfter(
+        _.find(_.getKey.dropRight(4).endsWith(leaseId.arr))
+          .exists(e => e.getValue.headOption.contains(1))
+      )
 
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
@@ -89,9 +92,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
-  override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
+  override protected def loadMaxAddressId(): Long = readOnly(db => db.get(Keys.lastAddressId).getOrElse(0L))
 
-  override protected def loadAddressId(address: Address): Option[BigInt] = readOnly(db => db.get(Keys.addressId(address)))
+  override protected def loadAddressId(address: Address): Option[Long] = readOnly(db => db.get(Keys.addressId(address)))
 
   override protected def loadHeight(): Int = readOnly(_.get(Keys.height))
 
@@ -106,22 +109,30 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
     addressId(address).fold(Option.empty[Script]) { addressId =>
-      db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
+      addressScriptIterator(addressId).closeAfter(_.toStream.headOption)
     }
   }
 
   override protected def hasScriptBytes(address: Address): Boolean = readOnly { db =>
     addressId(address).fold(false) { addressId =>
-      db.hasInHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId))
+      addressScriptIterator(addressId).closeAfter(_.hasNext)
     }
   }
 
-  override protected def loadAssetScript(asset: IssuedAsset): Option[Script] = readOnly { db =>
-    db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+  private[this] def addressScriptIterator(address: Long): CloseableIterator[Script] = readStream { db =>
+    db.iterateOverStreamReverse(Keys.AddressScriptPrefix, AddressId.toBytes(address))
+      .map(e => ScriptReader.fromBytes(e.getValue).explicitGet())
   }
 
-  override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean = readOnly { db =>
-    db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
+  override protected def loadAssetScript(asset: IssuedAsset): Option[Script] =
+    assetScriptIterator(asset).closeAfter(_.toStream.headOption)
+
+  override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean =
+    assetScriptIterator(asset).closeAfter(_.hasNext)
+
+  private[this] def assetScriptIterator(asset: IssuedAsset): CloseableIterator[Script] = readStream { db =>
+    db.iterateOverStreamReverse(Keys.AssetScriptPrefix)
+      .map(e => ScriptReader.fromBytes(e.getValue).explicitGet())
   }
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
@@ -148,43 +159,72 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
+  private[this] def readFromEndForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
+    val prefixBytes = Shorts.toByteArray(prefix)
+    db.iterateOverStreamReverse(Bytes.concat(prefixBytes, AddressId.toBytes(addressId + 1)), Bytes.concat(prefixBytes, AddressId.toBytes(addressId)))
+  }
+
+  private[this] def readLastForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
+    val prefixBytes = Shorts.toByteArray(prefix)
+    db.iterateOverStreamReverse(Bytes.concat(prefixBytes, AddressId.toBytes(addressId + 1)), Bytes.concat(prefixBytes, AddressId.toBytes(addressId)))
+      .closeAfter(_.toStream.headOption.map(_.getValue))
+  }
+
+  private[this] def readLastValue[T](db: ReadOnlyDB)(prefix: Short, read: Array[Byte] => T) =
+    db.iterateOverStreamReverse(prefix)
+      .map(e => read(e.getValue))
+      .closeAfter(_.toStream.headOption)
+
+  private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: Long, asset: Asset) = {
+    val (prefix, lastBytes) = asset match {
+      case IssuedAsset(asset) => (Keys.AssetBalancePrefix, asset.arr)
+      case Waves              => (Keys.WavesBalancePrefix, Array.emptyByteArray)
+    }
+
+    readFromEndForAddress(db)(prefix, addressId)
+      .filter(_.getKey.drop(Ints.BYTES).endsWith(lastBytes))
+      .map(e => Longs.fromByteArray(e.getValue))
+      .closeAfter(_.toStream.headOption)
+      .getOrElse(0L)
+  }
+
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
     addressId(req._1).fold(0L) { addressId =>
-      req._2 match {
-        case asset @ IssuedAsset(_) => db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)
-        case Waves                  => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
-      }
+      loadBalanceForId(db)(addressId, req._2)
     }
   }
 
-  private def loadLeaseBalance(db: ReadOnlyDB, addressId: BigInt): LeaseBalance = {
-    val lease = db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
-    lease
+  private def loadLeaseBalance(db: ReadOnlyDB, addressId: Long): LeaseBalance = {
+    readFromEndForAddress(db)(Keys.LeaseBalancePrefix, addressId)
+      .map(_.getValue)
+      .map(readLeaseBalance)
+      .closeAfter(_.toStream.headOption)
+      .getOrElse(LeaseBalance.empty)
   }
 
   override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
 
-  private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
-    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
+  private def loadLposPortfolio(db: ReadOnlyDB, addressId: Long) = Portfolio(
+    readLastForAddress(db)(Keys.WavesBalancePrefix, addressId).fold(0L)(Longs.fromByteArray),
     loadLeaseBalance(db, addressId),
     Map.empty
   )
 
-  private def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      asset <- db.get(Keys.assetList(addressId))
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+  private def loadFullPortfolio(db: ReadOnlyDB, addressId: Long) = loadLposPortfolio(db, addressId).copy(
+    assets = readFromEndForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+      val assetId = IssuedAsset(e.getKey.drop(Shorts.BYTES + Ints.BYTES).dropRight(Ints.BYTES))
+      if (map.contains(assetId)) map else map + (assetId -> Longs.fromByteArray(e.getValue))
+    })
   )
 
   private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      issuedAsset <- db.get(Keys.assetList(addressId))
-      asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
-      }
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+    assets = readFromEndForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+      val assetId = IssuedAsset(e.getKey.drop(Shorts.BYTES + Ints.BYTES).dropRight(Ints.BYTES))
+      val isNFT   = transactionInfo(assetId.id).collectFirst { case (_, it: IssueTransaction) => it.isNFT }.getOrElse(false)
+      if (isNFT || map.contains(assetId)) map else map + (assetId -> Longs.fromByteArray(e.getValue))
+    })
   )
 
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
@@ -199,9 +239,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
     transactionInfo(asset.id, db) match {
       case Some((_, i: IssueTransaction)) =>
-        val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
-        val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
-        val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+        val ai = readLastValue(db)(Keys.AssetInfoPrefix, readAssetInfo)
+          .getOrElse(AssetInfo(i.reissuable, i.quantity))
+
+        val sponsorship = readLastValue(db)(Keys.SponsorshipPrefix, readSponsorship)
+          .fold(0L)(_.minFee)
+
+        val script = readLastValue(db)(Keys.AssetScriptPrefix, ScriptReader.fromBytes(_).toOption).flatten
         Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
       case _ => None
     }
@@ -232,18 +276,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   //noinspection ScalaStyle
   override protected def doAppend(block: Block,
                                   carry: Long,
-                                  newAddresses: Map[Address, BigInt],
-                                  wavesBalances: Map[BigInt, Long],
-                                  assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
-                                  leaseBalances: Map[BigInt, LeaseBalance],
+                                  newAddresses: Map[Address, Long],
+                                  wavesBalances: Map[Long, Long],
+                                  assetBalances: Map[Long, Map[IssuedAsset, Long]],
+                                  leaseBalances: Map[Long, LeaseBalance],
                                   addressTransactions: Map[AddressId, List[TransactionId]],
                                   leaseStates: Map[ByteStr, Boolean],
                                   reissuedAssets: Map[IssuedAsset, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
-                                  scripts: Map[BigInt, Option[Script]],
+                                  scripts: Map[Long, Option[Script]],
                                   assetScripts: Map[IssuedAsset, Option[Script]],
-                                  data: Map[BigInt, AccountDataInfo],
-                                  aliases: Map[Alias, BigInt],
+                                  data: Map[Long, AccountDataInfo],
+                                  aliases: Map[Alias, Long],
                                   sponsorship: Map[IssuedAsset, Sponsorship],
                                   totalFee: Long,
                                   scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
@@ -285,13 +329,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
-      val kwbh = Keys.wavesBalanceHistory(addressId)
-      val wbh  = rw.get(kwbh)
-      if (wbh.isEmpty) {
-        newAddressesForWaves += addressId
-      }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
 
@@ -305,7 +343,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
@@ -319,7 +356,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
-        expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
       }
     }
 
@@ -340,25 +376,19 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     for ((asset, assetInfo) <- reissuedAssets) {
-      val combinedAssetInfo = rw.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).fold(assetInfo) { p =>
-        Monoid.combine(p, assetInfo)
-      }
+      val combinedAssetInfo = readLastValue(rw)(Keys.AssetInfoPrefix, readAssetInfo).fold(assetInfo)(old => Monoid.combine(old, assetInfo))
       rw.put(Keys.assetInfo(asset)(height), combinedAssetInfo)
-      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(asset), threshold, Keys.assetInfo(asset))
     }
 
     for ((leaseId, state) <- leaseStates) {
       rw.put(Keys.leaseStatus(leaseId)(height), state)
-      expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
     }
 
     for ((addressId, script) <- scripts) {
-      expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
       script.foreach(s => rw.put(Keys.addressScript(addressId)(height), Some(s)))
     }
 
     for ((asset, script) <- assetScripts) {
-      expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
       script.foreach(s => rw.put(Keys.assetScript(asset)(height), Some(s)))
     }
 
@@ -424,7 +454,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     for ((asset, sp: SponsorshipValue) <- sponsorship) {
       rw.put(Keys.sponsorship(asset)(height), sp)
-      expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
     }
 
     rw.put(Keys.carryFee(height), carry)
@@ -480,7 +509,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             for (assetId <- rw.get(Keys.assetList(addressId))) {
               balancesToInvalidate += (address -> assetId)
               rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
-              rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
             }
 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
@@ -490,10 +518,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             }
 
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))
-            rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
             rw.delete(Keys.leaseBalance(addressId)(currentHeight))
-            rw.filterHistory(Keys.leaseBalanceHistory(addressId), currentHeight)
 
             log.trace(s"Discarding portfolio for $address")
 
@@ -544,14 +570,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                   scriptsToDiscard += address
                   for (addressId <- addressId(address)) {
                     rw.delete(Keys.addressScript(addressId)(currentHeight))
-                    rw.filterHistory(Keys.addressScriptHistory(addressId), currentHeight)
                   }
 
                 case tx: SetAssetScriptTransaction =>
                   val asset = tx.asset
                   assetScriptsToDiscard += asset
                   rw.delete(Keys.assetScript(asset)(currentHeight))
-                  rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
 
                 case _: DataTransaction => // see changed data keys removal
 
@@ -605,7 +629,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
     rw.delete(Keys.assetInfo(asset)(currentHeight))
-    rw.filterHistory(Keys.assetInfoHistory(asset), currentHeight)
     asset
   }
 
@@ -617,12 +640,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(Keys.leaseStatus(leaseId)(currentHeight))
-    rw.filterHistory(Keys.leaseStatusHistory(leaseId), currentHeight)
   }
 
   private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
     rw.delete(Keys.sponsorship(asset)(currentHeight))
-    rw.filterHistory(Keys.sponsorshipHistory(asset), currentHeight)
     asset
   }
 
@@ -748,14 +769,30 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val toHeigth = this.heightOf(to).getOrElse(this.height)
-      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
-      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
-      for {
-        (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
-      } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
+      val toHeight = this.heightOf(to).getOrElse(this.height)
+
+      def readSlice(prefix: Short) = {
+        readFromEndForAddress(db)(prefix, addressId)
+          .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), e.getValue))
+          .dropWhile(_._1 > toHeight)
+          .takeWhile(_._1 >= from)
+      }
+
+      val wavesBalances = readSlice(Keys.WavesBalancePrefix)
+        .map { case (height, arr) => (height, Longs.fromByteArray(arr)) }
+
+      val leaseBalances = readSlice(Keys.LeaseBalancePrefix)
+        .map { case (height, arr) => (height, readLeaseBalance(arr)) }
+
+      val baseMap = wavesBalances.map(kv => (kv._1, BalanceSnapshot(kv._1, kv._2, 0, 0))).toMap
+      leaseBalances
+        .foldLeft(baseMap) {
+          case (map, (height, lb)) =>
+            val e = map.getOrElse(height, BalanceSnapshot(height, 0, 0, 0))
+            map + (height -> e.copy(leaseIn = lb.in, leaseOut = lb.out))
+        }
+        .values
+        .toVector
     }
   }
 
@@ -809,7 +846,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
     val b = Map.newBuilder[Address, A]
-    for (id <- BigInt(1) to db.get(Keys.lastAddressId).getOrElse(BigInt(0))) {
+    for (id <- 1L to db.get(Keys.lastAddressId).getOrElse(0L)) {
       val address = db.get(Keys.idToAddress(id))
       pf.runWith(b += address -> _)(address -> loadLposPortfolio(db, id))
     }
@@ -959,12 +996,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val dst = (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(asset))).par
       addressId <- db.get(Keys.addressesForAsset(asset, seqNr)).par
-      actualHeight <- db
-        .get(Keys.assetBalanceHistory(addressId, asset))
-        .filterNot(_ > height)
-        .headOption
-      balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-      if balance > 0
+      balance = loadBalanceForId(db)(addressId, asset) if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
     AssetDistribution(dst)
@@ -978,14 +1010,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
 
-    def takeAfter(s: Seq[BigInt], a: Option[BigInt]): Seq[BigInt] = {
+    def takeAfter(s: Seq[Long], a: Option[Long]): Seq[Long] = {
       a match {
         case None    => s
         case Some(v) => s.dropWhile(_ != v).drop(1)
       }
     }
 
-    lazy val addressIds: Seq[BigInt] = {
+    lazy val addressIds: Seq[Long] = {
       val all = for {
         seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(asset))
         addressId <- db
@@ -998,10 +1030,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     lazy val distribution: Stream[(Address, Long)] =
       for {
         addressId <- addressIds.toStream
-        history = db.get(Keys.assetBalanceHistory(addressId, asset))
-        actualHeight <- history.filterNot(_ > height).headOption
-        balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-        if balance > 0
+        balance = db.iterateOverStreamReverse(Keys.AssetBalancePrefix)
+          .filter(e => e.getKey.drop(Shorts.BYTES + Ints.BYTES).dropRight(Ints.BYTES).endsWith(asset.id.arr))
+          .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
+          .dropWhile(_._1 > height)
+          .closeAfter(_.toStream.headOption)
+          .fold(0L)(_._2) if balance > 0
       } yield db.get(Keys.idToAddress(addressId)) -> balance
 
     lazy val page: AssetDistributionPage = {
@@ -1032,9 +1066,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       (for {
         seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
         addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-        history = db.get(Keys.wavesBalanceHistory(addressId))
-        actualHeight <- history.partition(_ > height)._2.headOption
-        balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
+        balance = db.iterateOverStreamReverse(Keys.WavesBalancePrefix)
+          .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
+          .dropWhile(_._1 > height)
+          .closeAfter(_.toStream.headOption)
+          .fold(0L)(_._2) if balance > 0
         if balance > 0
       } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 

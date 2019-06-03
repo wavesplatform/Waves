@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.Shorts
+import com.google.common.primitives.{Bytes, Shorts}
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
 import com.wavesplatform.utils.CloseableIterator
@@ -32,6 +32,15 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
   def iterateOverStream(prefix: Array[Byte]): CloseableIterator[DBEntry] = db.iterateOverStream(prefix)
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
+
+  def iterateOverStreamReverse(seekKey: Array[Byte], prefix: Array[Byte]): CloseableIterator[DBEntry] =
+    db.iterateOverStreamReverse(seekKey, prefix)
+
+  def iterateOverStreamReverse(prefix: Short, bytes: Array[Byte]): CloseableIterator[DBEntry] =
+    db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort), Bytes.concat(Shorts.toByteArray(prefix), bytes))
+
+  def iterateOverStreamReverse(prefix: Short): CloseableIterator[DBEntry] =
+    db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort), Shorts.toByteArray(prefix))
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator
