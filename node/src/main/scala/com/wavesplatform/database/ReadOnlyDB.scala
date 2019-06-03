@@ -36,8 +36,12 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
   def iterateOverStreamReverse(seekKey: Array[Byte], prefix: Array[Byte]): CloseableIterator[DBEntry] =
     db.iterateOverStreamReverse(seekKey, prefix)
 
-  def iterateOverStreamReverse(prefix: Short, bytes: Array[Byte]): CloseableIterator[DBEntry] =
-    db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort), Bytes.concat(Shorts.toByteArray(prefix), bytes))
+  def iterateOverStreamReverse(prefix: Short, bytes: Array[Byte]): CloseableIterator[DBEntry] = {
+    val prefixBytes = Shorts.toByteArray(prefix)
+    val incBytes = new Array[Byte](bytes.length)
+    bytes.zipWithIndex.foreach { case (b, i) => incBytes(i) = if (java.lang.Byte.toUnsignedInt(b) == 0xFF) b else (b + 1).toByte }
+    db.iterateOverStreamReverse(Bytes.concat(prefixBytes, incBytes), Bytes.concat(prefixBytes, bytes))
+  }
 
   def iterateOverStreamReverse(prefix: Short): CloseableIterator[DBEntry] =
     db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort), Shorts.toByteArray(prefix))

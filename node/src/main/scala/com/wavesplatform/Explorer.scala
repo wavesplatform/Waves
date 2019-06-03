@@ -184,7 +184,10 @@ object Explorer extends ScorexLogging {
           log.info(s"Address ID = $addressId")
 
           db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
-            .filter(e => e.getKey.dropRight(4).endsWith(asset.id.arr))
+            .filter { e =>
+              val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
+              ByteStr(assetId) == asset.id
+            }
             .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
             .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
@@ -285,7 +288,10 @@ object Explorer extends ScorexLogging {
             }
             addressId    <- db.get(Keys.addressesForAsset(asset, seqNr))
             balance = db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
-              .filter(e => e.getKey.dropRight(4).endsWith(asset.id.arr))
+              .filter { e =>
+                val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
+                ByteStr(assetId) == asset.id
+              }
               .map(e => Longs.fromByteArray(e.getValue))
               .closeAfter(_.toStream.headOption)
               .getOrElse(0L)

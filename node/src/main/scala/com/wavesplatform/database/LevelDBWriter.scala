@@ -40,8 +40,10 @@ object LevelDBWriter {
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.iterateOverStreamReverse(Keys.LeaseStatusPrefix)
       .closeAfter(
-        _.find(_.getKey.dropRight(4).endsWith(leaseId.arr))
-          .exists(e => e.getValue.headOption.contains(1))
+        _.find { e =>
+          val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
+          ByteStr(bs) == leaseId
+        }.exists(e => e.getValue.headOption.contains(1: Byte))
       )
 
   /** {{{
@@ -49,7 +51,7 @@ object LevelDBWriter {
     * ([10, 7], 5, 11) => [10, 7, 1]
     * }}}
     */
-  private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
+  private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = { // TODO: Remove if not used
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
   }
@@ -252,7 +254,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee = readOnly { db =>
-    db.fromHistory(Keys.filledVolumeAndFeeHistory(orderId), Keys.filledVolumeAndFee(orderId)).getOrElse(VolumeAndFee.empty)
+    db.iterateOverStreamReverse(Keys.FilledVolumeAndFeePrefix, orderId)
+      .map(e => readVolumeAndFee(e.getValue))
+      .closeAfter(_.toStream.headOption)
+      .getOrElse(VolumeAndFee.empty)
   }
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = {
@@ -372,7 +377,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     for ((orderId, volumeAndFee) <- filledQuantity) {
       rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
-      expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
     }
 
     for ((asset, assetInfo) <- reissuedAssets) {
@@ -634,7 +638,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): ByteStr = {
     rw.delete(Keys.filledVolumeAndFee(orderId)(currentHeight))
-    rw.filterHistory(Keys.filledVolumeAndFeeHistory(orderId), currentHeight)
     orderId
   }
 
@@ -1030,9 +1033,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     lazy val distribution: Stream[(Address, Long)] =
       for {
         addressId <- addressIds.toStream
-        balance = db.iterateOverStreamReverse(Keys.AssetBalancePrefix)
-          .filter(e => e.getKey.drop(Shorts.BYTES + Ints.BYTES).dropRight(Ints.BYTES).endsWith(asset.id.arr))
-          .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
+        balance = db
+          .iterateOverStreamReverse(Keys.AssetBalancePrefix)
+          .flatMap { e =>
+            val (_, _, assetId, height) = Keys.parseAddressBytesHeight(e.getKey)
+            if (ByteStr(assetId) == asset.id) Some(height -> Longs.fromByteArray(e.getValue))
+            else None
+          }
           .dropWhile(_._1 > height)
           .closeAfter(_.toStream.headOption)
           .fold(0L)(_._2) if balance > 0
@@ -1066,7 +1073,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       (for {
         seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
         addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-        balance = db.iterateOverStreamReverse(Keys.WavesBalancePrefix)
+        balance = db
+          .iterateOverStreamReverse(Keys.WavesBalancePrefix)
           .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
           .dropWhile(_._1 > height)
           .closeAfter(_.toStream.headOption)

@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -19,6 +19,21 @@ object Keys {
   def score(height: Int): Key[BigInt] = Key("score", h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int]("height-of", hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
+
+  def parseBytesHeight(bs: Array[Byte]): (Short, Array[Byte], Height) = {
+    val prefix = Shorts.fromByteArray(bs.take(2))
+    val height = Height(Ints.fromByteArray(bs.takeRight(4)))
+    val aux = bs.drop(2).dropRight(4)
+    (prefix, aux, height)
+  }
+
+  def parseAddressBytesHeight(bs: Array[Byte]): (Short, AddressId, Array[Byte], Height) = {
+    val prefix = Shorts.fromByteArray(bs.take(2))
+    val addressId = AddressId.fromBytes(bs.slice(2, 6))
+    val height = Height(Ints.fromByteArray(bs.takeRight(4)))
+    val aux = bs.drop(6).dropRight(4)
+    (prefix, addressId, aux, height)
+  }
 
   val WavesBalancePrefix: Short = 6
   def wavesBalance(addressId: Long)(height: Int): Key[Long] =
@@ -44,9 +59,9 @@ object Keys {
   def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
     Key("lease-status", hBytes(LeaseStatusPrefix, leaseId.arr, height), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
 
-  def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]] = historyKey("filled-volume-and-fee-history", 16, orderId.arr)
+  val FilledVolumeAndFeePrefix: Short = 17
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
-    Key("filled-volume-and-fee", hBytes(17, orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
+    Key("filled-volume-and-fee", hBytes(FilledVolumeAndFeePrefix, orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
 
   // 19, 20 were never used
 
