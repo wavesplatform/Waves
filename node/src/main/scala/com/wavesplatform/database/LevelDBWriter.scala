@@ -777,10 +777,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeight = this.heightOf(to).getOrElse(this.height)
 
-      def readSlice(prefix: Short) = {
+      def beforeUpper(prefix: Short) = {
         readFromEndForAddress(db)(prefix, addressId)
           .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), e.getValue))
           .dropWhile(_._1 > toHeight)
+      }
+
+      def readSlice(prefix: Short) = {
+        beforeUpper(prefix)
           .takeWhile(_._1 >= from)
       }
 
@@ -789,7 +793,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           .map { case (height, arr) => (height, Longs.fromByteArray(arr)) }
           .toVector
 
-        base ++ (base.last._1 until from by -1).map((_, 0L))
+        val maxHeight = base.lastOption.fold(toHeight)(_._1 - 1)
+
+        val first = beforeUpper(Keys.WavesBalancePrefix)
+          .dropWhile(_._1 >= maxHeight)
+          .closeAfter(_.toStream.headOption)
+          .fold(0L)(kv => Longs.fromByteArray(kv._2))
+
+        base ++ (maxHeight to from by -1).map((_, first))
       }
 
       val leaseBalances = readSlice(Keys.LeaseBalancePrefix)

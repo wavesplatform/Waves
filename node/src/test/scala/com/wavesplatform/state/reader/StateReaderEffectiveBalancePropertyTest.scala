@@ -29,7 +29,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
         val genesisBlock = block(Seq(genesis))
         val nextBlocks   = List.fill(emptyBlocksAmt - 1)(block(Seq.empty))
         assertDiffAndState(genesisBlock +: nextBlocks, block(Seq.empty)) { (_, newState) =>
-          newState.effectiveBalance(genesis.recipient, confirmations) shouldBe genesis.amount
+          newState.effectiveBalance(genesis.recipient, 1) shouldBe genesis.amount
         }
     }
   }
