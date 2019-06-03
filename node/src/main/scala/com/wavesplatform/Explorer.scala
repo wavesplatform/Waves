@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 
-import com.google.common.primitives.Shorts
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
@@ -12,7 +12,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.state.{AddressId, Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -148,14 +148,9 @@ object Explorer extends ScorexLogging {
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
 
-          val kwbh = Keys.wavesBalanceHistory(addressId)
-          val wbh  = kwbh.parse(db.get(kwbh.keyBytes))
-
-          val balances = wbh.map { h =>
-            val k = Keys.wavesBalance(addressId)(h)
-            h -> k.parse(db.get(k.keyBytes))
-          }
-          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+          db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId)))
+            .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
+            .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
         case "AC" =>
           val lastAddressId = Keys.lastAddressId.parse(db.get(Keys.lastAddressId.keyBytes))
@@ -164,7 +159,7 @@ object Explorer extends ScorexLogging {
         case "AD" =>
           val result        = new util.HashMap[Address, java.lang.Integer]()
           val lastAddressId = Keys.lastAddressId.parse(db.get(Keys.lastAddressId.keyBytes))
-          for (id <- BigInt(1) to lastAddressId.getOrElse(BigInt(0))) {
+          for (id <- 1L to lastAddressId.getOrElse(0L)) {
             val k       = Keys.idToAddress(id)
             val address = k.parse(db.get(k.keyBytes))
             result.compute(address,
@@ -188,14 +183,10 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
-          val kabh = Keys.assetBalanceHistory(addressId, asset)
-          val abh  = kabh.parse(db.get(kabh.keyBytes))
-
-          val balances = abh.map { h =>
-            val k = Keys.assetBalance(addressId, asset)(h)
-            h -> k.parse(db.get(k.keyBytes))
-          }
-          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+          db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
+            .filter(e => e.getKey.dropRight(4).endsWith(asset.id.arr))
+            .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
+            .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
         case "S" =>
           log.info("Collecting DB stats")
@@ -268,9 +259,10 @@ object Explorer extends ScorexLogging {
           for {
             seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
             addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-            history = db.get(Keys.wavesBalanceHistory(addressId))
-            actualHeight <- history.headOption
-            balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
+            balance = db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId)))
+              .map(e => Longs.fromByteArray(e.getValue))
+              .closeAfter(_.toStream.headOption)
+              .getOrElse(0L)
             if balance > 0
           } yield {
             val addr = db.get(Keys.idToAddress(addressId))
@@ -292,8 +284,11 @@ object Explorer extends ScorexLogging {
               1 to db.get(Keys.addressesForAssetSeqNr(asset))
             }
             addressId    <- db.get(Keys.addressesForAsset(asset, seqNr))
-            actualHeight <- db.get(Keys.assetBalanceHistory(addressId, asset)).headOption
-            balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
+            balance = db.iterateOverStreamReverse(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId + 1)), Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
+              .filter(e => e.getKey.dropRight(4).endsWith(asset.id.arr))
+              .map(e => Longs.fromByteArray(e.getValue))
+              .closeAfter(_.toStream.headOption)
+              .getOrElse(0L)
             if balance > 0
           } yield {
             val addr = db.get(Keys.idToAddress(addressId))
