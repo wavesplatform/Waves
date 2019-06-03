@@ -12,7 +12,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.state.{AddressId, Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -164,8 +164,8 @@ object Explorer extends ScorexLogging {
         case "AD" =>
           val result        = new util.HashMap[Address, java.lang.Integer]()
           val lastAddressId = Keys.lastAddressId.parse(db.get(Keys.lastAddressId.keyBytes))
-          for (id <- BigInt(1) to lastAddressId.getOrElse(BigInt(0))) {
-            val k       = Keys.idToAddress(id)
+          for (id <- 1L to lastAddressId.getOrElse(0L)) {
+            val k       = Keys.idToAddress(AddressId @@ id)
             val address = k.parse(db.get(k.keyBytes))
             result.compute(address,
                            (_, prev) =>

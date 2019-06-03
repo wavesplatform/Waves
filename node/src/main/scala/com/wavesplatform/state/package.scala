@@ -5,8 +5,8 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -215,7 +215,7 @@ package object state {
   object TxNum extends TaggedType[Short]
   type TxNum = TxNum.Type
 
-  object AddressId extends TaggedType[BigInt]
+  object AddressId extends TaggedType[Long]
   type AddressId = AddressId.Type
 
   object TransactionId extends TaggedType[ByteStr]
