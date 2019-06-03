@@ -335,7 +335,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    val newAddressesForWaves = ArrayBuffer.empty[BigInt]
+    val newAddressesForWaves = ArrayBuffer.empty[Long]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       addressId
@@ -353,7 +353,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
     }
 
-    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
+    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
     for ((addressId, assets) <- assetBalances) {
       val prevAssets   = rw.get(Keys.assetList(addressId))
       val prevAssetSet = prevAssets.toSet
@@ -762,13 +762,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, BigInt), java.lang.Long]()
+    .build[(Int, Long), java.lang.Long]()
 
   private val leaseBalanceAtHeightCache = CacheBuilder
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, BigInt), LeaseBalance]()
+    .build[(Int, Long), LeaseBalance]()
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
