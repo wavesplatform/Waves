@@ -778,21 +778,22 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val toHeight = this.heightOf(to).getOrElse(this.height)
 
       def readSlice(prefix: Short) = {
-        def base = readFromEndForAddress(db)(prefix, addressId)
+        readFromEndForAddress(db)(prefix, addressId)
           .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), e.getValue))
           .dropWhile(_._1 > toHeight)
-
-        val current = base.takeWhile(_._1 >= from)
-        if (current.hasNext) current else base.take(1)
+          .takeWhile(_._1 >= from)
       }
 
-      val wavesBalances = readSlice(Keys.WavesBalancePrefix)
-        .map { case (height, arr) => (height, Longs.fromByteArray(arr)) }
-        .toVector
+      val wavesBalances = {
+        val base = readSlice(Keys.WavesBalancePrefix)
+          .map { case (height, arr) => (height, Longs.fromByteArray(arr)) }
+          .toVector
+
+        base ++ (base.last._1 until from by -1).map((_, 0L))
+      }
 
       val leaseBalances = readSlice(Keys.LeaseBalancePrefix)
         .map { case (height, arr) => (height, readLeaseBalance(arr)) }
-        .toVector
 
       val baseMap = wavesBalances.map(kv => (kv._1, BalanceSnapshot(kv._1, kv._2, 0, 0))).toMap
       leaseBalances
