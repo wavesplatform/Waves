@@ -132,10 +132,7 @@ object Explorer extends ScorexLogging {
 
             db.iterateOverStreamReverse(
                 Bytes.concat(Shorts.toByteArray(Keys.FilledVolumeAndFeePrefix), orderId.get.arr.map(b => if (b == 0xFF) b else (b + 1).toByte)),
-                Bytes.concat(Shorts.toByteArray(Keys.FilledVolumeAndFeePrefix),
-                             orderId.get.arr.map(b =>
-                               if (b == 0xFF) b
-                               else (b + 1).toByte))
+                Bytes.concat(Shorts.toByteArray(Keys.FilledVolumeAndFeePrefix), orderId.get.arr)
               )
               .filter { e =>
                 val (_, bs, _) = Keys.parseBytesHeight(e.getKey)
