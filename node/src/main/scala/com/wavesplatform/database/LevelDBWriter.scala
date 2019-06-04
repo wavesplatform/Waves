@@ -83,6 +83,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
+  private val issueTxIdentifierCache = Caches.cache(dbSettings.maxCacheSize, loadIssueTxIdentifier)
+
+  private def loadIssueTxIdentifier(asset: IssuedAsset): Option[(Height, TxNum)] =
+    readOnly(db => db.get(Keys.transactionHNById(TransactionId @@ asset.id)))
+
+  private def discardIssueTxIdentifier(asset: IssuedAsset): Unit = issueTxIdentifierCache.invalidate(asset)
+
   private def readStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = CloseableIterator.defer(writableDB.readOnlyStream(f))
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -160,7 +167,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     asset match {
       case asset @ IssuedAsset(_) =>
         val maybeBalance = for {
-          (txHeight, txNum) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id))
+          (txHeight, txNum) <- issueTxIdentifierCache.get(asset)
           balance           <- db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, txHeight, txNum))
         } yield balance
 
@@ -330,11 +337,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
       rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
       for ((assetId, balance) <- assets) {
-        val issueTransactionId = TransactionId @@ assetId.id
-
-        lazy val maybeHNFromState           = rw.get(Keys.transactionHNById(issueTransactionId))
-        lazy val maybeHNFromNewTransactions = transactions.get(issueTransactionId).map { case (_, n) => (Height @@ height, n) }
-
+        lazy val maybeHNFromState = issueTxIdentifierCache.get(assetId)
+        lazy val maybeHNFromNewTransactions = transactions
+          .get(TransactionId @@ assetId.id)
+          .map { case (_, n) => (Height @@ height, n) }
 
         maybeHNFromNewTransactions
           .orElse(maybeHNFromState)
@@ -617,7 +623,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
         balancesToInvalidate.result().foreach(discardBalance)
         portfoliosToInvalidate.result().foreach(discardPortfolio)
-        assetInfoToInvalidate.result().foreach(discardAssetDescription)
+        assetInfoToInvalidate.result().foreach { ai =>
+          discardAssetDescription(ai)
+          discardIssueTxIdentifier(ai)
+        }
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
