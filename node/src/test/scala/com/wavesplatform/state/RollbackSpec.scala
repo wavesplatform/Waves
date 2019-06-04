@@ -100,10 +100,6 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           d.removeAfter(genesisSignature)
 
-          if (transfers.flatten.exists(tx => d.blockchainUpdater.transactionHeight(tx.id()).isDefined)) {
-            d.removeAfter(genesisSignature)
-          }
-
           for (transfer <- transfers) {
             d.appendBlock(
               TestBlock.create(
