@@ -16,6 +16,7 @@ import com.wavesplatform.matcher.model.MatcherModel.Normalization
 import com.wavesplatform.matcher.settings.OrderFeeSettings._
 import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
+import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

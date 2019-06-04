@@ -11,6 +11,7 @@ import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransact
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import org.slf4j.LoggerFactory

@@ -7,6 +7,7 @@ import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.MatcherModel.Price
+import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._

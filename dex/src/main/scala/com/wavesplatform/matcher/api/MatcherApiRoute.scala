@@ -22,6 +22,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher, RateCache}
+import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
