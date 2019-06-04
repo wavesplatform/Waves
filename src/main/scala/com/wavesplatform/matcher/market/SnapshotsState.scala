@@ -37,6 +37,11 @@ case class SnapshotsState private (snapshotOffsets: Map[AssetPair, Option[EventO
       nearestSnapshotOffsets = nearestSnapshotOffsets + (assetPair -> nextOffset)
     )
   }
+
+  def without(assetPair: AssetPair): SnapshotsState = copy(
+    snapshotOffsets = snapshotOffsets - assetPair,
+    nearestSnapshotOffsets = nearestSnapshotOffsets.filterNot(_._1 == assetPair)
+  )
 }
 
 object SnapshotsState {

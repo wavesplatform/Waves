@@ -9,10 +9,10 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.db.AssetPairsDB
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
-import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
+import com.wavesplatform.matcher.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor}
 import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.AssetId
@@ -319,6 +319,54 @@ class MatcherActorSpecification
         probe.send(actor, MatcherActor.ForceStartOrderBook(pair))
         probe.expectMsg(MatcherActor.OrderBookCreated(pair))
       }
+
+      "after delete" in {
+        val apdb = mkAssetPairsDB
+        val pair = AssetPair(randomAssetId, randomAssetId)
+
+        matcherHadOrderBooksBefore(apdb, pair -> Some(9L))
+        val ob = emptyOrderBookRefs
+        val actor = TestActorRef(
+          new MatcherActor(
+            matcherSettings,
+            apdb,
+            doNothingOnRecovery,
+            ob,
+            (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
+            blockchain.assetDescription
+          )
+        )
+
+        val probe = TestProbe()
+        probe.send(actor, QueueEventWithMeta(10L, 0L, QueueEvent.OrderBookDeleted(pair)))
+
+        withClue("Removed from snapshots rotation") {
+          eventually {
+            probe.send(actor, GetMarkets)
+            probe.expectMsgPF() {
+              case xs @ Seq() => xs.size shouldBe 0 // To ignore annoying warnings
+            }
+
+            probe.send(actor, MatcherActor.GetSnapshotOffsets)
+            probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map.empty))
+          }
+        }
+
+        withClue("Can be re-created") {
+          val order1 = buy(pair, 2000, 1)
+          probe.send(actor, wrap(11L, order1))
+
+          eventually {
+            probe.send(actor, GetMarkets)
+            probe.expectMsgPF() {
+              case Seq(x: MarketData) => x.pair shouldBe pair
+            }
+
+            probe.send(actor, MatcherActor.GetSnapshotOffsets)
+            probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map.empty))
+          }
+        }
+      }
     }
   }
 
@@ -422,5 +470,10 @@ object MatcherActorSpecification {
       Thread.sleep(100)
       throw new RuntimeException("I don't want to work today")
     }
+  }
+  private class DeletingActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None)
+      extends RecoveringActor(owner, assetPair, startOffset) {
+    override def receive: Receive     = handleDelete orElse super.receive
+    private def handleDelete: Receive = { case QueueEventWithMeta(_, _, _: QueueEvent.OrderBookDeleted) => context.stop(self) }
   }
 }

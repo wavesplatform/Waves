@@ -141,8 +141,9 @@ class MatcherActor(settings: MatcherSettings,
             orderBooks.getAndUpdate(_.filterNot { x =>
               x._2.right.exists(_ == ref)
             })
-
+            snapshotsState = snapshotsState.without(assetPair)
             tradedPairs -= assetPair
+            assetPairsDB.remove(assetPair)
           }
 
         case _ => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
@@ -160,7 +161,12 @@ class MatcherActor(settings: MatcherSettings,
     case Terminated(ref) =>
       log.error(s"$ref is terminated")
       orderBooks.getAndUpdate { m =>
-        childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
+        childrenNames.get(ref).fold(m) { p =>
+          m.get(p) match {
+            case None    => m
+            case Some(_) => m.updated(p, Left(()))
+          }
+        }
       }
 
     case OrderBookRecovered(assetPair, eventNr) =>
