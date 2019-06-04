@@ -293,6 +293,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           append(Seq(transferTx, issueTx)).explicitGet()
 
+          val assetId = issueTx.assetId.value
           val script = ScriptCompiler
             .compile(
               s"""
@@ -300,19 +301,26 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | {-# CONTENT_TYPE EXPRESSION #-}
               | {-# SCRIPT_TYPE ACCOUNT #-}
               |
-              | let aInfoOpt = assetInfo(base58'${issueTx.assetId.value}')
+              | let aInfoOpt = assetInfo(base58'$assetId')
               |
-              | let aInfo = extract(aInfoOpt)
-              | let totalAmount = aInfo.totalAmount == $quantity
-              | let decimals = aInfo.decimals == $decimals
-              | let issuer = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress.bytes}'
+              | let aInfo           = extract(aInfoOpt)
+              | let id              = aInfo.id == base58'$assetId'
+              | let quantity        = aInfo.quantity == $quantity
+              | let decimals        = aInfo.decimals == $decimals
+              | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress.bytes}'
               | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
-              | let scripted = aInfo.scripted == ${assetScript.nonEmpty}
-              | let reissuable = aInfo.reissuable == $reissuable
-              | let sponsored = aInfo.sponsored == $sponsored
+              | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
+              | let reissuable      = aInfo.reissuable == $reissuable
+              | let sponsored       = aInfo.sponsored == $sponsored
               |
-              | isDefined(aInfoOpt) && totalAmount && decimals && issuer && issuerPublicKey && scripted && reissuable && sponsored
-              |
+              | id              &&
+              | quantity        &&
+              | decimals        &&
+              | issuer          &&
+              | issuerPublicKey &&
+              | scripted        &&
+              | reissuable      &&
+              | sponsored
               |
             """.stripMargin
             )
