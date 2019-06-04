@@ -10,22 +10,24 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import monix.reactive.Observer
 
-final case class StateUpdated(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)], dataEntries: Seq[(Address, DataEntry[_])])
+final case class StateUpdate(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)], dataEntries: Seq[(Address, DataEntry[_])]) {
+  def isEmpty: Boolean = balances.isEmpty && leases.isEmpty && dataEntries.isEmpty
+}
 
 sealed trait BlockchainUpdated
-final case class BlockAdded(block: Block, height: Int, blockStateUpdate: StateUpdated, transactionsStateUpdates: Seq[StateUpdated])
+final case class BlockAppended(block: Block, height: Int, blockStateUpdate: StateUpdate, transactionStateUpdates: Seq[StateUpdate])
     extends BlockchainUpdated
-final case class MicroBlockAdded(microBlock: MicroBlock,
-                                 height: Int,
-                                 microBlockStateUpdate: StateUpdated,
-                                 transactionsStateUpdates: Seq[StateUpdated])
+final case class MicroBlockAppended(microBlock: MicroBlock,
+                                    height: Int,
+                                    microBlockStateUpdate: StateUpdate,
+                                    transactionStateUpdates: Seq[StateUpdate])
     extends BlockchainUpdated
 final case class RollbackCompleted(to: ByteStr, height: Int)           extends BlockchainUpdated
 final case class MicroBlockRollbackCompleted(to: ByteStr, height: Int) extends BlockchainUpdated
 
 object BlockchainUpdateNotifier {
 
-  private def stateUpdateFromDiff(blockchain: Blockchain, diff: Diff): StateUpdated = {
+  private def stateUpdateFromDiff(blockchain: Blockchain, diff: Diff): StateUpdate = {
     val balances = Seq.newBuilder[(Address, Asset, Long)]
     val leases   = Seq.newBuilder[(Address, LeaseBalance)]
 
@@ -52,14 +54,14 @@ object BlockchainUpdateNotifier {
         data.toSeq.map { case (_, entry) => (address, entry) }
     }
 
-    StateUpdated(balances.result(), leases.result(), dataEntries)
+    StateUpdate(balances.result(), leases.result(), dataEntries)
   }
 
-  private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdated, Seq[StateUpdated]) = {
+  private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdate, Seq[StateUpdate]) = {
     val (blockDiff, txsDiffs) = diff
     val blockStateUpdate      = stateUpdateFromDiff(blockchain, blockDiff)
 
-    val txsStateUpdates = txsDiffs.foldLeft((Seq.empty[StateUpdated], composite(blockchain, blockDiff)))((acc, txDiff) => {
+    val txsStateUpdates = txsDiffs.foldLeft((Seq.empty[StateUpdate], composite(blockchain, blockDiff)))((acc, txDiff) => {
       val (updates, bc) = acc
       val update        = stateUpdateFromDiff(bc, txDiff)
       (updates :+ update, composite(bc, txDiff))
@@ -71,13 +73,13 @@ object BlockchainUpdateNotifier {
   def notifyProcessBlock(events: Option[Observer[BlockchainUpdated]], block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit =
     events foreach { es =>
       val (blockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      es.onNext(BlockAdded(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates))
+      es.onNext(BlockAppended(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates))
     }
 
   def notifyProcessMicroBlock(events: Option[Observer[BlockchainUpdated]], microBlock: MicroBlock, diff: DetailedDiff, blockchain: Blockchain): Unit =
     events foreach { es =>
       val (microBlockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      es.onNext(MicroBlockAdded(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates))
+      es.onNext(MicroBlockAppended(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates))
     }
 
   // here height + 1 is not required, because blockchain rollback resets height and ngState no longer affects it

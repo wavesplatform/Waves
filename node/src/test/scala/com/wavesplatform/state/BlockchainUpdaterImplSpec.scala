@@ -176,7 +176,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // genesis block
           updates.head match {
-            case BlockAdded(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
               height shouldBe 1
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
@@ -186,7 +186,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // transfers block
           updates(1) match {
-            case BlockAdded(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
               height shouldBe 2
               block.transactionData.length shouldBe 5
               // miner reward, no NG — all txs fees
@@ -213,7 +213,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // genesis block, same as without NG
           updates.head match {
-            case BlockAdded(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
               height shouldBe 1
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
@@ -223,7 +223,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // first transfers block
           updates(1) match {
-            case BlockAdded(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
               height shouldBe 2
               block.transactionData.length shouldBe 5
 
@@ -235,7 +235,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // second transfers block, with carryFee
           updates(2) match {
-            case BlockAdded(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
               height shouldBe 3
               block.transactionData.length shouldBe 4
 
@@ -289,7 +289,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           updates.length shouldBe 6
           updates.head match {
-            case BlockAdded(b, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(b, height, blockStateUpdate, transactionsStateUpdates) =>
               height shouldBe 1
               b.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
@@ -298,7 +298,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           }
 
           updates(1) match {
-            case MicroBlockAdded(microBlock, height, microBlockStateUpdate, _) =>
+            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _) =>
               height shouldBe 1
               microBlock.transactionData.length shouldBe 2
               // microBlock transactions miner reward
@@ -308,7 +308,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           }
 
           updates(2) match {
-            case MicroBlockAdded(microBlock, height, microBlockStateUpdate, _) =>
+            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _) =>
               height shouldBe 1
               microBlock.transactionData.length shouldBe 1
               // microBlock transactions miner reward

@@ -177,4 +177,6 @@ object Dependencies {
     "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   )
+
+  lazy val kafka: ModuleID = "org.apache.kafka" %% "kafka" % "2.2.0"
 }
