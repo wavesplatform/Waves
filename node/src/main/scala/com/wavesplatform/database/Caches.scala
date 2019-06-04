@@ -143,10 +143,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long
 
-  private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
-  protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription]
+  protected val assetDescriptionCache: LoadingCache[IssuedAsset, Option[(AssetDescription, (Height, TxNum))]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
+  protected def loadAssetDescription(asset: IssuedAsset): Option[(AssetDescription, (Height, TxNum))]
   protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
-  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset)
+  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset).map(_._1)
 
   private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee

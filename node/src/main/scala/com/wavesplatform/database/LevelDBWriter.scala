@@ -83,13 +83,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
-  private val issueTxIdentifierCache = Caches.cache(dbSettings.maxCacheSize, loadIssueTxIdentifier)
-
-  private def loadIssueTxIdentifier(asset: IssuedAsset): Option[(Height, TxNum)] =
-    readOnly(db => db.get(Keys.transactionHNById(TransactionId @@ asset.id)))
-
-  private def discardIssueTxIdentifier(asset: IssuedAsset): Unit = issueTxIdentifierCache.invalidate(asset)
-
   private def readStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = CloseableIterator.defer(writableDB.readOnlyStream(f))
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -167,7 +160,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     asset match {
       case asset @ IssuedAsset(_) =>
         val maybeBalance = for {
-          (txHeight, txNum) <- issueTxIdentifierCache.get(asset)
+          (txHeight, txNum) <- assetDescriptionCache.get(asset).map(_._2)
           balance           <- db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, txHeight, txNum))
         } yield balance
 
@@ -215,14 +208,19 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(asset.id, db) match {
-      case Some((_, i: IssueTransaction)) =>
+  override protected def loadAssetDescription(asset: IssuedAsset): Option[(AssetDescription, (Height, TxNum))] = readOnly { db =>
+    val maybeTxInfo = for {
+      (h, n) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id))
+      tx     <- db.get(Keys.transactionAt(h, n))
+    } yield (h, n, tx)
+
+    maybeTxInfo collect {
+      case (h, n, i: IssueTransaction) =>
         val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
         val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
-      case _ => None
+        val description = AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship)
+        (description, (h, n))
     }
   }
 
@@ -337,7 +335,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
       rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
       for ((assetId, balance) <- assets) {
-        lazy val maybeHNFromState = issueTxIdentifierCache.get(assetId)
+        lazy val maybeHNFromState = assetDescriptionCache.get(assetId).map(_._2)
         lazy val maybeHNFromNewTransactions = transactions
           .get(TransactionId @@ assetId.id)
           .map { case (_, n) => (Height @@ height, n) }
@@ -623,10 +621,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
         balancesToInvalidate.result().foreach(discardBalance)
         portfoliosToInvalidate.result().foreach(discardPortfolio)
-        assetInfoToInvalidate.result().foreach { ai =>
-          discardAssetDescription(ai)
-          discardIssueTxIdentifier(ai)
-        }
+        assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
