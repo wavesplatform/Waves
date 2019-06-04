@@ -75,7 +75,7 @@ object WavesContext {
         internalName,
         UNION(dataType.innerType, UNIT),
         "Find and extract data by key",
-        ("data", LIST(dataEntryType), "DataEntry vector, usally tx.data"),
+        ("data", LIST(dataEntryType), "DataEntry vector, usually tx.data"),
         ("key", STRING, "key")
       ) {
         case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
@@ -100,7 +100,7 @@ object WavesContext {
         30,
         UNION(dataType.innerType, UNIT),
         "Extract data by index",
-        ("@data", LIST(dataEntryType), "DataEntry vector, usally tx.data"),
+        ("@data", LIST(dataEntryType), "DataEntry vector, usually tx.data"),
         ("@index", LONG, "index")
       ) {
         LET_BLOCK(
@@ -212,7 +212,7 @@ object WavesContext {
     )
 
     lazy val addressFromStringF: BaseFunction =
-      UserFunction("addressFromString", 124, optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
+      UserFunction("addressFromString", 124, optionAddress, "Decode account address", ("@string", STRING, "string address representation")) {
 
         LET_BLOCK(
           LET("@afs_addrBytes",
@@ -376,7 +376,7 @@ object WavesContext {
       }
 
     val wavesBalanceF: UserFunction =
-      UserFunction("wavesBalance", 109, LONG, "get WAVES balanse for account", ("@addressOrAlias", addressOrAliasType, "account")) {
+      UserFunction("wavesBalance", 109, LONG, "get WAVES balance for account", ("@addressOrAlias", addressOrAliasType, "account")) {
         FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
 
       }
