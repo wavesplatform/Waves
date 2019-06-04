@@ -444,9 +444,17 @@ package object database {
       try {
         val seekKey = {
           val seekSuffix = new Array[Byte](suffix.length)
-          val ffBytes = suffix.takeWhile(_ == 0xff)
-          ffBytes.copyToArray(seekSuffix)
-          if (ffBytes.length < seekSuffix.length) seekSuffix(ffBytes.length) = (suffix(ffBytes.length) + 1).toByte
+          suffix.copyToArray(seekSuffix)
+
+          var index = seekSuffix.length - 1
+          while (index >= 0) {
+            if (seekSuffix(index) == 0xff) index -= 1
+            else {
+              seekSuffix(index) = (seekSuffix(index) + 1).toByte
+              index = -1
+            }
+          }
+
           Bytes.concat(prefix, seekSuffix)
         }
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.{Bytes, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Shorts}
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
 import com.wavesplatform.utils.CloseableIterator
@@ -33,18 +33,20 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
-  def iterateOverStreamReverse(prefix: Short, bytes: Array[Byte]): CloseableIterator[DBEntry] = {
-    val prefixBytes = Shorts.toByteArray(prefix)
-    val filterBytes = Bytes.concat(prefixBytes, bytes)
-    db.iterateOverStreamReverse(prefixBytes, bytes)
-      .dropWhile(e => !e.getKey.startsWith(filterBytes))
-      .takeWhile(e => e.getKey.startsWith(filterBytes))
-  }
+  def iterateFromTopHeight(prefix: Short, bytes: Array[Byte], height: Int): CloseableIterator[DBEntry] = {
+    def iterateOverStreamReverse(stablePrefix: Array[Byte], bytes: Array[Byte]): CloseableIterator[DBEntry] = {
+      val filterBytes = Bytes.concat(stablePrefix, bytes)
+      db.iterateOverStreamReverse(stablePrefix, bytes)
+        .dropWhile(e => !e.getKey.startsWith(filterBytes))
+        .takeWhile(e => e.getKey.startsWith(filterBytes))
+    }
 
-  def iterateOverStreamReverse(prefix: Short): CloseableIterator[DBEntry] =
-    db.iterateOverStreamReverse(Shorts.toByteArray((prefix + 1).toShort))
-      .dropWhile(e => Shorts.fromByteArray(e.getKey.take(2)) != prefix)
-      .takeWhile(e => Shorts.fromByteArray(e.getKey.take(2)) == prefix)
+    val stableBytes = Bytes.concat(
+      Shorts.toByteArray(prefix),
+      bytes
+    )
+    iterateOverStreamReverse(stableBytes, Ints.toByteArray(height))
+  }
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator
