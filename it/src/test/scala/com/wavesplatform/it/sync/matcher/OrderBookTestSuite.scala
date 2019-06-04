@@ -69,9 +69,20 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "orderbook was really deleted" in {
-      val orderBook = matcherNode.orderBook(wctUsdPair)
-      orderBook.bids shouldBe empty
-      orderBook.asks shouldBe empty
+      withClue("orderBook") {
+        val orderBook = matcherNode.orderBook(wctUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+
+      withClue("tradingMarkets") {
+        val tradingPairs = matcherNode.tradingMarkets().markets.map(x => s"${x.amountAsset}-${x.priceAsset}")
+        tradingPairs shouldNot contain(wctUsdPair.key)
+      }
+
+      withClue("getAllSnapshotOffsets") {
+        matcherNode.getAllSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
+      }
     }
 
     "reserved balances should be released for the pair" in {
