@@ -33,19 +33,32 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
-  def iterateFromTopHeight(prefix: Short, bytes: Array[Byte], height: Int): CloseableIterator[DBEntry] = {
-    def iterateOverStreamReverse(stablePrefix: Array[Byte], bytes: Array[Byte]): CloseableIterator[DBEntry] = {
-      val filterBytes = Bytes.concat(stablePrefix, bytes)
-      db.iterateOverStreamReverse(stablePrefix, bytes)
-        .dropWhile(e => !e.getKey.startsWith(filterBytes))
-        .takeWhile(e => e.getKey.startsWith(filterBytes))
-    }
-
+  def lastValue(prefix: Short, bytes: Array[Byte], height: Int): Option[DBEntry] = {
     val stableBytes = Bytes.concat(
       Shorts.toByteArray(prefix),
       bytes
     )
-    iterateOverStreamReverse(stableBytes, Ints.toByteArray(height))
+
+    db.iterateOverStream(stableBytes)
+      .takeWhile(e => Ints.fromByteArray(e.getKey.takeRight(Ints.BYTES)) <= height)
+      //    db.iterateOverStreamReverse(Bytes.concat(stableBytes, Ints.toByteArray(height + 1)))
+      //      .dropWhile(e => !e.getKey.startsWith(stableBytes))
+      //      .takeWhile(e => e.getKey.startsWith(stableBytes))
+      .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
+  }
+
+  def iterateFromTopHeight(prefix: Short, bytes: Array[Byte], height: Int): CloseableIterator[DBEntry] = {
+    val stableBytes = Bytes.concat(
+      Shorts.toByteArray(prefix),
+      bytes
+    )
+
+    db.iterateOverStream(stableBytes)
+//    db.iterateOverStreamReverse(Bytes.concat(stableBytes, Ints.toByteArray(height + 1)))
+//      .dropWhile(e => !e.getKey.startsWith(stableBytes))
+//      .takeWhile(e => e.getKey.startsWith(stableBytes))
+      .toVector
+      .reverseIterator
   }
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {

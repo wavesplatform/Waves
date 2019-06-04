@@ -446,12 +446,12 @@ package object database {
           val seekSuffix = new Array[Byte](suffix.length)
           suffix.copyToArray(seekSuffix)
 
-          var index = seekSuffix.length - 1
-          while (index >= 0) {
-            if (seekSuffix(index) == 0xff) index -= 1
+          var index = 0
+          while (index < seekSuffix.length) {
+            if (seekSuffix(index) == 0xff) index += 1
             else {
               seekSuffix(index) = (seekSuffix(index) + 1).toByte
-              index = -1
+              index = seekSuffix.length
             }
           }
 

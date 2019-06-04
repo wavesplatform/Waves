@@ -111,10 +111,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[this] def getAddressScript(address: Long): Option[() => Script] = readOnly { db =>
-    db.iterateFromTopHeight(Keys.AddressScriptPrefix, AddressId.toBytes(address), this.height)
-      .map(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
-      .closeAfter(_.toStream.headOption)
-      .flatten
+    db.lastValue(Keys.AddressScriptPrefix, AddressId.toBytes(address), this.height)
+      .flatMap(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
   }
 
   override protected def loadAssetScript(asset: IssuedAsset): Option[Script] =
@@ -124,10 +122,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     getAssetScript(asset).isDefined
 
   private[this] def getAssetScript(asset: IssuedAsset): Option[() => Script] = readOnly { db =>
-    db.iterateFromTopHeight(Keys.AssetScriptPrefix, asset.id, this.height)
-      .map(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
-      .closeAfter(_.toStream.headOption)
-      .flatten
+    db.lastValue(Keys.AssetScriptPrefix, asset.id, this.height)
+      .flatMap(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
   }
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
@@ -150,12 +146,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
     addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
-      db.iterateFromTopHeight(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), this.height)
+      db.lastValue(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), this.height)
         .map { e =>
           val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
           DataEntry.parseValue(new String(bs, UTF_8), e.getValue, 0)._1
         }
-        .closeAfter(_.toStream.headOption)
     }
   }
 
@@ -164,14 +159,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[this] def readLastForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
-    readFromEndForAddress(db)(prefix, addressId)
-      .closeAfter(_.toStream.headOption.map(_.getValue))
+    db.lastValue(prefix, AddressId.toBytes(addressId), this.height).map(_.getValue)
   }
 
   private[this] def readLastValue[T](db: ReadOnlyDB)(prefix: Short, bytes: Array[Byte], read: Array[Byte] => T) =
-    db.iterateFromTopHeight(prefix, bytes, this.height)
+    db.lastValue(prefix, bytes, this.height)
       .map(e => read(e.getValue))
-      .closeAfter(_.toStream.headOption)
 
   private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: Long, asset: Asset) = {
     val (prefix, assetBytes) = asset match {
@@ -179,13 +172,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       case Waves              => (Keys.WavesBalancePrefix, Array.emptyByteArray)
     }
 
-    readFromEndForAddress(db)(prefix, addressId)
-      .filter { e =>
-        val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
-        ByteStr(bs) == ByteStr(assetBytes)
-      }
-      .map(e => Longs.fromByteArray(e.getValue))
-      .closeAfter(_.toStream.headOption)
+    readLastValue(db)(prefix, Bytes.concat(AddressId.toBytes(addressId), assetBytes), Longs.fromByteArray)
       .getOrElse(0L)
   }
 
@@ -195,11 +182,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private def loadLeaseBalance(db: ReadOnlyDB, addressId: Long): LeaseBalance = {
-    readFromEndForAddress(db)(Keys.LeaseBalancePrefix, addressId)
-      .map(_.getValue)
-      .map(readLeaseBalance)
-      .closeAfter(_.toStream.headOption)
+  private[this] def loadLeaseBalance(db: ReadOnlyDB, addressId: Long): LeaseBalance = {
+    readLastValue(db)(Keys.LeaseBalancePrefix, AddressId.toBytes(addressId), readLeaseBalance)
       .getOrElse(LeaseBalance.empty)
   }
 
@@ -253,10 +237,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee = readOnly { db =>
-    db.iterateFromTopHeight(Keys.FilledVolumeAndFeePrefix, orderId, height)
-      .map(e => readVolumeAndFee(e.getValue))
-      .closeAfter(_.toStream.headOption)
-      .getOrElse(VolumeAndFee.empty)
+    db.lastValue(Keys.FilledVolumeAndFeePrefix, orderId, height)
+      .fold(VolumeAndFee.empty)(e => readVolumeAndFee(e.getValue))
   }
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = {
@@ -388,7 +370,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val newKeys = (
         for {
           (key, value) <- addressData.data
-          isNew = rw.iterateFromTopHeight(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), this.height).closeAfter(!_.hasNext)
+          isNew = rw.lastValue(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), this.height).isEmpty
           _     = rw.put(Keys.data(addressId, key)(height), Some(value))
           if isNew
         } yield key
@@ -1034,15 +1016,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       for {
         addressId <- addressIds.toStream
         balance = db
-          .iterateFromTopHeight(Keys.AssetBalancePrefix, AddressId.toBytes(addressId), height)
-          .flatMap { e =>
-            val (_, _, assetId, height) = Keys.parseAddressBytesHeight(e.getKey)
-            if (ByteStr(assetId) == asset.id) Some(height -> Longs.fromByteArray(e.getValue))
-            else None
-          }
-          .dropWhile(_._1 > height)
-          .closeAfter(_.toStream.headOption)
-          .fold(0L)(_._2) if balance > 0
+          .lastValue(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), asset.id), height)
+          .fold(0L)(e => Longs.fromByteArray(e.getValue)) if balance > 0
       } yield db.get(Keys.idToAddress(addressId)) -> balance
 
     lazy val page: AssetDistributionPage = {
@@ -1074,9 +1049,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
         addressId <- db.get(Keys.addressesForWaves(seqNr)).par
         balance <- db
-          .iterateFromTopHeight(Keys.WavesBalancePrefix, AddressId.toBytes(addressId), height)
+          .lastValue(Keys.WavesBalancePrefix, AddressId.toBytes(addressId), height)
           .map(e => Longs.fromByteArray(e.getValue))
-          .closeAfter(_.toStream.headOption)
           .filter(_ > 0)
       } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
@@ -1172,12 +1146,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     txs.toList
   }
 
-  private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
-    db.iterateFromTopHeight(Keys.LeaseStatusPrefix, leaseId, this.height)
-      .closeAfter(
-        _.find { e =>
-          val (_, bs, _) = Keys.parseBytesHeight(e.getKey)
-          ByteStr(bs) == leaseId
-        }.exists(e => e.getValue.headOption.contains(1: Byte))
-      )
+  private[this] def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
+    db.lastValue(Keys.LeaseStatusPrefix, leaseId, this.height)
+      .exists(e => e.getValue.headOption.contains(1: Byte))
 }
