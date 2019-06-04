@@ -21,6 +21,6 @@ message AssetInfoResponse {
     int64 total_volume = 6;
     ScriptData script = 7;
     int64 sponsorship = 8;
-    SignedTransaction issue_transaction = 11;
+    com.wavesplatform.protobuf.transaction.SignedTransaction issue_transaction = 11;
     int64 sponsor_balance = 10;
 }

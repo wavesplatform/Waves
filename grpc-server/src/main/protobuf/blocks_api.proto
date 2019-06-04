@@ -32,6 +32,6 @@ message BlockRangeRequest {
 }
 
 message BlockWithHeight {
-    Block block = 1;
+    com.wavesplatform.protobuf.block.Block block = 1;
     uint32 height = 2;
 }

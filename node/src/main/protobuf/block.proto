@@ -1,6 +1,7 @@
 // Transactions
 syntax = "proto3";
-option java_package = "com.wavesplatform.protobuf.block";
+package com.wavesplatform.protobuf.block;
+
 import "transaction.proto";
 
 message Block {
@@ -17,5 +18,5 @@ message Block {
 
     Header header = 1;
     bytes signature = 2;
-    repeated SignedTransaction transactions = 3;
+    repeated com.wavesplatform.protobuf.transaction.SignedTransaction transactions = 3;
 }

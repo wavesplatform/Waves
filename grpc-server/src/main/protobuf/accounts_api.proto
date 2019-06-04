@@ -22,7 +22,7 @@ message DataRequest {
 
 message BalancesRequest {
     bytes address = 1;
-    repeated AssetId assets = 4;
+    repeated com.wavesplatform.protobuf.transaction.AssetId assets = 4;
 }
 
 message BalanceResponse {
@@ -38,13 +38,13 @@ message BalanceResponse {
     bytes address = 1; // TODO: ???
     oneof balance {
         WavesBalances waves = 2;
-        AssetAmount asset = 3;
+        com.wavesplatform.protobuf.transaction.AssetAmount asset = 3;
     }
 }
 
 message DataEntryResponse {
     bytes address = 1;
-    DataTransactionData.DataEntry entry = 2;
+    com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry entry = 2;
 }
 
 message ScriptData {

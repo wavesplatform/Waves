@@ -1,6 +1,7 @@
 // Transactions
 syntax = "proto3";
-option java_package = "com.wavesplatform.protobuf.transaction";
+package com.wavesplatform.protobuf.transaction;
+
 import "script.proto";
 import "recipient.proto";
 import "google/protobuf/empty.proto";
