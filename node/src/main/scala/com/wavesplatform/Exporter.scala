@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
   private[wavesplatform] object Formats {
-    val Binary   = "BINARY_STD"
+    val Binary   = "BINARY"
     val Protobuf = "PROTOBUF"
     val Json     = "JSON"
 
@@ -36,12 +36,8 @@ object Exporter extends ScorexLogging {
   //noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFilename, outputFileNamePrefix, exportHeight, format) =>
-        val cfg      = Try(ConfigFactory.parseFile(configFilename)).getOrElse(ConfigFactory.empty())
-        val settings = WavesSettings.fromRootConfig(loadConfig(cfg))
-        AddressScheme.current = new AddressScheme {
-          override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-        }
+      case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
+        val settings = WavesSettings.loadRootConfig(Some(configFile))
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
@@ -139,7 +135,7 @@ object Exporter extends ScorexLogging {
       programName("waves export"),
       head("Waves Blockchain Exporter", Version.VersionString),
       opt[File]('c', "config")
-        .text("Config file name")
+        .text("Node config file path")
         .action((f, c) => c.copy(configFileName = f)),
       opt[String]('o', "output-prefix")
         .text("Output file name prefix")

@@ -377,47 +377,18 @@ object Application {
   }
 
   private[this] def startNode(configFile: Option[String]): Unit = {
-    def readConfig(userConfigPath: Option[String]): Config = {
-      val maybeConfigFile = for {
-        maybeFilename <- userConfigPath
-        file = new File(maybeFilename)
-        if file.exists
-      } yield ConfigFactory.parseFile(file)
-
-      loadConfig(maybeConfigFile)
-    }
-
-    val config = readConfig(configFile)
-    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
-    System.setProperty("waves.directory", config.getString("waves.directory"))
-
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
+    val settings = WavesSettings.loadRootConfig(configFile.map(new File(_)))
 
     val log = LoggerFacade(LoggerFactory.getLogger(getClass))
     log.info("Starting...")
     sys.addShutdownHook {
-      SystemInformationReporter.report(config)
-    }
-
-    val settings = WavesSettings.fromRootConfig(config)
-
-    // Initialize global var with actual address scheme
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
-
-    if (config.getBoolean("kamon.enable")) {
-      log.info("Aggregated metrics are enabled")
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
+      SystemInformationReporter.report(settings.config)
     }
 
     val time             = new NTP(settings.ntpServer)
     val isMetricsStarted = Metrics.start(settings.metrics, time)
 
-    RootActorSystem.start("wavesplatform", config) { actorSystem =>
+    RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
       import actorSystem.dispatcher
       isMetricsStarted.foreach { started =>
         if (started) {
@@ -438,7 +409,7 @@ object Application {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      new Application(actorSystem, settings, config.root(), time).run()
+      new Application(actorSystem, settings, settings.config.root(), time).run()
     }
   }
 }

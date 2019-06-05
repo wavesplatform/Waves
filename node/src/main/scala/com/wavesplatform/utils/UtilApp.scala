@@ -38,10 +38,16 @@ object UtilApp {
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "")
 
+  sealed trait Input
+  object Input {
+    case object StdIn                   extends Input
+    final case class File(file: String) extends Input
+    final case class Str(str: String)   extends Input
+  }
+
   case class Command(mode: Command.Mode = null,
                      configFile: Option[String] = None,
-                     inputData: Option[String] = None,
-                     inputFile: Option[String] = None,
+                     inputData: Input = Input.StdIn,
                      outputFile: Option[String] = None,
                      inFormat: String = "plain",
                      outFormat: String = "plain",
@@ -55,7 +61,7 @@ object UtilApp {
     OParser.parse(commandParser, args, Command()) match {
       case Some(cmd) =>
         lazy val nodeState = new NodeState(cmd)
-        val inBytes = IO.readInput(cmd)
+        val inBytes        = IO.readInput(cmd)
         val result = {
           val doAction = cmd.mode match {
             case Command.CompileScript   => Actions.doCompile _
@@ -65,7 +71,7 @@ object UtilApp {
             case Command.CreateKeyPair   => Actions.doCreateKeyPair _
             case Command.Hash            => Actions.doHash _
             case Command.SerializeTx     => Actions.doSerializeTx _
-            case Command.SignTx => Actions.doSignTx(nodeState) _
+            case Command.SignTx          => Actions.doSignTx(nodeState) _
           }
           doAction(cmd, inBytes)
         }
@@ -92,14 +98,14 @@ object UtilApp {
         opt[String](name = "input-str")
           .abbr("is")
           .text("Literal input data")
-          .action((s, c) => c.copy(inputData = Some(s))),
+          .action((s, c) => c.copy(inputData = Input.Str(s))),
         opt[String]("input-file")
           .abbr("if")
-          .action((f, c) => c.copy(inputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
+          .action((f, c) => c.copy(inputData = Input.File(f)))
           .text("Input file name (- for stdin)")
           .validate {
             case fs if fs.isEmpty || fs == "-" || Files.isRegularFile(Paths.get(fs)) => success
-            case fs                                                      => failure(s"Invalid file: $fs")
+            case fs                                                                  => failure(s"Invalid file: $fs")
           },
         opt[String]('o', "output-file")
           .action((f, c) => c.copy(outputFile = Some(f).filter(s => s != "-" && s.nonEmpty)))
@@ -110,7 +116,7 @@ object UtilApp {
           .text("Input data format (plain/base58/base64)")
           .validate {
             case "base64" | "base58" | "plain" => success
-            case fs => failure(s"Invalid format: $fs")
+            case fs                            => failure(s"Invalid format: $fs")
           },
         opt[String]("out-format")
           .abbr("fo")
@@ -183,13 +189,14 @@ object UtilApp {
       help("help").hidden(),
       checkConfig(_.mode match {
         case null => failure("Command should be provided")
-        case _ => success
+        case _    => success
       })
     )
   }
 
+  //noinspection TypeAnnotation
   private[this] final class NodeState(c: Command) {
-    lazy val settings = WavesSettings.fromRootConfig(c.configFile.fold(ConfigFactory.load())(cf => com.wavesplatform.settings.loadConfig(ConfigFactory.parseFile(new File(cf)))))
+    lazy val settings = WavesSettings.loadRootConfig(c.configFile.map(new File(_)))
     lazy val wallet   = Wallet(settings.walletSettings)
     lazy val time     = new NTP(settings.ntpServer)
   }
@@ -251,14 +258,14 @@ object UtilApp {
   private[this] object IO {
     def readInput(c: Command): Array[Byte] = {
       val inputStream = c.inputData match {
-        case Some(value) =>
-          new ByteArrayInputStream(value.getBytes)
+        case Input.StdIn | Input.File("-") =>
+          System.in
 
-        case None =>
-          c.inputFile match {
-            case Some(file) => new FileInputStream(file)
-            case None => System.in
-          }
+        case Input.Str(s) =>
+          new ByteArrayInputStream(s.getBytes)
+
+        case Input.File(file) =>
+          new FileInputStream(file)
       }
 
       toPlainBytes(c.inFormat, ByteStreams.toByteArray(inputStream))
@@ -267,7 +274,7 @@ object UtilApp {
     def writeOutput(c: Command, result: Array[Byte]): Unit = {
       val outputStream = c.outputFile match {
         case Some(file) => new FileOutputStream(file)
-        case None => System.out
+        case None       => System.out
       }
 
       val encodedBytes = encode(result, c.outFormat)
@@ -284,7 +291,7 @@ object UtilApp {
     private[this] def toPlainBytes(inFormat: String, encodedBytes: Array[Byte]) = {
       lazy val strWithoutSpaces = new String(encodedBytes).replaceAll("\\s+", "")
       inFormat match {
-        case "plain" => encodedBytes
+        case "plain"  => encodedBytes
         case "base58" => FastBase58.decode(strWithoutSpaces)
         case "base64" => Base64.decode(strWithoutSpaces)
       }

@@ -32,11 +32,7 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ImportOptions()).foreach {
       case ImportOptions(configFile, blockchainFile, importHeight, format, verifyTransactions) =>
-        val config   = loadConfig(ConfigFactory.parseFile(configFile))
-        val settings = WavesSettings.fromRootConfig(config)
-        AddressScheme.current = new AddressScheme {
-          override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-        }
+        val settings = WavesSettings.loadRootConfig(Some(configFile))
 
         implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
