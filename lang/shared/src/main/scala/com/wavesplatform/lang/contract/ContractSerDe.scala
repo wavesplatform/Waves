@@ -27,9 +27,6 @@ object ContractSerDe {
     out.writeInt(c.callableFuncs.size)
     c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
-    //TODO remove - default func
-    out.writeInt(0)
-
     c.verifierFuncOpt match {
       case None =>
         out.writeInt(0)
@@ -47,7 +44,6 @@ object ContractSerDe {
       _               <- tryEi(bb.getInt())
       decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
       callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
-      defaultFuncOpt  <- Either.cond(bb.getInt == 0, (), "") //TODO remove - default func
       verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
     } yield DApp(decs, callableFuncs, verifierFuncOpt)
   }
