@@ -1,12 +1,10 @@
 package com.wavesplatform.state
 
-import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import monix.reactive.Observer
 
@@ -28,33 +26,13 @@ final case class MicroBlockRollbackCompleted(to: ByteStr, height: Int) extends B
 object BlockchainUpdateNotifier {
 
   private def stateUpdateFromDiff(blockchain: Blockchain, diff: Diff): StateUpdate = {
-    val balances = Seq.newBuilder[(Address, Asset, Long)]
-    val leases   = Seq.newBuilder[(Address, LeaseBalance)]
-
-    for ((address, portfolioDiff) <- diff.portfolios) {
-      if (portfolioDiff.balance != 0) {
-        val wavesBalance = portfolioDiff.balance + blockchain.balance(address, Waves)
-        balances += ((address, Waves, wavesBalance))
-      }
-
-      if (portfolioDiff.lease != LeaseBalance.empty) {
-        val updatedLeaseBalance = blockchain.leaseBalance(address).combine(portfolioDiff.lease)
-        leases += ((address, updatedLeaseBalance))
-      }
-
-      if (portfolioDiff.assets.nonEmpty) {
-        for { (asset, balanceDiff) <- portfolioDiff.assets if balanceDiff != 0 } yield {
-          balances += ((address, asset, balanceDiff + blockchain.balance(address, asset)))
-        }
-      }
-    }
-
+    val balances = DiffToStateApplier.balances(blockchain, diff).toSeq.map { case ((address, asset), balance) => (address, asset, balance) }
+    val leases   = DiffToStateApplier.leases(blockchain, diff).toSeq
     val dataEntries = diff.accountData.toSeq.flatMap {
       case (address, AccountDataInfo(data)) =>
         data.toSeq.map { case (_, entry) => (address, entry) }
     }
-
-    StateUpdate(balances.result(), leases.result(), dataEntries)
+    StateUpdate(balances, leases, dataEntries)
   }
 
   private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdate, Seq[StateUpdate]) = {
