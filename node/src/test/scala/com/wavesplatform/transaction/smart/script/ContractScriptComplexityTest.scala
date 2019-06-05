@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.values._
@@ -64,8 +65,8 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
   property("estimate contract script with context correctly") {
     val contract = DApp(
       List(
-        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a"), CONST_STRING("b")))),
-        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c"), CONST_STRING("d"))))
+        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
+        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet())))
       ),
       List(
         CallableFunction(
@@ -115,8 +116,8 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
   property("estimate contract script with context correctly 2") {
     val contract = DApp(
       List(
-        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a"), CONST_STRING("b")))),
-        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c"), CONST_STRING("d"))))
+        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
+        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet())))
       ),
       List(
         CallableFunction(

@@ -17,9 +17,9 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   "roundtrip" - {
-    "CONST_LONG" in roundTripTest(CONST_LONG(1))
-    "CONST_BYTESTR" in roundTripTest(CONST_BYTESTR(ByteStr.fromBytes(1)))
-    "CONST_STRING" in roundTripTest(CONST_STRING("foo"))
+    "CONST_LONG"    in roundTripTest(CONST_LONG(1))
+    "CONST_BYTESTR" in roundTripTest(CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet())
+    "CONST_STRING"  in roundTripTest(CONST_STRING("foo").explicitGet())
 
     "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
 

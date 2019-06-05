@@ -3,11 +3,13 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-
 import monix.eval.Coeval
 import cats.implicits._
+import com.wavesplatform.lang.ExecutionError
 
 object Terms {
+  private val DATA_TX_BYTES_MAX = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
+
   sealed abstract class DECLARATION {
     def toStr: Coeval[String]
     override def toString: String = toStr()
@@ -65,9 +67,33 @@ object Terms {
   sealed trait EVALUATED extends EXPR {
     def toStr: Coeval[String] = Coeval.now(toString)
   }
-  case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString                 }
-  case class CONST_BYTESTR(bs: ByteStr) extends EVALUATED { override def toString: String = bs.toString                }
-  case class CONST_STRING(s: String)    extends EVALUATED { override def toString: String = s                          }
+  case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString  }
+
+  case class CONST_BYTESTR private (bs: ByteStr) extends EVALUATED {
+    override def toString: String = bs.toString
+  }
+  object CONST_BYTESTR {
+    def apply(bs: ByteStr): Either[ExecutionError, CONST_BYTESTR] =
+      Either.cond(
+        bs.size <= DATA_TX_BYTES_MAX,
+        new CONST_BYTESTR(bs),
+        "ByteStr is too large"
+      )
+  }
+
+  case class CONST_STRING private (s: String) extends EVALUATED {
+    override def toString: String = s
+  }
+  object CONST_STRING {
+    def apply(s: String): Either[ExecutionError, CONST_STRING] =
+      Either.cond(
+        s.length * 2 <= DATA_TX_BYTES_MAX,
+        new CONST_STRING(s),
+        "String is too large"
+      )
+  }
+
+
   case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = if (b) "TRUE" else "FALSE" }
 
   lazy val TRUE  = CONST_BOOLEAN(true)

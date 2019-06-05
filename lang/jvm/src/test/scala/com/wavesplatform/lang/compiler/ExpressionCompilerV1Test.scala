@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -152,7 +153,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right(
-          (LET_BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
+          (
+            LET_BLOCK(
+              LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING("").explicitGet())),
+              FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))
+            ),
+            BOOLEAN
+          )
+        )
       }
   )
 
@@ -196,12 +204,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
              IF(
                FUNCTION_CALL(
                  PureContext._isInstanceOf.header,
-                 List(REF("$match0"), CONST_STRING("PointB"))
+                 List(REF("$match0"), CONST_STRING("PointB").explicitGet())
                ),
                TRUE,
                FUNCTION_CALL(
                  PureContext._isInstanceOf.header,
-                 List(REF("$match0"), CONST_STRING("PointA"))
+                 List(REF("$match0"), CONST_STRING("PointA").explicitGet())
                )
              ),
              LET_BLOCK(LET("p", REF("$match0")), TRUE),
@@ -401,7 +409,10 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       List(Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.VALID(AnyPos, ByteStr.empty)), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Right((FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTESTR(ByteStr.empty), CONST_LONG(1))), BYTESTR))
+        res: Either[String, (EXPR, TYPE)] => res shouldBe Right((
+          FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
+          BYTESTR
+        ))
       }
   )
 
@@ -413,7 +424,10 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       List(Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, "")), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Right((FUNCTION_CALL(dropRightString.header, List(CONST_STRING(""), CONST_LONG(1))), STRING))
+        res: Either[String, (EXPR, TYPE)] => res shouldBe Right((
+          FUNCTION_CALL(dropRightString.header, List(CONST_STRING("").explicitGet(), CONST_LONG(1))),
+          STRING
+        ))
       }
   )
 
@@ -466,7 +480,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                FUNCTION_CALL(
                  FunctionHeader.Native(1100),
                  List(
-                   CONST_STRING(""),
+                   CONST_STRING("").explicitGet(),
                    REF("nil")
                  )
                )

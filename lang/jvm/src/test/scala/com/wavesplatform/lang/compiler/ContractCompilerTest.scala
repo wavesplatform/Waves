@@ -74,8 +74,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
                   List(FUNCTION_CALL(
                     Native(1100),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil")))
                     )
                   ))
                 )
@@ -94,8 +94,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
                   List(FUNCTION_CALL(
                     Native(1100),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), CONST_STRING("b"))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet())),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil")))
                     )
                   ))
                 )
@@ -106,7 +106,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         Some(
           VerifierFunction(
             VerifierAnnotation("t"),
-            FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty))))
+            FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty).explicitGet())))
           ))
       ))
     compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
@@ -150,8 +150,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
                   List(FUNCTION_CALL(
                     Native(1100),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), CONST_STRING("b"))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet())),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil")))
                     )
                   ))
                 )

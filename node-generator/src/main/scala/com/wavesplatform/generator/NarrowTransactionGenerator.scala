@@ -251,9 +251,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             } yield
               argType.toLowerCase match {
                 case "integer" => Terms.CONST_LONG(value.toLong)
-                case "string"  => Terms.CONST_STRING(value.toString)
+                case "string"  => Terms.CONST_STRING(value.toString).explicitGet()
                 case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
-                case "binary"  => Terms.CONST_BYTESTR(Base58.decode(value))
+                case "binary"  => Terms.CONST_BYTESTR(Base58.decode(value)).explicitGet()
               }
 
             val maybeFunctionCall =

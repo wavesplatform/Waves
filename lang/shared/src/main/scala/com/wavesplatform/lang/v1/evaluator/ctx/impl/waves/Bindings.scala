@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
@@ -23,7 +24,7 @@ object Bindings {
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
-    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteStr.empty)).map(CONST_BYTESTR).toIndexedSeq)
+    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteStr.empty)).map(b => CONST_BYTESTR(b).explicitGet()))
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
     val commonPart = combine(Map(
@@ -66,7 +67,7 @@ object Bindings {
           "amount" -> CONST_LONG(pmt.amount),
           "assetId" -> (pmt.asset match {
             case None                 => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-            case Some(asset: ByteStr) => CONST_BYTESTR(asset)
+            case Some(asset: ByteStr) => CONST_BYTESTR(asset).explicitGet()
           })
         )
       )
@@ -262,8 +263,12 @@ object Bindings {
 
         CaseObj(
           buildDataTransactionType(proofsEnabled),
-          combine(Map("data" -> data.map(e => CaseObj(dataEntryType, Map("key" -> CONST_STRING(e.key), "value" -> mapValue(e.value))))),
-                  provenTxPart(p, proofsEnabled))
+          combine(Map("data" -> data.map(e => CaseObj(
+            dataEntryType,
+            Map("key" -> CONST_STRING(e.key).explicitGet(), "value" -> mapValue(e.value))
+          ))),
+                  provenTxPart(p, proofsEnabled)
+          )
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(

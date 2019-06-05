@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator
+
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -19,7 +21,14 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
 
   val writeSetObj = CaseObj(
     CASETYPEREF("WriteSet", el),
-    Map("data" -> ARR(IndexedSeq(CaseObj(CASETYPEREF("DataEntry", el), Map("key" -> CONST_STRING("xxx"), "value" -> CONST_LONG(42)))))))
+    Map("data" -> ARR(IndexedSeq(CaseObj(
+      CASETYPEREF("DataEntry", el),
+      Map(
+        "key"   -> CONST_STRING("xxx").explicitGet(),
+        "value" -> CONST_LONG(42)
+      )
+    ))))
+  )
 
   val transferSetObj = CaseObj(
     CASETYPEREF("TransferSet", el),
@@ -28,15 +37,15 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
         CaseObj(
           CASETYPEREF("ScriptTransfer", el),
           Map(
-            "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address1))),
+            "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address1).explicitGet())),
             "amount"    -> CONST_LONG(41),
-            "asset"     -> CONST_BYTESTR(asset)
+            "asset"     -> CONST_BYTESTR(asset).explicitGet()
           )
         ),
         CaseObj(
           CASETYPEREF("ScriptTransfer", el),
           Map(
-            "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address2))),
+            "recipient" -> CaseObj(CASETYPEREF("Address", el), Map("bytes" -> CONST_BYTESTR(address2).explicitGet())),
             "amount"    -> CONST_LONG(42),
             "asset"     -> noAsset
           )
