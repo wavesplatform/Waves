@@ -114,7 +114,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
   override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keysIterator
-      .map(id => diff.transactions(id)._2)
+      .map(id => diff.transactions(id)._1)
       .collect { case lt: LeaseTransaction => lt }
 
     val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))

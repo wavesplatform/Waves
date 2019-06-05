@@ -636,7 +636,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     ngState.fold(blockchain.allActiveLeases) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
       val fromDiff = active.keysIterator
-        .map(id => ng.bestLiquidDiff.transactions(id)._2)
+        .map(id => ng.bestLiquidDiff.transactions(id)._1)
         .collect { case lt: LeaseTransaction => lt }
 
       val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
