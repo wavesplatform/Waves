@@ -470,7 +470,7 @@ object PureContext {
       ("pos", LONG, "element position")
     ) {
       case ARR(arr) :: CONST_LONG(pos) :: Nil => Try(arr(pos.toInt)).toEither.left.map({
-        case e: java.lang.IndexOutOfBoundsException => s"$pos OutOfBounds ${arr.size}}"
+        case e: java.lang.IndexOutOfBoundsException => s"$pos OutOfBounds ${arr.size}"
         case e: Throwable => e.toString
       })
       case _                                  => ???
