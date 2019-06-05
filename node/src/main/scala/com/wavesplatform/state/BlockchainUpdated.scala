@@ -36,16 +36,14 @@ object BlockchainUpdateNotifier {
   }
 
   private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdate, Seq[StateUpdate]) = {
-    val (blockDiff, txsDiffs) = diff
-    val blockStateUpdate      = stateUpdateFromDiff(blockchain, blockDiff)
+    val DetailedDiff(parentDiff, txsDiffs) = diff
+    val parentStateUpdate                  = stateUpdateFromDiff(blockchain, parentDiff)
 
-    val txsStateUpdates = txsDiffs.foldLeft((Seq.empty[StateUpdate], composite(blockchain, blockDiff)))((acc, txDiff) => {
-      val (updates, bc) = acc
-      val update        = stateUpdateFromDiff(bc, txDiff)
-      (updates :+ update, composite(bc, txDiff))
-    })
+    val (txsStateUpdates, _) = txsDiffs.foldLeft((Seq.empty[StateUpdate], composite(blockchain, parentDiff))) {
+      case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), composite(bc, txDiff))
+    }
 
-    (blockStateUpdate, txsStateUpdates._1)
+    (parentStateUpdate, txsStateUpdates)
   }
 
   def notifyProcessBlock(events: Option[Observer[BlockchainUpdated]], block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit =
