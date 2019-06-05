@@ -722,7 +722,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | }
          |
       """.stripMargin
-    eval[EVALUATED](sampleScript, None) should produce("Undefined type: `UndefinedType`, expected: Int, String")
+    eval(sampleScript) should produce("Undefined type: `UndefinedType` of variable `a`, expected: Int, String")
   }
 
   property("big let assignment chain") {

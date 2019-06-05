@@ -72,7 +72,8 @@ object ExpressionCompiler {
             pos:           Pos,
             typeDefs:      Map[String, FINAL],
             definedTypes:  List[String],
-            expectedTypes: List[String] = List()
+            expectedTypes: List[String] = List(),
+            varName:       Option[String] = None
           ): Either[CompilationError, List[FINAL]] = {
     definedTypes.flatTraverse(typeName =>
       typeDefs.get(typeName) match {
@@ -82,7 +83,7 @@ object ExpressionCompiler {
           val messageTypes =
             if (expectedTypes.nonEmpty) expectedTypes
             else definedTypes
-          TypeNotFound(pos.start, pos.end, typeName, messageTypes)
+          TypeNotFound(pos.start, pos.end, typeName, messageTypes, varName)
         }
       })
   }
@@ -322,7 +323,8 @@ object ExpressionCompiler {
               pos           = mc.position,
               typeDefs      = ctx.predefTypes,
               definedTypes  = types.map(_.asInstanceOf[PART.VALID[String]].v),
-              expectedTypes = exprTypes.typeList.map(_.name)
+              expectedTypes = exprTypes.typeList.map(_.name),
+              allowShadowVarName
             )
             cases <- types.map(_.name) match {
               case hType :: tTypes =>
