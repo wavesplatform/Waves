@@ -63,14 +63,14 @@ object TransferTransactionDiff {
       _ <- Either.cond(
         blockTime <= blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil || (assetIssued && feeAssetIssued),
         (),
-        GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil}")
+        GenericError(
+          s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil}")
       )
     } yield
-      Diff(height,
-        tx,
-        portfolios,
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx))
+      Diff(tx,
+           portfolios,
+           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+           scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx))
   }
 
   private def validateOverflow(blockchain: Blockchain, tx: TransferTransaction) = {

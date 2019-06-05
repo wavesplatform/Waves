@@ -30,7 +30,6 @@ object LeaseTransactionsDiff {
           )
           Right(
             Diff(
-              height = height,
               tx = tx,
               portfolios = portfolioDiff,
               leaseState = Map(tx.id() -> true),
@@ -72,7 +71,7 @@ object LeaseTransactionsDiff {
               s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${fs.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
 
     } yield
-      Diff(height = height,
+      Diff(
         tx = tx,
         portfolios = portfolioDiff,
         leaseState = Map(tx.leaseId -> false),

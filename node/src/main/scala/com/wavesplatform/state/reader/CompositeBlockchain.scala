@@ -67,7 +67,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
         diff.transactions
           .get(asset.id)
           .collectFirst {
-            case (_, it: IssueTransaction, _) =>
+            case (it: IssueTransaction, _) =>
               AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
@@ -77,25 +77,24 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (h, lt: LeaseTransaction, _) =>
-          LeaseDetails(lt.sender, lt.recipient, h, lt.amount, diff.leaseState(lt.id()))
+        case (lt: LeaseTransaction, _) =>
+          LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
     diff.transactions
       .get(id)
-      .map(_._1)
+      .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
 
   override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
-
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
     nftListFromDiff(inner, maybeDiff)(address, from)

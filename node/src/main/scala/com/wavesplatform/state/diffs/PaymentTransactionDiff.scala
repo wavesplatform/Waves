@@ -19,7 +19,6 @@ object PaymentTransactionDiff {
     } else {
       Right(
         Diff(
-          height = height,
           tx = tx,
           portfolios = Map(tx.recipient -> Portfolio(balance = tx.amount, LeaseBalance.empty, assets = Map.empty)) combine Map(
             Address.fromPublicKey(tx.sender) -> Portfolio(

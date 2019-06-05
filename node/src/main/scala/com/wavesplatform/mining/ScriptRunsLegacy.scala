@@ -12,14 +12,8 @@ private[mining] object ScriptRunsLegacy extends ScorexLogging {
   // Can be removed from resulting build with -Xelide-below 2001
   @elidable(elidable.ASSERTION)
   def assertEquals(blockchain: Blockchain, tx: Transaction, diff: Diff): Unit = {
-    val ride4Dapps = {
-      val height = diff.transactions
-        .get(tx.id())
-        .map(_._1)
-        .getOrElse(blockchain.height)
-
-      blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)
-    }
+    val ride4Dapps =
+      blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)
 
     lazy val oldRulesRuns: Int = calculateForTransaction(blockchain, tx)
     assert(ride4Dapps || diff.scriptsRun == oldRulesRuns, s"$tx script runs ${diff.scriptsRun} not equals to legacy $oldRulesRuns")
