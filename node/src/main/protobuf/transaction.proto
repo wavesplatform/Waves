@@ -4,7 +4,6 @@ package waves;
 
 option java_package = "com.wavesplatform.protobuf.transaction";
 option csharp_namespace = "Waves";
-option go_package = "github.com/wavesplatform/Waves/protobuf";
 
 import "script.proto";
 import "recipient.proto";
