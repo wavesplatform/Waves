@@ -131,9 +131,10 @@ object ContractCompiler {
           Generic(
             contract.position.start,
             contract.position.end,
-            s"Contract meta size in bytes must be less than ${ContractLimits.MaxContractMetaSizeInBytes}"
+            s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}"
           )
         )
+        .toCompileM
 
       callableFuncs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
 

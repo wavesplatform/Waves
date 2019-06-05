@@ -22,6 +22,7 @@ object ContractSerDe {
   def serialize(c: DApp): Array[Byte] = {
     val out = new ByteArrayOutputStream()
 
+    // version byte
     out.writeInt(0)
 
     out.writeInt(c.meta.size)
