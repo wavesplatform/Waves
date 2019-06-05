@@ -1,5 +1,8 @@
 syntax = "proto3";
-package com.wavesplatform.api.grpc;
+package waves.grpc;
+option java_package = "com.wavesplatform.api.grpc";
+option csharp_namespace = "Waves.Grpc";
+option go_package = "github.com/wavesplatform/Waves/protobuf/grpc";
 
 import "google/protobuf/empty.proto";
 
