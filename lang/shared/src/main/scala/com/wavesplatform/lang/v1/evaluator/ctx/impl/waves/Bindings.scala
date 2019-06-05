@@ -286,7 +286,8 @@ object Bindings {
     CaseObj(
       assetType,
       Map(
-        "totalAmount"     -> sAInfo.totalAmount,
+        "id"              -> sAInfo.id,
+        "quantity"        -> sAInfo.quantity,
         "decimals"        -> sAInfo.decimals.toLong,
         "issuer"          -> mapRecipient(sAInfo.issuer)._2,
         "issuerPublicKey" -> sAInfo.issuerPk,
