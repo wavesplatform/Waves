@@ -825,18 +825,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("extract functions with message") {
     val message = "Custom error message"
-    def script(func: String, error: Boolean): String =
+    def script(error: Boolean): String =
       s"""
          |
          | let a = if ($error) then unit else 1
-         | $func(a, "$message")
+         | valueOrErrorMessage(a, "$message")
          |
        """.stripMargin
 
-    eval(script("extractWithErrorMessage", error = false)) shouldBe Right(CONST_LONG(1))
-    eval(script("extractWithErrorMessage", error = true))  shouldBe Left(message)
-
-    eval(script("valueWithErrorMessage", error = false))   shouldBe Right(CONST_LONG(1))
-    eval(script("valueWithErrorMessage", error = true))    shouldBe Left(message)
+    eval(script(error = false)) shouldBe Right(CONST_LONG(1))
+    eval(script(error = true))  shouldBe Left(message)
   }
 }

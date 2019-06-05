@@ -111,9 +111,9 @@ object PureContext {
       )
     }
 
-  private def extractWithMessageF(name: String): BaseFunction =
+  lazy val valueOrErrorMessage: BaseFunction =
     UserFunction(
-      name,
+      "valueOrErrorMessage",
       13,
       TYPEPARAM('T'),
       "Extract value from option or fail with message",
@@ -126,9 +126,6 @@ object PureContext {
         REF("@a")
       )
     }
-
-  lazy val extractWithMessage: BaseFunction = extractWithMessageF("extractWithErrorMessage")
-  lazy val valueWithMessage: BaseFunction   = extractWithMessageF("valueWithErrorMessage")
 
   lazy val isDefined: BaseFunction =
     UserFunction(
@@ -429,7 +426,7 @@ object PureContext {
     ) {
       val parseO = FUNCTION_CALL(Native(PARSEINT), List(REF("str")))
       FUNCTION_CALL(
-        User("extractWithErrorMessage"),
+        User("valueOrErrorMessage"),
         List(parseO, CONST_STRING("Error while parsing string to integer"))
       )
     }
@@ -551,7 +548,7 @@ object PureContext {
         case "Floor" => BaseGlobal.RoundFloor()
         case v => throw new Exception(s"Type error: $v isn't in $rounds")
       }
-        case v => throw new Exception(s"Type error: $v isn't rounds CaseObj") 
+        case v => throw new Exception(s"Type error: $v isn't rounds CaseObj")
     }
   }
 
@@ -643,7 +640,7 @@ object PureContext {
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
             Array(
-              value, valueWithMessage, extractWithMessage,
+              value, valueOrErrorMessage,
               listConstructor,
               toUtf8String,
               toLong, toLongOffset,
