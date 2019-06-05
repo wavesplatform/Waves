@@ -142,16 +142,6 @@ message SetScriptTransactionData {
 };
 
 message ExchangeTransactionData {
-    message BuySellOrders {
-        Order buy_order = 1;
-        Order sell_order = 2;
-    }
-
-    message MakerTakerOrders {
-        Order maker_order = 1;
-        Order taker_order = 2;
-    }
-
     message Order {
         enum Side {
             BUY = 0;
