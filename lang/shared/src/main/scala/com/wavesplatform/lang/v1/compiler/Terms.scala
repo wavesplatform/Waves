@@ -63,11 +63,30 @@ object Terms {
   }
 
   sealed trait EVALUATED extends EXPR {
+    def prettyString(level: Int) : String = toString
     def toStr: Coeval[String] = Coeval.now(toString)
   }
   case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString                 }
-  case class CONST_BYTESTR(bs: ByteStr) extends EVALUATED { override def toString: String = bs.toString                }
-  case class CONST_STRING(s: String)    extends EVALUATED { override def toString: String = s                          }
+  case class CONST_BYTESTR(bs: ByteStr) extends EVALUATED {
+    import com.wavesplatform.common.utils.{Base58, Base64}
+    override def toString: String = bs.toString
+    override def prettyString(level: Int) : String = {
+      if(bs.size > 1024) {
+        "base64'" ++ Base64.encode(bs) ++ "'"
+      } else {
+        "base58'" ++ Base58.encode(bs) ++ "'"
+      }
+    }
+
+  }
+  case class CONST_STRING(s: String)    extends EVALUATED {
+    override def toString: String = s
+    override def prettyString(level: Int) : String = if(s.isEmpty) {
+      "<EmptyString>"
+    } else {
+      s
+    }
+  }
   case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = if (b) "TRUE" else "FALSE" }
 
   lazy val TRUE  = CONST_BOOLEAN(true)
@@ -76,7 +95,7 @@ object Terms {
   case class CaseObj(caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
 
-    def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
+    override def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
   }
 
   case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED {
