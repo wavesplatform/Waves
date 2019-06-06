@@ -133,27 +133,11 @@ object OrderValidator {
     )
   }
 
-  def matcherSettingsAware(
-      matcherPublicKey: PublicKeyAccount,
-      blacklistedAddresses: Set[Address],
-      whiteListOnly: Boolean,
-      blacklistedAssets: Set[Option[AssetId]],
-      allowedAssetPairs: Set[AssetPair]
-  )(order: Order): ValidationResult = {
-    def init: ValidationResult = Right(order)
-
-    def pairSettingsAware: ValidationResult =
-      if (allowedAssetPairs.contains(order.assetPair)) init
-      else if (whiteListOnly) Left(s"Trading is not allowed for the pair: ${order.assetPair}")
-      else
-        init
-          .ensure(s"Invalid amount asset ${order.assetPair.amountAsset}")(_ => !blacklistedAssets(order.assetPair.amountAsset))
-          .ensure(s"Invalid price asset ${order.assetPair.priceAsset}")(_ => !blacklistedAssets(order.assetPair.priceAsset))
-
-    pairSettingsAware
+  def matcherSettingsAware(matcherPublicKey: PublicKeyAccount, blacklistedAddresses: Set[Address])(order: Order): ValidationResult =
+    order
+      .asRight[String]
       .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
-      .ensure("Invalid address")(_ => !blacklistedAddresses.contains(order.sender.toAddress))
-  }
+      .ensure("Invalid address")(o => !blacklistedAddresses.contains(o.sender.toAddress))
 
   def timeAware(time: Time)(order: Order): ValidationResult = {
     for {

@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import akka.actor.ActorRef
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
@@ -92,18 +93,23 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     case _          => complete(OrderBookUnavailable)
   }
 
-  private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
+  private def withAssetPair(p: AssetPair,
+                            redirectToInverse: Boolean = false,
+                            suffix: String = "",
+                            formatError: String => ToResponseMarshallable = defaultFormatError): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
         assetPairBuilder
           .validateAssetPair(p.reverse)
           .fold(
-            _ => complete(StatusCodes.NotFound -> Json.obj("message" -> e)),
+            _ => complete(formatError(e)),
             _ => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
           )
-      case Left(e) => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
+      case Left(e) => complete(formatError(e))
     }
+
+  private def defaultFormatError(e: String): ToResponseMarshallable = StatusCodes.NotFound -> Json.obj("message" -> e)
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
@@ -204,11 +210,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def place: Route = path("orderbook") {
     (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
-      unavailableOrderBookBarrier(order.assetPair) {
-        complete(placeTimer.measureFuture(orderValidator(order) match {
-          case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
-          case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
-        }))
+      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
+        unavailableOrderBookBarrier(pair) {
+          complete(placeTimer.measureFuture(orderValidator(order) match {
+            case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
+            case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
+          }))
+        }
       }
     }
   }
@@ -268,8 +276,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
-    unavailableOrderBookBarrier(p) {
-      withAssetPair(p) { pair =>
+    withAssetPair(p, formatError = e => OrderCancelRejected(e)) { pair =>
+      unavailableOrderBookBarrier(pair) {
         handleCancelRequest(Some(pair))
       }
     }
@@ -511,15 +519,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { pair =>
-    if (assetPairBuilder.isCorrectlyOrdered(pair))
-      orderBook(pair) match {
-        case Some(Right(_)) =>
-          complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
-            case None => SavingEventsDisabled
-            case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
-          })
-        case _ => complete(OrderBookUnavailable)
-      } else complete(OrderBookUnavailable)
+    orderBook(pair) match {
+      case Some(Right(_)) =>
+        complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
+          case None => SavingEventsDisabled
+          case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+        })
+      case _ => complete(OrderBookUnavailable)
+    }
   }
 
   @Path("/transactions/{orderId}")
