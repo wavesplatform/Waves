@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.testing
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -57,7 +58,7 @@ trait TypedScriptGen {
       callables   <- Gen.listOfN(nCallables, callableGen)
       defaultFunc <- Gen.option(defaultFuncGen)
       verifier    <- Gen.option(verifierGen)
-      c = DApp(lets ++ funcs, callables ++ defaultFunc, verifier)
+      c = DApp(ByteStr.empty, lets ++ funcs, callables ++ defaultFunc, verifier)
       if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
     } yield c
 
