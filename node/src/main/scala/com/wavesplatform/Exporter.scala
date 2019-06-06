@@ -4,13 +4,10 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
@@ -37,7 +34,7 @@ object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
-        val settings = WavesSettings.loadRootConfig(Some(configFile))
+        val settings = Application.loadApplicationConfig(Some(configFile))
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)

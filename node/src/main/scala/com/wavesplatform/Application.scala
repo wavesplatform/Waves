@@ -28,7 +28,7 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
-import com.wavesplatform.settings._
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -353,6 +353,33 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application {
+  private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
+    import com.wavesplatform.settings._
+
+    val config = loadConfig(external.map(ConfigFactory.parseFile))
+
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+
+    val settings = WavesSettings.fromRootConfig(config)
+
+    // Initialize global var with actual address scheme
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+    }
+
+    if (config.getBoolean("kamon.enable")) {
+      Kamon.addReporter(new InfluxDBReporter())
+      SystemMetrics.startCollecting()
+    }
+
+    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+    Kamon.reconfigure(config)
+
+    settings
+  }
+
   def main(args: Array[String]): Unit = {
 
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
@@ -377,7 +404,8 @@ object Application {
   }
 
   private[this] def startNode(configFile: Option[String]): Unit = {
-    val settings = WavesSettings.loadRootConfig(configFile.map(new File(_)))
+    import com.wavesplatform.settings.Constants
+    val settings = loadApplicationConfig(configFile.map(new File(_)))
 
     val log = LoggerFacade(LoggerFactory.getLogger(getClass))
     log.info("Starting...")

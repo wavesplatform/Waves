@@ -1,13 +1,7 @@
 package com.wavesplatform.settings
 
-import java.io.File
-
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AddressScheme
+import com.typesafe.config.Config
 import com.wavesplatform.metrics.Metrics
-import kamon.Kamon
-import kamon.influxdb.InfluxDBReporter
-import kamon.system.SystemMetrics
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
@@ -65,29 +59,5 @@ object WavesSettings extends CustomValueReaders {
       metrics,
       rootConfig
     )
-  }
-
-  def loadRootConfig(external: Option[File] = None): WavesSettings = {
-    val config = loadConfig(external.map(ConfigFactory.parseFile))
-    val settings = fromRootConfig(config)
-
-    // Initialize global var with actual address scheme
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
-
-    if (config.getBoolean("kamon.enable")) {
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
-    }
-
-    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
-    System.setProperty("waves.directory", config.getString("waves.directory"))
-
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
-
-    settings
   }
 }

@@ -5,15 +5,13 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
 import com.google.common.io.ByteStreams
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.Version
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{Application, Version}
 import play.api.libs.json.{JsObject, Json}
 import scopt.OParser
 
@@ -99,9 +97,8 @@ object UtilApp {
           .abbr("is")
           .text("Literal input data")
           .action((s, c) => c.copy(inputData = Input.Str(s))),
-        opt[String]("input-file")
-          .abbr("if")
-          .action((f, c) => c.copy(inputData = Input.File(f)))
+        opt[String]('i', "input-file")
+          .action((f, c) => c.copy(inputData = if (f.isEmpty || f == "-") Input.StdIn else Input.File(f)))
           .text("Input file name (- for stdin)")
           .validate {
             case fs if fs.isEmpty || fs == "-" || Files.isRegularFile(Paths.get(fs)) => success
@@ -196,7 +193,7 @@ object UtilApp {
 
   //noinspection TypeAnnotation
   private[this] final class NodeState(c: Command) {
-    lazy val settings = WavesSettings.loadRootConfig(c.configFile.map(new File(_)))
+    lazy val settings = Application.loadApplicationConfig(c.configFile.map(new File(_)))
     lazy val wallet   = Wallet(settings.walletSettings)
     lazy val time     = new NTP(settings.ntpServer)
   }
@@ -258,7 +255,7 @@ object UtilApp {
   private[this] object IO {
     def readInput(c: Command): Array[Byte] = {
       val inputStream = c.inputData match {
-        case Input.StdIn | Input.File("-") =>
+        case Input.StdIn =>
           System.in
 
         case Input.Str(s) =>

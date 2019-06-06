@@ -3,9 +3,8 @@ package com.wavesplatform
 import java.io._
 
 import com.google.common.primitives.Ints
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -13,7 +12,6 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -32,7 +30,7 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ImportOptions()).foreach {
       case ImportOptions(configFile, blockchainFile, importHeight, format, verifyTransactions) =>
-        val settings = WavesSettings.loadRootConfig(Some(configFile))
+        val settings = Application.loadApplicationConfig(Some(configFile))
 
         implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
