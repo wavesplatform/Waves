@@ -57,7 +57,7 @@ object Keys {
     Key("asset-info", hBytes(AssetInfoPrefix, asset.id.arr, height), readAssetInfo, writeAssetInfo)
 
   def leaseBalanceLastHeight(addressId: Long): Key[Int] =
-    Key("lease-balance-last-height", addr(5, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+    Key("lease-balance-last-height", addr(12, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
 
   val LeaseBalancePrefix: Short = 13
   def leaseBalance(addressId: Long)(height: Int): Key[LeaseBalance] =
