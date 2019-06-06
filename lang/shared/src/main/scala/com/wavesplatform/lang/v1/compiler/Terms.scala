@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import play.api.libs.json.Json
 
 import monix.eval.Coeval
 import cats.implicits._
@@ -80,10 +79,29 @@ object Terms {
     }
 
   }
+
+  def escape(s: String): String = {
+    // Simple and very naive implementation based on
+    // https://github.com/linkedin/dustjs/blob/3fc12efd153433a21fd79ac81e8c5f5d6f273a1c/dist/dust-core.js#L1099
+
+    // Note this might not be the most efficient since Scala.js compiles this to a bunch of .split and .join calls
+    s.replace("\\", "\\\\")
+     .replace("/", "\\/")
+     .replace("'", "\\'")
+     .replace("\"", "\\\"")
+     .replace("\n", "\\n")
+     .replace("\r", "\\r")
+     .replace("\t", "\\t")
+     .replace("\b", "\\b")
+     .replace("\f", "\\f")
+     .replace("\u2028", "\\u2028")
+     .replace("\u2029", "\\u2029")
+  }
   case class CONST_STRING(s: String)    extends EVALUATED {
     override def toString: String = s
-    override def prettyString(level: Int) : String = Json.toJson(s).toString
+    override def prettyString(level: Int) : String = "\"" ++ escape(s) ++ "\""
   }
+
   case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = if (b) "TRUE" else "FALSE" }
 
   lazy val TRUE  = CONST_BOOLEAN(true)
