@@ -176,15 +176,16 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .map(e => read(e.getValue))
 
   private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: Long, asset: Asset) = {
-    asset match {
-      case IssuedAsset(asset) =>
-        readLastValue(db)(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), asset), Longs.fromByteArray)
-          .getOrElse(0L)
+    val (lastKey, valueKey) = asset match {
+      case ia@IssuedAsset(_) =>
+        (Keys.assetBalanceLastHeight(addressId, ia), Keys.assetBalance(addressId, ia) _)
 
       case Waves =>
-        val lastHeight = db.get(Keys.wavesBalanceLastHeight(addressId))
-        if (lastHeight == 0) 0L else db.get(Keys.wavesBalance(addressId)(lastHeight))
+        (Keys.wavesBalanceLastHeight(addressId), Keys.wavesBalance(addressId) _)
     }
+
+    val lastHeight = db.get(lastKey)
+    if (lastHeight == 0) 0L else db.get(valueKey(lastHeight))
   }
 
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
@@ -219,7 +220,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val (_, _, abs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val assetId = IssuedAsset(abs)
-      if (map.contains(assetId)) map else map + (assetId -> Longs.fromByteArray(e.getValue))
+      map + (assetId -> Longs.fromByteArray(e.getValue))
     })
   )
 
@@ -228,7 +229,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val (_, _, abs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val assetId = IssuedAsset(abs)
       val isNFT = transactionInfo(assetId.id).collectFirst { case (_, it: IssueTransaction) => it.isNFT }.getOrElse(false)
-      if (isNFT || map.contains(assetId)) map else map + (assetId -> Longs.fromByteArray(e.getValue))
+      if (isNFT) map else map + (assetId -> Longs.fromByteArray(e.getValue))
     })
   )
 
@@ -351,10 +352,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
-      rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
+      rw.put(Keys.assetList(addressId), (assets.keys.toList ::: prevAssets).distinct)
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
-        // rw.put(Keys.assetBalanceLastHeight(addressId, assetId), height)
+        rw.put(Keys.assetBalanceLastHeight(addressId, assetId), height)
       }
     }
 
@@ -500,24 +501,25 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             val address   = rw.get(Keys.idToAddress(addressId))
             balancesToInvalidate += (address -> Waves)
 
-            for (assetId <- rw.get(Keys.assetList(addressId))) {
-              balancesToInvalidate += (address -> assetId)
-              rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
-            }
-
-            for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
-              log.trace(s"Discarding $k for $address at $currentHeight")
-              rw.delete(Keys.data(addressId, k)(currentHeight))
-            }
-
-            def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short) = {
-              val prefixBs = KeyHelpers.bytes(prefix, AddressId.toBytes(addressId))
+            def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte] = Array.emptyByteArray) = {
+              val prefixBs = KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), prefixBytes))
               val prevHeight = rw.iterateOverStream(prefixBs)
                 .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
                 .takeWhile(_ < currentHeight)
                 .closeAfter(_.fold(0)((_, r) => r))
 
               if (prevHeight == 0) rw.delete(lastHeightKey) else rw.put(lastHeightKey, prevHeight)
+            }
+
+            for (assetId <- rw.get(Keys.assetList(addressId))) {
+              balancesToInvalidate += (address -> assetId)
+              rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
+              resetLastForAddress(Keys.assetBalanceLastHeight(addressId, assetId), Keys.AssetBalancePrefix, assetId.id)
+            }
+
+            for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
+              log.trace(s"Discarding $k for $address at $currentHeight")
+              rw.delete(Keys.data(addressId, k)(currentHeight))
             }
 
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))

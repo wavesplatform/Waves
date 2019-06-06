@@ -45,12 +45,20 @@ object Keys {
   def assetList(addressId: Long): Key[List[IssuedAsset]] =
     Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
 
-  //  def assetBalanceLastHeight(addressId: Long, asset: IssuedAsset): Key[Int] =
-  //    Key("asset-balance-last-height", bytes(8, Bytes.concat(AddressId.toBytes(addressId), asset.id)), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def assetBalanceLastHeight(addressId: Long, asset: IssuedAsset): Key[Int] =
+    Key("asset-balance-last-height",
+      bytes(8, Bytes.concat(AddressId.toBytes(addressId), asset.id)),
+      Option(_).fold(0)(Ints.fromByteArray),
+      Ints.toByteArray)
 
   val AssetBalancePrefix: Short = 9
   def assetBalance(addressId: Long, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key("asset-balance", hBytes(AssetBalancePrefix, Bytes.concat(Ints.toByteArray(addressId.toInt), asset.id.arr), height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+    Key(
+      "asset-balance",
+      hBytes(AssetBalancePrefix, Bytes.concat(Ints.toByteArray(addressId.toInt), asset.id.arr), height),
+      Option(_).fold(0L)(Longs.fromByteArray),
+      Longs.toByteArray
+    )
 
   val AssetInfoPrefix: Short = 11
   def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
@@ -75,12 +83,15 @@ object Keys {
 
   def changedAddresses(height: Int): Key[Seq[Long]] = Key("changed-addresses", h(21, height), AddressId.readSeq, AddressId.writeSeq)
 
-  def addressIdOfAlias(alias: Alias): Key[Option[Long]] = Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
+  def addressIdOfAlias(alias: Alias): Key[Option[Long]] =
+    Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
 
   val lastAddressId: Key[Option[Long]] = Key.opt("last-address-id", Array[Byte](0, 24), AddressId.fromBytes, AddressId.toBytes)
 
-  def addressId(address: Address): Key[Option[Long]] = Key.opt("address-id", bytes(25, address.bytes.arr), b => AddressId.fromBytes(b), id => AddressId.toBytes(id))
-  def idToAddress(id: Long): Key[Address]            = Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
+  def addressId(address: Address): Key[Option[Long]] =
+    Key.opt("address-id", bytes(25, address.bytes.arr), b => AddressId.fromBytes(b), id => AddressId.toBytes(id))
+
+  def idToAddress(id: Long): Key[Address] = Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   val AddressScriptPrefix: Short = 28
   def addressScript(addressId: Long)(height: Int): Key[Option[Script]] =
@@ -96,13 +107,16 @@ object Keys {
 
   val DataPrefix: Short = 34
   def data(addressId: Long, key: String)(height: Int): Key[Option[DataEntry[_]]] =
-    Key.opt("data", hBytes(DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
+    Key.opt("data",
+      hBytes(DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height),
+      DataEntry.parseValue(key, _, 0)._1,
+      _.valueBytes)
 
   val SponsorshipPrefix: Short = 36
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =
     Key("sponsorship", hBytes(SponsorshipPrefix, asset.id.arr, height), readSponsorship, writeSponsorship)
 
-  val addressesForWavesSeqNr: Key[Int]                = intKey("addresses-for-waves-seq-nr", 37)
+  val addressesForWavesSeqNr: Key[Int] = intKey("addresses-for-waves-seq-nr", 37)
   def addressesForWaves(seqNr: Int): Key[Seq[Long]] = Key("addresses-for-waves", h(38, seqNr), AddressId.readSeq, AddressId.writeSeq)
 
   def addressesForAssetSeqNr(asset: IssuedAsset): Key[Int] = bytesSeqNr("addresses-for-asset-seq-nr", 39, asset.id.arr)
