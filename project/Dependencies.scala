@@ -77,6 +77,7 @@ object Dependencies {
 
   val common = Def.setting(
     Seq(
+      "com.typesafe.play"        %% "play-json"     % "2.7.1",
       scalaTest
     )
   )
@@ -96,7 +97,6 @@ object Dependencies {
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
-      "org.apache.commons" % "commons-lang3" % "3.9",
       "org.scorexfoundation" %% "scrypto" % "2.0.4",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
@@ -138,7 +138,7 @@ object Dependencies {
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json"     % "2.7.1",
+//      "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
       // "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0",
