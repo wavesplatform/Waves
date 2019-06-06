@@ -324,10 +324,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val threshold = height - dbSettings.maxRollbackDepth
 
+    def deleteOldBalances(prefix: Short, addressId: Long, bytes: Array[Byte] = Array.emptyByteArray)(key: Int => Key[_]): Unit = {
+      rw.iterateOverStream(KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes)))
+        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
+        .takeWhile(_ < threshold)
+        .foreach(h => rw.delete(key(h)))
+    }
+
     val newAddressesForWaves = ArrayBuffer.empty[Long]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       rw.put(Keys.wavesBalanceLastHeight(addressId), height)
+      deleteOldBalances(Keys.WavesBalancePrefix, addressId)(Keys.wavesBalance(addressId))
       addressId
     }
 
@@ -342,6 +350,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
       rw.put(Keys.leaseBalanceLastHeight(addressId), height)
+      deleteOldBalances(Keys.LeaseBalancePrefix, addressId)(Keys.leaseBalance(addressId))
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
@@ -353,9 +362,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
       rw.put(Keys.assetList(addressId), (assets.keys.toList ::: prevAssets).distinct)
-      for ((assetId, balance) <- assets) {
-        rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
-        rw.put(Keys.assetBalanceLastHeight(addressId, assetId), height)
+      for ((asset, balance) <- assets) {
+        rw.put(Keys.assetBalance(addressId, asset)(height), balance)
+        rw.put(Keys.assetBalanceLastHeight(addressId, asset), height)
+        deleteOldBalances(Keys.AssetBalancePrefix, addressId, asset.id)(Keys.assetBalance(addressId, asset))
       }
     }
 
