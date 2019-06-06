@@ -38,6 +38,7 @@ import scala.collection.{immutable, mutable}
 import scala.util.{Success, Try}
 
 object LevelDBWriter {
+
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
@@ -154,8 +155,20 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private[this] def readFromEndForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
-    db.iterateFromTopHeight(prefix, AddressId.toBytes(addressId), this.height)
+  private[this] def readFromStartForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
+    val prefixBytes = Bytes.concat(
+      Shorts.toByteArray(prefix),
+      AddressId.toBytes(addressId)
+    )
+    db.iterateOverStream(prefixBytes)
+  }
+
+  private[this] def readFromHeightForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long, height: Int = 1) = {
+    db.iterateOverStream(Bytes.concat(
+      Shorts.toByteArray(prefix),
+      AddressId.toBytes(addressId)
+    ),
+      Ints.toByteArray((height - 1) max 0))
   }
 
   private[this] def readLastForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
@@ -167,13 +180,15 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .map(e => read(e.getValue))
 
   private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: Long, asset: Asset) = {
-    val (prefix, assetBytes) = asset match {
-      case IssuedAsset(asset) => (Keys.AssetBalancePrefix, asset.arr)
-      case Waves              => (Keys.WavesBalancePrefix, Array.emptyByteArray)
-    }
+    asset match {
+      case IssuedAsset(asset) =>
+        readLastValue(db)(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), asset), Longs.fromByteArray)
+          .getOrElse(0L)
 
-    readLastValue(db)(prefix, Bytes.concat(AddressId.toBytes(addressId), assetBytes), Longs.fromByteArray)
-      .getOrElse(0L)
+      case Waves =>
+        val lastHeight = db.get(Keys.wavesBalanceLastHeight(addressId))
+        if (lastHeight == 0) 0L else db.get(Keys.wavesBalance(addressId)(lastHeight))
+    }
   }
 
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
@@ -183,8 +198,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[this] def loadLeaseBalance(db: ReadOnlyDB, addressId: Long): LeaseBalance = {
-    readLastValue(db)(Keys.LeaseBalancePrefix, AddressId.toBytes(addressId), readLeaseBalance)
-      .getOrElse(LeaseBalance.empty)
+    val lastHeight = db.get(Keys.leaseBalanceLastHeight(addressId))
+    if (lastHeight == 0) LeaseBalance.empty else db.get(Keys.leaseBalance(addressId)(lastHeight))
   }
 
   override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
@@ -198,14 +213,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   )
 
   private def loadFullPortfolio(db: ReadOnlyDB, addressId: Long) = loadLposPortfolio(db, addressId).copy(
-    assets = readFromEndForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val assetId = IssuedAsset(e.getKey.drop(Shorts.BYTES + Ints.BYTES).dropRight(Ints.BYTES))
       if (map.contains(assetId)) map else map + (assetId -> Longs.fromByteArray(e.getValue))
     })
   )
 
   private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = readFromEndForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val assetId = IssuedAsset(e.getKey.drop(Shorts.BYTES + Ints.BYTES).dropRight(Ints.BYTES))
       val isNFT   = transactionInfo(assetId.id).collectFirst { case (_, it: IssueTransaction) => it.isNFT }.getOrElse(false)
       if (isNFT || map.contains(assetId)) map else map + (assetId -> Longs.fromByteArray(e.getValue))
@@ -301,11 +316,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
-    val threshold        = height - dbSettings.maxRollbackDepth
+    val threshold = height - dbSettings.maxRollbackDepth
 
     val newAddressesForWaves = ArrayBuffer.empty[Long]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       rw.put(Keys.wavesBalance(addressId)(height), balance)
+      rw.put(Keys.wavesBalanceLastHeight(addressId), height)
       addressId
     }
 
@@ -319,6 +335,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
+      rw.put(Keys.leaseBalanceLastHeight(addressId), height)
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
@@ -332,6 +349,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
+        // rw.put(Keys.assetBalanceLastHeight(addressId, assetId), height)
       }
     }
 
@@ -741,33 +759,27 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val toHeight = this.heightOf(to).getOrElse(this.height)
 
       def beforeUpper(prefix: Short) = {
-        readFromEndForAddress(db)(prefix, addressId)
+        readFromHeightForAddress(db)(prefix, addressId, from max 1)
           .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), e.getValue))
-          .dropWhile(_._1 > toHeight)
+          .takeWhile(_._1 <= toHeight)
       }
 
-      def readSlice(prefix: Short) = {
-        beforeUpper(prefix)
-          .takeWhile(_._1 >= from)
+      def beforeFromOrLast[T](prefix: Short, lastKey: => Key[Int], read: Int => Key[T], default: T): Vector[(Int, T)] = {
+        val base = beforeUpper(prefix).map { case (h, bs) => (h, read(h).parse(bs)) }.toVector
+        if (base.headOption.exists(_._1 == from)) base
+        else {
+          val lastHeight = db.get(lastKey)
+          val lastValue = if (lastHeight == 0 || lastHeight > from) default else db.get(read(lastHeight))
+          (from, lastValue) +: base
+        }
       }
 
-      val wavesBalances = {
-        val base = readSlice(Keys.WavesBalancePrefix)
-          .map { case (height, arr) => (height, Longs.fromByteArray(arr)) }
-          .toVector
+      val allBalances = db.iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId)))
+        .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
+        .toVector
 
-        val maxHeight = base.lastOption.fold(toHeight)(_._1 - 1)
-
-        val first = beforeUpper(Keys.WavesBalancePrefix)
-          .dropWhile(_._1 >= maxHeight)
-          .closeAfter(_.toStream.headOption)
-          .fold(0L)(kv => Longs.fromByteArray(kv._2))
-
-        base ++ (maxHeight to from by -1).map((_, first))
-      }
-
-      val leaseBalances = readSlice(Keys.LeaseBalancePrefix)
-        .map { case (height, arr) => (height, readLeaseBalance(arr)) }
+      val wavesBalances = beforeFromOrLast(Keys.WavesBalancePrefix, Keys.wavesBalanceLastHeight(addressId), Keys.wavesBalance(addressId), 0L)
+      val leaseBalances = beforeFromOrLast(Keys.LeaseBalancePrefix, Keys.leaseBalanceLastHeight(addressId), Keys.leaseBalance(addressId), LeaseBalance.empty)
 
       val baseMap = wavesBalances.map(kv => (kv._1, BalanceSnapshot(kv._1, kv._2, 0, 0))).toMap
       leaseBalances

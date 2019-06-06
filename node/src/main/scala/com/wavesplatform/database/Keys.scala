@@ -35,6 +35,9 @@ object Keys {
     (prefix, addressId, aux, height)
   }
 
+  def wavesBalanceLastHeight(addressId: Long): Key[Int] =
+    Key("waves-balance-last-height", addr(5, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+
   val WavesBalancePrefix: Short = 6
   def wavesBalance(addressId: Long)(height: Int): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
@@ -42,14 +45,19 @@ object Keys {
   def assetList(addressId: Long): Key[List[IssuedAsset]] =
     Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
 
+  //  def assetBalanceLastHeight(addressId: Long, asset: IssuedAsset): Key[Int] =
+  //    Key("asset-balance-last-height", bytes(8, Bytes.concat(AddressId.toBytes(addressId), asset.id)), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+
   val AssetBalancePrefix: Short = 9
-  def assetBalancePrefix(addressId: Long, asset: IssuedAsset): Array[Byte] = bytes(AssetBalancePrefix, Bytes.concat(Ints.toByteArray(addressId.toInt)))
   def assetBalance(addressId: Long, asset: IssuedAsset)(height: Int): Key[Long] =
     Key("asset-balance", hBytes(AssetBalancePrefix, Bytes.concat(Ints.toByteArray(addressId.toInt), asset.id.arr), height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   val AssetInfoPrefix: Short = 11
   def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
     Key("asset-info", hBytes(AssetInfoPrefix, asset.id.arr, height), readAssetInfo, writeAssetInfo)
+
+  def leaseBalanceLastHeight(addressId: Long): Key[Int] =
+    Key("lease-balance-last-height", addr(5, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
 
   val LeaseBalancePrefix: Short = 13
   def leaseBalance(addressId: Long)(height: Int): Key[LeaseBalance] =

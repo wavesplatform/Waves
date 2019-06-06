@@ -29,7 +29,7 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(): CloseableIterator[DBEntry] = db.iterateOverStream()
 
-  def iterateOverStream(prefix: Array[Byte]): CloseableIterator[DBEntry] = db.iterateOverStream(prefix)
+  def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = db.iterateOverStream(prefix, suffix)
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
@@ -45,20 +45,6 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
       //      .dropWhile(e => !e.getKey.startsWith(stableBytes))
       //      .takeWhile(e => e.getKey.startsWith(stableBytes))
       .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
-  }
-
-  def iterateFromTopHeight(prefix: Short, bytes: Array[Byte], height: Int): CloseableIterator[DBEntry] = {
-    val stableBytes = Bytes.concat(
-      Shorts.toByteArray(prefix),
-      bytes
-    )
-
-    db.iterateOverStream(stableBytes)
-//    db.iterateOverStreamReverse(Bytes.concat(stableBytes, Ints.toByteArray(height + 1)))
-//      .dropWhile(e => !e.getKey.startsWith(stableBytes))
-//      .takeWhile(e => e.getKey.startsWith(stableBytes))
-      .toVector
-      .reverseIterator
   }
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {

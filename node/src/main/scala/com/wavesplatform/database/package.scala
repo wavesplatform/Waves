@@ -423,11 +423,11 @@ package object database {
       )
     }
 
-    def iterateOverStream(prefix: Array[Byte]): CloseableIterator[DBEntry] = {
+    def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = {
       import scala.collection.JavaConverters._
       val dbIter = db.iterator()
       try {
-        dbIter.seek(prefix)
+        dbIter.seek(Bytes.concat(prefix, suffix))
         CloseableIterator(
           dbIter.asScala.takeWhile(_.getKey.startsWith(prefix)),
           () => dbIter.close()
