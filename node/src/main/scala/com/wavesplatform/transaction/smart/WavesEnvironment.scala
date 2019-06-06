@@ -96,13 +96,14 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
       ScriptAssetInfo(
-        totalAmount = assetDesc.totalVolume.toLong,
-        decimals    = assetDesc.decimals,
-        issuer      = Address(assetDesc.issuer.toAddress.bytes),
-        issuerPk    = assetDesc.issuer,
-        reissuable  = assetDesc.reissuable,
-        scripted    = assetDesc.script.nonEmpty,
-        sponsored   = assetDesc.sponsorship != 0
+        id         = id,
+        quantity   = assetDesc.totalVolume.toLong,
+        decimals   = assetDesc.decimals,
+        issuer     = Address(assetDesc.issuer.toAddress.bytes),
+        issuerPk   = assetDesc.issuer,
+        reissuable = assetDesc.reissuable,
+        scripted   = assetDesc.script.nonEmpty,
+        sponsored  = assetDesc.sponsorship != 0
       )
     }
   }
