@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 
 import monix.eval.Coeval
 import cats.implicits._
@@ -81,11 +82,7 @@ object Terms {
   }
   case class CONST_STRING(s: String)    extends EVALUATED {
     override def toString: String = s
-    override def prettyString(level: Int) : String = if(s.isEmpty) {
-      "<EmptyString>"
-    } else {
-      s
-    }
+    override def prettyString(level: Int) : String = "\"" ++ escapeJava(s) ++ "\""
   }
   case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = if (b) "TRUE" else "FALSE" }
 
