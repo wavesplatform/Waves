@@ -74,7 +74,7 @@ object Gen {
     val keyLets =
       accountsWithIndexes map {
         case (acc, i) =>
-          s"let accountPK$i = base58'${ByteStr(acc.publicKey).base58}'"
+          s"let accountPK$i = base58'${ByteStr(acc.publicKey).toString}'"
       } mkString "\n"
 
     val signedLets =

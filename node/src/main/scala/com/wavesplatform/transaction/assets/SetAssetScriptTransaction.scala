@@ -37,7 +37,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
       jsonBase() ++ Json.obj(
         "version" -> version,
         "chainId" -> chainId,
-        "assetId" -> asset.id.base58,
+        "assetId" -> asset.id.toString,
         "script"  -> script.map(_.bytes().base64)
       )
     )

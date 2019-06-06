@@ -298,7 +298,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     } yield {
       JsObject(
         Seq(
-          "assetId"        -> JsString(id.base58),
+          "assetId" -> JsString(id.toString),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
           "issuer"         -> JsString(tx.sender.address),

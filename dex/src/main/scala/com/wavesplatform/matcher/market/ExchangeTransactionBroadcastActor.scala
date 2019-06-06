@@ -42,7 +42,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
 
       broadcast(ready)
       log.debug(
-        s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${expired.size} failed to send: ${expired.map(_.id().base58).mkString(", ")}")
+        s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
 
       scheduleSend()
       context.become(watching(next ++ ready, Vector.empty))

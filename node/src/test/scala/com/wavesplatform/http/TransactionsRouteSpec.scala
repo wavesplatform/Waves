@@ -123,7 +123,7 @@ class TransactionsRouteSpec
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.base58,
+          "feeAssetId" -> assetId.toString,
           "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -153,7 +153,7 @@ class TransactionsRouteSpec
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.id.base58,
+          "feeAssetId" -> assetId.id.toString,
           "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -184,7 +184,7 @@ class TransactionsRouteSpec
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.base58
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
         }
       }
@@ -196,7 +196,7 @@ class TransactionsRouteSpec
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.id.base58,
+          "feeAssetId" -> assetId.id.toString,
           "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -228,7 +228,7 @@ class TransactionsRouteSpec
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.base58
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
         }
       }
@@ -313,7 +313,7 @@ class TransactionsRouteSpec
       forAll(txAvailability) {
         case (tx, height) =>
           (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
-          Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
+          Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
           }
@@ -334,9 +334,9 @@ class TransactionsRouteSpec
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
             if ((r \ "version").as[Int] == 1) {
-              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).base58
+              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).toString
             } else {
-              (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.base58)
+              (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.toString)
             }
           }
         }
@@ -374,7 +374,7 @@ class TransactionsRouteSpec
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
         (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
-        Get(routePath(s"/unconfirmed/info/${tx.id().base58}")) ~> route ~> check {
+        Get(routePath(s"/unconfirmed/info/${tx.id().toString}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual tx.json()
         }

@@ -26,10 +26,10 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
       "type"      -> builder.typeId,
-      "id"        -> id().base58,
+      "id" -> id().toString,
       "fee"       -> 0,
       "timestamp" -> timestamp,
-      "signature" -> this.signature.base58,
+      "signature" -> this.signature.toString,
       "recipient" -> recipient.address,
       "amount"    -> amount
     ))

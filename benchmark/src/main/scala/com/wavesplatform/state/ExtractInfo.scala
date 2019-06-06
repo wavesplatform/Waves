@@ -86,7 +86,7 @@ object ExtractInfo extends App with ScorexLogging {
     val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransactionV1].alias.stringRepr)
     write("aliases", benchSettings.aliasesFile, aliasTxIds.take(1000))
 
-    val restTxIds = restTxs.map(_.id().base58)
+    val restTxIds = restTxs.map(_.id().toString)
     write("rest transactions", benchSettings.restTxsFile, restTxIds.take(10000))
 
     val assets = nonEmptyBlocks(benchSettings.assetsFromHeight)
@@ -95,7 +95,7 @@ object ExtractInfo extends App with ScorexLogging {
           case tx: IssueTransaction => tx.assetId()
         }
       }
-      .map(_.base58)
+      .map(_.toString)
 
     write("assets", benchSettings.assetsFile, takeUniq(300, assets))
 

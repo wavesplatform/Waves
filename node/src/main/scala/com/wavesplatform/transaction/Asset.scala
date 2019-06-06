@@ -24,7 +24,7 @@ object Asset {
     case _ => JsError("Expected base58-encoded assetId")
   }
   implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
-    JsString(asset.id.base58)
+    JsString(asset.id.toString)
   }
 
   implicit val assetIdReads: Reads[Asset] = Reads {
@@ -34,7 +34,7 @@ object Asset {
   }
   implicit val assetIdWrites: Writes[Asset] = Writes {
     case Waves           => JsNull
-    case IssuedAsset(id) => JsString(id.base58)
+    case IssuedAsset(id) => JsString(id.toString)
   }
 
   implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
@@ -75,7 +75,7 @@ object Asset {
 
     def maybeBase58Repr: Option[String] = ai match {
       case Waves           => None
-      case IssuedAsset(id) => Some(id.base58)
+      case IssuedAsset(id) => Some(id.toString)
     }
 
     def fold[A](onWaves: => A)(onAsset: IssuedAsset => A): A = ai match {
