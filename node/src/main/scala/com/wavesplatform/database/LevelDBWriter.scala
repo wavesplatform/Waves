@@ -163,14 +163,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.iterateOverStream(prefixBytes)
   }
 
-  private[this] def readFromHeightForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long, height: Int = 1) = {
-    db.iterateOverStream(Bytes.concat(
-      Shorts.toByteArray(prefix),
-      AddressId.toBytes(addressId)
-    ),
-      Ints.toByteArray((height - 1) max 0))
-  }
-
   private[this] def readLastValue[T](db: ReadOnlyDB)(prefix: Short, bytes: Array[Byte], read: Array[Byte] => T) =
     db.lastValue(prefix, bytes, this.height)
       .map(e => read(e.getValue))
@@ -789,6 +781,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
       def beforeFromOrLast[T](prefix: Short, lastKey: => Key[Int], read: Int => Key[T], default: T) = {
         def beforeUpper(prefix: Short) = {
+          def readFromHeightForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long, height: Int) = {
+            db.iterateOverStream(Bytes.concat(
+              Shorts.toByteArray(prefix),
+              AddressId.toBytes(addressId)
+            ),
+              Ints.toByteArray((height - 1) max 0))
+          }
+
           readFromHeightForAddress(db)(prefix, addressId, from max 1)
             .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), e.getValue))
             .takeWhile(_._1 <= toHeight)
