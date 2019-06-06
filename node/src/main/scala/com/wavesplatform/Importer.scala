@@ -68,7 +68,7 @@ object Importer extends ScorexLogging {
             var blocksToSkip  = blockchainUpdater.height - 1
             val blocksToApply = importHeight - blockchainUpdater.height + 1
 
-            println(s"Skipping $blocksToSkip blocks(s)")
+            println(s"Skipping $blocksToSkip block(s)")
 
             while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
