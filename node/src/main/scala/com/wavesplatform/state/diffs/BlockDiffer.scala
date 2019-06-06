@@ -20,10 +20,7 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.TxValidationError._
 
 object BlockDiffer extends ScorexLogging {
-  /**
-    * Block/microblock diff with a sequence of transactions diffs
-    */
-  type DetailedDiff = (Diff, Seq[Diff])
+  final case class DetailedDiff(parentDiff: Diff, transactionDiffs: Seq[Diff])
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint, detailedDiff: DetailedDiff)
   type GenResult = Result[MiningConstraint]
 
@@ -159,9 +156,9 @@ object BlockDiffer extends ScorexLogging {
     }
 
     txs
-      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, (initDiff, Seq.empty[Diff])).asRight[ValidationError])) {
+      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Seq.empty[Diff])).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
-        case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, (blockDiff, txDiffs))), _), tx) =>
+        case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _), tx) =>
           val updatedBlockchain = composite(blockchain, currDiff)
           txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
@@ -176,17 +173,17 @@ object BlockDiffer extends ScorexLogging {
                 if (hasNg) {
                   val minerDiff = Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees))
                   Result(updatedDiff.combine(minerDiff),
-                    carryFee + nextBlockFee,
-                    totalWavesFee,
-                    updatedConstraint,
-                    (blockDiff.combine(minerDiff), txDiffs :+ newDiff))
-                } else Result(updatedDiff, 0L, totalWavesFee, updatedConstraint, (blockDiff, txDiffs :+ newDiff))
+                         carryFee + nextBlockFee,
+                         totalWavesFee,
+                         updatedConstraint,
+                         DetailedDiff(parentDiff.combine(minerDiff), txDiffs :+ newDiff))
+                } else Result(updatedDiff, 0L, totalWavesFee, updatedConstraint, DetailedDiff(parentDiff, txDiffs :+ newDiff))
               )
             }
           }
       }
       .map {
-        case Result(diff, carry, totalFee, constraint, (blockDiff, txDiffs)) =>
+        case Result(diff, carry, totalFee, constraint, DetailedDiff(parentDiff, txDiffs)) =>
           def withPatches(d: Diff): Diff = {
             val diffWithCancelledLeases =
               if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
@@ -206,7 +203,7 @@ object BlockDiffer extends ScorexLogging {
             diffWithCancelledLeaseIns
           }
 
-          Result(withPatches(diff), carry, totalFee, constraint, (withPatches(blockDiff), txDiffs))
+          Result(withPatches(diff), carry, totalFee, constraint, DetailedDiff(withPatches(parentDiff), txDiffs))
       }
   }
 }
