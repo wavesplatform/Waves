@@ -148,8 +148,8 @@ message ExchangeTransactionData {
         };
 
         message AssetPair {
-            bytes amount_asset_id = 1;
-            bytes price_asset_id = 2;
+            AssetId amount_asset_id = 1;
+            AssetId price_asset_id = 2;
         };
 
         int32 chain_id = 1;
