@@ -59,12 +59,17 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     val tp        = new TopicPartition(settings.topic, partition.partition)
 
     consumer.assign(util.Arrays.asList(tp))
-    consumer.seek(tp, consumer.endOffsets(util.Arrays.asList(tp)).asScala.apply(tp) - 1)
 
-    val records = consumer.poll(JDuration.ofMillis(timeout.toMillis))
+    val endOffset = consumer.endOffsets(util.Arrays.asList(tp)).asScala.apply(tp)
 
-    if (records.isEmpty) 0
-    else records.records(tp).asScala.last.value
+    if (endOffset != 0) {
+      consumer.seek(tp, endOffset - 1)
+
+      val records = consumer.poll(JDuration.ofMillis(timeout.toMillis))
+
+      if (records.isEmpty) 0
+      else records.records(tp).asScala.last.value
+    } else 0
   }
 
   private[this] def startupCheck(): Unit = {
