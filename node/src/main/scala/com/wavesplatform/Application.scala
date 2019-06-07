@@ -47,9 +47,8 @@ import monix.execution.Scheduler
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import org.influxdb.dto.Point
-
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -86,14 +85,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
 
-  private val maybeBlockchainUpdatesScheduler =
-    if (settings.enableBlockchainUpdates)
-      Some(singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _)))
-    else None
-  private val maybeBlockchainUpdated = maybeBlockchainUpdatesScheduler map (ConcurrentSubject.publish[BlockchainUpdated](_))
+  private val (maybeBlockchainUpdatesScheduler, blockchainUpdated) = {
+    import com.wavesplatform.utils.Implicits.SubjectOps
+    if (settings.enableBlockchainUpdates) {
+      val scheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
+      (Some(scheduler), ConcurrentSubject.publish[BlockchainUpdated](scheduler))
+    } else (None, Subject.empty[BlockchainUpdated])
+  }
 
   private val blockchainUpdater =
-    StorageFactory(settings, db, time, spendableBalanceChanged, maybeBlockchainUpdated)
+    StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdated)
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -156,15 +157,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Extensions start
     val extensionContext = new Context {
-      override def settings: WavesSettings                                  = app.settings
-      override def blockchain: Blockchain with BlockchainUpdater            = app.blockchainUpdater
-      override def time: Time                                               = app.time
-      override def wallet: Wallet                                           = app.wallet
-      override def utx: UtxPool                                             = utxStorage
-      override def broadcastTx(tx: Transaction): Unit                       = allChannels.broadcastTx(tx, None)
-      override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                 = app.actorSystem
-      override def blockchainUpdated: Option[Observable[BlockchainUpdated]] = maybeBlockchainUpdated
+      override def settings: WavesSettings                               = app.settings
+      override def blockchain: Blockchain with BlockchainUpdater         = app.blockchainUpdater
+      override def time: Time                                            = app.time
+      override def wallet: Wallet                                        = app.wallet
+      override def utx: UtxPool                                          = utxStorage
+      override def broadcastTx(tx: Transaction): Unit                    = allChannels.broadcastTx(tx, None)
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def blockchainUpdated: Observable[BlockchainUpdated]      = app.blockchainUpdated
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -366,6 +367,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Stopping network services")
       network.shutdown()
 
+      blockchainUpdated.onComplete()
       maybeBlockchainUpdatesScheduler foreach (shutdownAndWait(_, "BlockchainUpdated"))
 
       shutdownAndWait(minerScheduler, "Miner")

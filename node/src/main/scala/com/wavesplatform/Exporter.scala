@@ -24,6 +24,8 @@ object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFilename, outputFileNamePrefix, exportHeight, format) =>
+        implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.LogExceptionsToStandardErr
+
         val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(configFilename)))
         AddressScheme.current = new AddressScheme {
           override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
@@ -31,7 +33,7 @@ object Exporter extends ScorexLogging {
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), None)
+        val blockchain       = StorageFactory(settings, db, time, Observer.empty, Observer.empty)
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")

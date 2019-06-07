@@ -56,7 +56,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     )
 
     val partition = consumer.partitionsFor(settings.topic).asScala.head
-    val tp = new TopicPartition(settings.topic, partition.partition)
+    val tp        = new TopicPartition(settings.topic, partition.partition)
 
     consumer.assign(util.Arrays.asList(tp))
     consumer.seek(tp, consumer.endOffsets(util.Arrays.asList(tp)).asScala.apply(tp) - 1)
@@ -102,13 +102,13 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     }
   }
 
-  override def start(): Unit = {
-    context.blockchainUpdated foreach { blockchainUpdated =>
+  override def start(): Unit =
+    if (context.settings.enableBlockchainUpdates) {
       maybeProducer = Some(createProducer(settings))
       maybeProducer foreach { producer =>
         log.info("Performing startup node/Kafka consistency check...")
 
-        blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
+        context.blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
           override def onNext(elem: BlockchainUpdated): Ack = {
             producer.send(
               createProducerRecord(settings.topic, elem),
@@ -135,7 +135,6 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
         log.info("Starting sending blockchain updates to Kafka")
       }
     }
-  }
 
   override def shutdown(): Future[Unit] = Future {
     log.info("Shutting down blockchain updates sending")

@@ -25,15 +25,15 @@ object ImporterSending extends ScorexLogging {
     val ctor           = extensionClass.getConstructor(classOf[Context])
 
     val extensionContext = new Context {
-      override def settings: WavesSettings                                  = wavesSettings
-      override def blockchain: Blockchain with BlockchainUpdater            = ???
-      override def time: Time                                               = ???
-      override def wallet: Wallet                                           = ???
-      override def utx: UtxPool                                             = ???
-      override def broadcastTx(tx: Transaction): Unit                       = ???
-      override def spendableBalanceChanged: Observable[(Address, Asset)]    = ???
-      override def actorSystem: ActorSystem                                 = ???
-      override def blockchainUpdated: Option[Observable[BlockchainUpdated]] = Some(blockchainUpdatedObservable)
+      override def settings: WavesSettings                               = wavesSettings
+      override def blockchain: Blockchain with BlockchainUpdater         = ???
+      override def time: Time                                            = ???
+      override def wallet: Wallet                                        = ???
+      override def utx: UtxPool                                          = ???
+      override def broadcastTx(tx: Transaction): Unit                    = ???
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
+      override def actorSystem: ActorSystem                              = ???
+      override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
     }
 
     ctor.newInstance(extensionContext)

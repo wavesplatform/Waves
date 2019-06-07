@@ -114,9 +114,11 @@ object Importer extends ScorexLogging {
                      settings: WavesSettings,
                      importOptions: ImportOptions,
                      blockchainUpdated: Option[Observer[BlockchainUpdated]]): (Blockchain, AppendBlock) = {
+    implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.LogExceptionsToStandardErr
+
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
-      StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), blockchainUpdated)
+      StorageFactory(settings, db, time, Observer.empty, Observer.empty)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, settings, scheduler, importOptions.verify) _
 

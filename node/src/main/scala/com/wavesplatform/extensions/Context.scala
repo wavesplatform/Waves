@@ -18,6 +18,6 @@ trait Context {
   def utx: UtxPool
   def broadcastTx(tx: Transaction): Unit
   def spendableBalanceChanged: Observable[(Address, Asset)]
-  def blockchainUpdated: Option[Observable[BlockchainUpdated]]
+  def blockchainUpdated: Observable[BlockchainUpdated]
   def actorSystem: ActorSystem
 }
