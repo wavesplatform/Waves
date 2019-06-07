@@ -319,11 +319,15 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     def deleteOldBalances(prefix: Short, addressId: Long, bytes: Array[Byte] = Array.emptyByteArray)(key: Int => Key[_]): Unit = {
       rw.iterateOverStream(KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes)))
         .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
-        .takeWhile(_ < threshold)
-        .foreach(h => rw.delete(key(h)))
+        .closeAfter { iterator =>
+          val heights = iterator.toStream
+          heights
+            .zip(heights.tail)
+            .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
+            .foreach { case (h, _) => rw.delete(key(h)) }
+        }
     }
 
-    val newAddressesForWaves = ArrayBuffer.empty[Long]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       rw.put(Keys.wavesBalanceLastHeight(addressId), height)
@@ -332,12 +336,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
-
-    if (newAddressesForWaves.nonEmpty) {
-      val newSeqNr = rw.get(Keys.addressesForWavesSeqNr) + 1
-      rw.put(Keys.addressesForWavesSeqNr, newSeqNr)
-      rw.put(Keys.addressesForWaves(newSeqNr), newAddressesForWaves)
-    }
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
@@ -505,7 +503,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
             def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte] = Array.emptyByteArray) = {
               val prefixBs = KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), prefixBytes))
-              val prevHeight = rw.iterateOverStream(prefixBs)
+              val prevHeight = rw
+                .iterateOverStream(prefixBs)
                 .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
                 .takeWhile(_ < currentHeight)
                 .closeAfter(_.fold(0)((_, r) => r))
@@ -806,7 +805,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
 
       val wavesBalances = beforeFromOrLast(Keys.WavesBalancePrefix, Keys.wavesBalanceLastHeight(addressId), Keys.wavesBalance(addressId), 0L)
-      val leaseBalances = beforeFromOrLast(Keys.LeaseBalancePrefix, Keys.leaseBalanceLastHeight(addressId), Keys.leaseBalance(addressId), LeaseBalance.empty)
+      val leaseBalances =
+        beforeFromOrLast(Keys.LeaseBalancePrefix, Keys.leaseBalanceLastHeight(addressId), Keys.leaseBalance(addressId), LeaseBalance.empty)
 
       val baseMap = wavesBalances.map(kv => (kv._1, BalanceSnapshot(kv._1, kv._2, 0, 0))).toMap
       leaseBalances
@@ -1086,15 +1086,20 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
-    def createMap() =
-      (for {
-        seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-        addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-        balance <- db
-          .lastValue(Keys.WavesBalancePrefix, AddressId.toBytes(addressId), height)
-          .map(e => Longs.fromByteArray(e.getValue))
-          .filter(_ > 0)
-      } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+    def createMap() = {
+      val balances = db.iterateOverStream(Keys.WavesBalancePrefix).map { e =>
+        val (_, addressId, _, height) = Keys.parseAddressBytesHeight(e.getKey)
+        (addressId, height) -> Longs.fromByteArray(e.getValue)
+      }
+
+      val byAddressId = balances.closeAfter(_.foldLeft(Map.empty[AddressId, Long]) {
+        case (map, ((addressId, h), balance)) =>
+          if (h <= height) map + (addressId -> balance)
+          else map
+      })
+
+      byAddressId.map(kv => db.get(Keys.idToAddress(kv._1)) -> kv._2)
+    }
 
     Either.cond(
       height > canGetAfterHeight,
