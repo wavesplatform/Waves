@@ -316,7 +316,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
-      rw.put(Keys.assetList(addressId), newAssets.toList ++ prevAssets)
+      rw.put(Keys.assetList(addressId), (newAssets.toList ++ prevAssets).distinct)
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
         expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
