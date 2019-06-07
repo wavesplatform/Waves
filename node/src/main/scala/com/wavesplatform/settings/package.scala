@@ -61,22 +61,22 @@ package object settings {
       .resolve()
   }
 
+  //noinspection SpellCheckingInspection
   def defaultDirectory(config: Config): String = {
-    // No actual interpolation here, `s` to suppress warnings
     def osxDefaultDirectory: String =
-      s"$${user.home}/Library/Application Support"
+      "${user.home}/Library/Application Support"
 
     def winDefaultDirectory: String =
-      s"$${LOCALAPPDATA}"
+      "${LOCALAPPDATA}"
 
     def nixDefaultDirectory: String = {
       val maybeXdgDir = sys.env.get("XDG_DATA_HOME")
-      val defaultDir = s"$${user.home}/.local/share"
+      val defaultDir = "${user.home}/.local/share"
 
       maybeXdgDir getOrElse defaultDir
     }
 
-    def withNetwork(config: Config): Unit = {
+    def withNetwork(config: Config): String = {
       val bc = config.getString("waves.blockchain.type")
       val suffix =
         if (bc == "CUSTOM") s"custom${config.getString("waves.blockchain.custom.address-scheme-character")}"
