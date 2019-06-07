@@ -24,7 +24,7 @@ package object state {
 
   def nftListFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
     def transactionFromDiff(d: Diff, id: ByteStr): Option[Transaction] = {
-      d.transactions.get(id).map(_._2)
+      d.transactions.get(id).map(_._1)
     }
 
     def assetStreamFromDiff(d: Diff): Iterator[IssuedAsset] = {
@@ -64,20 +64,24 @@ package object state {
                                                                   types: Set[TransactionParser],
                                                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
-    def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
-      d.transactions.values.toSeq.reverseIterator
+    def transactionsFromDiff(d: Diff): Iterator[(Height, Transaction, Set[Address])] =
+      d.transactions
+        .values
+        .toSeq
+        .map { case (t,a) => (Height @@ b.height, t, a) }
+        .reverseIterator
 
-    def withPagination(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction, Set[Address])] =
+    def withPagination(txs: Iterator[(Height, Transaction, Set[Address])]): Iterator[(Height, Transaction, Set[Address])] =
       fromId match {
         case None     => txs
         case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction)] =
+    def withFilterAndLimit(txs: Iterator[(Height, Transaction, Set[Address])]): Iterator[(Height, Transaction)] =
       txs
-        .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
+        .collect { case (h, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (h, tx) }
 
-    def transactions: Diff => Iterator[(Int, Transaction)] =
+    def transactions: Diff => Iterator[(Height, Transaction)] =
       withFilterAndLimit _ compose withPagination compose transactionsFromDiff
 
     d.fold(b.addressTransactions(address, types, fromId)) { diff =>

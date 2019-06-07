@@ -474,7 +474,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       .fold(Diff.empty)(_.bestLiquidDiff)
       .transactions
       .get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (this.height, t._1))
       .orElse(blockchain.transactionInfo(id))
   }
 
@@ -514,8 +514,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       case Some(ng) =>
         blockchain.leaseDetails(leaseId).map(ld => ld.copy(isActive = ng.bestLiquidDiff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
           ng.bestLiquidDiff.transactions.get(leaseId).collect {
-            case (h, lt: LeaseTransaction, _) =>
-              LeaseDetails(lt.sender, lt.recipient, h, lt.amount, ng.bestLiquidDiff.leaseState(lt.id()))
+            case (lt: LeaseTransaction, _) =>
+              LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, ng.bestLiquidDiff.leaseState(lt.id()))
           }
       case None =>
         blockchain.leaseDetails(leaseId)
@@ -636,7 +636,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     ngState.fold(blockchain.allActiveLeases) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
       val fromDiff = active.keysIterator
-        .map(id => ng.bestLiquidDiff.transactions(id)._2)
+        .map(id => ng.bestLiquidDiff.transactions(id)._1)
         .collect { case lt: LeaseTransaction => lt }
 
       val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
@@ -679,7 +679,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
     ngState flatMap { ng =>
-      ng.bestLiquidDiff.transactions.get(id).map(_._1)
+      ng.bestLiquidDiff.transactions.get(id).map(_ => this.height)
     } orElse blockchain.transactionHeight(id)
   }
 

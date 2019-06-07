@@ -111,7 +111,6 @@ object ExchangeTransactionDiff {
       val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
       Diff(
-        height,
         tx,
         portfolios = portfolios,
         orderFills = Map(

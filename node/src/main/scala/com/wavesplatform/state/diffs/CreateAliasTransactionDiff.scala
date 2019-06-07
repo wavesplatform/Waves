@@ -16,7 +16,6 @@ object CreateAliasTransactionDiff {
     else
       Right(
         Diff(
-          height = height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
           aliases = Map(tx.alias -> tx.sender.toAddress),

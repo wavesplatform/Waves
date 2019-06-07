@@ -490,10 +490,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
-                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args(0).asInstanceOf[CONST_BYTESTR].bs)
+                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
               ))
 
-            blockDiff.transactions(ci.id())._3.contains(setScript.sender) shouldBe true
+            blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
           }
         }
     }
