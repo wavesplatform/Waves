@@ -132,7 +132,14 @@ object Explorer extends ScorexLogging {
 
             db.iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.FilledVolumeAndFeePrefix), orderId.get.arr))
               .filter { e =>
-                val (_, bs, _) = Keys.parseBytesHeight(e.getKey)
+                def parseBytesHeight(bs: Array[Byte]): (Short, Array[Byte], Height) = {
+                  val prefix = Shorts.fromByteArray(bs.take(2))
+                  val height = Height(Ints.fromByteArray(bs.takeRight(4)))
+                  val aux = bs.drop(2).dropRight(4)
+                  (prefix, aux, height)
+                }
+
+                val (_, bs, _) = parseBytesHeight(e.getKey)
                 ByteStr(bs) == orderId.get
               }
               .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), com.wavesplatform.database.readVolumeAndFee(e.getValue)))

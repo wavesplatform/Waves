@@ -20,13 +20,6 @@ object Keys {
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int]("height-of", hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
 
-  def parseBytesHeight(bs: Array[Byte]): (Short, Array[Byte], Height) = {
-    val prefix = Shorts.fromByteArray(bs.take(2))
-    val height = Height(Ints.fromByteArray(bs.takeRight(4)))
-    val aux = bs.drop(2).dropRight(4)
-    (prefix, aux, height)
-  }
-
   def parseAddressBytesHeight(bs: Array[Byte]): (Short, AddressId, Array[Byte], Height) = {
     val prefix = Shorts.fromByteArray(bs.take(2))
     val addressId = AddressId.fromBytes(bs.slice(2, 6))
@@ -79,6 +72,7 @@ object Keys {
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
     Key("filled-volume-and-fee", hBytes(FilledVolumeAndFeePrefix, orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
 
+  // 3, 10, 14, 16, 18, 22, 27, 33, 35, 37, 38, 41, 42, 44, 46 not used
   // 19, 20 were never used
 
   def changedAddresses(height: Int): Key[Seq[Long]] = Key("changed-addresses", h(21, height), AddressId.readSeq, AddressId.writeSeq)
