@@ -42,13 +42,16 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     settings.copy(
       blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings)))
 
+  private def withBlockchainUpdatesEnabled(settings: WavesSettings): WavesSettings =
+    settings.copy(enableBlockchainUpdates = true)
+
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Observer[BlockchainUpdated] = Observer.empty)(
       f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
     val (fs, settings) =
       if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
 
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings)
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, events)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withBlockchainUpdatesEnabled(settings), ntpTime, events)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -56,9 +59,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         bcu.processBlock(block).explicitGet()
       }
 
+      events.onComplete()
       bcu.shutdown()
       f(bcu, account)
     } finally {
+      events.onComplete()
       bcu.shutdown()
       db.close()
     }
@@ -270,7 +275,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         val events = ReplaySubject[BlockchainUpdated]()
         val defaultWriter =
           new LevelDBWriter(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
-        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, events)
+        val bcu = new BlockchainUpdaterImpl(defaultWriter,
+                                            ignoreSpendableBalanceChanged,
+                                            withBlockchainUpdatesEnabled(withNg(wavesSettings)),
+                                            ntpTime,
+                                            events)
 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get
@@ -283,6 +292,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           bcu.processBlock(block2).explicitGet() // this should remove previous microblock
           bcu.processMicroBlock(microBlock3.head).explicitGet()
           bcu.shutdown()
+          events.onComplete()
 
           // test goes here
           val updates = events.toListL
