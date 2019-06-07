@@ -78,7 +78,7 @@ object Importer extends ScorexLogging {
                   } else {
                     val Right(block) =
                       if (format == Formats.Binary) Block.parseBytes(buffer).toEither
-                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
+                      else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
