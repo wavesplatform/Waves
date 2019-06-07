@@ -316,7 +316,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val threshold = height - dbSettings.maxRollbackDepth
 
-    def deleteOldKeys(prefix: Short, bytes: Array[Byte] = Array.emptyByteArray)(key: Int => Key[_]): Unit = {
+    def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Int => Key[_]): Unit = {
       rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
         .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
         .closeAfter { iterator =>
