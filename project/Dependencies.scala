@@ -77,7 +77,6 @@ object Dependencies {
 
   val common = Def.setting(
     Seq(
-      "com.typesafe.play"        %% "play-json"     % "2.7.1",
       scalaTest
     )
   )
@@ -138,7 +137,7 @@ object Dependencies {
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-//      "com.typesafe.play"        %% "play-json"     % "2.7.1",
+      "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
       // "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0",
