@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import java.io._
 
+import akka.actor.ActorSystem
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -9,6 +10,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
+import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
@@ -16,20 +18,24 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Portfolio}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
-import monix.reactive.Observer
+import monix.execution.Scheduler
+import monix.reactive.subjects.{ConcurrentSubject, Subject}
+import monix.reactive.{Observable, Observer}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 import scopt.OParser
 
 object Importer extends ScorexLogging {
-  private implicit class TryWithTap[T](t: Try[T]) {
+  import monix.execution.Scheduler.Implicits.global
+
+  private implicit class TryExt[T](t: Try[T]) {
     def tapLeft(cb: Throwable => Unit): Try[T] = {
       t match {
         case Failure(throwable) => cb(throwable)
@@ -113,18 +119,53 @@ object Importer extends ScorexLogging {
                      utxPool: UtxPool,
                      settings: WavesSettings,
                      importOptions: ImportOptions,
-                     blockchainUpdated: Option[Observer[BlockchainUpdated]]): (Blockchain, AppendBlock) = {
-    implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.LogExceptionsToStandardErr
-
+                     blockchainUpdated: Observer[BlockchainUpdated]): (Blockchain with BlockchainUpdater, AppendBlock) = {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
-      StorageFactory(settings, db, time, Observer.empty, Observer.empty)
+      StorageFactory(settings, db, time, Observer.empty, blockchainUpdated)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, settings, scheduler, importOptions.verify) _
 
     checkGenesis(settings, blockchainUpdater)
 
     (blockchainUpdater, extAppender)
+  }
+
+  def initBlockchainUpdated(wavesSettings: WavesSettings): Subject[BlockchainUpdated, BlockchainUpdated] = {
+    import com.wavesplatform.utils.Implicits.SubjectOps
+    if (wavesSettings.enableBlockchainUpdates) ConcurrentSubject.publish
+    else Subject.empty
+  }
+
+  def initExtensions(wavesSettings: WavesSettings,
+                     blockchainUpdater: Blockchain with BlockchainUpdater,
+                     time: Time,
+                     utxPool: UtxPool,
+                     blockchainUpdatedObservable: Observable[BlockchainUpdated]): Seq[Extension] = {
+    val extensionContext = {
+      val t = time
+      new Context {
+        override def settings: WavesSettings                               = wavesSettings
+        override def blockchain: Blockchain with BlockchainUpdater         = blockchainUpdater
+        override def time: Time                                            = t
+        override def wallet: Wallet                                        = ???
+        override def utx: UtxPool                                          = utxPool
+        override def broadcastTx(tx: Transaction): Unit                    = ???
+        override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
+        override def actorSystem: ActorSystem                              = ???
+        override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
+      }
+    }
+
+    val extensions = wavesSettings.extensions.map { extensionClassName =>
+      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+      val ctor           = extensionClass.getConstructor(classOf[Context])
+      log.info(s"Enable extension: $extensionClassName")
+      ctor.newInstance(extensionContext)
+    }
+    extensions.foreach(_.start())
+
+    extensions
   }
 
   def startImport(scheduler: Scheduler,
@@ -194,14 +235,19 @@ object Importer extends ScorexLogging {
       scheduler                        = Scheduler.singleThread("appender")
       time                             = initTime(wavesSettings.ntpServer)
       utxPool                          = initUtxPool()
-      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, None)
+      blockchainUpdated                = initBlockchainUpdated(wavesSettings)
+      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, blockchainUpdated)
+      extensions                       = initExtensions(wavesSettings, blockchainUpdater, time, utxPool, blockchainUpdated)
       _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield
       () => {
+        Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
         bis.close()
         fis.close()
         time.close()
         utxPool.close()
+        blockchainUpdated.onComplete()
+        blockchainUpdater.shutdown()
       }
 
   def main(args: Array[String]): Unit = {
