@@ -310,13 +310,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
     for ((addressId, assets) <- assetBalances) {
-      val prevAssets   = rw.get(Keys.assetList(addressId))
-      val prevAssetSet = prevAssets.toSet
-      val newAssets    = assets.keys.filter(!prevAssetSet(_))
-      for (asset <- newAssets) {
-        newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
-      }
-      rw.put(Keys.assetList(addressId), (newAssets.toList ++ prevAssets).distinct)
+      val prevAssetSet = rw.get(Keys.assetList(addressId)).toSet
+      val newAssets = assets.keySet.diff(prevAssetSet)
+
+      for (asset <- newAssets) newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
+      rw.put(Keys.assetList(addressId), (newAssets ++ prevAssetSet).toList)
+
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
         expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
