@@ -18,7 +18,7 @@ object StorageFactory extends ScorexLogging {
             spendableBalanceChanged: Observer[(Address, Asset)],
             blockchainUpdated: Observer[BlockchainUpdated]): BlockchainUpdater with NG = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings)
     new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdated)
   }
 

@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
@@ -124,7 +125,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combineAll(Seq(PureContext.build(V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
@@ -324,7 +325,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext,
+      PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x"                -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -338,7 +339,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1).evaluationContext,
+      PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -411,31 +412,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
   }
 
-  property("ensure user function: success") {
-    val src =
-      """
-        |let x = true
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
-  }
-
-  property("ensure user function: fail") {
-    val src =
-      """
-        |let x = false
-        |ensure(x, "test fail")
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe Left("test fail")
-  }
-
   property("postfix syntax (one argument)") {
     val src =
       """
-        |let x = true
-        |x.ensure("test fail")
+        | let list = [1, 2, 3]
+        | list.getElement(1)
       """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(TRUE)
+
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(2))
   }
 
   property("postfix syntax (no arguments)") {
@@ -483,6 +467,20 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 
+  property("toInt Long.MinValue") {
+    val num = Base58.encode(BigInt(Long.MinValue).toByteArray)
+    val src =
+      s""" base58'$num'.toInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(Long.MinValue))
+  }
+
+  property("toInt Long.MaxValue") {
+    val num = Base58.encode(BigInt(Long.MaxValue).toByteArray)
+    val src =
+      s""" base58'$num'.toInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(Long.MaxValue))
+  }
+
   property("extract Long by offset (out of bounds)") {
     val src =
       """ base58'2EtvziXsJaBRS'.toInt(10) """
@@ -523,6 +521,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
     eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("q:we"), CONST_STRING("q;we:x;q.we"))))
+  }
+
+  property("split separate correctly") {
+    val src =
+      """ "str1;str2;str3;str4".split(";") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING("str3"), CONST_STRING("str4"))))
+  }
+
+  property("split separator at the end") {
+    val src =
+      """ "str1;str2;".split(";") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING(""))))
+  }
+
+  property("split double separator") {
+    val src =
+      """ "str1;;str2;str3".split(";") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING(""), CONST_STRING("str2"), CONST_STRING("str3"))))
   }
 
   property("parseInt") {
@@ -626,5 +642,63 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("math functions") {
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
+    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
+    eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
+    eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
+    eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
+    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe 'left
+    eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
+    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
+    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
+  }
+
+  property("concat empty list") {
+    val script =
+      s"""
+         | let l = if (true) then cons(1, nil) else nil
+         | let concat = 0 :: l
+         | concat == [0, 1]
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("matching parameterized types") {
+    val script =
+      s"""
+         | func dosSigVerify() = {
+         |    let result = if true then [DataEntry("a", "a")] else ""
+         |    let entry = match result[0] {
+         |        case r:DataEntry => r
+         |        case _ => throw("err")
+         |    }
+         |    WriteSet(result)
+         | }
+         |
+      """.stripMargin
+
+    eval[EVALUATED](script, None) should produce("expected: List[T], actual: List[DataEntry]|String")
+  }
+
+  property("extract functions with message") {
+    val message = "Custom error message"
+    def script(func: String, error: Boolean): String =
+      s"""
+         |
+         | let a = if ($error) then unit else 1
+         | $func(a, "$message")
+         |
+       """.stripMargin
+
+    eval(script("extractWithErrorMessage", error = false)) shouldBe Right(CONST_LONG(1))
+    eval(script("extractWithErrorMessage", error = true))  shouldBe Left(message)
+
+    eval(script("valueWithErrorMessage", error = false))   shouldBe Right(CONST_LONG(1))
+    eval(script("valueWithErrorMessage", error = true))    shouldBe Left(message)
   }
 }

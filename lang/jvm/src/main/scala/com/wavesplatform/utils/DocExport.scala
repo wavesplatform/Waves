@@ -26,6 +26,7 @@ object DocExport {
           override def chainId: Byte                                                                                   = 66
           override def inputEntity: Environment.InputEntity                                                            = ???
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+          override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
           override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
           override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
@@ -70,7 +71,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
+      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(Global, version), cryptoContext, wavesContext))
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 

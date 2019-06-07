@@ -17,7 +17,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -41,12 +41,13 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)(
+  implicit ec: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain, fs)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   private[this] val commonAssetsApi = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {
@@ -56,7 +57,7 @@ case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, 
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
+      balance ~ balances ~ nft ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -177,6 +178,41 @@ case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, 
       }
     }
 
+  @Path("/nft/{address}/limit/{limit}")
+  @ApiOperation(value = "NFTs", notes = "Account's NFTs balance", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
+    ))
+  def nft: Route = (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
+    val response: Either[ApiError, Future[JsArray]] = for {
+      addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
+      limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
+      maybeAfter <- maybeAfterParam match {
+        case Some(v) =>
+          ByteStr
+            .decodeBase58(v)
+            .fold(
+              _ => Left(CustomValidationError(s"Unable to decode asset id $v")),
+              id => Right(Some(IssuedAsset(id)))
+            )
+        case None => Right(None)
+      }
+    } yield {
+      commonAccountApi
+        .portfolioNFT(addr, maybeAfter)
+        .take(limit)
+        .map(_.json())
+        .toListL
+        .map(lst => JsArray(lst))
+        .runAsync
+    }
+
+    complete(response)
+  }
+
   def transfer: Route =
     processRequest[TransferRequests](
       "transfer", { req =>
@@ -262,7 +298,7 @@ case class AssetsApiRoute(settings: RestAPISettings, fs: FunctionalitySettings, 
     } yield {
       JsObject(
         Seq(
-          "assetId"        -> JsString(id.base58),
+          "assetId" -> JsString(id.toString),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
           "issuer"         -> JsString(tx.sender.address),

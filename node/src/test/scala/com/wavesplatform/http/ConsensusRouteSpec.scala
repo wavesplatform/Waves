@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.BlockDoesNotExist
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.JsObject
@@ -24,20 +23,20 @@ class ConsensusRouteSpec
     1 to 10 foreach { _ =>
       d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchainUpdater))
     }
-    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater, FunctionalitySettings.TESTNET).route)
+    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater).route)
   }
 
   routePath("/generationsignature") - {
     "for last block" in routeTest { (h, route) =>
       Get(routePath("/generationsignature")) ~> route ~> check {
-        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual h.lastBlock.get.consensusData.generationSignature.base58
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual h.lastBlock.get.consensusData.generationSignature.toString
       }
     }
 
     "for existing block" in routeTest { (h, route) =>
       val block = h.blockAt(3).get
-      Get(routePath(s"/generationsignature/${block.uniqueId.base58}")) ~> route ~> check {
-        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual block.consensusData.generationSignature.base58
+      Get(routePath(s"/generationsignature/${block.uniqueId.toString}")) ~> route ~> check {
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual block.consensusData.generationSignature.toString
       }
     }
 
@@ -49,7 +48,7 @@ class ConsensusRouteSpec
   routePath("/basetarget") - {
     "for existing block" in routeTest { (h, route) =>
       val block = h.blockAt(3).get
-      Get(routePath(s"/basetarget/${block.uniqueId.base58}")) ~> route ~> check {
+      Get(routePath(s"/basetarget/${block.uniqueId.toString}")) ~> route ~> check {
         (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.consensusData.baseTarget
       }
     }

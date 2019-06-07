@@ -25,10 +25,12 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   final lazy val assetId                     = id
   override final val assetFee: (Asset, Long) = (Waves, fee)
 
+  val isNFT: Boolean = quantity == 1 && decimals == 0 && !reissuable
+
   val issueJson: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"     -> version,
-      "assetId"     -> assetId().base58,
+      "assetId" -> assetId().toString,
       "name"        -> new String(name, StandardCharsets.UTF_8),
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,

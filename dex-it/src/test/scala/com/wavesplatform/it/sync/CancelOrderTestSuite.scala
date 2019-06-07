@@ -69,7 +69,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves + i, 400, matcherFee).message.id
         }
 
-        node.assetBalance(bob.toAddress.stringRepr, BtcId.base58)
+        node.assetBalance(bob.toAddress.stringRepr, BtcId.toString)
 
         val btcOrderIds = 1 to 5 map { i =>
           node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 100.waves + i, 400, matcherFee).message.id

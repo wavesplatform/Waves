@@ -75,7 +75,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${ByteStr(
-           pkByAddress(secondAddress).publicKey).base58}')
+        pkByAddress(secondAddress).publicKey).toString
+      }')
                                         |  case _ => false
                                         |}
          """.stripMargin,
@@ -94,8 +95,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                 |match tx {
                                 |  case s : SetAssetScriptTransaction => true
                                 |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${ByteStr(
-           pkByAddress(secondAddress).publicKey).base58}') && t.recipient != addressFromPublicKey(base58'${ByteStr(
-           pkByAddress(firstAddress).publicKey).base58}')
+        pkByAddress(secondAddress).publicKey).toString
+      }') && t.recipient != addressFromPublicKey(base58'${
+        ByteStr(
+          pkByAddress(firstAddress).publicKey).toString
+      }')
                                 |  case _ => false
                                 |}
          """.stripMargin,
@@ -197,7 +201,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       .right
       .get
 
-    val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.base58}", 42)), minFee).id
+    val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.toString}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)
 
     sender.signedBroadcast(blackTx.json(), waitForTx = true)
@@ -214,11 +218,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val scr = ScriptCompiler(
       s"""
-                                |match tx {
-                                |  case s : SetAssetScriptTransaction => true
-                                |  case b:  BurnTransaction => b.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
-                                |  case _ => false
-                                |}
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case b:  BurnTransaction => b.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true
     ).explicitGet()._1.bytes.value.base64
@@ -233,7 +237,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${ByteStr(
-           pkByAddress(secondAddress).publicKey).base58}')
+        pkByAddress(secondAddress).publicKey).toString
+      }')
                                         |  case _ => false
                                         |}
          """.stripMargin,
@@ -352,11 +357,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val scr = ScriptCompiler(
       s"""
-                             |match tx {
-                             |  case s : SetAssetScriptTransaction => true
-                             |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
-                             |  case _ => false
-                             |}
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true
     ).explicitGet()._1.bytes.value.base64
@@ -384,11 +389,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val scr = ScriptCompiler(
       s"""
-        |match tx {
-        |  case s : SetAssetScriptTransaction => true
-        |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
-        |  case _ => false
-        |}""".stripMargin,
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+         |  case _ => false
+         |}""".stripMargin,
       isAssetScript = true
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(assetNonReissue, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)

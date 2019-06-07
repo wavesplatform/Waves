@@ -69,7 +69,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   @ApiModelProperty(hidden = true)
   val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
   @ApiModelProperty(hidden = true)
-  val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
+  val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]]
 

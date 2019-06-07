@@ -22,7 +22,7 @@ import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
   val version = V1
-  val pureEvalContext = PureContext.build(version).evaluationContext
+  val pureEvalContext = PureContext.build(Global, V1).evaluationContext
 }
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)

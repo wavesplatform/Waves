@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -17,6 +17,7 @@ import java.nio.charset.MalformedInputException
 import java.nio.{BufferUnderflowException, ByteBuffer}
 
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
@@ -109,6 +110,25 @@ object PureContext {
         REF("@a")
       )
     }
+
+  private def extractWithMessageF(name: String): BaseFunction =
+    UserFunction(
+      name,
+      13,
+      TYPEPARAM('T'),
+      "Extract value from option or fail with message",
+      ("@a",   PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value"),
+      ("@msg", STRING, "Error message")
+    ) {
+      IF(
+        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(throwWithMessage, List(REF("@msg"))),
+        REF("@a")
+      )
+    }
+
+  lazy val extractWithMessage: BaseFunction = extractWithMessageF("extractWithErrorMessage")
+  lazy val valueWithMessage: BaseFunction   = extractWithMessageF("valueWithErrorMessage")
 
   lazy val isDefined: BaseFunction =
     UserFunction(
@@ -400,9 +420,18 @@ object PureContext {
     }
 
   lazy val parseIntVal: BaseFunction =
-    NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
-      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).toEither.left.map(_.toString)
-      case xs                      => notImplemented("parseInt(STRING)", xs)
+    UserFunction(
+      "parseIntValue",
+      20,
+      LONG,
+      "parse string to integer with fail on errors",
+      ("str", STRING, "String for parsing")
+    ) {
+      val parseO = FUNCTION_CALL(Native(PARSEINT), List(REF("str")))
+      FUNCTION_CALL(
+        User("extractWithErrorMessage"),
+        List(parseO, CONST_STRING("Error while parsing string to integer"))
+      )
     }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
@@ -460,11 +489,6 @@ object PureContext {
       IF(REF("@p"), FALSE, TRUE)
     }
 
-  lazy val ensure: BaseFunction =
-    UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
-      IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
-    }
-
   private lazy val operators: Array[BaseFunction] = Array(
     mulLong,
     divLong,
@@ -481,10 +505,6 @@ object PureContext {
     getListSize,
     uMinus,
     uNot
-  )
-
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
   )
   private lazy val functions = Array(
     fraction,
@@ -510,20 +530,111 @@ object PureContext {
     throwNoMessage,
   ) ++ operators
 
+  val roundCeiling = CASETYPEREF("Ceiling", List.empty)
+  val roundFloor = CASETYPEREF("Floor", List.empty)
+  val roundHalfEven = CASETYPEREF("HalfEven", List.empty)
+  val roundDown = CASETYPEREF("Down", List.empty)
+  val roundUp = CASETYPEREF("Up", List.empty)
+  val roundHalfUp = CASETYPEREF("HalfUp", List.empty)
+  val roundHalfDown = CASETYPEREF("HalfDown", List.empty)
+  val rounds = UNION(roundDown, roundUp, roundHalfUp, roundHalfDown, roundCeiling, roundFloor, roundHalfEven)
+
+  def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
+    m match {
+      case (p: CaseObj) => p.caseType.name match {
+        case "Down" => BaseGlobal.RoundDown()
+        case "Up" => BaseGlobal.RoundUp()
+        case "HalfUp" => BaseGlobal.RoundHalfUp()
+        case "HalfDown" => BaseGlobal.RoundHalfDown()
+        case "HalfEven" => BaseGlobal.RoundHalfEven()
+        case "Ceiling" => BaseGlobal.RoundCeiling()
+        case "Floor" => BaseGlobal.RoundFloor()
+        case v => throw new Exception(s"Type error: $v isn't in $rounds")
+      }
+        case v => throw new Exception(s"Type error: $v isn't rounds CaseObj") 
+    }
+  }
+
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
+    ("UP", ((roundUp, "'UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
+    ("HALFUP", ((roundHalfUp, "'HALF_UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
+    ("HALFDOWN", ((roundHalfUp, "'HALF_DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfDown, Map.empty))))),
+    ("DOWN", ((roundDown, "'DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundDown, Map.empty))))),
+    ("HALFEVEN", ((roundHalfUp, "'HALF_EVEN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfEven, Map.empty))))),
+    ("CEILING", ((roundHalfUp, "'CEILING' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundCeiling, Map.empty))))),
+    ("FLOOR", ((roundHalfUp, "'FLOOR' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundFloor, Map.empty)))))
+  )
+
   private lazy val ctx = CTX(
     Seq(
       UNIT,
       LONG,
       BOOLEAN,
       BYTESTR,
-      STRING
+      STRING,
+      roundDown,
+      roundUp,
+      roundHalfUp,
+      roundHalfDown,
+      roundHalfEven,
+      roundCeiling,
+      roundFloor,
+      rounds
     ),
     vars,
     functions
   )
 
-  def build(version: StdLibVersion): CTX =
-    version match {
+  def build(math: BaseGlobal, version: StdLibVersion): CTX = {
+    val pow: BaseFunction =
+      NativeFunction("pow", 100, POW, LONG, "Math pow",
+          ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
+          ("exponent", LONG, "exponents value"), ("ep", LONG, "exponents decimal"),
+          ("rp", LONG, "results decimal"),
+          ("round", rounds, "round method")
+       ) {
+        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+          if(
+               bp < 0
+            || bp > 8
+            || ep < 0
+            || ep > 8
+            || rp < 0
+            || rp > 8
+          ) {
+            Left("pow: scale out of range 0-8")
+          } else {
+            math.pow(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+          }
+        case xs                      => notImplemented("pow(Int, Int, Int, Int, Int, Rounds)", xs)
+      }
+
+    val log: BaseFunction =
+      NativeFunction("log", 100, LOG, LONG, "Math log",
+          ("value", LONG, "value"), ("ep", LONG, "value decimal"),
+          ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
+          ("rp", LONG, "results decimal"),
+          ("round", rounds, "round method")
+       ) {
+        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+          if(
+               bp < 0
+            || bp > 8
+            || ep < 0
+            || ep > 8
+            || rp < 0
+            || rp > 8
+          ) {
+            Left("log: scale out of range 0-8")
+          } else {
+            math.log(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+          }
+        case xs                      => notImplemented("log(Int, Int, Int, Int, Int, Rounds)", xs)
+      }
+
+
+   version match {
       case V1 | V2 => ctx
       case V3 =>
         Monoid.combine(
@@ -531,9 +642,18 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
+            Array(
+              value, valueWithMessage, extractWithMessage,
+              listConstructor,
+              toUtf8String,
+              toLong, toLongOffset,
+              indexOf, indexOfN,
+              splitStr,
+              parseInt, parseIntVal,
+              pow, log
+            )
           )
         )
     }
-
+  }
 }

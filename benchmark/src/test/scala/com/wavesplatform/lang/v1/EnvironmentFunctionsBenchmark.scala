@@ -79,6 +79,7 @@ object EnvironmentFunctionsBenchmark {
     override def chainId: Byte                                                                                   = ChainId
     override def inputEntity: Environment.InputEntity                                                            = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???

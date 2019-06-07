@@ -12,12 +12,13 @@ object Types {
   val assetType = CASETYPEREF(
     "Asset",
     List(
-      "totalAmount" -> LONG,
-      "decimals"    -> LONG,
-      "issuer"      -> BYTESTR,
-      "reissuable"  -> BOOLEAN,
-      "scripted"    -> BOOLEAN,
-      "sponsored"   -> BOOLEAN
+      "totalAmount"     -> LONG,
+      "decimals"        -> LONG,
+      "issuer"          -> addressType,
+      "issuerPublicKey" -> BYTESTR,
+      "reissuable"      -> BOOLEAN,
+      "scripted"        -> BOOLEAN,
+      "sponsored"       -> BOOLEAN
     )
   )
 
@@ -26,7 +27,10 @@ object Types {
     List(
       "timestamp"           -> LONG,
       "height"              -> LONG,
-      "generationSignature" -> BYTESTR
+      "baseTarget"          -> LONG,
+      "generationSignature" -> BYTESTR,
+      "generator"           -> addressType,
+      "generatorPublicKey"  -> BYTESTR
     )
   )
 

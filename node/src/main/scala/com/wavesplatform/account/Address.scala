@@ -13,7 +13,7 @@ import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
-  lazy val address: String    = bytes.base58
+  lazy val address: String = bytes.toString
   lazy val stringRepr: String = address
 }
 
@@ -62,20 +62,27 @@ object Address extends ScorexLogging {
   def fromBytes(addressBytes: ByteStr, chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
     bytesCache.get(
       addressBytes, { () =>
-        val Array(version, network, _*) = addressBytes.arr
+        Either
+          .cond(
+            addressBytes.length == Address.AddressLength,
+            (),
+            InvalidAddress(s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
+          )
+          .right
+          .flatMap {
+            res =>
+              val Array(version, network, _*) = addressBytes.arr
 
-        (for {
-          _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-          _ <- Either.cond(network == chainId,
-                           (),
-                           s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
-          _ <- Either.cond(addressBytes.length == Address.AddressLength,
-                           (),
-                           s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
-          checkSum          = addressBytes.takeRight(ChecksumLength)
-          checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-          _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
-        } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
+              (for {
+                _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+                _ <- Either.cond(network == chainId,
+                                 (),
+                                 s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
+                checkSum          = addressBytes.takeRight(ChecksumLength)
+                checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+                _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+              } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
+          }
       }
     )
   }

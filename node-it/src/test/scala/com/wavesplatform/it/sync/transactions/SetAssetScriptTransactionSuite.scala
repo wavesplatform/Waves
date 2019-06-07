@@ -96,7 +96,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             s"""
                                         |match tx {
                                         |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(
-                 pkByAddress(secondAddress).publicKey).base58}')
+              pkByAddress(secondAddress).publicKey).toString
+            }')
                                         |case _ => false}""".stripMargin,
             isAssetScript = true
           ).explicitGet()._1.bytes.value.base64)
@@ -186,7 +187,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     for ((tx, diag) <- invalidTxs) {
       assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
-      nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
+      nodes.foreach(_.ensureTxDoesntExist(tx.id().toString))
     }
 
     nodes.waitForHeightArise()
@@ -215,7 +216,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
     val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt.toByte))))
-    assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "proof doesn't validate as signature")
+    assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "Proof doesn't validate as signature")
     nodes.foreach(_.ensureTxDoesntExist(id(badProof)))
 
     val withProof = request

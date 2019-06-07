@@ -87,9 +87,9 @@ package object database {
     Seq.fill(d.length / 4)(in.getInt)
   }
 
-  def readTxIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
+  def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
-    val ids = Seq.newBuilder[ByteStr]
+    val ids = List.newBuilder[ByteStr]
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {

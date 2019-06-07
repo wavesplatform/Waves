@@ -22,10 +22,10 @@ import com.wavesplatform.transaction.smart.RealTransactionWrapper
 object MatcherContext {
 
   def build(version: StdLibVersion, nByte: Byte, in: Eval[Order], proofsEnabled: Boolean): EvaluationContext = {
-    val baseContext = Monoid.combine(PureContext.build(version), CryptoContext.build(Global, version)).evaluationContext
+    val baseContext = Monoid.combine(PureContext.build(Global, version), CryptoContext.build(Global, version)).evaluationContext
 
     val inputEntityCoeval: Eval[Either[String, CaseObj]] =
-      Eval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled))))
+      Eval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled, version))))
 
     val sellOrdTypeCoeval: Eval[Either[String, CaseObj]] = Eval.now(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.now(Right(ordType(OrdType.Buy)))

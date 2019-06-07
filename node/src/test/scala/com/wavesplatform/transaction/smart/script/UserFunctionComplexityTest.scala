@@ -29,7 +29,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1),
+          PureContext.build(Global, V1),
           CryptoContext.build(Global, V1),
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet(),
@@ -94,7 +94,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V2),
+          PureContext.build(Global, V2),
           CryptoContext.build(Global, V2),
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
@@ -159,7 +159,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3),
+          PureContext.build(Global, V3),
           CryptoContext.build(Global, V3),
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet(),
@@ -208,9 +208,6 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
 
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 2
-
-    val exprEnsure = FUNCTION_CALL(PureContext.ensure, List(TRUE))
-    est(exprEnsure).explicitGet() shouldBe 17
 
     val exprDataByIndex = LET_BLOCK(
       LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1"), REF("nil")))),

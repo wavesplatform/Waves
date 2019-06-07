@@ -5,8 +5,8 @@ import cats.implicits._
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -127,7 +127,7 @@ class MinerImpl(allChannels: ChannelGroup,
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.timestamp
-    lazy val balance        = GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, account.toAddress, refBlockID)
+    lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
@@ -140,7 +140,7 @@ class MinerImpl(allChannels: ChannelGroup,
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
       estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(utx.packUnconfirmed(mdConstraint))
+      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime))
       _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
@@ -177,7 +177,7 @@ class MinerImpl(allChannels: ChannelGroup,
     } else {
       val (unconfirmed, updatedTotalConstraint) = metrics.measureLog("packing unconfirmed transactions for microblock") {
         val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-        val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
+        val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime)
         (unconfirmed, updatedMdConstraint.constraints.head)
       }
 
@@ -253,9 +253,9 @@ class MinerImpl(allChannels: ChannelGroup,
   }
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
-    val balance = GeneratingBalanceProvider.balance(blockchainUpdater, fs, account.toAddress, block.uniqueId)
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
 
-    if (GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, height, balance)) {
+    if (blockchainUpdater.isMiningAllowed(height, balance)) {
       for {
         expectedTS <- pos
           .getValidBlockDelay(height, account, block.consensusData.baseTarget, balance)

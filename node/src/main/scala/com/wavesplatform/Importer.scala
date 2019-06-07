@@ -103,15 +103,16 @@ object Importer extends ScorexLogging {
   def initTime(ntpServer: String): NTP = new NTP(ntpServer)
 
   def initUtxPool(): UtxPool = new UtxPool {
-    override def putIfNew(tx: Transaction, b: Boolean)                   = ???
-    override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-    override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
-    override def pessimisticPortfolio(addr: Address): Portfolio          = ???
-    override def all                                                     = ???
-    override def size                                                    = ???
-    override def transactionById(transactionId: ByteStr)                 = ???
-    override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
-    override def close(): Unit                                           = {}
+    override def putIfNew(tx: Transaction, b: Boolean)                 = ???
+    override def removeAll(txs: Traversable[Transaction]): Unit        = {}
+    override def spendableBalance(addr: Address, assetId: Asset): Long = ???
+    override def pessimisticPortfolio(addr: Address): Portfolio        = ???
+    override def all                                                   = ???
+    override def size                                                  = ???
+    override def transactionById(transactionId: ByteStr)               = ???
+    override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
+                                 maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
+    override def close(): Unit                                                                                = {}
   }
 
   def initBlockchain(scheduler: Scheduler,

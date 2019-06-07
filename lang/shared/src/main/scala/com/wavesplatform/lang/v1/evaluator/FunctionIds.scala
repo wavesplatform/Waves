@@ -15,6 +15,9 @@ object FunctionIds {
   val MOD_LONG: Short = 106
   val FRACTION: Short = 107
 
+  val POW: Short      = 108
+  val LOG: Short      = 109
+
   val SIZE_BYTES: Short = 200
   val TAKE_BYTES: Short = 201
   val DROP_BYTES: Short = 202
@@ -42,7 +45,6 @@ object FunctionIds {
   val INDEXOFN: Short   = 1204
   val SPLIT: Short      = 1205
   val PARSEINT: Short   = 1206
-  val PARSEINTV: Short  = 1207
 
   // Crypto
   val SIGVERIFY: Short = 500
@@ -58,12 +60,15 @@ object FunctionIds {
   val TOBASE16: Short   = 604
   val FROMBASE16: Short = 605
 
+  val CHECK_MERKLE_PROOF: Short = 700
+
   // Waves
-  val GETTRANSACTIONBYID: Short    = 1000
-  val TRANSACTIONHEIGHTBYID: Short = 1001
-  val ACCOUNTASSETBALANCE: Short   = 1003
-  val GETASSETINFOBYID: Short      = 1004
-  val BLOCKINFOBYHEIGHT: Short     = 1005
+  val GETTRANSACTIONBYID: Short      = 1000
+  val TRANSACTIONHEIGHTBYID: Short   = 1001
+  val ACCOUNTASSETBALANCE: Short     = 1003
+  val GETASSETINFOBYID: Short        = 1004
+  val BLOCKINFOBYHEIGHT: Short       = 1005
+  val TRANSFERTRANSACTIONBYID: Short = 1006
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041

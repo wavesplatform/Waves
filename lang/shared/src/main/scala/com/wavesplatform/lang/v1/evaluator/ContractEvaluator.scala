@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.DApp
@@ -10,32 +11,26 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Pmt, ScriptTransfer}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
-import cats.implicits._
 
 object ContractEvaluator {
 
-  val DEFAULT_FUNC_NAME = "defaultFunction"
+  val DEFAULT_FUNC_NAME = "default"
 
-  case class Invocation(funcCallOpt: Option[FUNCTION_CALL],
+  case class Invocation(funcCall: FUNCTION_CALL,
                         caller: Recipient.Address,
                         callerPk: ByteStr,
                         payment: Option[(Long, Option[ByteStr])],
                         dappAddress: ByteStr,
                         transactionId: ByteStr,
                         fee: Long,
-                        feeAssetId: Option[ByteStr]
-                       )
+                        feeAssetId: Option[ByteStr])
 
-  def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
-     val functionName = i.funcCallOpt.map(_.function.asInstanceOf[FunctionHeader.User].name).getOrElse(DEFAULT_FUNC_NAME)
+  private def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
+    val functionName = i.funcCall.function.funcName
 
-    val contractFuncAndCall =
-      if (i.funcCallOpt.nonEmpty)
-        c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCallOpt.get))
-      else
-        c.defaultFuncOpt.map(defFunc => (defFunc, FUNCTION_CALL(FunctionHeader.User(defFunc.u.name), List.empty)))
+    val contractFuncAndCallOpt = c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCall))
 
-    contractFuncAndCall match {
+    contractFuncAndCallOpt match {
       case None =>
         val otherFuncs = c.decs.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
         val message =
@@ -43,24 +38,34 @@ object ContractEvaluator {
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
+
       case Some((f, fc)) =>
-        withDecls(
-          c.decs,
-          BLOCK(
-            LET(
-              f.annotation.invocationArgName,
-              Bindings.buildInvocation(
+        val takingArgsNumber = f.u.args.size
+        val passedArgsNumber = fc.args.size
+        if (takingArgsNumber == passedArgsNumber) {
+          withDecls(
+            c.decs,
+            BLOCK(
+              LET(
+                f.annotation.invocationArgName,
+                Bindings.buildInvocation(
                   i.caller,
                   i.callerPk,
-                  i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress),
+                  i.payment.map { case (a, t) => Pmt(t, a) },
+                  Recipient.Address(i.dappAddress),
                   i.transactionId,
                   i.fee,
                   i.feeAssetId
                 )
-            ),
-            BLOCK(f.u, fc)
+              ),
+              BLOCK(f.u, fc)
+            )
           )
-        )
+        } else {
+          raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](
+            s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
+          )
+        }
     }
   }
 

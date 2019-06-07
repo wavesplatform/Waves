@@ -23,14 +23,15 @@ object ExprScript {
   def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true, checkComplexity: Boolean = true): Either[String, Script] =
     for {
       scriptComplexity <- ScriptEstimator(varNames(version, Expression), functionCosts(version), x)
-      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxExprComplexity,
+      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxComplexityByVersion(version),
                        (),
-                       s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
+                       s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}")
       s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
   private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends ExprScript {
+    override val complexityMap: Map[String, Long] = Map.empty
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr))

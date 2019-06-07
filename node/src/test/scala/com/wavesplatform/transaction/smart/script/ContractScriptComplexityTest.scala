@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -27,19 +27,19 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
               REF("x")
             )
           )
-        )),
-      Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(""),
+        ),
+        CallableFunction(
+          CallableAnnotation(""),
           Terms.FUNC(
-            "second",
-            List("arg1", "arg2"),
+            "default",
+            List(),
             LET_BLOCK(
               LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
               REF("x")
             )
           )
-        )),
+        )
+      ),
       Some(
         VerifierFunction(
           VerifierAnnotation(""),
@@ -78,19 +78,19 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
               REF("x")
             )
           )
-        )),
-      Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(""),
+        ),
+        CallableFunction(
+          CallableAnnotation(""),
           Terms.FUNC(
-            "second",
-            List("arg1", "arg2"),
+            "default",
+            List(),
             LET_BLOCK(
               LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
               REF("x")
             )
           )
-        )),
+        )
+      ),
       Some(
         VerifierFunction(
           VerifierAnnotation(""),
@@ -129,19 +129,19 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
               REF("x")
             )
           )
-        )),
-      Some(
-        DefaultFunction(
-          DefaultFuncAnnotation(""),
+        ),
+        CallableFunction(
+          CallableAnnotation(""),
           Terms.FUNC(
-            "first",
-            List("arg1", "arg2"),
+            "default",
+            List(),
             LET_BLOCK(
               LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
               REF("x")
             )
           )
-        )),
+        )
+      ),
       Some(
         VerifierFunction(
           VerifierAnnotation(""),

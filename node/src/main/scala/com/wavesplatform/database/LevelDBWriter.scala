@@ -12,9 +12,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
+import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -71,9 +72,13 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, val dbSettings: DBSettings)
+class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
+
+  // Only for tests
+  def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
+    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
@@ -167,14 +172,28 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     Map.empty
   )
 
-  private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
+  private def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
     assets = (for {
       asset <- db.get(Keys.assetList(addressId))
     } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
   )
 
+  private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
+    assets = (for {
+      issuedAsset <- db.get(Keys.assetList(addressId))
+      asset <- transactionInfo(issuedAsset.id).collect {
+        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
+      }
+    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+  )
+
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _))
+    val excludeNFT = this.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
+
+    addressId(address).fold(Portfolio.empty) { addressId =>
+      if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)
+      else loadFullPortfolio(db, addressId)
+    }
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
@@ -198,7 +217,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override protected def loadActivatedFeatures(): Map[Short, Int] = {
     val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
-    stateFeatures ++ fs.preActivatedFeatures
+    stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
@@ -291,12 +310,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
     for ((addressId, assets) <- assetBalances) {
-      val prevAssets = rw.get(Keys.assetList(addressId))
-      val newAssets  = assets.keySet.diff(prevAssets)
+      val prevAssets   = rw.get(Keys.assetList(addressId))
+      val prevAssetSet = prevAssets.toSet
+      val newAssets    = assets.keys.filter(!prevAssetSet(_))
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
-      rw.put(Keys.assetList(addressId), prevAssets ++ assets.keySet)
+      rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
         expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
@@ -384,11 +404,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
-    val activationWindowSize = fs.activationWindowSize(height)
+    val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
     if (height % activationWindowSize == 0) {
-      val minVotes = fs.blocksForFeatureActivation(height)
+      val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
       val newlyApprovedFeatures = featureVotes(height)
-        .filterNot { case (featureId, _) => fs.preActivatedFeatures.contains(featureId) }
+        .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
         .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
 
       if (newlyApprovedFeatures.nonEmpty) {
@@ -397,7 +417,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
         val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
 
-        activatedFeaturesCache = featuresToSave ++ fs.preActivatedFeatures
+        activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
         rw.put(Keys.activatedFeatures, featuresToSave)
       }
     }
@@ -621,7 +641,36 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
 
-  override def addressTransactions(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
+  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
+    val assetIdStream: CloseableIterator[IssuedAsset] = db
+      .get(Keys.addressId(address))
+      .fold(CloseableIterator.empty[IssuedAsset]) { id =>
+        val addressId = AddressId @@ id
+
+        val iter = db.get(Keys.assetList(addressId)).iterator
+
+        CloseableIterator(iter, () => CloseableIterator.close(iter))
+      }
+
+    val issueTxStream = assetIdStream
+      .flatMap(ia => transactionInfo(ia.id, db).map(_._2))
+      .collect {
+        case itx: IssueTransaction if itx.isNFT => itx
+      }
+
+    from
+      .flatMap(ia => transactionInfo(ia.id, db))
+      .fold(issueTxStream) {
+        case (_, afterTx) =>
+          issueTxStream
+            .dropWhile(_.id() != afterTx.id())
+            .drop(1)
+      }
+  }
+
+  override def addressTransactions(address: Address,
+                                   types: Set[TransactionParser],
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
     db.get(Keys.addressId(address)).fold(CloseableIterator.empty[(Height, Transaction)]) { id =>
@@ -644,7 +693,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
               case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
               case None                   => Nil
-            })
+          })
 
         takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
           .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
@@ -752,8 +801,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
         val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        db
-          .get(Keys.transactionAt(height, txNum))
+        db.get(Keys.transactionAt(height, txNum))
           .collect { case lt: LeaseTransaction => lt }
       } else None
     }
@@ -895,7 +943,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
-    fs.activationWindow(height)
+    settings.functionalitySettings
+      .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
         db.get(Keys.blockHeaderAndSizeAt(height))

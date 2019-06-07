@@ -6,8 +6,7 @@ import java.nio.ByteBuffer
 import cats.implicits._
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.utils.Serialize._
-import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.Serde.desAux
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
 import monix.eval.Coeval
@@ -28,13 +27,8 @@ object ContractSerDe {
     out.writeInt(c.callableFuncs.size)
     c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
-    c.defaultFuncOpt match {
-      case None =>
-        out.writeInt(0)
-      case Some(df) =>
-        out.writeInt(1)
-        serializeAnnotatedFunction(out, df.u, df.annotation.invocationArgName)
-    }
+    //TODO remove - default func
+    out.writeInt(0)
 
     c.verifierFuncOpt match {
       case None =>
@@ -53,9 +47,9 @@ object ContractSerDe {
       _               <- tryEi(bb.getInt())
       decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
       callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
-      defaultFuncOpt  <- deserializeOption(bb, deserializeDefaultFunction)
+      defaultFuncOpt  <- Either.cond(bb.getInt == 0, (), "") //TODO remove - default func
       verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
-    } yield DApp(decs, callableFuncs, defaultFuncOpt, verifierFuncOpt)
+    } yield DApp(decs, callableFuncs, verifierFuncOpt)
   }
 
   private def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
@@ -89,16 +83,6 @@ object ContractSerDe {
         s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}"
       )
     } yield CallableFunction(ca, cf)
-  }
-
-  private[lang] def deserializeDefaultFuncAnnotation(bb: ByteBuffer): Either[String, DefaultFuncAnnotation] =
-    tryEi(DefaultFuncAnnotation(bb.getString))
-
-  private def deserializeDefaultFunction(bb: ByteBuffer): Either[String, DefaultFunction] = {
-    for {
-      a <- deserializeDefaultFuncAnnotation(bb)
-      f <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
-    } yield DefaultFunction(a, f)
   }
 
   private[lang] def deserializeVerifiableAnnotation(bb: ByteBuffer): Either[String, VerifierAnnotation] =

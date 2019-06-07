@@ -137,7 +137,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       override def all                                                     = ???
       override def size                                                    = ???
       override def transactionById(transactionId: ByteStr)                 = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
       override def close(): Unit                                           = {}
     }
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")

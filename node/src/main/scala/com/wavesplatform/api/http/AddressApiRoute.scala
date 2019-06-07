@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
+import java.util.regex.Pattern
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
@@ -9,9 +10,10 @@ import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -25,20 +27,15 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings,
-                           wallet: Wallet,
-                           blockchain: Blockchain,
-                           utx: UtxPool,
-                           allChannels: ChannelGroup,
-                           time: Time,
-                           functionalitySettings: FunctionalitySettings)(implicit ec: Scheduler)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(
+    implicit ec: Scheduler)
     extends ApiRoute
     with WithSettings
     with BroadcastRoute {
 
   import AddressApiRoute._
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain, functionalitySettings)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   val MaxAddressesPerRequest         = 1000
 
   override lazy val route =
@@ -271,9 +268,30 @@ case class AddressApiRoute(settings: RestAPISettings,
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
-  @ApiImplicitParams(Array(new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")))
-  def getData: Route = (path("data" / Segment) & get) { address =>
-    complete(accountData(address))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "matches",
+        value = "URL encoded (percent-encoded) regular expression to filter keys (https://www.tutorialspoint.com/scala/scala_regular_expressions.htm)",
+        required = false,
+        dataType = "string",
+        paramType = "query"
+      )
+    ))
+  def getData: Route = (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
+    maybeRegex match {
+      case None => complete(accountData(address))
+      case Some(regex) =>
+        complete(
+          Try(regex.r)
+            .fold(
+              _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+              r => accountData(address, r.pattern)
+            )
+        )
+
+    }
   }
 
   @Path("/data/{address}/{key}")
@@ -283,9 +301,9 @@ case class AddressApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")
     ))
-  def getDataItem: Route = (path("data" / Segment / Segment.?) & get) {
-    case (address, keyOpt) =>
-      complete(accountData(address, keyOpt.getOrElse("")))
+  def getDataItem: Route = (path("data" / Segment / Segment) & get) {
+    case (address, key) =>
+      complete(accountData(address, key))
   }
 
   @Path("/")
@@ -379,6 +397,21 @@ case class AddressApiRoute(settings: RestAPISettings,
       .fromString(address)
       .map { acc =>
         ToResponseMarshallable(commonAccountApi.dataStream(acc).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
+      }
+      .getOrElse(InvalidAddress)
+  }
+
+  private def accountData(address: String, regex: Pattern): ToResponseMarshallable = {
+    Address
+      .fromString(address)
+      .map { addr =>
+        val result: ToResponseMarshallable = commonAccountApi
+          .dataStream(addr, k => regex.matcher(k).matches())
+          .toListL
+          .runAsyncLogErr
+          .map(_.sortBy(_.key))
+
+        result
       }
       .getOrElse(InvalidAddress)
   }

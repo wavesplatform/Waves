@@ -39,7 +39,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
     val trace = List(
       InvokeScriptTrace(
         tx.dAppAddressOrAlias,
-        tx.funcCallOpt,
+        tx.funcCall,
         Right(
           ScriptResult(
             List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
@@ -104,7 +104,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
     val trace = List(
       InvokeScriptTrace(
         tx.dAppAddressOrAlias,
-        tx.funcCallOpt,
+        tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false))
       ))
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)

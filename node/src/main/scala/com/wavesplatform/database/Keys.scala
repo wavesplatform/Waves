@@ -24,8 +24,8 @@ object Keys {
   def wavesBalance(addressId: BigInt)(height: Int): Key[Long] =
     Key("waves-balance", hAddr(6, height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetList(addressId: BigInt): Key[Set[IssuedAsset]] =
-    Key("asset-list", addr(7, addressId), readTxIds(_).toSet.map(IssuedAsset), assets => writeTxIds(assets.toSeq.map(_.id)))
+  def assetList(addressId: BigInt): Key[List[IssuedAsset]] =
+    Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
   def assetBalanceHistory(addressId: BigInt, asset: IssuedAsset): Key[Seq[Int]] =
     historyKey("asset-balance-history", 8, addressId.toByteArray ++ asset.id.arr)
   def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =

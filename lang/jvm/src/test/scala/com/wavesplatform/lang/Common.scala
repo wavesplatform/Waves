@@ -24,7 +24,7 @@ object Common {
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
   val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 
-  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
+  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
                          expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
 
@@ -70,6 +70,7 @@ object Common {
     override def inputEntity   = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???

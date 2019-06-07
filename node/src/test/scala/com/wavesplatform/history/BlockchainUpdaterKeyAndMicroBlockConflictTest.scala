@@ -59,9 +59,9 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
 
   property("data keys should not be duplicated") {
     forAll(Preconditions.duplicateDataKeys()) {
-      case (genesisBlock, block1, microBlocks, address) =>
+      case (genesisBlock, Seq(block1, block2), microBlocks, address) =>
         withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, block1).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
+          Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
           d.blockchainUpdater.accountDataKeys(address) shouldBe Seq("test")
 
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
@@ -202,7 +202,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
       }
     }
 
-    def duplicateDataKeys(): Gen[(Block, Block, Seq[MicroBlock], Address)] = {
+    def duplicateDataKeys(): Gen[(Block, Seq[Block], Seq[MicroBlock], Address)] = {
       for {
         richAccount   <- accountGen
         tsAmount = FeeAmount * 10
@@ -217,16 +217,23 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           timestamp = 0
         )
 
+        val preBlock = unsafeBlock(
+          genesisBlock.signerData.signature,
+          Seq(data1),
+          richAccount,
+          3,
+          System.currentTimeMillis()
+        )
+
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.signerData.signature,
-          base = Seq(data1),
+          totalRefTo = preBlock.signerData.signature,
+          base = Seq(),
           micros = Seq(Seq(data2)),
           signer = richAccount,
           version = 3,
           timestamp = System.currentTimeMillis()
         )
-
-        (genesisBlock, keyBlock, microBlocks, richAccount.toAddress)
+        (genesisBlock, Seq(preBlock, keyBlock), microBlocks, richAccount.toAddress)
       }
     }
   }

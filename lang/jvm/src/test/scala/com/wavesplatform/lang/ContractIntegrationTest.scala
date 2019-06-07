@@ -23,7 +23,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
   val ctx: CTX =
-    PureContext.build(V3) |+|
+    PureContext.build(Global, V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         DirectiveSet(V3, Account, DApp).explicitGet(),
@@ -35,7 +35,6 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   private val transactionId: ByteStr      = ByteStr.fromLong(777)
   private val fee: Int                    = 1000 * 1000
   private val feeAssetId: Option[ByteStr] = None
-
 
   property("Simple call") {
     parseCompileAndEvaluate(
@@ -115,14 +114,15 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |     else WriteSet([])
         | }
       """.stripMargin,
-      "foo"
+      "foo",
+      args = Nil
     )
     inside(evalResult) {
       case Left((error, log)) =>
         error shouldBe "exception message"
-        log should contain allOf(
-          ("a",       Right(CONST_LONG(1))),
-          ("b",       Right(CONST_LONG(2))),
+        log should contain allOf (
+          ("a", Right(CONST_LONG(1))),
+          ("b", Right(CONST_LONG(2))),
           ("isError", Right(TRUE))
         )
     }
@@ -152,7 +152,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       ctx.evaluationContext,
       compiled,
       Invocation(
-        Some(Terms.FUNCTION_CALL(FunctionHeader.User(func), args)),
+        Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
         Recipient.Address(callerAddress),
         callerPublicKey,
         None,
@@ -275,7 +275,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         | }
         |
         """.stripMargin,
-      "test"
+      "test",
+      args = Nil
     ).explicitGet() shouldBe ScriptResult(
       List(
         DataItem.Lng("a", 1),

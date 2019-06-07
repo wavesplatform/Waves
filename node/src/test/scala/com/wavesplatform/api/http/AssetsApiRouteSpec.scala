@@ -2,16 +2,15 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
+import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
@@ -27,15 +26,8 @@ class AssetsApiRouteSpec
 
   private val blockchain = stub[Blockchain]
 
-  private val route = AssetsApiRoute(
-    restAPISettings,
-    WavesSettings.fromRootConfig(ConfigFactory.load()).blockchainSettings.functionalitySettings,
-    testWallet,
-    mock[UtxPool],
-    mock[ChannelGroup],
-    blockchain,
-    new TestTime
-  ).route
+  private val route =
+    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPool], mock[ChannelGroup], blockchain, new TestTime)(Scheduler(executor)).route
 
   private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
@@ -51,10 +43,10 @@ class AssetsApiRouteSpec
 
   (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
-  routePath(s"/details/${smartAssetTx.id().base58}") in {
-    Get(routePath(s"/details/${smartAssetTx.id().base58}")) ~> route ~> check {
+  routePath(s"/details/${smartAssetTx.id().toString}") in {
+    Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
       val response = responseAs[JsObject]
-      (response \ "assetId").as[String] shouldBe smartAssetTx.id().base58
+      (response \ "assetId").as[String] shouldBe smartAssetTx.id().toString
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe smartAssetTx.timestamp
       (response \ "issuer").as[String] shouldBe smartAssetTx.sender.address
@@ -80,10 +72,10 @@ class AssetsApiRouteSpec
   )
   (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
-  routePath(s"/details/${sillyAssetTx.id().base58}") in {
-    Get(routePath(s"/details/${sillyAssetTx.id().base58}")) ~> route ~> check {
+  routePath(s"/details/${sillyAssetTx.id().toString}") in {
+    Get(routePath(s"/details/${sillyAssetTx.id().toString}")) ~> route ~> check {
       val response = responseAs[JsObject]
-      (response \ "assetId").as[String] shouldBe sillyAssetTx.id().base58
+      (response \ "assetId").as[String] shouldBe sillyAssetTx.id().toString
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe sillyAssetTx.timestamp
       (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.address
