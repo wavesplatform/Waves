@@ -49,11 +49,7 @@ package object settings {
       .fold(defaults)(defaults.withFallback)
 
     val directoryDefaults = ConfigFactory
-      .parseString(
-        s"""
-           |waves.directory = ${defaultDirectory(external)}
-           |waves.directory = $${?waves.default-directory}
-         """.stripMargin)
+      .parseString(s"waves.directory = ${defaultDirectory(external)}")
 
     external
       .withFallback(directoryDefaults)
