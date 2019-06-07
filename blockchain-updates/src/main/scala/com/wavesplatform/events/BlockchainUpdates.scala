@@ -17,7 +17,9 @@ import com.wavesplatform.events.kafka.{createProducer, createProducerRecord}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.serialization.Deserializer
 import com.wavesplatform.events.protobuf.PBBlockchainUpdated
+import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.config.SaslConfigs
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -39,6 +41,15 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
     props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "10000")
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1")
+
+    if (settings.ssl.enabled) {
+      props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL")
+      props.put(SaslConfigs.SASL_MECHANISM, "PLAIN")
+      props.put(
+        SaslConfigs.SASL_JAAS_CONFIG,
+        s"org.apache.kafka.common.security.plain.PlainLoginModule required username = '${settings.ssl.username}' password = '${settings.ssl.password}';"
+      )
+    }
 
     val consumer = new KafkaConsumer[Unit, Int](
       props,
