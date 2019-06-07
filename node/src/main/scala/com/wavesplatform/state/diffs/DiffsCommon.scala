@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.ProvenTransaction
 
 private[diffs] object DiffsCommon {
   def verifierComplexity(script: Script): Long = script match {
-    case ContractScriptImpl(_, DApp(_, _, Some(vf)), cm) if cm.contains(vf.u.name) => cm(vf.u.name)
+    case ContractScriptImpl(_, DApp(_, _, _, Some(vf)), cm) if cm.contains(vf.u.name) => cm(vf.u.name)
     case _                                                                         => script.complexity
   }
 
@@ -20,7 +20,7 @@ private[diffs] object DiffsCommon {
 
     case None =>
       script.expr match {
-        case DApp(_, cFuncs, _) =>
+        case DApp(_, _, cFuncs, _) =>
           cFuncs
             .find(f => (f.u.name == DEFAULT_FUNC_NAME) && f.u.args.isEmpty)
             .flatMap(f => script.complexityMap.get(f.u.name))

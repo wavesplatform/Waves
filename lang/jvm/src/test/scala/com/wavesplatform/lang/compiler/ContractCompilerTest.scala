@@ -60,6 +60,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
+        ByteStr.empty,
         List.empty,
         List(
           CallableFunction(
@@ -136,6 +137,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
+        ByteStr.empty,
         List.empty,
         List(
           CallableFunction(

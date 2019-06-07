@@ -2,14 +2,13 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.kernel.Monoid
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
@@ -120,7 +119,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
   }
 
-  private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC, ctxt: CTX = CTX.empty): Either[String, T] = {
+  private def eval[T <: EVALUATED](code: String,
+                                   pointInstance: Option[CaseObj] = None,
+                                   pointType: FINAL = AorBorC,
+                                   ctxt: CTX = CTX.empty): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
@@ -472,9 +474,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("arr" -> ((BYTESTR -> "max sized ByteVector") -> LazyVal(EitherT.pure(CONST_BYTESTR(array))))), Array())
-    ) shouldBe Right(CONST_LONG(0x0101010101010101L))
+    eval[EVALUATED](
+      src,
+      ctxt = CTX(Seq(), Map("arr" -> ((BYTESTR -> "max sized ByteVector") -> LazyVal(EitherT.pure(CONST_BYTESTR(array))))), Array())) shouldBe Right(
+      CONST_LONG(0x0101010101010101L))
   }
 
   property("toInt by offset (partial)") {
@@ -559,9 +562,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val str = "a" * 32766 + "z"
     val src =
       """ str.indexOf("z", 32766) """
-    eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str))))), Array())
-    ) shouldBe Right(CONST_LONG(32766L))
+    eval[EVALUATED](src, ctxt = CTX(Seq(), Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str))))), Array())) shouldBe Right(
+      CONST_LONG(32766L))
   }
 
   property("indexOf (not present)") {
@@ -804,7 +806,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
-
 
   property("matching parameterized types") {
     val script =

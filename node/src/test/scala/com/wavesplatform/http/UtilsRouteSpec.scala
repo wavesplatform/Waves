@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
@@ -32,6 +33,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   )
 
   val dappVer = DApp(
+    meta = ByteStr.empty,
     decs = List.empty,
     callableFuncs = List.empty,
     verifierFuncOpt = Some(
