@@ -437,39 +437,5 @@ package object database {
           throw new IOException("Couldn't create DB iterator", err)
       }
     }
-
-    //    def iterateOverStreamReverse(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = {
-    //      val dbIter = db.iterator()
-    //      try {
-    //        val seekKey = {
-    //          val seekSuffix = new Array[Byte](suffix.length)
-    //          suffix.copyToArray(seekSuffix)
-    //
-    //          var index = 0
-    //          while (index < seekSuffix.length) {
-    //            if (seekSuffix(index) == 0xff) index += 1
-    //            else {
-    //              seekSuffix(index) = (seekSuffix(index) + 1).toByte
-    //              index = seekSuffix.length
-    //            }
-    //          }
-    //
-    //          Bytes.concat(prefix, seekSuffix)
-    //        }
-    //
-    //        dbIter.seek(seekKey)
-    //        CloseableIterator(
-    //          new AbstractIterator[DBEntry] {
-    //            override def hasNext: Boolean = dbIter.hasPrev
-    //            override def next(): DBEntry  = dbIter.prev()
-    //          },
-    //          () => dbIter.close()
-    //        )
-    //      } catch {
-    //        case NonFatal(err) =>
-    //          dbIter.close()
-    //          throw new IOException("Couldn't create DB iterator", err)
-    //      }
-    //    }
   }
 }

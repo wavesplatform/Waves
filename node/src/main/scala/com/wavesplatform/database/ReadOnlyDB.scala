@@ -41,9 +41,6 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
     db.iterateOverStream(stableBytes)
       .takeWhile(e => Ints.fromByteArray(e.getKey.takeRight(Ints.BYTES)) <= height)
-      //    db.iterateOverStreamReverse(Bytes.concat(stableBytes, Ints.toByteArray(height + 1)))
-      //      .dropWhile(e => !e.getKey.startsWith(stableBytes))
-      //      .takeWhile(e => e.getKey.startsWith(stableBytes))
       .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
   }
 
