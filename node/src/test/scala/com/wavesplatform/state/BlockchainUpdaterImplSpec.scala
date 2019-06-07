@@ -42,7 +42,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     settings.copy(
       blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings)))
 
-  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Option[Observer[BlockchainUpdated]] = None)(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
+  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Observer[BlockchainUpdated] = Observer.empty)(
+      f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
     val (fs, settings) =
       if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
 
@@ -168,7 +169,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     "without NG" - {
       "genesis block and two transfers blocks" in {
         val events = ReplaySubject[BlockchainUpdated]()
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, Some(events)) { (_, _) =>
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, events) { (_, _) =>
           val updates = events.toListL
             .runSyncUnsafe(5.seconds)
 
@@ -205,7 +206,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     "with NG" - {
       "genesis block and two transfers blocks" in {
         val events = ReplaySubject[BlockchainUpdated]()
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, Some(events)) { (_, _) =>
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, events) { (_, _) =>
           val updates = events.toListL
             .runSyncUnsafe(5.seconds)
 
@@ -223,7 +224,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // first transfers block
           updates(1) match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, _) =>
               height shouldBe 2
               block.transactionData.length shouldBe 5
 
@@ -235,7 +236,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // second transfers block, with carryFee
           updates(2) match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, _) =>
               height shouldBe 3
               block.transactionData.length shouldBe 4
 
@@ -269,7 +270,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         val events = ReplaySubject[BlockchainUpdated]()
         val defaultWriter =
           new LevelDBWriter(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
-        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, Some(events))
+        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, events)
 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get

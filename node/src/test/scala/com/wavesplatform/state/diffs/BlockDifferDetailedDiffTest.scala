@@ -46,11 +46,11 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
       forAll(genesisBlockGen) {
         case (master, b) =>
           assertDetailedDiff(Seq.empty, b) {
-            case (diff, detailedDiff) =>
+            case (diff, DetailedDiff(parentDiff, transactionDiffs)) =>
               diff.portfolios(master).balance shouldBe ENOUGH_AMT
-              detailedDiff._1.portfolios.get(master) shouldBe None
-              detailedDiff._2.length shouldBe 1
-              detailedDiff._2.head.portfolios(master).balance shouldBe ENOUGH_AMT
+              parentDiff.portfolios.get(master) shouldBe None
+              transactionDiffs.length shouldBe 1
+              transactionDiffs.head.portfolios(master).balance shouldBe ENOUGH_AMT
           }
       }
     }
@@ -82,12 +82,12 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
         forAll(genesisTransfersBlockGen) {
           case (addr1, addr2, amt1, amt2, b) =>
             assertDetailedDiff(Seq.empty, b) {
-              case (_, detailedDiff) =>
-                detailedDiff._2.head.portfolios(addr1).balance shouldBe ENOUGH_AMT
-                detailedDiff._2(1).portfolios(addr1).balance shouldBe -(amt1 + transactionFee)
-                detailedDiff._2(1).portfolios(addr2).balance shouldBe amt1
-                detailedDiff._2(2).portfolios(addr2).balance shouldBe -(amt2 + transactionFee)
-                detailedDiff._2(2).portfolios(addr1).balance shouldBe amt2
+              case (_, DetailedDiff(_, transactionDiffs)) =>
+                transactionDiffs.head.portfolios(addr1).balance shouldBe ENOUGH_AMT
+                transactionDiffs(1).portfolios(addr1).balance shouldBe -(amt1 + transactionFee)
+                transactionDiffs(1).portfolios(addr2).balance shouldBe amt1
+                transactionDiffs(2).portfolios(addr2).balance shouldBe -(amt2 + transactionFee)
+                transactionDiffs(2).portfolios(addr1).balance shouldBe amt2
             }
         }
 
@@ -96,8 +96,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
           forAll(genesisTransfersBlockGen) {
             case (addr1, _, _, _, b) =>
               assertDetailedDiff(Seq.empty, b) {
-                case (_, detailedDiff) =>
-                  detailedDiff._1.portfolios(addr1).balance shouldBe 20
+                case (_, DetailedDiff(parentDiff, __)) =>
+                  parentDiff.portfolios(addr1).balance shouldBe 20
               }
           }
 
@@ -108,8 +108,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
             forAll(genesisTransfersBlockGen) {
               case (addr1, _, _, _, b) =>
                 assertDetailedDiff(Seq.empty, b, ngFs) {
-                  case (_, detailedDiff) =>
-                    detailedDiff._1.portfolios(addr1).balance shouldBe (transactionFee * 2 * 0.4) // 40%
+                  case (_, DetailedDiff(parentDiff, _)) =>
+                    parentDiff.portfolios(addr1).balance shouldBe (transactionFee * 2 * 0.4) // 40%
                 }
             }
 
@@ -137,8 +137,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
             forAll(blocksNgMinerGen) {
               case (history, block, ngMiner) =>
                 assertDetailedDiff(history, block, ngFs) {
-                  case (_, detailedDiff) =>
-                    detailedDiff._1.portfolios(ngMiner).balance shouldBe transactionFee // 60% + 40%
+                  case (_, DetailedDiff(parentDiff, _)) =>
+                    parentDiff.portfolios(ngMiner).balance shouldBe transactionFee // 60% + 40%
                 }
             }
           }
