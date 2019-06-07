@@ -52,9 +52,9 @@ object ContractScript {
     funcsWithComplexity.toVector.sequence
   }
 
-  def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (String, Long)] = {
-    estimateComplexityByFunction(version, contract).map(namesAndComp => (("", 0L) +: namesAndComp).maxBy(_._2))
-  }
+  def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (Long, Vector[(String, Long)])] =
+    estimateComplexityByFunction(version, contract)
+      .map(namesAndComp => ((("", 0L) +: namesAndComp).map(_._2).max, namesAndComp))
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =
