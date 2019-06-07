@@ -48,8 +48,11 @@ package object settings {
     val external = maybeUserConfig
       .fold(defaults)(defaults.withFallback)
 
+    val withApp = external
+      .withFallback(ConfigFactory.defaultApplication())
+
     val directoryDefaults = ConfigFactory
-      .parseString(s"waves.directory = ${defaultDirectory(external)}")
+      .parseString(s"waves.directory = ${defaultDirectory(withApp)}")
 
     external
       .withFallback(directoryDefaults)
@@ -87,6 +90,6 @@ package object settings {
       else if (SystemUtils.IS_OS_MAC) osxDefaultDirectory
       else nixDefaultDirectory
 
-    s"parent/${withNetwork(config)}"
+    s"$parent/${withNetwork(config)}"
   }
 }
