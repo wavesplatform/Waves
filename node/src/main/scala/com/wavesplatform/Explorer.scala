@@ -257,13 +257,13 @@ object Explorer extends ScorexLogging {
 
           println(s"\nWAVES balances\n")
           for {
-            seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-            addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-            balance = db
-              .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.WavesBalancePrefix), AddressId.toBytes(addressId)))
-              .map(e => Longs.fromByteArray(e.getValue))
-              .closeAfter(_.toStream.headOption)
-              .getOrElse(0L)
+            (addressId, balance) <- db
+              .iterateOverStream(Shorts.toByteArray(Keys.WavesBalancePrefix))
+              .map { e =>
+                val (_, addressId, _, height) = Keys.parseAddressBytesHeight(e.getKey)
+                (addressId, height, Longs.fromByteArray(e.getValue))
+              }
+              .foldLeft(Map.empty[AddressId, Long]) { case (map, (addressId, _, balance)) => map + (addressId -> balance) }
             if balance > 0
           } yield {
             val addr = db.get(Keys.idToAddress(addressId))
