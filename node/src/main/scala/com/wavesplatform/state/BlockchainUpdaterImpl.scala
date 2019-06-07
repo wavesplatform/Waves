@@ -155,7 +155,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                 val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(blockchain, height)
 
-                BlockchainUpdateNotifier.notifyMicroBlockRollback(settings.enableBlockchainUpdates, blockchainUpdated, block.reference, height)
+                BlockchainUpdateNotifier.notifyMicroBlockRollback(wavesSettings.enableBlockchainUpdates, blockchainUpdated, block.reference, height)
 
                 BlockDiffer
                   .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -174,7 +174,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                   val miningConstraints = MiningConstraints(blockchain, height)
 
                   BlockchainUpdateNotifier
-                    .notifyMicroBlockRollback(settings.enableBlockchainUpdates, blockchainUpdated, block.reference, height)
+                    .notifyMicroBlockRollback(wavesSettings.enableBlockchainUpdates, blockchainUpdated, block.reference, height)
 
                   BlockDiffer
                     .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -193,7 +193,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
 
                     if (discarded.nonEmpty) {
                       BlockchainUpdateNotifier
-                        .notifyMicroBlockRollback(settings.enableBlockchainUpdates, blockchainUpdated, referencedForgedBlock.uniqueId, height)
+                        .notifyMicroBlockRollback(wavesSettings.enableBlockchainUpdates, blockchainUpdated, referencedForgedBlock.uniqueId, height)
                       metrics.microBlockForkStats.increment()
                       metrics.microBlockForkHeightStats.record(discarded.size)
                     }
@@ -238,7 +238,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                 log.info(s"New height: $height")
               }
 
-              BlockchainUpdateNotifier.notifyProcessBlock(settings.enableBlockchainUpdates, blockchainUpdated, block, detailedDiff, blockchain)
+              BlockchainUpdateNotifier.notifyProcessBlock(wavesSettings.enableBlockchainUpdates, blockchainUpdated, block, detailedDiff, blockchain)
 
               discarded
           }
@@ -251,7 +251,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     val prevNgState = ngState
     val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
-      BlockchainUpdateNotifier.notifyMicroBlockRollback(settings.enableBlockchainUpdates, blockchainUpdated, blockId, blockchain.height)
+      BlockchainUpdateNotifier.notifyMicroBlockRollback(wavesSettings.enableBlockchainUpdates, blockchainUpdated, blockId, blockchain.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(_.bestLiquidBlock).toSeq
@@ -259,7 +259,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
       blockchain
         .rollbackTo(blockId)
         .map { bs =>
-          BlockchainUpdateNotifier.notifyRollback(settings.enableBlockchainUpdates, blockchainUpdated, blockId, blockchain.height)
+          BlockchainUpdateNotifier.notifyRollback(wavesSettings.enableBlockchainUpdates, blockchainUpdated, blockId, blockchain.height)
           bs ++ discardedNgBlock
         }
         .leftMap(err => GenericError(err))
@@ -312,7 +312,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
-              BlockchainUpdateNotifier.notifyProcessMicroBlock(settings.enableBlockchainUpdates,
+              BlockchainUpdateNotifier.notifyProcessMicroBlock(wavesSettings.enableBlockchainUpdates,
                                                                blockchainUpdated,
                                                                microBlock,
                                                                detailedDiff,
