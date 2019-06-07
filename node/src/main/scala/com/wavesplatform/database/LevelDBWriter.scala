@@ -322,7 +322,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         .closeAfter { iterator =>
           val heights = iterator.toStream
           heights
-            .zip(heights.tail)
+            .zip(heights.drop(1))
             .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
             .foreach { case (h, _) => rw.delete(key(h)) }
         }
