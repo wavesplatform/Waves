@@ -61,17 +61,18 @@ package object settings {
       .resolve()
   }
 
-  //noinspection SpellCheckingInspection
   def defaultDirectory(config: Config): String = {
+    // No actual interpolation here, `s` to suppress warnings
     def osxDefaultDirectory: String =
-      "${user.home}/Library/Application Support"
+      s"$${user.home}/Library/Application Support"
 
+    //noinspection SpellCheckingInspection
     def winDefaultDirectory: String =
-      "${LOCALAPPDATA}"
+      s"$${LOCALAPPDATA}"
 
     def nixDefaultDirectory: String = {
       val maybeXdgDir = sys.env.get("XDG_DATA_HOME")
-      val defaultDir = "${user.home}/.local/share"
+      val defaultDir = s"$${user.home}/.local/share"
 
       maybeXdgDir getOrElse defaultDir
     }
