@@ -7,13 +7,6 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class WavesSettingsSpecification extends FlatSpec with Matchers {
 
-  val expectedDir =
-    ConfigFactory
-      .defaultOverrides()
-      .withFallback(ConfigFactory.parseString(s"waves.directory=${com.wavesplatform.settings.defaultDirectory}"))
-      .resolve()
-      .getString("waves.directory")
-
   private def config(configName: String) = {
     WavesSettings.fromRootConfig(
       com.wavesplatform.settings.loadConfig(
@@ -26,7 +19,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     "WavesSettings" should s"read values from default config with $configName overrides" in {
       val settings = config(configName)
 
-      settings.directory should be(expectedDir)
+      settings.directory should be(com.wavesplatform.settings.defaultDirectory(settings.config))
       settings.networkSettings should not be null
       settings.walletSettings should not be null
       settings.blockchainSettings should not be null
