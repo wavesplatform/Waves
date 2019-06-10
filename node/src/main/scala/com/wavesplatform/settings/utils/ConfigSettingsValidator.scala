@@ -60,6 +60,23 @@ class ConfigSettingsValidator(config: Config) {
       .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
   }
 
+  def validateMap[K, V: ValueReader](settingName: String)(keyReader: String => Validated[String, K]): ErrorsListOr[Map[K, V]] = {
+    config
+      .getConfig(settingName)
+      .root()
+      .entrySet()
+      .asScala
+      .toList
+      .traverse { entry =>
+        val elemPath = s"$settingName.${entry.getKey}"
+        val k        = keyReader(entry.getKey).leftMap(List(_))
+        val v        = Validated fromTry Try(entry.getValue.atPath(elemPath).as[V](elemPath)) leftMap (ex => List(ex.getMessage))
+        k.product(v)
+      }
+      .map(_.toMap)
+      .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
+  }
+
   def validateWithDefault[T: ValueReader](settingName: String, defaultValue: T, showError: Boolean = false): ErrorsListOr[T] = {
     Validated
       .fromTry(Try(config.as[T](settingName)).recover { case _: ConfigException.Missing => defaultValue })

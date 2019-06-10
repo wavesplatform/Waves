@@ -4,7 +4,7 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.OrderBook.Level
+import com.wavesplatform.matcher.model.OrderBook.{Level, TickSize}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -31,11 +31,8 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
   "place several buy orders at the same price" in {}
 
   "place buy and sell orders with prices different from each other less than tick size in one level" in {
-
-    def toNormalized(value: Long): Long = value * Order.PriceConstant
-
-    val ob                 = OrderBook.empty
-    val normalizedTickSize = Some(toNormalized(100L))
+    val ob       = OrderBook.empty
+    val tickSize = TickSize.Enabled(toNormalized(100L))
 
     val buyOrd1 = buy(pair, 1583290045643L, 34100)
     val buyOrd2 = buy(pair, 170484969L, 34120)
@@ -51,19 +48,19 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val sellOrd5 = sell(pair, 54521418494L, 44357)
     val sellOrd6 = sell(pair, 54521418493L, 44389)
 
-    ob.add(buyOrd1, ntpNow, normalizedTickSize)
-    ob.add(buyOrd2, ntpNow, normalizedTickSize)
-    ob.add(buyOrd3, ntpNow, normalizedTickSize)
-    ob.add(buyOrd4, ntpNow, normalizedTickSize)
-    ob.add(buyOrd5, ntpNow, normalizedTickSize)
-    ob.add(buyOrd6, ntpNow, normalizedTickSize)
+    ob.add(buyOrd1, ntpNow, tickSize)
+    ob.add(buyOrd2, ntpNow, tickSize)
+    ob.add(buyOrd3, ntpNow, tickSize)
+    ob.add(buyOrd4, ntpNow, tickSize)
+    ob.add(buyOrd5, ntpNow, tickSize)
+    ob.add(buyOrd6, ntpNow, tickSize)
 
-    ob.add(sellOrd1, ntpNow, normalizedTickSize)
-    ob.add(sellOrd2, ntpNow, normalizedTickSize)
-    ob.add(sellOrd3, ntpNow, normalizedTickSize)
-    ob.add(sellOrd4, ntpNow, normalizedTickSize)
-    ob.add(sellOrd5, ntpNow, normalizedTickSize)
-    ob.add(sellOrd6, ntpNow, normalizedTickSize)
+    ob.add(sellOrd1, ntpNow, tickSize)
+    ob.add(sellOrd2, ntpNow, tickSize)
+    ob.add(sellOrd3, ntpNow, tickSize)
+    ob.add(sellOrd4, ntpNow, tickSize)
+    ob.add(sellOrd5, ntpNow, tickSize)
+    ob.add(sellOrd6, ntpNow, tickSize)
 
     ob.getBids.keySet shouldBe SortedSet[Long](34300, 34200, 34100).map(toNormalized)
     ob.getAsks.keySet shouldBe SortedSet[Long](44100, 44200, 44300, 44400).map(toNormalized)
@@ -94,7 +91,50 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     Seq(ord3, ord1, ord2).map(LimitOrder(_))
   }
 
-  "place several sell orders at the same price" in {}
+  "place several sell orders at the same price" - {
+    "with same level" - {
+      "TickSize.Enabled" in {
+        val tickSize = TickSize.Enabled(toNormalized(100L))
+        val ob       = OrderBook.empty
+
+        val sellOrder = sell(pair, 54521418493L, 44389)
+        ob.add(sellOrder, ntpNow, tickSize)
+        ob.add(sellOrder, ntpNow, tickSize)
+
+        ob.getAsks.size shouldBe 1
+
+        val sellLimitOrder = LimitOrder(sellOrder)
+        ob.getAsks.head._2.toList shouldBe List(sellLimitOrder, sellLimitOrder)
+      }
+
+      "TickSize.Disabled" in {
+        val ob = OrderBook.empty
+
+        val sellOrder = sell(pair, 54521418493L, 44389)
+        ob.add(sellOrder, ntpNow, TickSize.Disabled)
+        ob.add(sellOrder, ntpNow, TickSize.Disabled)
+
+        ob.getAsks.size shouldBe 1
+
+        val sellLimitOrder = LimitOrder(sellOrder)
+        ob.getAsks.head._2.toList shouldBe List(sellLimitOrder, sellLimitOrder)
+      }
+    }
+
+    "with different levels" in {
+      val ob = OrderBook.empty
+
+      val sellOrder = sell(pair, 54521418493L, 44389)
+      ob.add(sellOrder, ntpNow, TickSize.Enabled(toNormalized(100L)))
+      ob.add(sellOrder, ntpNow, TickSize.Disabled)
+
+      ob.getAsks.size shouldBe 2
+
+      val sellLimitOrder = LimitOrder(sellOrder)
+      ob.getAsks.head._2.head shouldBe sellLimitOrder
+      ob.getAsks.last._2.head shouldBe sellLimitOrder
+    }
+  }
 
   "sell market" in {
     val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
@@ -211,4 +251,6 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
   "aggregate levels for snapshot, preserving order" in {
     pending
   }
+
+  private def toNormalized(value: Long): Long = value * Order.PriceConstant
 }

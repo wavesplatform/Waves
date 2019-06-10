@@ -1,6 +1,6 @@
 package com.wavesplatform.settings.utils
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, Validated}
 import cats.implicits._
 import com.typesafe.config.Config
 import net.ceedubs.ficus.readers.ValueReader
@@ -17,8 +17,8 @@ object ConfigOps {
       cfgValidator.validateList[T](path).map(_.toSet) valueOr throwErrors
     }
 
-    def getValidatedMap[T, U](path: String)(implicit tupleReader: ValueReader[(T, U)]): Map[T, U] = {
-      cfgValidator.validateList[(T, U)](path).map(_.toMap) valueOr throwErrors
+    def getValidatedMap[K, V: ValueReader](path: String)(keyReader: String => Validated[String, K]): Map[K, V] = {
+      cfgValidator.validateMap(path)(keyReader) valueOr throwErrors
     }
 
     def getValidatedByPredicate[T: ValueReader](path: String)(predicate: T => Boolean, errorMsg: String): T = {
