@@ -406,7 +406,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           (key, value) <- addressData.data
           dataKeySuffix = Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))
           isNew = rw.lastValue(Keys.DataPrefix, dataKeySuffix, this.height).isEmpty
-          _     = rw.put(Keys.data(addressId, key)(height), Some(value))
+          _ = rw.put(Keys.data(addressId, key)(height), Some(value))
           _ = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
           if isNew
         } yield key
@@ -797,7 +797,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               Shorts.toByteArray(prefix),
               AddressId.toBytes(addressId)
             ),
-              Ints.toByteArray((height - 1) max 0))
+              Ints.toByteArray(height))
           }
 
           readFromHeightForAddress(db)(prefix, addressId, from max 1)
@@ -810,7 +810,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         if (base.headOption.exists(_._1 == from)) base
         else {
           val lastHeight = db.get(lastKey)
-          val lastValue = if (lastHeight == 0 || lastHeight > from) default else db.get(read(lastHeight))
+          val lastValue =
+            if (lastHeight == 0)
+              default
+            else if (lastHeight > from)
+              db.lastValue(Keys.WavesBalancePrefix, AddressId.toBytes(addressId), from)
+                .map { e =>
+                  val (_, _, _, h) = Keys.parseAddressBytesHeight(e.getKey)
+                  read(h).parse(e.getValue)
+                }
+                .getOrElse(default)
+            else
+              db.get(read(lastHeight))
 
           (from -> lastValue) +: base
         }
