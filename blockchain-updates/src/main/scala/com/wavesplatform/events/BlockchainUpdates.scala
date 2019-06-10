@@ -39,7 +39,8 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "admin")
     props.put(ConsumerConfig.CLIENT_ID_CONFIG, settings.clientId)
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
-    props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "10000")
+    props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "60000")
+    props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "120000")
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1")
 
     if (settings.ssl.enabled) {
