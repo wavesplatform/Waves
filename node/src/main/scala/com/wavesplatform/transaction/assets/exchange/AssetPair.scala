@@ -48,7 +48,7 @@ object AssetPair {
 
   def assetIdStr(aid: Asset): String = aid match {
     case Waves           => WavesName
-    case IssuedAsset(id) => id.base58
+    case IssuedAsset(id) => id.toString
   }
 
   def extractAssetId(a: String): Try[Asset] = a match {

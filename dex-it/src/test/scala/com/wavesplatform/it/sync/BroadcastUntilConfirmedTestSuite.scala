@@ -37,7 +37,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     markup("Issue an asset")
     node.signedBroadcast(IssueEthTx.json())
     val pair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
-    nodes.waitForTransaction(IssueEthTx.id().base58)
+    nodes.waitForTransaction(IssueEthTx.id().toString)
     nodes.waitForHeightArise()
 
     markup("Prepare orders")

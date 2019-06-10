@@ -34,7 +34,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
       .get
 
     node.sendByNetwork(RawBytes.from(tx))
-    node.waitForTransaction(tx.id().base58)
+    node.waitForTransaction(tx.id().toString)
 
   }
 
@@ -54,7 +54,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
     node.sendByNetwork(RawBytes.from(tx))
     val maxHeight = nodes.map(_.height).max
     nodes.waitForHeight(maxHeight + 1)
-    node.ensureTxDoesntExist(tx.id().base58)
+    node.ensureTxDoesntExist(tx.id().toString)
   }
 
   test("should blacklist senders of non-parsable transactions") {

@@ -446,7 +446,7 @@ object DebugApiRoute {
         }
       case _ => JsError("The map is expected")
     },
-    m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
+    m => Json.toJson(m.map { case (assetId, count) => assetId.toString -> count })
   )
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
 

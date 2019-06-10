@@ -18,7 +18,6 @@ object AssetTransactionsDiff {
     val asset = IssuedAsset(tx.id())
     Right(
       Diff(
-        height = blockchain.height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
@@ -33,7 +32,6 @@ object AssetTransactionsDiff {
       if (blockchain.hasAssetScript(tx.asset)) {
         Right(
           Diff(
-            height = blockchain.height,
             tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
             assetScripts = Map(tx.asset          -> tx.script),
@@ -71,7 +69,6 @@ object AssetTransactionsDiff {
         } else {
           Right(
             Diff(
-              height = blockchain.height,
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))),
               assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable)),
@@ -89,7 +86,6 @@ object AssetTransactionsDiff {
 
     validateAsset(tx, blockchain, tx.asset, !burnAnyTokensEnabled).map { _ =>
       Diff(
-        height = blockchain.height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))),
         assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity)),
@@ -104,7 +100,6 @@ object AssetTransactionsDiff {
       Either.cond(
         !blockchain.hasAssetScript(tx.asset),
         Diff(
-          height = blockchain.height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
           sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),

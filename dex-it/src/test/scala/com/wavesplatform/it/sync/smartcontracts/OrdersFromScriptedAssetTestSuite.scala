@@ -159,7 +159,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   private def issueAsset(): String = {
     info("issue an asset")
     val allowAsset2   = mkAllowAsset()
-    val allowAsset2Id = allowAsset2.id().base58
+    val allowAsset2Id = allowAsset2.id().toString
     node.signedIssue(createSignedIssueRequest(allowAsset2))
     node.waitForTransaction(allowAsset2Id)
     allowAsset2Id
@@ -187,7 +187,7 @@ object OrdersFromScriptedAssetTestSuite {
     )
     .explicitGet()
 
-  private val UnscriptedAssetId = UnscriptedAsset.id().base58
+  private val UnscriptedAssetId = UnscriptedAsset.id().toString
 
   private def mkAllowAsset(id: Int = Random.nextInt(1000) + 1): IssueTransactionV2 = {
     IssueTransactionV2
@@ -207,11 +207,11 @@ object OrdersFromScriptedAssetTestSuite {
   }
 
   private val AllowAsset    = mkAllowAsset(0)
-  private val AllowAssetId  = AllowAsset.id().base58
+  private val AllowAssetId = AllowAsset.id().toString
   private val AllowAsset2   = mkAllowAsset(1)
-  private val AllowAsset2Id = AllowAsset2.id().base58
+  private val AllowAsset2Id = AllowAsset2.id().toString
   private val AllowAsset3   = mkAllowAsset(1)
-  private val AllowAsset3Id = AllowAsset3.id().base58
+  private val AllowAsset3Id = AllowAsset3.id().toString
 
   private val DenyAsset = IssueTransactionV2
     .selfSigned(
@@ -228,7 +228,7 @@ object OrdersFromScriptedAssetTestSuite {
     )
     .explicitGet()
 
-  private val DenyAssetId = DenyAsset.id().base58
+  private val DenyAssetId = DenyAsset.id().toString
 
   private val DenyBigAmountScript: Script = {
     val scriptText = s"""

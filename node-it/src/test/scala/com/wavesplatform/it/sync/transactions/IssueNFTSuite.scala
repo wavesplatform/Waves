@@ -94,7 +94,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
     secondNode.signedBroadcast(itx.json(), waitForTx = true)
 
-    secondNode.assertAssetBalance(secondNodeIssuer.address, itx.assetId().base58, 1L)
+    secondNode.assertAssetBalance(secondNodeIssuer.address, itx.assetId().toString, 1L)
   }
 
   test("Can't issue reissuable NFT") {

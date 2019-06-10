@@ -123,7 +123,7 @@ object Sponsorship {
   }
 }
 
-case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
+case class Diff(transactions: Map[ByteStr, (Transaction, Set[Address])],
                 portfolios: Map[Address, Portfolio],
                 issuedAssets: Map[IssuedAsset, AssetInfo],
                 aliases: Map[Alias, Address],
@@ -164,8 +164,7 @@ object Diff {
       scriptsComplexity = 0
     )
 
-  def apply(height: Int,
-            tx: Transaction,
+  def apply(tx: Transaction,
             portfolios: Map[Address, Portfolio] = Map.empty,
             assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
             aliases: Map[Alias, Address] = Map.empty,
@@ -179,7 +178,7 @@ object Diff {
             scriptsComplexity: Long = 0,
             scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
     Diff(
-      transactions = Map((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet))),
+      transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,

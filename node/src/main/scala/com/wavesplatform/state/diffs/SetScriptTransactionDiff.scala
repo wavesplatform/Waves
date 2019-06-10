@@ -11,7 +11,6 @@ object SetScriptTransactionDiff {
     val scriptOpt = tx.script
     Right(
       Diff(
-        height = blockchain.height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
         scripts = Map(tx.sender.toAddress    -> scriptOpt),
