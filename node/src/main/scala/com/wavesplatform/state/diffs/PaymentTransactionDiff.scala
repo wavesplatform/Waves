@@ -14,7 +14,7 @@ object PaymentTransactionDiff {
 
   def apply(settings: FunctionalitySettings, height: Int, blockTime: Long)(tx: PaymentTransaction): Either[ValidationError, Diff] = {
 
-    if (height > settings.blockVersion3AfterHeight) {
+    if (height > settings.blockVersion3AfterHeight + 1) {
       Left(GenericError(s"Payment transaction is deprecated after h=${settings.blockVersion3AfterHeight}"))
     } else {
       Right(

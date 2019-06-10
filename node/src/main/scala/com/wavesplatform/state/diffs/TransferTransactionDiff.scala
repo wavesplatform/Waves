@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.transfer._
 import scala.util.{Right, Try}
 
 object TransferTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int, blockTime: Long)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long)(tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender)
 
     val isSmartAsset = tx.feeAssetId match {
@@ -30,7 +30,7 @@ object TransferTransactionDiff {
       recipient <- blockchain.resolveAlias(tx.recipient)
       _         <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
 
-      _ <- validateOverflow(blockchain, height, tx)
+      _ <- validateOverflow(blockchain, blockchain.height, tx)
       portfolios = (tx.assetId match {
         case Waves =>
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
@@ -45,7 +45,7 @@ object TransferTransactionDiff {
           case Waves => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
           case asset @ IssuedAsset(_) =>
             val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.fee)))
-            if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+            if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
               val sponsorPf = blockchain
                 .assetDescription(asset)
                 .collect {
@@ -66,7 +66,7 @@ object TransferTransactionDiff {
         GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil}")
       )
     } yield
-      Diff(height,
+      Diff(blockchain.height,
         tx,
         portfolios,
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),

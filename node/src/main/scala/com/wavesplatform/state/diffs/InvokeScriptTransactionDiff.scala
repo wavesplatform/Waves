@@ -40,7 +40,7 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
@@ -53,7 +53,7 @@ object InvokeScriptTransactionDiff {
             val environment = new WavesEnvironment(
               AddressScheme.current.chainId,
               Coeval(tx.asInstanceOf[In]),
-              Coeval(height),
+              Coeval(blockchain.height),
               blockchain,
               Coeval(tx.dAppAddressOrAlias.bytes)
             )
@@ -126,7 +126,7 @@ object InvokeScriptTransactionDiff {
           })
           dAppAddress <- TracedResult(dAppAddressEi)
           wavesFee = feeInfo._1
-          dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, dAppAddress, dataEntries, feeInfo._2))
+          dataAndPaymentDiff <- TracedResult(payableAndDataPart(blockchain.height, tx, dAppAddress, dataEntries, feeInfo._2))
           _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _                  <- TracedResult(validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
           _ <- TracedResult(
@@ -185,7 +185,7 @@ object InvokeScriptTransactionDiff {
             assetsComplexity + accountComplexity + funcComplexity
           }
 
-          _ <- foldScriptTransfers(blockchain, height, tx, dAppAddress)(ps, dataAndPaymentDiff)
+          _ <- foldScriptTransfers(blockchain, tx, dAppAddress)(ps, dataAndPaymentDiff)
         } yield {
           val paymentReceiversMap: Map[Address, Portfolio] = Monoid
             .combineAll(pmts)
@@ -244,7 +244,7 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def foldScriptTransfers(blockchain: Blockchain, currentBlockHeight: Int, tx: InvokeScriptTransaction, dAppAddress: Address)(
+  private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
       ps: List[(Recipient.Address, Long, Option[ByteStr])],
       dataDiff: Diff): TracedResult[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount) {
@@ -272,7 +272,7 @@ object InvokeScriptTransactionDiff {
                 nextDiff.asRight[ValidationError]
               case Some(script) =>
                 val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
-                  d => validateScriptTransferWithSmartAssetScript(blockchain, currentBlockHeight, tx)(d, addressRepr, amount, asset, nextDiff, script)
+                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                 TracedResult(
@@ -289,7 +289,7 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, currentBlockHeight: Int, tx: InvokeScriptTransaction)(
+  private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       totalDiff: Diff,
       addressRepr: Recipient.Address,
       amount: Long,
@@ -298,7 +298,6 @@ object InvokeScriptTransactionDiff {
       script: Script): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
-        currentBlockHeight,
         Coproduct[TxOrd](
           ScriptTransfer(
             asset,

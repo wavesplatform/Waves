@@ -94,7 +94,10 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
       .map(_._1)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
+  override def height: Int = {
+
+    inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
+  }
 
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
