@@ -1,8 +1,8 @@
 package com.wavesplatform.settings.utils
 
-import cats.data.{NonEmptyList, Validated}
-import cats.implicits._
+import cats.data.Validated
 import com.typesafe.config.Config
+import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorListOrOps
 import net.ceedubs.ficus.readers.ValueReader
 
 object ConfigOps {
@@ -11,18 +11,16 @@ object ConfigOps {
 
     val cfgValidator = ConfigSettingsValidator(config)
 
-    private def throwErrors(list: NonEmptyList[String]) = throw new Exception(list.mkString_(", "))
-
     def getValidatedSet[T: ValueReader](path: String): Set[T] = {
-      cfgValidator.validateList[T](path).map(_.toSet) valueOr throwErrors
+      cfgValidator.validateList[T](path).map(_.toSet) getValueOrThrowErrors
     }
 
-    def getValidatedMap[K, V: ValueReader](path: String)(keyReader: String => Validated[String, K]): Map[K, V] = {
-      cfgValidator.validateMap(path)(keyReader) valueOr throwErrors
+    def getValidatedMap[K, V: ValueReader](path: String)(keyValidator: String => Validated[String, K]): Map[K, V] = {
+      cfgValidator.validateMap(path)(keyValidator) getValueOrThrowErrors
     }
 
     def getValidatedByPredicate[T: ValueReader](path: String)(predicate: T => Boolean, errorMsg: String): T = {
-      cfgValidator.validateByPredicate(path)(predicate, errorMsg) valueOr throwErrors
+      cfgValidator.validateByPredicate(path)(predicate, errorMsg) getValueOrThrowErrors
     }
   }
 }

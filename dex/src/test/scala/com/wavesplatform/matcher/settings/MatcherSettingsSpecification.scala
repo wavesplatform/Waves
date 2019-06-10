@@ -6,7 +6,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings, RawMatchingRules}
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
