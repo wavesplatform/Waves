@@ -216,9 +216,22 @@ object Explorer extends ScorexLogging {
           }
           iterator.close()
 
-          log.info("key-space,entry-count,total-key-size,total-value-size")
+          def humanReadableByteCount(bytes: Long, si: Boolean = false): String = {
+            val unit =
+              if (si) 1000
+              else 1024
+            if (bytes < unit) return bytes + " B"
+            val exp = (Math.log(bytes) / Math.log(unit)).toInt
+            val pre = (if (si) "kMGTPE"
+            else "KMGTPE").charAt(exp - 1) + (if (si) ""
+            else "i")
+            "%.1f %sB".format(bytes / Math.pow(unit, exp), pre)
+          }
+
+          log.info("key-space,entry-count,total-key-size,total-key-size-hr,total-value-size,total-value-size-hr")
           for ((prefix, stats) <- result.asScala) {
-            log.info(s"${keys(prefix.toInt)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+            log.info(
+              s"${keys(prefix.toInt)},${stats.entryCount},${stats.totalKeySize},${humanReadableByteCount(stats.totalKeySize)},${stats.totalValueSize},${humanReadableByteCount(stats.totalValueSize)}")
           }
 
         case "TXBH" =>
