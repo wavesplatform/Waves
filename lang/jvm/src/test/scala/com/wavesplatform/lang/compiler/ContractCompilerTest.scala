@@ -60,6 +60,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
+        ByteStr.empty,
         List.empty,
         List(
           CallableFunction(
@@ -136,6 +137,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
+        ByteStr.empty,
         List.empty,
         List(
           CallableFunction(
@@ -545,7 +547,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
-    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
   }
 
   property("expression matching case with non-existing type should produce error message with suitable types") {
@@ -556,9 +558,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       val script =
         s"""
            |
-          |  func local(tx: ${verifierTypes.mkString("|")}) = tx
+           |  func local(tx: ${verifierTypes.mkString("|")}) = tx
            |
-          |  @Verifier(tx)
+           |  @Verifier(tx)
            |  func test() =
            |    match local(tx) {
            |      case _: UndefinedType => true
@@ -568,10 +570,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
   }
 
-  ignore("matching case with union type containing non-existing type should produce error message with suitable types") {
+  property("matching case with union type containing non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
     val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
 
@@ -589,7 +591,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
   }
 
   property("locally call @Callable func should produce informative error") {

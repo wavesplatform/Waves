@@ -19,10 +19,7 @@ object TermPrinter {
     e match {
       case obj: CaseObj => printObj(toDest, obj, depth)
       case arr: ARR     => printArr(toDest, arr)
-      case a            =>
-        val str = a.toString
-        if (str.isEmpty) toDest("<empty>")
-        else toDest(str)
+      case a            => toDest(a.prettyString(depth))
     }
 
   private def printArr(toDest: String => Unit, arr: ARR): Unit = {

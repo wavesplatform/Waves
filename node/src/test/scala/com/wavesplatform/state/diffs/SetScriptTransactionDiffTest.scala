@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -52,6 +53,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     script = ContractScript(
       V3,
       DApp(
+        ByteStr.empty,
         List.empty,
         List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None
