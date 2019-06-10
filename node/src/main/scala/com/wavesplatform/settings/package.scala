@@ -80,8 +80,11 @@ package object settings {
     def withNetwork(config: Config): String = {
       val bc = config.getString("waves.blockchain.type")
       val suffix =
-        if (bc == "CUSTOM") s"custom${config.getString("waves.blockchain.custom.address-scheme-character")}"
-        else bc.toLowerCase
+        if (bc == "CUSTOM") {
+          val char = config.getString("waves.blockchain.custom.address-scheme-character").headOption.getOrElse(0.toChar)
+          s"custom-${Integer.toHexString(char)}"
+        } else
+          bc.toLowerCase
 
       s"waves-$suffix"
     }
