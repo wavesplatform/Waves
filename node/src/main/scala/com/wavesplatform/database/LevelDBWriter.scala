@@ -348,8 +348,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
+    val assetsByAddress = mutable.AnyRefMap.empty[Long, Set[IssuedAsset]]
+
     for ((addressId, assets) <- assetBalances) {
-      val prevAssetSet = assetBalanceIterator(rw, addressId).map(_._1._1).toSet
+      val prevAssetSet = assetsByAddress.getOrElseUpdate(addressId, assetBalanceIterator(rw, addressId).map(_._1._1).toSet)
       val newAssets = assets.keys.filter(!prevAssetSet(_))
       for (asset <- newAssets) newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
 
