@@ -78,12 +78,9 @@ object MatcherSettings {
   }
 
   private val rawMatchingRulesNel: ValueReader[NonEmptyList[RawMatchingRules]] = nonEmptyListReader[RawMatchingRules].map { xs =>
-    val strictOrder = xs.tail.zip(xs.toList).forall {
-      case (next, prev) => next.startOffset > prev.startOffset
-    }
-
-    if (strictOrder) xs
-    else throw new IllegalArgumentException(s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}")
+    val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }
+    if (isStrictOrder) { if (xs.head.startOffset != 0) RawMatchingRules(0, false) :: xs else xs } else
+      throw new IllegalArgumentException(s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}")
   }
 
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)

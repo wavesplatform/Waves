@@ -115,7 +115,7 @@ object MatcherTool extends ScorexLogging {
               } yield s"${lo.order.id()} -> $lo").mkString("\n")
 
             println(s"Last snapshot: $lastSnapshot")
-            println(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders)}")
+            println(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders.map(_._2))}")
           }
         } finally {
           Await.ready(system.terminate(), Duration.Inf)

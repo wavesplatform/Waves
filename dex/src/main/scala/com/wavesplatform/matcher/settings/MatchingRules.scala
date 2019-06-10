@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.matcher.settings
 
 import cats.data.NonEmptyList
 import com.wavesplatform.matcher.model.OrderBook.TickSize
@@ -7,6 +7,7 @@ import com.wavesplatform.matcher.queue.QueueEventWithMeta
 case class MatchingRules(startOffset: QueueEventWithMeta.Offset, tickSize: TickSize)
 
 object MatchingRules {
+
   val Default                                 = MatchingRules(0L, TickSize.Disabled)
   val DefaultNel: NonEmptyList[MatchingRules] = NonEmptyList.one(Default)
 

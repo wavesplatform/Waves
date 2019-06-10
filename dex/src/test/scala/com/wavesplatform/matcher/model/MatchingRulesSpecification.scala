@@ -4,6 +4,7 @@ import cats.data.NonEmptyList
 import com.wavesplatform.NoShrink
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.OrderBook.TickSize
+import com.wavesplatform.matcher.settings.MatchingRules
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

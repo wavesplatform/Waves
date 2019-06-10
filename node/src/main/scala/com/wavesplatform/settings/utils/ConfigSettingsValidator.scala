@@ -10,7 +10,9 @@ import scala.collection.JavaConverters._
 import scala.util.Try
 
 object ConfigSettingsValidator {
+
   type ErrorsListOr[A] = ValidatedNel[String, A]
+
   def apply(config: Config): ConfigSettingsValidator = new ConfigSettingsValidator(config)
 
   implicit class ErrorListOrOpts[A](validatedValue: ErrorsListOr[A]) {

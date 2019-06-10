@@ -20,10 +20,10 @@ import com.wavesplatform.matcher.history.HistoryRouter
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.MatcherModel.Normalization
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, MatchingRules, OrderBook, OrderValidator}
+import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
-import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.matcher.settings.MatcherSettings.RawMatchingRules
+import com.wavesplatform.matcher.settings.{MatcherSettings, MatchingRules}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

@@ -19,26 +19,23 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[Or
   def bestBid: Option[LevelAgg] = bids.aggregated.headOption
   def bestAsk: Option[LevelAgg] = asks.aggregated.headOption
 
-  def allOrders: Iterable[LimitOrder] =
+  def allOrders: Iterable[(Long, LimitOrder)] = {
     for {
-      (_, level) <- bids ++ asks
-      lo         <- level
-    } yield lo
+      (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
+      lo             <- level
+    } yield price -> lo
+  }
 
   def cancel(orderId: ByteStr, timestamp: Long, tickSize: TickSize): Option[OrderCanceled] = {
     allOrders.collectFirst {
-      case lo if lo.order.id() == orderId =>
-        (if (lo.order.orderType == OrderType.BUY) bids else asks)
-          .remove(
-            correctPriceByTickSize(lo.order.price, lo.order.orderType, tickSize),
-            lo.order.id()
-          )
+      case (price, lo) if lo.order.id() == orderId =>
+        (if (lo.order.orderType == OrderType.BUY) bids else asks).remove(price, lo.order.id())
         OrderCanceled(lo, false, timestamp)
     }
   }
 
   def cancelAll(timestamp: Long): Seq[OrderCanceled] = {
-    val canceledOrders = allOrders.map(lo => OrderCanceled(lo, unmatchable = false, timestamp)).toSeq
+    val canceledOrders = allOrders.map { case (_, lo) => OrderCanceled(lo, unmatchable = false, timestamp) }.toSeq
     bids.clear()
     asks.clear()
     canceledOrders

@@ -11,8 +11,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
 import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdated}
-import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, MatchingRules, OrderBook}
+import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.matcher.settings.MatchingRules
 import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
