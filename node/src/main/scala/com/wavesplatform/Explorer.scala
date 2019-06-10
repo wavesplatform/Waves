@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.nio.ByteBuffer
 import java.util
+import java.util.Locale
 
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.typesafe.config.ConfigFactory
@@ -223,9 +224,8 @@ object Explorer extends ScorexLogging {
             if (bytes < unit) return bytes + " B"
             val exp = (Math.log(bytes) / Math.log(unit)).toInt
             val pre = (if (si) "kMGTPE"
-            else "KMGTPE").charAt(exp - 1) + (if (si) ""
-            else "i")
-            "%.1f %sB".format(bytes / Math.pow(unit, exp), pre)
+            else "KMGTPE").charAt(exp - 1)
+            "%.1f %sB".formatLocal(Locale.ENGLISH, bytes / Math.pow(unit, exp), pre)
           }
 
           log.info("key-space,entry-count,total-key-size,total-key-size-hr,total-value-size,total-value-size-hr")
