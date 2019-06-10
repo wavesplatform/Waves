@@ -21,7 +21,7 @@ trait OrderDB {
 }
 
 object OrderDB {
-  private val OldestOrderIndexOffset = 100
+  val OldestOrderIndexOffset = 100
 
   def apply(settings: MatcherSettings, db: DB): OrderDB = new OrderDB with ScorexLogging {
     override def containsInfo(id: ByteStr): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
