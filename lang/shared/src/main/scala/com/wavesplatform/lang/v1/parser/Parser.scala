@@ -23,6 +23,7 @@ object Parser {
   val lowerChar          = CharIn('a' to 'z')
   val upperChar          = CharIn('A' to 'Z')
   val char               = lowerChar | upperChar
+  val underscore         = "_"
   val digit              = CharIn('0' to '9')
   val unicodeSymbolP     = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
   val notEndOfString     = CharPred(_ != '\"')
@@ -89,11 +90,11 @@ object Parser {
     }
     .map(Function.tupled(CONST_STRING))
 
-  val correctVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
+  val correctVarName: P[PART[String]] = (Index ~~ ((char | underscore) ~~ (digit | char | underscore).repX()).! ~~ Index)
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
+  val anyVarName: P[PART[String]] = (Index ~~ ((char | underscore) ~~ (digit | char | underscore).repX()).! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
       else PART.VALID(Pos(start, end), x)
