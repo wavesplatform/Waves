@@ -349,6 +349,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
     for ((addressId, assets) <- assetBalances) {
+      val prevAssetSet = assetBalanceIterator(rw, addressId).map(_._1._1).toSet
+      val newAssets = assets.keys.filter(!prevAssetSet(_))
+      for (asset <- newAssets) newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
+
       for ((asset, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, asset)(height), balance)
         rw.put(Keys.assetBalanceLastHeight(addressId, asset), height)
@@ -399,7 +403,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           (key, value) <- addressData.data
           dataKeySuffix = Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))
           isNew = rw.lastValue(Keys.DataPrefix, dataKeySuffix, this.height).isEmpty
-          _     = rw.put(Keys.data(addressId, key)(height), Some(value))
+          _ = rw.put(Keys.data(addressId, key)(height), Some(value))
           _ = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
           if isNew
         } yield key
