@@ -814,7 +814,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             if (lastHeight == 0)
               default
             else if (lastHeight > from)
-              db.lastValue(Keys.WavesBalancePrefix, AddressId.toBytes(addressId), from)
+              db.lastValue(prefix, AddressId.toBytes(addressId), from)
                 .map { e =>
                   val (_, _, _, h) = Keys.parseAddressBytesHeight(e.getKey)
                   read(h).parse(e.getValue)
