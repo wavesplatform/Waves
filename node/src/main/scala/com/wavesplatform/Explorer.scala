@@ -183,7 +183,7 @@ object Explorer extends ScorexLogging {
           import scala.concurrent.duration._
 
           object timeThrottledLogger {
-            private[this] var entriesProcessed = 0
+            private[this] var entriesProcessed = 0L
             private[this] var lastLogTime = System.nanoTime()
 
             def incEntries(): Unit =
