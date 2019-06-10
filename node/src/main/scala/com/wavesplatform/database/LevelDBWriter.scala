@@ -688,6 +688,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .map(assetBalanceIterator(db, _))
       .getOrElse(CloseableIterator.empty)
       .map { case ((asset, _), _) => asset }
+      .closeAfter(_.toVector) // FIXME: Proper reverse iterator
+      .reverseIterator
 
     val issueTxStream = assetIdStream
       .flatMap(ia => transactionInfo(ia.id, db).map(_._2))
