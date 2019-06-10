@@ -324,7 +324,7 @@ object WavesContext {
         "transferTransactionById",
         100,
         TRANSFERTRANSACTIONBYID,
-        buildTransferTransactionType(proofsEnabled),
+        UNION(buildTransferTransactionType(proofsEnabled), UNIT),
         "Lookup transfer transaction",
         ("id", BYTESTR, "transfer transaction id")
       ) {
