@@ -525,7 +525,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               if (prevHeight == 0) rw.delete(lastHeightKey) else rw.put(lastHeightKey, prevHeight)
             }
 
-            for (((assetId, `currentHeight`), _) <- assetBalanceIterator(rw, addressId)) {
+            for (((assetId, h), _) <- assetBalanceIterator(rw, addressId) if h == currentHeight) {
               balancesToInvalidate += (address -> assetId)
               rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
               resetLastForAddress(Keys.assetBalanceLastHeight(addressId, assetId), Keys.AssetBalancePrefix, assetId.id)
