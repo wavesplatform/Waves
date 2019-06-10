@@ -386,6 +386,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
 
+  property("LIST access IndexOutOfBounds") {
+    val src =
+      """
+        |[1].getElement(1)
+      """.stripMargin
+    eval[EVALUATED](src) should produce("OutOfBounds")
+  }
+
   property("list constructor for different data entries") {
     val src =
       """

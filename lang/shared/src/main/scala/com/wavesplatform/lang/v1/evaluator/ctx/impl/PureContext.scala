@@ -466,7 +466,10 @@ object PureContext {
       ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')), "list"),
       ("pos", LONG, "element position")
     ) {
-      case ARR(arr) :: CONST_LONG(pos) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
+      case ARR(arr) :: CONST_LONG(pos) :: Nil => Try(arr(pos.toInt)).toEither.left.map({
+        case e: java.lang.IndexOutOfBoundsException => s"$pos OutOfBounds ${arr.size}"
+        case e: Throwable => e.toString
+      })
       case _                                  => ???
     }
 

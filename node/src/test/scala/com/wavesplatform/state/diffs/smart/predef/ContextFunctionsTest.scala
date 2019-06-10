@@ -176,7 +176,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
              |""".stripMargin,
           Coproduct(tx)
         )
-        outOfBounds shouldBe Left(s"java.lang.IndexOutOfBoundsException: $badIndex")
+        outOfBounds shouldBe Left(s"$badIndex OutOfBounds ${tx.data.size}")
     }
   }
 
