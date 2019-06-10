@@ -368,14 +368,14 @@ object Application {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
+    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+    Kamon.reconfigure(config)
+
     if (config.getBoolean("kamon.enable")) {
       Kamon.addReporter(new InfluxDBReporter())
       SystemMetrics.startCollecting()
     }
-
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
 
     settings
   }
@@ -394,12 +394,12 @@ object Application {
     System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
-      case "export"  => Exporter.main(args.tail)
-      case "import"  => Importer.main(args.tail)
+      case "export" => Exporter.main(args.tail)
+      case "import" => Importer.main(args.tail)
       case "explore" => Explorer.main(args.tail)
-      case "util"    => UtilApp.main(args.tail)
+      case "util" => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _         => startNode(args.headOption)
+      case _ => startNode(args.headOption)
     }
   }
 
