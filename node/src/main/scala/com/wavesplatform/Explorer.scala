@@ -23,69 +23,53 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
+import scala.util.control.NonFatal
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
 
-  private val keys = Array(
-    "version",
-    "height",
-    "score",
-    "block-at-height", // not used now
-    "height-of",
-    "waves-balance-history",
-    "waves-balance",
-    "assets-for-address",
-    "asset-balance-history",
-    "asset-balance",
-    "asset-info-history",
-    "asset-info",
-    "lease-balance-history",
-    "lease-balance",
-    "lease-status-history",
-    "lease-status",
-    "filled-volume-and-fee-history",
-    "filled-volume-and-fee",
-    "transaction-info", // not used now
-    "address-transaction-history",
-    "address-transaction-ids-at-height",
-    "changed-addresses",
-    "transaction-ids-at-height", // not used now
-    "address-id-of-alias",
-    "last-address-id",
-    "address-to-id",
-    "id-of-address",
-    "address-script-history",
-    "address-script",
-    "approved-features",
-    "activated-features",
-    "data-key-chunk-count",
-    "data-key-chunk",
-    "data-history",
-    "data",
-    "sponsorship-history",
-    "sponsorship",
-    "addresses-for-waves-seq-nr",
-    "addresses-for-waves",
-    "addresses-for-asset-seq-nr",
-    "addresses-for-asset",
-    "address-transaction-ids-seq-nr", // not used now
-    "address-transaction-ids", // not used now
-    "alias-is-disabled",
-    "carry-fee-history",
-    "carry-fee",
-    "asset-script-history",
-    "asset-script",
-    "safe-rollback-height",
-    "changed-data-keys",
-    "block-header-at-height",
-    "nth-transaction-info-at-height",
-    "address-transaction-seq-nr",
-    "address-transaction-height-type-and-nums",
-    "transaction-height-and-nums-by-id",
-    "block-transactions-fee",
-    "invoke-script-result"
+  private val keys = Map[Int, String](
+    0  -> "version",
+    1  -> "height",
+    2  -> "score",
+    4  -> "height-of",
+    5  -> "waves-balance-last-height",
+    6  -> "waves-balance",
+    7  -> "assets-for-address",
+    8  -> "asset-balance-last-height",
+    9  -> "asset-balance",
+    11 -> "asset-info",
+    12 -> "lease-balance-last-height",
+    13 -> "lease-balance",
+    15 -> "lease-status",
+    17 -> "filled-volume-and-fee",
+    21 -> "changed-addresses",
+    23 -> "address-id-of-alias",
+    24 -> "last-address-id",
+    25 -> "address-to-id",
+    26 -> "id-of-address",
+    28 -> "address-script",
+    29 -> "approved-features",
+    30 -> "activated-features",
+    31 -> "data-key-chunk-count",
+    32 -> "data-key-chunk",
+    34 -> "data",
+    36 -> "sponsorship",
+    39 -> "addresses-for-asset-seq-nr",
+    40 -> "addresses-for-asset",
+    43 -> "alias-is-disabled",
+    45 -> "carry-fee",
+    47 -> "asset-script",
+    48 -> "safe-rollback-height",
+    49 -> "changed-data-keys",
+    50 -> "block-header-at-height",
+    51 -> "nth-transaction-info-at-height",
+    52 -> "address-transaction-seq-nr",
+    53 -> "address-transaction-height-type-and-nums",
+    54 -> "transaction-height-and-nums-by-id",
+    55 -> "block-transactions-fee",
+    56 -> "invoke-script-result"
   )
 
   def main(args: Array[String]): Unit = {
@@ -135,7 +119,7 @@ object Explorer extends ScorexLogging {
                 def parseBytesHeight(bs: Array[Byte]): (Short, Array[Byte], Height) = {
                   val prefix = Shorts.fromByteArray(bs.take(2))
                   val height = Height(Ints.fromByteArray(bs.takeRight(4)))
-                  val aux = bs.drop(2).dropRight(4)
+                  val aux    = bs.drop(2).dropRight(4)
                   (prefix, aux, height)
                 }
 
@@ -196,6 +180,21 @@ object Explorer extends ScorexLogging {
             .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
         case "S" =>
+          import scala.concurrent.duration._
+
+          object timeThrottledLogger {
+            private[this] var entriesProcessed = 0
+            private[this] var lastLogTime = System.nanoTime()
+
+            def incEntries(): Unit =
+              entriesProcessed += 1
+
+            def logLine(threshold: FiniteDuration): Unit = if ((System.nanoTime() - lastLogTime) > threshold.toNanos) {
+              log.info(s"$entriesProcessed entries processed")
+              lastLogTime = System.nanoTime()
+            }
+          }
+
           log.info("Collecting DB stats")
           val iterator = db.iterator()
           val result   = new util.HashMap[Short, Stats]
@@ -211,12 +210,15 @@ object Explorer extends ScorexLogging {
                   case prev => Stats(prev.entryCount + 1, prev.totalKeySize + entry.getKey.length, prev.totalValueSize + entry.getValue.length)
               }
             )
+
+            timeThrottledLogger.incEntries()
+            timeThrottledLogger.logLine(5 seconds)
           }
           iterator.close()
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
-            log.info(s"${keys(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+            log.info(s"${keys(prefix.toInt)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
           }
 
         case "TXBH" =>
@@ -319,6 +321,6 @@ object Explorer extends ScorexLogging {
             }
           }
       }
-    } finally db.close()
+    } catch { case NonFatal(e) => log.error(s"Explorer error, args = $args", e) } finally db.close()
   }
 }

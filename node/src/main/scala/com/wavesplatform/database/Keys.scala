@@ -124,8 +124,6 @@ object Keys {
   val AssetScriptPrefix: Short = 47
   def assetScript(asset: IssuedAsset)(height: Int): Key[Option[Script]] =
     Key.opt("asset-script", hBytes(AssetScriptPrefix, asset.id.arr, height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
-  def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
-    Key.opt("asset-script", hBytes(AssetScriptPrefix, asset.id.arr, height), (_ => ()), (_ => Array[Byte]()))
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 
