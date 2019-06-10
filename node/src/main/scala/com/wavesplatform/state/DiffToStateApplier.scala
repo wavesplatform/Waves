@@ -17,11 +17,12 @@ object DiffToStateApplier {
       (address, portfolioDiff) <- diff.portfolios
       wavesUpdate = {
         if (portfolioDiff.balance != 0)
-          Some(Waves -> (portfolioDiff.balance + blockchain.balance(address, Waves)))
+          Some(Waves -> portfolioDiff.balance)
         else None
       }
-      (asset, balance) <- portfolioDiff.assets ++ wavesUpdate
-    } yield (address, asset) -> balance
+      (asset, balanceDiff) <- portfolioDiff.assets ++ wavesUpdate
+      newBalance = balanceDiff + blockchain.balance(address, asset)
+    } yield (address, asset) -> newBalance
 
   def leases(blockchain: Blockchain, diff: Diff): Map[Address, LeaseBalance] =
     diff.portfolios
