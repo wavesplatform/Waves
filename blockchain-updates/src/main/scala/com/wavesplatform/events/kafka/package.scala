@@ -4,7 +4,9 @@ import java.util
 import com.wavesplatform.events.protobuf.PBEvents
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.state.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
+import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.apache.kafka.common.config.SaslConfigs
 import org.apache.kafka.common.serialization.{IntegerSerializer, Serializer}
 
 package object kafka {
@@ -26,22 +28,37 @@ package object kafka {
       integerSerializer.serialize(topic, data)
   }
 
-  private def createProperties(settings: BlockchainUpdatesSettings): util.Properties = {
+  def createProperties(settings: BlockchainUpdatesSettings): util.Properties = {
     val props = new util.Properties()
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.bootstrapServers)
     props.put(ProducerConfig.CLIENT_ID_CONFIG, settings.clientId)
     //  props.put(ProducerConfig.RETRIES_CONFIG, "0")
+
+    // SASL_SSL
+    if (settings.ssl.enabled) {
+      props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL")
+      props.put(SaslConfigs.SASL_MECHANISM, "PLAIN")
+      props.put(
+        SaslConfigs.SASL_JAAS_CONFIG,
+        s"org.apache.kafka.common.security.plain.PlainLoginModule required username = '${settings.ssl.username}' password = '${settings.ssl.password}';"
+      )
+    }
+    props
+  }
+
+  def createProducerProperties(settings: BlockchainUpdatesSettings): util.Properties = {
+    val props = createProperties(settings)
     props.put(ProducerConfig.ACKS_CONFIG, "all")
     props
   }
 
   def createProducer(settings: BlockchainUpdatesSettings): KafkaProducer[Int, BlockchainUpdated] =
-    new KafkaProducer[Int, BlockchainUpdated](createProperties(settings), IntSerializer, BlockchainUpdatedSerializer)
+    new KafkaProducer[Int, BlockchainUpdated](createProducerProperties(settings), IntSerializer, BlockchainUpdatedSerializer)
 
   def createProducerRecord(topic: String, event: BlockchainUpdated): ProducerRecord[Int, BlockchainUpdated] = {
     val h = event match {
-      case BlockAppended(_, height, _, _)            => height
-      case MicroBlockAppended(_, height, _, _)       => height
+      case BlockAppended(_, height, _, _)         => height
+      case MicroBlockAppended(_, height, _, _)    => height
       case RollbackCompleted(_, height)           => height
       case MicroBlockRollbackCompleted(_, height) => height
     }
