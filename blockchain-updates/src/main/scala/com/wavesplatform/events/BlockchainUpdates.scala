@@ -2,7 +2,6 @@ package com.wavesplatform.events
 
 import java.time.{Duration => JDuration}
 import java.util
-import java.util.Properties
 
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
@@ -17,9 +16,7 @@ import com.wavesplatform.events.kafka.{createProducer, createProducerRecord, cre
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.serialization.Deserializer
 import com.wavesplatform.events.protobuf.PBBlockchainUpdated
-import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.config.SaslConfigs
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

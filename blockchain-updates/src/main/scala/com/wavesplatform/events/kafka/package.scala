@@ -49,6 +49,7 @@ package object kafka {
   def createProducerProperties(settings: BlockchainUpdatesSettings): util.Properties = {
     val props = createProperties(settings)
     props.put(ProducerConfig.ACKS_CONFIG, "all")
+    props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, "10485760") // 10MB
     props
   }
 
