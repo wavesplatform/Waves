@@ -4,6 +4,7 @@ import sbt._
 
 object CommonSettings extends AutoPlugin {
   object autoImport extends CommonKeys
+  import autoImport._
 
   override def trigger: PluginTrigger = allRequirements
 
@@ -11,10 +12,12 @@ object CommonSettings extends AutoPlugin {
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
     javaOptions ++= {
       if (isScalaJSProject.value || !fork.value) Seq.empty else ModernJavaSettings.options
-    }
+    },
+    packageSource := sourceDirectory.value / "package"
   )
 }
 
 trait CommonKeys {
-  val network = settingKey[Network]("The network for artifacts")
+  val network       = settingKey[Network]("The network for artifacts")
+  val packageSource = settingKey[File]("Additional files for DEB")
 }
