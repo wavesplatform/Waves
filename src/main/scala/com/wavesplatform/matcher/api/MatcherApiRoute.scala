@@ -497,13 +497,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
-      complete(
-        DBUtils
-          .order(db, orderId)
-          .fold[Future[OrderStatus]](Future.successful(OrderStatus.NotFound)) { order =>
-            askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
-          }
-          .map(_.json))
+      complete {
+        val r = DBUtils.order(db, orderId) match {
+          case Some(order) => askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
+          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status))
+        }
+        r.map(_.json)
+      }
     }
   }
 

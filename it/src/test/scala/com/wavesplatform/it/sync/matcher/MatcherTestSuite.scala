@@ -9,6 +9,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.db.OrderDB
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, _}
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -377,6 +378,27 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val o1                = matcherNode.placeOrder(aliceAcc, pair, BUY, amount, minNonZeroInvalid, matcherFee)
         o1.status shouldBe "OrderAccepted"
       }
+    }
+  }
+
+  "Order statuses for old orders" in {
+    val (amountAssetTx, priceAssetTx, pair) = issueAssetPair(aliceAcc, 2, 8)
+
+    def placeOrder(i: Int, tpe: OrderType) = matcherNode.placeOrder(aliceAcc, pair, tpe, 100L + i, Order.PriceConstant, matcherFee)
+
+    val txIds = List(amountAssetTx, priceAssetTx).map(matcherNode.signedIssue).map(_.id)
+    txIds.foreach(matcherNode.waitForTransaction(_))
+
+    val ids = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+      List(
+        placeOrder(i, OrderType.BUY).message.id,
+        placeOrder(i, OrderType.SELL).message.id
+      )
+    }
+
+    ids.foreach { id =>
+      val status = matcherNode.orderStatus(id, pair, waitForStatus = false).status
+      withClue(id)(status should not be "NotFound")
     }
   }
 
