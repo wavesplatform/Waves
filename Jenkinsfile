@@ -14,7 +14,7 @@ pipeline {
     stages {
         stage('Unit Test') {
             steps {
-                sh "sbt -mem 10240 node/checkPR"
+                sh "sbt -mem 10240 checkPR"
             }
         }
         stage('Check containers') {
