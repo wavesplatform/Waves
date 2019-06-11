@@ -50,7 +50,7 @@ case class MatcherSettings(account: String,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            allowedAssetPairs: Set[AssetPair],
-                           allowOrderV3: Boolean,
+                           allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings])
@@ -110,7 +110,7 @@ object MatcherSettings {
     val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
-    val allowOrderV3            = config.as[Boolean]("allow-order-v3")
+    val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
     val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
     val postgresConnection = config.as[PostgresConnection]("postgres")
@@ -142,7 +142,7 @@ object MatcherSettings {
       deviation,
       orderRestrictions,
       allowedAssetPairs,
-      allowOrderV3,
+      allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
       orderHistory
