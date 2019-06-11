@@ -124,7 +124,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private[this] def getAssetScript(asset: IssuedAsset): Option[() => Script] = readOnly { db =>
     for {
-      (h, n) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id))
+      (_, (h, n)) <- assetDescriptionCache.get(asset)
       e <- db.lastValue(Keys.AssetScriptPrefix, Keys.heightWithNum(h, n), this.height)
       value <- Option(e.getValue) if value.nonEmpty
     } yield () => ScriptReader.fromBytes(value).explicitGet()
@@ -172,8 +172,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: AddressId, asset: Asset) = {
     val (lastKey, valueKey) = asset match {
-      case ia@IssuedAsset(id) =>
-        val (issueH, issueN) = db.get(Keys.transactionHNById(TransactionId @@ id)).getOrElse((Height @@ 0, TxNum @@ 0.toShort))
+      case ia@IssuedAsset(_) =>
+        val (_, (issueH, issueN)) = assetDescriptionCache.get(ia).getOrElse(throw new IllegalArgumentException(s"No such asset: $asset"))
         (Keys.assetBalanceLastHeight(addressId, issueH, issueN), Keys.assetBalance(addressId, issueH, issueN) _)
 
       case Waves =>
@@ -328,15 +328,15 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold = height - dbSettings.maxRollbackDepth
 
     def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
-      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
-        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
-        .closeAfter { iterator =>
-          val heights = iterator.toStream
-          heights
-            .zip(heights.drop(1))
-            .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
-            .foreach { case (h, _) => rw.delete(key(h)) }
-        }
+      //      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
+      //        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
+      //        .closeAfter { iterator =>
+      //          val heights = iterator.toStream
+      //          heights
+      //            .zip(heights.drop(1))
+      //            .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
+      //            .foreach { case (h, _) => rw.delete(key(h)) }
+      //        }
     }
 
     def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte] = Array.emptyByteArray)(key: AddressId => Height => Key[_]): Unit = {
