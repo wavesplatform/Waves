@@ -84,9 +84,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
-  override protected def loadMaxAddressId(): Long = readOnly(db => db.get(Keys.lastAddressId).getOrElse(0L))
+  override protected def loadMaxAddressId(): AddressId = readOnly(db => db.get(Keys.lastAddressId).getOrElse(AddressId @@ 0L))
 
-  override protected def loadAddressId(address: Address): Option[Long] = readOnly(db => db.get(Keys.addressId(address)))
+  override protected def loadAddressId(address: Address): Option[AddressId] = readOnly(db => db.get(Keys.addressId(address)))
 
   override protected def loadHeight(): Int = readOnly(_.get(Keys.height))
 
@@ -208,8 +208,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     )
   }
 
-  private def loadFullPortfolio(db: ReadOnlyDB, addressId: Long) = loadLposPortfolio(db, addressId).copy(
-    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+  private def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
+    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
       val (_, _, abs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val assetId = IssuedAsset(abs)
       map + (assetId -> Longs.fromByteArray(e.getValue))
@@ -234,9 +234,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(asset.id, db) match {
-      case Some((_, i: IssueTransaction)) =>
+  override protected def loadAssetDescription(asset: IssuedAsset): Option[(AssetDescription, (Height, TxNum))] = readOnly { db =>
+    val maybeTxInfo = for {
+      (h, n) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id))
+      tx     <- db.get(Keys.transactionAt(h, n))
+    } yield (h, n, tx)
+
+    maybeTxInfo collect {
+      case (h, n, i: IssueTransaction) =>
         val ai = readLastValue(db)(Keys.AssetInfoPrefix, asset.id, readAssetInfo)
           .getOrElse(AssetInfo(i.reissuable, i.quantity))
 
@@ -244,8 +249,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           .fold(0L)(_.minFee)
 
         val script = readLastValue(db)(Keys.AssetScriptPrefix, asset.id, ScriptReader.fromBytes(_).toOption).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
-      case _ => None
+        val description = AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship)
+        (description, (h, n))
     }
   }
 
@@ -266,18 +271,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   //noinspection ScalaStyle
   override protected def doAppend(block: Block,
                                   carry: Long,
-                                  newAddresses: Map[Address, Long],
-                                  wavesBalances: Map[Long, Long],
-                                  assetBalances: Map[Long, Map[IssuedAsset, Long]],
-                                  leaseBalances: Map[Long, LeaseBalance],
+                                  newAddresses: Map[Address, AddressId],
+                                  wavesBalances: Map[AddressId, Long],
+                                  assetBalances: Map[AddressId, Map[IssuedAsset, Long]],
+                                  leaseBalances: Map[AddressId, LeaseBalance],
                                   addressTransactions: Map[AddressId, List[TransactionId]],
                                   leaseStates: Map[ByteStr, Boolean],
                                   reissuedAssets: Map[IssuedAsset, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
-                                  scripts: Map[Long, Option[Script]],
+                                  scripts: Map[AddressId, Option[Script]],
                                   assetScripts: Map[IssuedAsset, Option[Script]],
-                                  data: Map[Long, AccountDataInfo],
-                                  aliases: Map[Alias, Long],
+                                  data: Map[AddressId, AccountDataInfo],
+                                  aliases: Map[Alias, AddressId],
                                   sponsorship: Map[IssuedAsset, Sponsorship],
                                   totalFee: Long,
                                   scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
@@ -302,7 +307,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
-    val lastAddressId = loadMaxAddressId() + newAddresses.size
+    val lastAddressId = AddressId @@ (loadMaxAddressId() + newAddresses.size)
 
     rw.put(Keys.lastAddressId, Some(lastAddressId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
@@ -327,7 +332,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             .foreach { case (h, _) => rw.delete(key(h)) }
         }
     }
-
+    val newAddressesForWaves = ArrayBuffer.empty[AddressId]
     def deleteOldKeysForAddress(prefix: Short, addressId: Long, bytes: Array[Byte] = Array.emptyByteArray)(key: Long => Int => Key[_]): Unit = {
       deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
     }
@@ -347,7 +352,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       deleteOldKeysForAddress(Keys.LeaseBalancePrefix, addressId)(Keys.leaseBalance)
     }
 
-    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
+    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[AddressId]]
     for ((addressId, assets) <- assetBalances) {
       val prevAssets   = rw.get(Keys.assetList(addressId))
       val prevAssetSet = prevAssets.toSet
@@ -355,11 +360,21 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
-      rw.put(Keys.assetList(addressId), (assets.keys.toList ::: prevAssets).distinct)
-      for ((asset, balance) <- assets) {
-        rw.put(Keys.assetBalance(addressId, asset)(height), balance)
-        rw.put(Keys.assetBalanceLastHeight(addressId, asset), height)
-        deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, asset.id)(Keys.assetBalance(_, asset))
+      rw.put(Keys.assetList(addressId), assets.keys.toList ++ prevAssets)
+      for ((assetId, balance) <- assets) {
+        lazy val maybeHNFromState = assetDescriptionCache.get(assetId).map(_._2)
+        lazy val maybeHNFromNewTransactions = transactions
+          .get(TransactionId @@ assetId.id)
+          .map { case (_, n) => (Height @@ height, n) }
+
+        maybeHNFromNewTransactions
+          .orElse(maybeHNFromState)
+          .foreach {
+            case (h, n) =>
+              rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
+              rw.put(Keys.assetBalanceLastHeight(addressId, asset), height)
+              deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, asset.id)(Keys.assetBalance(_, asset))
+          }
       }
     }
 
@@ -472,7 +487,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       case (txId, result) =>
         val (txHeight, txNum) = transactions
           .get(TransactionId(txId))
-          .map { case (_, txNum) => (height, txNum) }
+          .map { case (_, txN) => (height, txN) }
           .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
@@ -526,7 +541,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
             for (assetId <- rw.get(Keys.assetList(addressId))) {
               balancesToInvalidate += (address -> assetId)
-              rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
+              rw.get(Keys.transactionHNById(TransactionId @@ assetId.id))
+                .foreach {
+                  case (txH, txN) =>
+                    rw.delete(Keys.assetBalance(addressId, txH, txN)(currentHeight))
+                }
               resetLastForAddress(Keys.assetBalanceLastHeight(addressId, assetId), Keys.AssetBalancePrefix, assetId.id)
             }
 
@@ -897,8 +916,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
     val b = Map.newBuilder[Address, A]
     for (id <- 1L to db.get(Keys.lastAddressId).getOrElse(0L)) {
-      val address = db.get(Keys.idToAddress(id))
-      pf.runWith(b += address -> _)(address -> loadLposPortfolio(db, id))
+      val address = db.get(Keys.idToAddress(AddressId @@ id))
+      pf.runWith(b += address -> _)(address -> loadLposPortfolio(db, AddressId @@ id))
     }
     b.result()
   }
@@ -1060,14 +1079,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
 
-    def takeAfter(s: Seq[Long], a: Option[Long]): Seq[Long] = {
+    def takeAfter(s: Seq[AddressId], a: Option[AddressId]): Seq[AddressId] = {
       a match {
         case None    => s
         case Some(v) => s.dropWhile(_ != v).drop(1)
       }
     }
 
-    lazy val addressIds: Seq[Long] = {
+    lazy val addressIds: Seq[AddressId] = {
       val all = for {
         seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(asset))
         addressId <- db
@@ -1082,7 +1101,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         addressId <- addressIds.toStream
         balance = db
           .lastValue(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), asset.id), height)
-          .fold(0L)(e => Longs.fromByteArray(e.getValue)) if balance > 0
+        balance = db
+          .get(Keys.transactionHNById(TransactionId @@ asset.id))
+          .fold(0L) {
+            case (h, n) =>
+              db.lastValue(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), Ints.toByteArray(h), Ints.toByteArray(n)), height)
+          }
       } yield db.get(Keys.idToAddress(addressId)) -> balance
 
     lazy val page: AssetDistributionPage = {

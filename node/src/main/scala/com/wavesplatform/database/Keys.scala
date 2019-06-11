@@ -35,7 +35,7 @@ object Keys {
   def wavesBalance(addressId: Long)(height: Int): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetList(addressId: Long): Key[List[IssuedAsset]] =
+  def assetList(addressId: AddressId): Key[List[IssuedAsset]] =
     Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
 
   def assetBalanceLastHeight(addressId: Long, asset: IssuedAsset): Key[Int] =
@@ -45,23 +45,34 @@ object Keys {
       Ints.toByteArray)
 
   val AssetBalancePrefix: Short = 9
-  def assetBalance(addressId: Long, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key(
-      "asset-balance",
-      hBytes(AssetBalancePrefix, Bytes.concat(Ints.toByteArray(addressId.toInt), asset.id.arr), height),
-      Option(_).fold(0L)(Longs.fromByteArray),
-      Longs.toByteArray
-    )
+  def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Long] = {
+    val keyBytes =
+      hBytes(
+        AssetBalancePrefix,
+        Bytes.concat(
+          writeAddressId(addressId),
+          Ints.toByteArray(issueTxHeight),
+          Shorts.toByteArray(issueTxNum)
+        ),
+	height
+      )
+
+    val balanceDecoder = (arr: Array[Byte]) => Option(arr).fold(0L)(Longs.fromByteArray)
+    val balanceEncoder = (b: Long) => Longs.toByteArray(b)
+
+    Key("asset-balance", keyBytes, balanceDecoder, balanceEncoder)
+  }
+
 
   val AssetInfoPrefix: Short = 11
   def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
     Key("asset-info", hBytes(AssetInfoPrefix, asset.id.arr, height), readAssetInfo, writeAssetInfo)
 
   def leaseBalanceLastHeight(addressId: Long): Key[Int] =
-    Key("lease-balance-last-height", addr(12, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def leaseBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("lease-balance-history", 12, addressId.toByteArray)
 
   val LeaseBalancePrefix: Short = 13
-  def leaseBalance(addressId: Long)(height: Int): Key[LeaseBalance] =
+  def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
     Key("lease-balance", hAddr(LeaseBalancePrefix, addressId, height), readLeaseBalance, writeLeaseBalance)
 
   val LeaseStatusPrefix: Short = 15
@@ -75,34 +86,32 @@ object Keys {
   // 3, 10, 14, 16, 18, 22, 27, 33, 35, 37, 38, 41, 42, 44, 46 not used
   // 19, 20 were never used
 
-  def changedAddresses(height: Int): Key[Seq[Long]] = Key("changed-addresses", h(21, height), AddressId.readSeq, AddressId.writeSeq)
+  def changedAddresses(height: Int): Key[Seq[AddressId]] = Key("changed-addresses", h(21, height), readAddressIdSeq, writeAddressIdSeq)
 
-  def addressIdOfAlias(alias: Alias): Key[Option[Long]] =
-    Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
+  def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] =
+    Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), readAddressId, writeAddressId)
 
-  val lastAddressId: Key[Option[Long]] = Key.opt("last-address-id", Array[Byte](0, 24), AddressId.fromBytes, AddressId.toBytes)
+  val lastAddressId: Key[Option[AddressId]] = Key.opt("last-address-id", Array[Byte](0, 24), readAddressId, writeAddressId)
 
-  def addressId(address: Address): Key[Option[Long]] =
-    Key.opt("address-id", bytes(25, address.bytes.arr), b => AddressId.fromBytes(b), id => AddressId.toBytes(id))
-
-  def idToAddress(id: Long): Key[Address] = Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
+  def addressId(address: Address): Key[Option[AddressId]] = Key.opt("address-id", bytes(25, address.bytes.arr), readAddressId, writeAddressId)
+  def idToAddress(id: AddressId): Key[Address]            = Key("id-to-address", bytes(26, writeAddressId(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   val AddressScriptPrefix: Short = 28
-  def addressScript(addressId: Long)(height: Int): Key[Option[Script]] =
+  def addressScript(addressId: AddressId)(height: Int): Key[Option[Script]] =
     Key.opt("address-script", hAddr(AddressScriptPrefix, addressId, height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
 
-  def dataKeyChunkCount(addressId: Long): Key[Int] =
+  def dataKeyChunkCount(addressId: AddressId): Key[Int] =
     Key("data-key-chunk-count", addr(31, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
-  def dataKeyChunk(addressId: Long, chunkNo: Int): Key[Seq[String]] =
+  def dataKeyChunk(addressId: AddressId, chunkNo: Int): Key[Seq[String]] =
     Key("data-key-chunk", addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
   val DataPrefix: Short = 34
-  def data(addressId: Long, key: String)(height: Int): Key[Option[DataEntry[_]]] =
+  def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[_]]] =
     Key.opt("data",
-      hBytes(DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height),
+    Key.opt("data", hBytes(34, height, writeAddressId(addressId) ++ key.getBytes(UTF_8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
       DataEntry.parseValue(key, _, 0)._1,
       _.valueBytes)
 
@@ -110,9 +119,10 @@ object Keys {
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =
     Key("sponsorship", hBytes(SponsorshipPrefix, asset.id.arr, height), readSponsorship, writeSponsorship)
 
+  def addressesForWaves(seqNr: Int): Key[Seq[AddressId]] = Key("addresses-for-waves", h(38, seqNr), readAddressIdSeq, writeAddressIdSeq)
   def addressesForAssetSeqNr(asset: IssuedAsset): Key[Int] = bytesSeqNr("addresses-for-asset-seq-nr", 39, asset.id.arr)
-  def addressesForAsset(asset: IssuedAsset, seqNr: Int): Key[Seq[Long]] =
-    Key("addresses-for-asset", hBytes(40, asset.id.arr, seqNr), AddressId.readSeq, AddressId.writeSeq)
+  def addressesForAsset(asset: IssuedAsset, seqNr: Int): Key[Seq[AddressId]] =
+    Key("addresses-for-asset", hBytes(40, seqNr, asset.id.arr), readAddressIdSeq, writeAddressIdSeq)
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
@@ -127,7 +137,7 @@ object Keys {
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 
-  def changedDataKeys(height: Int, addressId: Long): Key[Seq[String]] =
+  def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, addressId, height), readStrings, writeStrings)
 
   val BlockHeaderPrefix: Short = 50
@@ -162,13 +172,13 @@ object Keys {
 
   val AddressTransactionSeqNrPrefix: Short = 52
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
-    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, AddressId.toBytes(addressId))
+    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, writeAddressId(addressId))
 
   val AddressTransactionHNPrefix: Short = 53
   def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
     Key.opt(
       "address-transaction-height-type-and-nums",
-      hBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
+      hBytes(AddressTransactionHNPrefix, writeAddressId(addressId), seqNr),
       readTransactionHNSeqAndType,
       writeTransactionHNSeqAndType
     )

@@ -143,10 +143,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long
 
-  private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
-  protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription]
+  protected val assetDescriptionCache: LoadingCache[IssuedAsset, Option[(AssetDescription, (Height, TxNum))]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
+  protected def loadAssetDescription(asset: IssuedAsset): Option[(AssetDescription, (Height, TxNum))]
   protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
-  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset)
+  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset).map(_._1)
 
   private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
@@ -175,11 +175,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
 
   private var lastAddressId = loadMaxAddressId()
-  protected def loadMaxAddressId(): Long
+  protected def loadMaxAddressId(): AddressId
 
-  private val addressIdCache: LoadingCache[Address, Option[Long]] = cache(dbSettings.maxCacheSize, loadAddressId)
-  protected def loadAddressId(address: Address): Option[Long]
-  protected def addressId(address: Address): Option[Long] = addressIdCache.get(address)
+  private val addressIdCache: LoadingCache[Address, Option[AddressId]] = cache(dbSettings.maxCacheSize, loadAddressId)
+  protected def loadAddressId(address: Address): Option[AddressId]
+  protected def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -194,18 +194,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   //noinspection ScalaStyle
   protected def doAppend(block: Block,
                          carry: Long,
-                         newAddresses: Map[Address, Long],
-                         wavesBalances: Map[Long, Long],
-                         assetBalances: Map[Long, Map[IssuedAsset, Long]],
-                         leaseBalances: Map[Long, LeaseBalance],
+                         newAddresses: Map[Address, AddressId],
+                         wavesBalances: Map[AddressId, Long],
+                         assetBalances: Map[AddressId, Map[IssuedAsset, Long]],
+                         leaseBalances: Map[AddressId, LeaseBalance],
                          addressTransactions: Map[AddressId, List[TransactionId]],
                          leaseStates: Map[ByteStr, Boolean],
                          reissuedAssets: Map[IssuedAsset, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
-                         scripts: Map[Long, Option[Script]],
+                         scripts: Map[AddressId, Option[Script]],
                          assetScripts: Map[IssuedAsset, Option[Script]],
-                         data: Map[Long, AccountDataInfo],
-                         aliases: Map[Alias, Long],
+                         data: Map[AddressId, AccountDataInfo],
+                         aliases: Map[Alias, AddressId],
                          sponsorship: Map[IssuedAsset, Sponsorship],
                          totalFee: Long,
                          scriptResults: Map[ByteStr, InvokeScriptResult]): Unit
@@ -221,18 +221,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex
-    } yield address -> (lastAddressId + offset + 1)).toMap
+    } yield address -> AddressId @@ (lastAddressId + offset + 1)).toMap
 
-    def addressId(address: Address): Long = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
+    def addressId(address: Address): AddressId = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
 
-    lastAddressId += newAddressIds.size
+    lastAddressId = AddressId @@ (lastAddressId + newAddressIds.size)
 
     log.trace(s"CACHE newAddressIds = $newAddressIds")
     log.trace(s"CACHE lastAddressId = $lastAddressId")
 
-    val wavesBalances        = Map.newBuilder[Long, Long]
-    val assetBalances        = Map.newBuilder[Long, Map[IssuedAsset, Long]]
-    val leaseBalances        = Map.newBuilder[Long, LeaseBalance]
+    val wavesBalances        = Map.newBuilder[AddressId, Long]
+    val assetBalances        = Map.newBuilder[AddressId, Map[IssuedAsset, Long]]
+    val leaseBalances        = Map.newBuilder[AddressId, LeaseBalance]
     val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
     val newPortfolios        = Seq.newBuilder[Address]
     val newBalances          = Map.newBuilder[(Address, Asset), java.lang.Long]
@@ -283,7 +283,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>
-              val addrId = AddressId(addressId(addr))
+              val addrId = addressId(addr)
               addrId -> TransactionId(tx.id())
             }
         }

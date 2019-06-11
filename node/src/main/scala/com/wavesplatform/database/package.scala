@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Bytes, Ints, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
@@ -78,6 +78,25 @@ package object database {
     def readPublicKey: PublicKey = PublicKey(readBytes(KeyLength))
   }
 
+  def writeAddressId(id: AddressId): Array[Byte] = Longs.toByteArray(id)
+  def readAddressId(arr: Array[Byte]): AddressId = AddressId @@ Longs.fromByteArray(arr)
+
+  def writeAddressIdSeq(values: Seq[AddressId]): Array[Byte] = {
+    require(values.length <= Short.MaxValue, s"BigInt sequence is too long")
+    val ndo = newDataOutput()
+    ndo.writeShort(values.size)
+    for (v <- values) {
+      ndo.writeLong(v)
+    }
+    ndo.toByteArray
+  }
+
+  def readAddressIdSeq(data: Array[Byte]): Seq[AddressId] = Option(data).fold(Seq.empty[AddressId]) { d =>
+    val ndi    = newDataInput(d)
+    val length = ndi.readShort()
+    for (_ <- 0 until length) yield AddressId @@ ndi.readLong()
+  }
+
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {
     values.foldLeft(ByteBuffer.allocate(4 * values.length))(_ putInt _).array()
   }
@@ -135,22 +154,6 @@ package object database {
           b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
-
-  def writeBigIntSeq(values: Seq[BigInt]): Array[Byte] = {
-    require(values.length <= Short.MaxValue, s"BigInt sequence is too long")
-    val ndo = newDataOutput()
-    ndo.writeShort(values.size)
-    for (v <- values) {
-      ndo.writeBigInt(v)
-    }
-    ndo.toByteArray
-  }
-
-  def readBigIntSeq(data: Array[Byte]): Seq[BigInt] = Option(data).fold(Seq.empty[BigInt]) { d =>
-    val ndi    = newDataInput(d)
-    val length = ndi.readShort()
-    for (_ <- 0 until length) yield ndi.readBigInt()
-  }
 
   def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
     val ndo = newDataOutput()

@@ -13,7 +13,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.{AddressId, Height, TxNum}
+import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -149,7 +149,7 @@ object Explorer extends ScorexLogging {
           val result        = new util.HashMap[Address, java.lang.Integer]()
           val lastAddressId = Keys.lastAddressId.parse(db.get(Keys.lastAddressId.keyBytes))
           for (id <- 1L to lastAddressId.getOrElse(0L)) {
-            val k       = Keys.idToAddress(id)
+            val k       = Keys.idToAddress(AddressId @@ id)
             val address = k.parse(db.get(k.keyBytes))
             result.compute(address,
                            (_, prev) =>
@@ -172,10 +172,13 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
+	  val (txH, txN) = db.get(Keys.transactionHNById(TransactionId @@ asset.id)).get
+	  val hnBytes = ByteStr(Bytes,concat(Ints.toByteArray(txH), Ints.toByteArray(txN)))
+	  
           db.iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
             .filter { e =>
-              val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
-              ByteStr(assetId) == asset.id
+              val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)  
+              hnBytes == ByteStr(assetId)
             }
             .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
             .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
@@ -307,11 +310,15 @@ object Explorer extends ScorexLogging {
               1 to db.get(Keys.addressesForAssetSeqNr(asset))
             }
             addressId <- db.get(Keys.addressesForAsset(asset, seqNr))
+	    hnBytes = {
+	      val (txH, txN) = db.get(Keys.transactionHNById(TransactionId @@ asset.id)).get
+	      ByteStr(Bytes,concat(Ints.toByteArray(txH), Ints.toByteArray(txN)))
+	    }
             balance = db
               .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
               .filter { e =>
                 val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
-                ByteStr(assetId) == asset.id
+                ByteStr(assetId) == hnBytes
               }
               .map(e => Longs.fromByteArray(e.getValue))
               .closeAfter(_.toStream.headOption)

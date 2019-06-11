@@ -6,8 +6,8 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.database.{readIntSeq, writeIntSeq}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
