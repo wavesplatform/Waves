@@ -77,7 +77,7 @@ object Terms {
       Either.cond(
         bs.size <= DATA_TX_BYTES_MAX,
         new CONST_BYTESTR(bs),
-        "ByteStr is too large"
+        s"ByteStr exceeds $DATA_TX_BYTES_MAX bytes"
       )
   }
 
@@ -87,9 +87,9 @@ object Terms {
   object CONST_STRING {
     def apply(s: String): Either[ExecutionError, CONST_STRING] =
       Either.cond(
-        s.length * 2 <= DATA_TX_BYTES_MAX,
+        s.getBytes.length <= DATA_TX_BYTES_MAX,
         new CONST_STRING(s),
-        "String is too large"
+        s"String exceeds $DATA_TX_BYTES_MAX bytes"
       )
   }
 
