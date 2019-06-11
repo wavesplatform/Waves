@@ -78,8 +78,20 @@ object CompilationError {
   final case class UnexpectedType(start: Int, end: Int, required: String, found: String) extends CompilationError {
     val message = s"Unexpected type, required: $required, but $found found"
   }
-  final case class TypeNotFound(start: Int, end: Int, name: String) extends CompilationError {
-    val message = s"Undefined type: `$name`"
+  final case class TypeNotFound(
+                                 start:         Int,
+                                 end:           Int,
+                                 name:          String,
+                                 expectedTypes: List[String],
+                                 varName:       Option[String]
+                               ) extends CompilationError {
+    val message = {
+      val varStr = varName.fold("")(v => s" of variable `$v`")
+      val expectedTypesStr =
+        if (expectedTypes.nonEmpty) s", expected: ${expectedTypes.mkString(", ")}"
+        else ""
+      s"Undefined type: `$name`" + varStr + expectedTypesStr
+    }
   }
   final case class FieldNotFound(start: Int, end: Int, name: String, typeName: String) extends CompilationError {
     val message = s"Undefined field `$name` of variable of type `$typeName`"

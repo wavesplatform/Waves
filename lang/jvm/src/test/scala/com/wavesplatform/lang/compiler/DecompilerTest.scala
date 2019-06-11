@@ -213,6 +213,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract with verifier decompilation") {
     val contract = DApp(
+      ByteStr.empty,
       List(FUNC("foo", List(), FALSE), FUNC("bar", List(), IF(FUNCTION_CALL(User("foo"), List()), TRUE, FALSE))),
       List(
         CallableFunction(
@@ -275,6 +276,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract decompilation") {
     val contract = DApp(
+      ByteStr.empty,
       List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(

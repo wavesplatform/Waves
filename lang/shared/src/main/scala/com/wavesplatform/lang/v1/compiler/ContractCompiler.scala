@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 import cats.Show
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
@@ -122,6 +123,19 @@ object ContractCompiler {
         )
         .toCompileM
 
+      meta = ByteStr.empty
+      _ <- Either
+        .cond(
+          meta.size <= ContractLimits.MaxContractMetaSizeInBytes,
+          (),
+          Generic(
+            contract.position.start,
+            contract.position.end,
+            s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}"
+          )
+        )
+        .toCompileM
+
       callableFuncs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
 
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
@@ -137,7 +151,7 @@ object ContractCompiler {
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
-    } yield DApp(decs, callableFuncs, verifierFuncOpt)
+    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {

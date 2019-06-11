@@ -176,7 +176,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
              |""".stripMargin,
           Coproduct(tx)
         )
-        outOfBounds shouldBe Left(s"java.lang.IndexOutOfBoundsException: $badIndex")
+        outOfBounds shouldBe Left(s"$badIndex OutOfBounds ${tx.data.size}")
     }
   }
 
@@ -434,6 +434,12 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |   transferTransactionById(base64'${transferTx.id.value.base64Raw}')
                  | )
                  |
+                 | let checkTransferOpt = match transferTransactionById(base64'') {
+                 |  case _: Unit => true
+                 |  case _: TransferTransaction => false
+                 |  case _ => false
+                 | }
+                 |
                  | let checkAddress = match transfer.recipient {
                  |   case addr: Address => addr.bytes == base64'${transferTx.recipient.bytes.base64Raw}'
                  |   case _             => false
@@ -456,6 +462,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |   transferTransactionById(base64'${dataTransaction.id.value.base64Raw}')
                  | )
                  |
+                 | checkTransferOpt    &&
                  | checkAmount         &&
                  | checkAddress        &&
                  | checkAttachment     &&

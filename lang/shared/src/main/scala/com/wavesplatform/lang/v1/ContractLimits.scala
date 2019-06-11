@@ -10,6 +10,8 @@ object ContractLimits {
   val MaxExprSizeInBytes     =  8 * 1024
   val MaxContractSizeInBytes = 32 * 1024
 
+  val MaxContractMetaSizeInBytes = 1024
+
   // As in Scala
   val MaxInvokeScriptArgs = 22
   val MaxAnnotatedFunctionNameInBytes    = 255

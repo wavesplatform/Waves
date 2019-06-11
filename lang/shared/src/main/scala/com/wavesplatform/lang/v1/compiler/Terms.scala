@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import monix.eval.Coeval
 import cats.implicits._
+import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError
 
 object Terms {
@@ -65,12 +66,21 @@ object Terms {
   }
 
   sealed trait EVALUATED extends EXPR {
+    def prettyString(level: Int) : String = toString
     def toStr: Coeval[String] = Coeval.now(toString)
   }
   case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString  }
 
   case class CONST_BYTESTR private (bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
+    override def prettyString(level: Int) : String = {
+      if(bs.size > 1024) {
+        "base64'" ++ Base64.encode(bs) ++ "'"
+      } else {
+        "base58'" ++ Base58.encode(bs) ++ "'"
+      }
+    }
+
   }
   object CONST_BYTESTR {
     def apply(bs: ByteStr): Either[ExecutionError, CONST_BYTESTR] =
@@ -81,8 +91,26 @@ object Terms {
       )
   }
 
-  case class CONST_STRING private (s: String) extends EVALUATED {
+  def escape(s: String): String = {
+    // Simple and very naive implementation based on
+    // https://github.com/linkedin/dustjs/blob/3fc12efd153433a21fd79ac81e8c5f5d6f273a1c/dist/dust-core.js#L1099
+
+    // Note this might not be the most efficient since Scala.js compiles this to a bunch of .split and .join calls
+    s.replace("\\", "\\\\")
+     .replace("/", "\\/")
+     .replace("'", "\\'")
+     .replace("\"", "\\\"")
+     .replace("\n", "\\n")
+     .replace("\r", "\\r")
+     .replace("\t", "\\t")
+     .replace("\b", "\\b")
+     .replace("\f", "\\f")
+     .replace("\u2028", "\\u2028")
+     .replace("\u2029", "\\u2029")
+  }
+  case class CONST_STRING private (s: String)    extends EVALUATED {
     override def toString: String = s
+    override def prettyString(level: Int) : String = "\"" ++ escape(s) ++ "\""
   }
   object CONST_STRING {
     def apply(s: String): Either[ExecutionError, CONST_STRING] =
@@ -93,7 +121,6 @@ object Terms {
       )
   }
 
-
   case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = if (b) "TRUE" else "FALSE" }
 
   lazy val TRUE  = CONST_BOOLEAN(true)
@@ -102,7 +129,7 @@ object Terms {
   case class CaseObj(caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
 
-    def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
+    override def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
   }
 
   case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED {

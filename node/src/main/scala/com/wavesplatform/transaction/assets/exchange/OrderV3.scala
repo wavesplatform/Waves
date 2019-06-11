@@ -40,8 +40,8 @@ case class OrderV3(senderPublicKey: PublicKey,
         matcherPublicKey,
         assetPair.bytes,
         orderType.bytes,
-        Longs.toByteArray(amount),
         Longs.toByteArray(price),
+        Longs.toByteArray(amount),
         Longs.toByteArray(timestamp),
         Longs.toByteArray(expiration),
         Longs.toByteArray(matcherFee),
@@ -160,8 +160,8 @@ object OrderV3 {
       amountAssetId     <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
       priceAssetId      <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
       orderType         <- readByte
-      amount            <- read(Longs.fromByteArray, longLength)
       price             <- read(Longs.fromByteArray, longLength)
+      amount            <- read(Longs.fromByteArray, longLength)
       timestamp         <- read(Longs.fromByteArray, longLength)
       expiration        <- read(Longs.fromByteArray, longLength)
       matcherFee        <- read(Longs.fromByteArray, longLength)
@@ -183,6 +183,6 @@ object OrderV3 {
       )
     }
 
-    makeOrder.run(0).value._2
+    makeOrder.runA(0).value
   }
 }

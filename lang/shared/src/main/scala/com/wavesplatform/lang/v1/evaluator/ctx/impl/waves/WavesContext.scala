@@ -27,7 +27,7 @@ object WavesContext {
     CASETYPEREF(FieldNames.ScriptTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
   lazy val scriptTransferSetType = CASETYPEREF(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(scriptTransfer)))
   lazy val scriptResultType =
-    CASETYPEREF(FieldNames.ScriptResult, List(FieldNames.Data -> writeSetType, FieldNames.Transfers -> scriptTransferSetType))
+    CASETYPEREF(FieldNames.ScriptResult, List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType))
 
   def build(ds: DirectiveSet, env: Environment): CTX = {
 
@@ -335,7 +335,7 @@ object WavesContext {
         "transferTransactionById",
         100,
         TRANSFERTRANSACTIONBYID,
-        buildTransferTransactionType(proofsEnabled),
+        UNION(buildTransferTransactionType(proofsEnabled), UNIT),
         "Lookup transfer transaction",
         ("id", BYTESTR, "transfer transaction id")
       ) {

@@ -28,7 +28,7 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
-import com.wavesplatform.settings._
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -353,6 +353,33 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application {
+  private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
+    import com.wavesplatform.settings._
+
+    val config = loadConfig(external.map(ConfigFactory.parseFile))
+
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+
+    val settings = WavesSettings.fromRootConfig(config)
+
+    // Initialize global var with actual address scheme
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+    }
+
+    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+    Kamon.reconfigure(config)
+
+    if (config.getBoolean("kamon.enable")) {
+      Kamon.addReporter(new InfluxDBReporter())
+      SystemMetrics.startCollecting()
+    }
+
+    settings
+  }
+
   def main(args: Array[String]): Unit = {
 
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
@@ -367,56 +394,29 @@ object Application {
     System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
-      case "export"  => Exporter.main(args.tail)
-      case "import"  => Importer.main(args.tail)
+      case "export" => Exporter.main(args.tail)
+      case "import" => Importer.main(args.tail)
       case "explore" => Explorer.main(args.tail)
-      case "util"    => UtilApp.main(args.tail)
-      case _         => startNode(args.headOption)
+      case "util" => UtilApp.main(args.tail)
+      case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
+      case _ => startNode(args.headOption)
     }
   }
 
   private[this] def startNode(configFile: Option[String]): Unit = {
-    def readConfig(userConfigPath: Option[String]): Config = {
-      val maybeConfigFile = for {
-        maybeFilename <- userConfigPath
-        file = new File(maybeFilename)
-        if file.exists
-      } yield ConfigFactory.parseFile(file)
-
-      loadConfig(maybeConfigFile)
-    }
-
-    val config = readConfig(configFile)
-    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
-    System.setProperty("waves.directory", config.getString("waves.directory"))
-
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
+    import com.wavesplatform.settings.Constants
+    val settings = loadApplicationConfig(configFile.map(new File(_)))
 
     val log = LoggerFacade(LoggerFactory.getLogger(getClass))
     log.info("Starting...")
     sys.addShutdownHook {
-      SystemInformationReporter.report(config)
-    }
-
-    val settings = WavesSettings.fromRootConfig(config)
-
-    // Initialize global var with actual address scheme
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
-
-    if (config.getBoolean("kamon.enable")) {
-      log.info("Aggregated metrics are enabled")
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
+      SystemInformationReporter.report(settings.config)
     }
 
     val time             = new NTP(settings.ntpServer)
     val isMetricsStarted = Metrics.start(settings.metrics, time)
 
-    RootActorSystem.start("wavesplatform", config) { actorSystem =>
+    RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
       import actorSystem.dispatcher
       isMetricsStarted.foreach { started =>
         if (started) {
@@ -437,7 +437,7 @@ object Application {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      new Application(actorSystem, settings, config.root(), time).run()
+      new Application(actorSystem, settings, settings.config.root(), time).run()
     }
   }
 }

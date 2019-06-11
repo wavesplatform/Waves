@@ -44,35 +44,56 @@ package object settings {
   }
 
   def loadConfig(maybeUserConfig: Option[Config]): Config = {
-    val directoryDefaults = ConfigFactory
-      .parseString(s"waves.directory = $defaultDirectory")
-
     val defaults = ConfigFactory.defaultOverrides()
-
-    maybeUserConfig
+    val external = maybeUserConfig
       .fold(defaults)(defaults.withFallback)
+
+    val withApp = external
+      .withFallback(ConfigFactory.defaultApplication())
+
+    val directoryDefaults = ConfigFactory
+      .parseString(s"waves.directory = ${defaultDirectory(withApp)}")
+
+    external
       .withFallback(directoryDefaults)
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
   }
 
-  def defaultDirectory: String =
-    if (SystemUtils.IS_OS_WINDOWS) winDefaultDirectory
-    else if (SystemUtils.IS_OS_MAC) osxDefaultDirectory
-    else nixDefaultDirectory
+  def defaultDirectory(config: Config): String = {
+    // No actual interpolation here, `s` to suppress warnings
+    def osxDefaultDirectory: String =
+      s"$${user.home}/Library/Application Support"
 
-  // No actual interpolation here, `s` to suppress warnings
-  def osxDefaultDirectory: String =
-    s"$${user.home}/Library/Application Support/waves"
+    //noinspection SpellCheckingInspection
+    def winDefaultDirectory: String =
+      s"$${LOCALAPPDATA}"
 
-  def winDefaultDirectory: String =
-    s"$${LOCALAPPDATA}/waves"
+    def nixDefaultDirectory: String = {
+      val maybeXdgDir = sys.env.get("XDG_DATA_HOME")
+      val defaultDir = s"$${user.home}/.local/share"
 
-  def nixDefaultDirectory: String = {
-    val maybeXdgDir = sys.env.get("XDG_DATA_HOME").map(path => s"$path/waves")
-    val defaultDir  = s"$${user.home}/.local/share/waves"
+      maybeXdgDir getOrElse defaultDir
+    }
 
-    maybeXdgDir getOrElse defaultDir
+    def withNetwork(config: Config): String = {
+      val bc = config.getString("waves.blockchain.type")
+      val suffix =
+        if (bc == "CUSTOM") {
+          val char = config.getString("waves.blockchain.custom.address-scheme-character").headOption.getOrElse(0.toChar)
+          s"custom-${Integer.toHexString(char)}"
+        } else
+          bc.toLowerCase
+
+      s"waves-$suffix"
+    }
+
+    val parent =
+      if (SystemUtils.IS_OS_WINDOWS) winDefaultDirectory
+      else if (SystemUtils.IS_OS_MAC) osxDefaultDirectory
+      else nixDefaultDirectory
+
+    s"$parent/${withNetwork(config)}"
   }
 }

@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.traits.domain.DataItem
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -53,7 +54,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
       )))
   )
 
-  val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map("data" -> writeSetObj, "transfers" -> transferSetObj))
+  val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))
 
   val writeResult    = List(DataItem.Lng("xxx", 42))
   val transferResult = List((Address(address1), 41L, Some(asset)), (Address(address2), 42L, None))

@@ -183,7 +183,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
       if (unconfirmed.isEmpty) {
         log.trace {
-          if (updatedTotalConstraint.isEmpty) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
+          if (updatedTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
           else "Stopping forging microBlocks, because all transactions are too big"
         }
         Task.now(Stop)
@@ -210,7 +210,7 @@ class MinerImpl(allChannels: ChannelGroup,
           case Right((microBlock, signedBlock)) =>
             BlockStats.mined(microBlock)
             allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
-            if (updatedTotalConstraint.isEmpty) {
+            if (updatedTotalConstraint.isFull) {
               log.trace(s"$microBlock has been mined for $account. Stop forging microBlocks, the block is full: $updatedTotalConstraint")
               Stop
             } else {
@@ -306,7 +306,7 @@ class MinerImpl(allChannels: ChannelGroup,
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()
-                  if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators, totalConstraint)
+                  if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, estimators, totalConstraint)
                 case Right(None) => log.warn("Newly created block has already been appended, should not happen")
               }
 

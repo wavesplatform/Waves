@@ -334,7 +334,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] =>
-          res.left.get.startsWith( "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are") shouldBe true
+          res.left.get.startsWith("Compilation failed: Undefined type: `Point0`, expected: PointA, PointB") shouldBe true
       }
   )
 

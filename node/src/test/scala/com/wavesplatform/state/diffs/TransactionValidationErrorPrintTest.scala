@@ -92,54 +92,54 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
           """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
             |	\$match0 = TransferTransaction\(
             |		recipient = Address\(
-            |			bytes = 3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu
+            |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |		\)
             |		timestamp = 0
-            |		bodyBytes = ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZ48AaFTA3GoWXEU4UpGCUakckZU1fs9W8oNbBceLDuy52DfTTiBysM3RfXAboKTMsqU44mgsuU2BVK4T3xHhXzYke5BCmDcXQfCqz13QiYerEMcpgZpuD
-            |		assetId = DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX
+            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZ48AaFTA3GoWXEU4UpGCUakckZU1fs9W8oNbBceLDuy52DfTTiBysM3RfXAboKTMsqU44mgsuU2BVK4T3xHhXzYke5BCmDcXQfCqz13QiYerEMcpgZpuD'
+            |		assetId = base58'DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX'
             |		feeAssetId = Unit
             |		amount = 1
             |		version = 2
-            |		id = DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM
-            |		senderPublicKey = EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF
-            |		attachment = <empty>
+            |		id = base58'DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM'
+            |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
+            |		attachment = base58''
             |		sender = Address\(
-            |			bytes = 3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5
+            |			bytes = base58'3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5'
             |		\)
             |		fee = 10000000
             |	\)
-            |	@xs = 11111112
+            |	@xs = base58'11111112'
             |	@number = 1
-            |	@xs = 11111112W
+            |	@xs = base58'11111112W'
             |	@number = 1
-            |	NETWORKBYTE = 2W
+            |	NETWORKBYTE = base58'2W'
             |	t = TransferTransaction\(
             |		recipient = Address\(
-            |			bytes = 3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu
+            |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |		\)
             |		timestamp = 0
-            |		bodyBytes = ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZ48AaFTA3GoWXEU4UpGCUakckZU1fs9W8oNbBceLDuy52DfTTiBysM3RfXAboKTMsqU44mgsuU2BVK4T3xHhXzYke5BCmDcXQfCqz13QiYerEMcpgZpuD
-            |		assetId = DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX
+            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZ48AaFTA3GoWXEU4UpGCUakckZU1fs9W8oNbBceLDuy52DfTTiBysM3RfXAboKTMsqU44mgsuU2BVK4T3xHhXzYke5BCmDcXQfCqz13QiYerEMcpgZpuD'
+            |		assetId = base58'DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX'
             |		feeAssetId = Unit
             |		amount = 1
             |		version = 2
-            |		id = DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM
-            |		senderPublicKey = EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF
-            |		attachment = <empty>
+            |		id = base58'DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM'
+            |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
+            |		attachment = base58''
             |		sender = Address\(
-            |			bytes = 3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5
+            |			bytes = base58'3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5'
             |		\)
             |		fee = 10000000
             |	\)
-            |	recipientPublicKeyAndSignature = <empty>
-            |	recipientPublicKey = <empty>
-            |	recipientPublicKeyHash = 3aDy5kHaDeXWfQwMrBCRvd6r7gzg
-            |	rpkWithVersionAndByte = N8tNz9vAHAwFpa4A8Rgk45q8tNjeC
-            |	checksum = 2U8tZq
-            |	recipientAddressFromPublicKey = 3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs
-            |	recipientAddressFromTx = 3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu
-            |	@a = 3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs
-            |	@b = 3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu
+            |	recipientPublicKeyAndSignature = base58''
+            |	recipientPublicKey = base58''
+            |	recipientPublicKeyHash = base58'3aDy5kHaDeXWfQwMrBCRvd6r7gzg'
+            |	rpkWithVersionAndByte = base58'N8tNz9vAHAwFpa4A8Rgk45q8tNjeC'
+            |	checksum = base58'2U8tZq'
+            |	recipientAddressFromPublicKey = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
+            |	recipientAddressFromTx = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
+            |	@a = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
+            |	@b = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |	@p = FALSE
             |\),
             |tx = \{
