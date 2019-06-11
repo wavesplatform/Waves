@@ -50,6 +50,8 @@ package object kafka {
     val props = createProperties(settings)
     props.put(ProducerConfig.ACKS_CONFIG, "all")
     props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, "10485760") // 10MB
+    props.put("max.request.size", "10485760")                     // 10MB
+    props.put("message.max.bytes", "10485760")                    // 10MB
     props
   }
 
