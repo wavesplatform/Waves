@@ -33,10 +33,10 @@ pipeline {
             post {
                 always {
                     dir('it/target/logs') {
-                        sh "tar zcf ${env.BUILD_TAG}.logs.tar.gz * || :"
+                        sh "tar zcf "${env.BUILD_TAG}.logs.tar.gz" * || :"
                     }
                     dir('node-it/target/logs') {
-                        sh "tar zcf ${env.BUILD_TAG}.node.logs.tar.gz * || :"
+                        sh "tar zcf "${env.BUILD_TAG}.node.logs.tar.gz" * || :"
                     }
                 }
             }
