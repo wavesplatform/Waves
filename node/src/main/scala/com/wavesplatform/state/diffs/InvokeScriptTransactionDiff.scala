@@ -6,6 +6,7 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -139,35 +140,28 @@ object InvokeScriptTransactionDiff {
               (),
               GenericError(s"Unissued assets are not allowed")
             ))
-          _ <- TracedResult {
-            val totalScriptsInvoked =
-              tx.checkedAssets()
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) 1 else 0)
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + OldFeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            Either.cond(
-              minWaves <= wavesFee,
-              (),
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
-            )
+          scriptsInvoked = {
+            tx.checkedAssets()
+              .collect { case asset@IssuedAsset(_) => asset }
+              .count(blockchain.hasAssetScript) +
+              ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+              (if (blockchain.hasScript(tx.sender)) 1 else 0)
           }
-          scriptsInvoked <- TracedResult {
-            val totalScriptsInvoked =
-              tx.checkedAssets()
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + OldFeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            Either.cond(
-              minWaves <= wavesFee,
-              totalScriptsInvoked,
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
-            )
+          _ <- TracedResult {
+            import com.wavesplatform.features.FeatureProvider._
+            if (blockchain.isFeatureActivated(BlockchainFeatures.FlatFee)) {
+              Right(())
+            } else {
+              val minWaves = scriptsInvoked * ScriptExtraFee + OldFeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+              Either.cond(
+                minWaves <= wavesFee,
+                (),
+                GenericError(s"Fee in ${
+                  tx.assetFee._1
+                    .fold("WAVES")(_.toString)
+                } for ${tx.builder.classTag} with $scriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              )
+            }
           }
 
           scriptsComplexity = {
