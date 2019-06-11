@@ -28,15 +28,15 @@ pipeline {
         }
         stage('Integration Test') {
             steps {
-                sh "sbt -mem 40960 clean;it/test"
+                sh "sbt -mem 40960 clean it/test"
             }
             post {
                 always {
                     dir('it/target/logs') {
-                        sh "tar zcf \"${env.BUILD_TAG}.logs.tar.gz\" * || :"
+                        sh "tar zcf logs.tar.gz * || true"
                     }
                     dir('node-it/target/logs') {
-                        sh "tar zcf \"${env.BUILD_TAG}.node.logs.tar.gz\" * || :"
+                        sh "tar zcf node.logs.tar.gz * || true"
                     }
                 }
             }
