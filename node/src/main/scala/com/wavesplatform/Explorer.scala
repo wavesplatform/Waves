@@ -172,13 +172,11 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
-	  val (txH, txN) = db.get(Keys.transactionHNById(TransactionId @@ asset.id)).get
-	  val hnBytes = ByteStr(Bytes,concat(Ints.toByteArray(txH), Ints.toByteArray(txN)))
-	  
+          val (txH, txN) = db.get(Keys.transactionHNById(TransactionId @@ asset.id)).get
           db.iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
             .filter { e =>
-              val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)  
-              hnBytes == ByteStr(assetId)
+              val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
+              ByteStr(Keys.heightWithNum(txH, txN)) == ByteStr(assetId)
             }
             .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
             .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
@@ -234,7 +232,10 @@ object Explorer extends ScorexLogging {
           log.info("key-space,entry-count,total-key-size,total-key-size-hr,total-value-size,total-value-size-hr")
           for ((prefix, stats) <- result.asScala) {
             log.info(
-              s"${keys(prefix.toInt)},${stats.entryCount},${stats.totalKeySize},${humanReadableByteCount(stats.totalKeySize)},${stats.totalValueSize},${humanReadableByteCount(stats.totalValueSize)}")
+              s"${keys(prefix.toInt)},${stats.entryCount},${stats.totalKeySize},${humanReadableByteCount(stats.totalKeySize)},${stats.totalValueSize},${
+                humanReadableByteCount(
+                  stats.totalValueSize)
+              }")
           }
 
         case "TXBH" =>
@@ -305,20 +306,17 @@ object Explorer extends ScorexLogging {
           for {
             assetId <- assets.sorted
             asset = IssuedAsset(assetId)
+            (txH, txN) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id)).toSeq
             seqNr <- {
               println(s"\n$assetId:")
-              1 to db.get(Keys.addressesForAssetSeqNr(asset))
+              1 to db.get(Keys.addressesForAssetSeqNr(txH, txN))
             }
-            addressId <- db.get(Keys.addressesForAsset(asset, seqNr))
-	    hnBytes = {
-	      val (txH, txN) = db.get(Keys.transactionHNById(TransactionId @@ asset.id)).get
-	      ByteStr(Bytes,concat(Ints.toByteArray(txH), Ints.toByteArray(txN)))
-	    }
+            addressId <- db.get(Keys.addressesForAsset(txH, txN, seqNr))
             balance = db
               .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
               .filter { e =>
                 val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
-                ByteStr(assetId) == hnBytes
+                ByteStr(assetId) == ByteStr(Keys.heightWithNum(txH, txN))
               }
               .map(e => Longs.fromByteArray(e.getValue))
               .closeAfter(_.toStream.headOption)
