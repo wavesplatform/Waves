@@ -117,17 +117,16 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override protected def loadAssetScript(asset: IssuedAsset): Option[Script] =
-    getAssetScript(asset).map(_())
+    getAssetScript(asset)
 
   override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean =
     getAssetScript(asset).isDefined
 
-  private[this] def getAssetScript(asset: IssuedAsset): Option[() => Script] = readOnly { db =>
+  private[this] def getAssetScript(asset: IssuedAsset): Option[Script] = readOnly { db =>
     for {
-      (_, (h, n)) <- assetDescriptionCache.get(asset)
-      e <- db.lastValue(Keys.AssetScriptPrefix, Keys.heightWithNum(h, n), this.height)
-      value <- Option(e.getValue) if value.nonEmpty
-    } yield () => ScriptReader.fromBytes(value).explicitGet()
+      (desc, _) <- assetDescriptionCache.get(asset)
+      script <- desc.script
+    } yield script
   }
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
@@ -173,7 +172,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   private[this] def loadBalanceForId(db: ReadOnlyDB)(addressId: AddressId, asset: Asset) = {
     val (lastKey, valueKey) = asset match {
       case ia@IssuedAsset(_) =>
-        val (_, (issueH, issueN)) = assetDescriptionCache.get(ia).getOrElse(throw new IllegalArgumentException(s"No such asset: $asset"))
+        val (issueH, issueN) = db.get(Keys.transactionHNById(TransactionId @@ ia.id)).getOrElse((Height @@ 0, TxNum @@ 0.toShort))
         (Keys.assetBalanceLastHeight(addressId, issueH, issueN), Keys.assetBalance(addressId, issueH, issueN) _)
 
       case Waves =>
@@ -327,7 +326,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val threshold = height - dbSettings.maxRollbackDepth
 
-    def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
+    def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = { // TODO WIP
       //      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
       //        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
       //        .closeAfter { iterator =>
@@ -339,7 +338,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       //        }
     }
 
-    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte] = Array.emptyByteArray)(key: AddressId => Height => Key[_]): Unit = {
+    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte] = Array.emptyByteArray)(
+      key: AddressId => Height => Key[_]): Unit = {
       deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
     }
 
@@ -401,7 +401,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     for ((asset, assetInfo) <- reissuedAssets; (h, n) <- getHNForAsset(asset)) {
-      val combinedAssetInfo = readLastValue(rw)(Keys.AssetInfoPrefix, Keys.heightWithNum(h, n), readAssetInfo).fold(assetInfo)(old => Monoid.combine(old, assetInfo))
+      val combinedAssetInfo =
+        readLastValue(rw)(Keys.AssetInfoPrefix, Keys.heightWithNum(h, n), readAssetInfo).fold(assetInfo)(old => Monoid.combine(old, assetInfo))
       rw.put(Keys.assetInfo(h, n)(height), combinedAssetInfo)
       deleteOldKeys(Keys.AddressScriptPrefix, asset.id)(Keys.assetInfo(h, n))
     }
