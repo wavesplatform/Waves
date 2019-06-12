@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.matcher.settings.{MatcherSettings, MatchingRules}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
@@ -139,7 +139,7 @@ class OrderBookActor(owner: ActorRef,
           matchingRules = MatchingRules.skipOutdated(x, matchingRules)
       }
 
-      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
+      processEvents(orderBook.allOrders.map { case (_, lo) => OrderAdded(lo, lo.order.timestamp) })
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)

@@ -25,7 +25,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord2, ntpNow)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders.toSeq shouldEqual Seq(LimitOrder(ord2), LimitOrder(ord1), LimitOrder(ord3))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(LimitOrder(ord2), LimitOrder(ord1), LimitOrder(ord3))
   }
 
   "place several buy orders at the same price" in {}
@@ -144,12 +144,12 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord1, ntpNow)
     ob.add(ord2, ntpNow)
 
-    ob.allOrders shouldEqual Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+    ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
 
     val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders shouldEqual Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+    ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
 
   "execute orders at different price levels" in {
@@ -166,7 +166,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
 
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
-    ob.allOrders shouldEqual Seq(
+    ob.allOrders.map(_._2) shouldEqual Seq(
       SellLimitOrder(
         restAmount,
         ord3.matcherFee - LimitOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
@@ -185,7 +185,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord2, ntpNow)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders shouldEqual Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+    ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
 
   "partially execute order with zero fee remaining part" in {
@@ -205,7 +205,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
     val restFee = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
-    ob.allOrders.toSeq shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
   "partially execute order with price > 1 and zero fee remaining part " in {
@@ -222,7 +222,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
     val restFee    = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
-    ob.allOrders.toSeq shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
   "buy small amount of pricey asset" in {
@@ -237,7 +237,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
     val restFee     = s.matcherFee - LimitOrder.partialFee(s.matcherFee, s.amount, restSAmount)
-    ob.allOrders shouldEqual Seq(SellLimitOrder(restAmount, restFee, s))
+    ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, s))
   }
 
   "cleanup expired buy orders" in {

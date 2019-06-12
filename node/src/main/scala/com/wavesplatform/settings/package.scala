@@ -3,8 +3,10 @@ package com.wavesplatform
 import java.io.File
 import java.net.{InetSocketAddress, URI}
 
+import cats.data.NonEmptyList
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
 import com.wavesplatform.common.state.ByteStr
+import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
@@ -37,6 +39,11 @@ package object settings {
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
     val uri = new URI(s"my://${config.getString(path)}")
     new InetSocketAddress(uri.getHost, uri.getPort)
+  }
+
+  implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
+    case Nil     => throw new IllegalArgumentException("Expected at least one element")
+    case x :: xs => NonEmptyList(x, xs)
   }
 
   def loadConfig(userConfig: Config): Config = {

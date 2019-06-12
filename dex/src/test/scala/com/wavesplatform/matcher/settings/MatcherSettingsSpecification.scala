@@ -6,8 +6,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings, RawMatchingRules}
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, DynamicSettings, PercentSettings}
+import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -416,7 +415,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |}
       """.stripMargin
 
-    val incorrectPairAndStepSize =
+    val incorrectPairAndStepAmount =
       """order-restrictions = {
         | "WAVES-BTC": {
         |   step-amount = -0.013
@@ -451,7 +450,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       getSettingByConfig(configStr("")).explicitGet().orderRestrictions shouldBe Map.empty
     }
 
-    withClue("nonEmptyCorrect") {
+    withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().orderRestrictions shouldBe
         Map(
           AssetPair.createAssetPair("WAVES", "BTC").get ->
@@ -475,14 +474,14 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         )
     }
 
-    withClue("incorrectPairAndStepSize") {
-      getSettingByConfig(configStr(incorrectPairAndStepSize)) should produce(
+    withClue("incorrect pair and step amount") {
+      getSettingByConfig(configStr(incorrectPairAndStepAmount)) should produce(
         "Invalid setting order-restrictions value: Can't parse asset pair 'ETH-;;;', " +
           "Invalid setting order-restrictions.WAVES-BTC.step-amount value: -0.013 (required 0 < value)"
       )
     }
 
-    withClue("incorrectMinAndMax") {
+    withClue("incorrect min and max") {
       getSettingByConfig(configStr(incorrectMinAndMax)) should produce(
         "Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price")
     }
@@ -527,22 +526,25 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       getSettingByConfig(configStr("")).explicitGet().matchingRules shouldBe Map.empty
     }
 
-    withClue("nonEmptyCorrect") {
+    withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
           NonEmptyList[RawMatchingRules](
-            RawMatchingRules(100L, mergePrices = true, 0.002),
-            List(RawMatchingRules(500L, mergePrices = false))
+            RawMatchingRules(0, false),
+            List(
+              RawMatchingRules(100L, mergePrices = true, 0.002),
+              RawMatchingRules(500L, mergePrices = false)
+            )
           )
       )
     }
 
-    withClue("incorrectRulesOrder: 100, 100") {
+    withClue("incorrect rules order: 100, 100") {
       getSettingByConfig(configStr(incorrectRulesOrder(100, 100))) should produce(
         "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 100")
     }
 
-    withClue("incorrectRulesOrder: 100, 88") {
+    withClue("incorrect rules order: 100, 88") {
       getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
         "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88")
     }
