@@ -38,8 +38,7 @@ object Keys {
     (Height @@ bb.getInt, TxNum @@ bb.getShort)
   }
 
-  def wavesBalanceLastHeight(addressId: Long): Key[Int] =
-    Key("waves-balance-last-height", addr(5, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey("waves-balance-history", 5, AddressId.toBytes(addressId))
 
   val WavesBalancePrefix: Short = 6
   def wavesBalance(addressId: Long)(height: Int): Key[Long] =
@@ -77,8 +76,8 @@ object Keys {
   def assetInfo(issueH: Height, issueN: TxNum)(height: Int): Key[AssetInfo] =
     Key("asset-info", hBytes(AssetInfoPrefix, heightWithNum(issueH, issueN), height), readAssetInfo, writeAssetInfo)
 
-  def leaseBalanceLastHeight(addressId: Long): Key[Int] =
-    Key("lease-balance-last-height", addr(12, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] =
+    historyKey("lease-balance-history", 12, AddressId.toBytes(addressId))
 
   val LeaseBalancePrefix: Short = 13
 
