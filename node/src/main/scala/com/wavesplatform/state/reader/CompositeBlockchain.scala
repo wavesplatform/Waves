@@ -95,7 +95,6 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
       .orElse(inner.transactionHeight(id))
 
   override def height: Int = {
-
     inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
   }
 
@@ -229,7 +228,10 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = inner.scoreOf(blockId)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(height)
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    if (height == inner.height + 1) lastBlock.map(b => (b, b.bytes().length))
+    else inner.blockHeaderAndSize(height)
+  }
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 
