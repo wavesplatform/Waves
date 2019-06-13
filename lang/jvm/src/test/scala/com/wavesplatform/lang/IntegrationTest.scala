@@ -391,7 +391,20 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """
         |[1].getElement(1)
       """.stripMargin
-    eval[EVALUATED](src) should produce("OutOfBounds")
+    eval(src) should produce("Index 1 out of bounds for length 1")
+
+    def testListAccessError(length: Int, index: Int): Unit = {
+      eval(
+        s"""
+           | let a = ${List.fill(length)(1).mkString("[", ", ", "]")}
+           | a[$index]
+         """.stripMargin
+      ) should produce(s"Index $index out of bounds for length $length")
+    }
+
+    testListAccessError(length = 3, index = 3)
+    testListAccessError(length = 3, index = -1)
+    testListAccessError(length = 0, index = 1)
   }
 
   property("list constructor for different data entries") {

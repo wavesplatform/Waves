@@ -176,7 +176,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
              |""".stripMargin,
           Coproduct(tx)
         )
-        outOfBounds shouldBe Left(s"$badIndex OutOfBounds ${tx.data.size}")
+        outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
     }
   }
 
