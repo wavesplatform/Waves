@@ -961,7 +961,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         case _ => Map.empty
       }
 
-      val newCache = current.copy(TreeMap((pre ++ current.snapshots ++ post).toSeq: _*))
+      val newCache = current.copy(TreeMap((pre ++ current.snapshots ++ post).toSeq: _*)(Ordering[Int].reverse))
       caches.put(java.lang.Long.valueOf(addressId), newCache)
       newCache
     }
