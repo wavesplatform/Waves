@@ -812,29 +812,39 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     def slice(fromHeight: Int, toHeight: Int): Seq[(Int, (Long, LeaseBalance))] = {
       val values = snapshots.from(height)
-      snapshots.to(fromHeight).collect {
-        case (height, (Some(bs), Some(lb))) =>
-          (height, (bs, lb))
+      snapshots
+        .to(fromHeight)
+        .collect {
+          case (height, (Some(bs), Some(lb))) =>
+            (height, (bs, lb))
 
-        case (height, (None, Some(lb))) =>
-          val bs = values.from(height).collectFirst {
-            case (_, (Some(bs), _)) => bs
-          }.getOrElse(0L)
+          case (height, (None, Some(lb))) =>
+            val bs = values
+              .from(height)
+              .collectFirst {
+                case (_, (Some(bs), _)) => bs
+              }
+              .getOrElse(0L)
 
-          (height, (bs, lb))
+            (height, (bs, lb))
 
-        case (height, (Some(bs), None)) =>
-          val lb = values.from(height).collectFirst {
-            case (_, (_, Some(lb))) => lb
-          }.getOrElse(LeaseBalance.empty)
+          case (height, (Some(bs), None)) =>
+            val lb = values
+              .from(height)
+              .collectFirst {
+                case (_, (_, Some(lb))) => lb
+              }
+              .getOrElse(LeaseBalance.empty)
 
-          (height, (bs, lb))
-      }.toVector
+            (height, (bs, lb))
+        }
+        .toVector
     }
 
     def dropBefore(height: Int): AddressBalancesCache = {
       val keys = snapshots.keysIterator.toStream
-      val keysToDelete = keys.zip(keys.drop(1))
+      val keysToDelete = keys
+        .zip(keys.drop(1))
         .takeWhile { case (h1, h2) => h1 < height && h2 < height }
         .map(_._1)
 
@@ -927,8 +937,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                   .map { e =>
                     val (_, _, _, h) = Keys.parseAddressBytesHeight(e.getKey)
                     read(h).parse(e.getValue)
-                  }
-              else
+                  } else
                 Some(db.get(read(lastHeight)))
 
             (from -> lastValue) +: base
@@ -961,9 +970,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         case _ => Map.empty
       }
 
-      val newCache = current.copy(TreeMap((pre ++ current.snapshots ++ post).toSeq: _*)(Ordering[Int].reverse))
-      caches.put(java.lang.Long.valueOf(addressId), newCache)
-      newCache
+      if (pre.isEmpty && post.isEmpty)
+        current
+      else {
+        val newCache = current.copy(TreeMap((pre ++ current.snapshots ++ post).toSeq: _*)(Ordering[Int].reverse))
+        caches.put(java.lang.Long.valueOf(addressId), newCache)
+        newCache
+      }
     }
   }
 
