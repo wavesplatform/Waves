@@ -387,14 +387,14 @@ class OrderValidatorSpecification
         }
       }
 
-      "it's version = 3 and matcher disallows that" in forAll(orderWithFeeSettingsGenerator) {
+      "it's version is not allowed by matcher" in forAll(orderWithFeeSettingsGenerator) {
         case (order, _, orderFeeSettings) =>
-          if (order.version == 3) {
-            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = false)(order) should produce("OrderV3IsNotAllowed")
-            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = true)(order) shouldBe 'right
+          if (order.version > 1) {
+            validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) should produce("OrderVersionIsNotAllowed")
+            validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
           } else {
-            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = false)(order) shouldBe 'right
-            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = true)(order) shouldBe 'right
+            validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) shouldBe 'right
+            validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
           }
       }
 
@@ -711,7 +711,7 @@ class OrderValidatorSpecification
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
                                         blacklistedAssets: Set[IssuedAsset] = Set.empty[IssuedAsset],
                                         allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair],
-                                        allowOrderV3: Boolean = true,
+                                        allowedOrderVersions: Set[Byte] = Set(1, 2, 3),
                                         rateCache: RateCache = rateCache): Order => Result[Order] =
     order =>
       OrderValidator
@@ -719,7 +719,7 @@ class OrderValidatorSpecification
           MatcherAccount,
           Set.empty,
           blacklistedAssets,
-          matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs, allowOrderV3 = allowOrderV3),
+          matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions),
           rateCache
         )(order)
 
