@@ -186,7 +186,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
     addressId(req._1).fold(0L) { addressId =>
       req._2 match {
-        case asset@IssuedAsset(_) => loadBalanceForAsset(db)(addressId, req._2)
+        case asset@IssuedAsset(_) => loadBalanceForAsset(db)(addressId, asset)
         case Waves => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
     }
@@ -332,22 +332,22 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = { // TODO WIP
-      //      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
-      //        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
-      //        .closeAfter { iterator =>
-      //          val heights = iterator.toStream
-      //          heights
-      //            .zip(heights.drop(1))
-      //            .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
-      //            .foreach { case (h, _) => rw.delete(key(h)) }
-      //        }
+    /* def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
+      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
+        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
+        .closeAfter { iterator =>
+          val heights = iterator.toStream
+          heights
+            .zip(heights.drop(1))
+            .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
+            .foreach { case (h, _) => rw.delete(key(h)) }
+        }
     }
 
     def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte] = Array.emptyByteArray)(
-      key: AddressId => Height => Key[_]): Unit = {
+        key: AddressId => Height => Key[_]): Unit = {
       deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
-    }
+    } */
 
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
@@ -386,7 +386,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       for ((asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
         rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
         rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
-        deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
+        // deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
       }
     }
 
@@ -409,22 +409,22 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val combinedAssetInfo =
         readLastValue(rw)(Keys.AssetInfoPrefix, Keys.heightWithNum(h, n), readAssetInfo).fold(assetInfo)(old => Monoid.combine(old, assetInfo))
       rw.put(Keys.assetInfo(h, n)(height), combinedAssetInfo)
-      deleteOldKeys(Keys.AddressScriptPrefix, asset.id)(Keys.assetInfo(h, n))
+      // deleteOldKeys(Keys.AddressScriptPrefix, asset.id)(Keys.assetInfo(h, n))
     }
 
     for ((leaseId, state) <- leaseStates) {
       rw.put(Keys.leaseStatus(leaseId)(height), state)
-      deleteOldKeys(Keys.AddressScriptPrefix, leaseId)(Keys.leaseStatus(leaseId))
+      // deleteOldKeys(Keys.AddressScriptPrefix, leaseId)(Keys.leaseStatus(leaseId))
     }
 
     for ((addressId, script) <- scripts) {
       rw.put(Keys.addressScript(addressId)(height), script)
-      deleteOldKeysForAddress(Keys.AddressScriptPrefix, addressId)(Keys.addressScript)
+      // deleteOldKeysForAddress(Keys.AddressScriptPrefix, addressId)(Keys.addressScript)
     }
 
     for ((asset, script) <- assetScripts; (h, n) <- getHNForAsset(asset)) {
       rw.put(Keys.assetScript(h, n)(height), script)
-      deleteOldKeys(Keys.AssetScriptPrefix, asset.id)(Keys.assetScript(h, n))
+      // deleteOldKeys(Keys.AssetScriptPrefix, asset.id)(Keys.assetScript(h, n))
     }
 
     for ((addressId, addressData) <- data) {
@@ -435,7 +435,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           dataKeySuffix = Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))
           isNew = rw.lastValue(Keys.DataPrefix, dataKeySuffix, this.height).isEmpty
           _ = rw.put(Keys.data(addressId, key)(height), Some(value))
-          _ = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
+          // _             = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
           if isNew
         } yield key
       ).toSeq
