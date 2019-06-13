@@ -806,15 +806,70 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   // These two caches are used exclusively for balance snapshots. They are not used for portfolios, because there aren't
   // as many miners, so snapshots will rarely be evicted due to overflows.
 
-  private[this] case class AddressBalancesCache(snapshots: SortedMap[Int, (Long, LeaseBalance)]) {
-    lazy val start: Option[Int] = if (snapshots.isEmpty) None else Some(snapshots.keys.min)
-    lazy val end: Option[Int] = if (snapshots.isEmpty) None else Some(snapshots.keys.max)
+  private[this] case class AddressBalancesCache(snapshots: SortedMap[Int, (Option[Long], Option[LeaseBalance])]) {
+    lazy val start: Option[Int] = if (snapshots.isEmpty) None else Some(snapshots.lastKey)
+    lazy val end: Option[Int] = if (snapshots.isEmpty) None else Some(snapshots.firstKey)
 
-    def last: (Long, LeaseBalance) = snapshots.lastOption.fold((0L, LeaseBalance.empty))(_._2)
+    def slice(fromHeight: Int, toHeight: Int): Seq[(Int, (Long, LeaseBalance))] = {
+      val values = snapshots.from(height)
+      snapshots.to(fromHeight).collect {
+        case (height, (Some(bs), Some(lb))) =>
+          (height, (bs, lb))
 
-    def at(height: Int): Seq[(Long, LeaseBalance)] = snapshots.to(height).values.toVector
+        case (height, (None, Some(lb))) =>
+          val bs = values.from(height).collectFirst {
+            case (_, (Some(bs), _)) => bs
+          }.getOrElse(0L)
+
+          (height, (bs, lb))
+
+        case (height, (Some(bs), None)) =>
+          val lb = values.from(height).collectFirst {
+            case (_, (_, Some(lb))) => lb
+          }.getOrElse(LeaseBalance.empty)
+
+          (height, (bs, lb))
+      }.toVector
+    }
+
+    def dropBefore(height: Int): AddressBalancesCache = {
+      val keys = snapshots.keysIterator.toStream
+      val keysToDelete = keys.zip(keys.drop(1))
+        .takeWhile { case (h1, h2) => h1 < height && h2 < height }
+        .map(_._1)
+
+      val newSnapshots = snapshots -- keysToDelete
+      newSnapshots.headOption match {
+        case Some((h, (bs, lb))) if bs.isEmpty || lb.isEmpty =>
+          val pre = snapshots.to(height)
+          val bs1 = bs.orElse(pre.values.foldLeft(Option.empty[Long]) {
+            case (_, (Some(bs), _)) => Some(bs)
+            case (bs, _) => bs
+          })
+          val lb1 = lb.orElse(pre.values.foldLeft(Option.empty[LeaseBalance]) {
+            case (_, (_, Some(lb))) => Some(lb)
+            case (lb, _) => lb
+          })
+          copy(newSnapshots + ((h, (bs1, lb1))))
+
+        case _ =>
+          copy(newSnapshots)
+      }
+    }
 
     def inRange(from: Int, to: Int): AddressBalancesCache = copy(snapshots.from(from).to(to))
+
+    def withBalance(height: Int, balance: Long): AddressBalancesCache = {
+      val lb = snapshots.get(height).flatMap(_._2)
+      val withCurrent = snapshots + ((height, (Some(balance), lb)))
+      copy(withCurrent)
+    }
+
+    def withLeaseBalance(height: Int, leaseBalance: LeaseBalance): AddressBalancesCache = {
+      val bs = snapshots.get(height).flatMap(_._1)
+      val withCurrent = snapshots + ((height, (bs, Some(leaseBalance))))
+      copy(withCurrent)
+    }
   }
 
   private[this] object AddressBalancesCache {
@@ -832,23 +887,19 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     def updateBalance(addressId: AddressId, height: Int, balance: Long): Unit = {
       Option(caches.getIfPresent(addressId)).foreach { cache =>
-        val (_, lb) = cache.snapshots.getOrElse(height, cache.last)
-        val newSnapshots = cache.snapshots + ((height, (balance, lb)))
-        caches.put(addressId, cache.copy(snapshots = newSnapshots))
+        caches.put(addressId, cache.withBalance(height, balance))
       }
     }
 
     def updateLeaseBalance(addressId: AddressId, height: Int, leaseBalance: LeaseBalance): Unit = {
       Option(caches.getIfPresent(addressId)).foreach { cache =>
-        val (bs, _) = cache.snapshots.getOrElse(height, cache.last)
-        val newSnapshots = cache.snapshots + ((height, (bs, leaseBalance)))
-        caches.put(addressId, cache.copy(snapshots = newSnapshots))
+        caches.put(addressId, cache.withLeaseBalance(height, leaseBalance))
       }
     }
 
     def load(db: ReadOnlyDB, addressId: AddressId, from: Int, to: Int): AddressBalancesCache = {
-      def mergedIterator(from: Int, to: Int) = {
-        def beforeFromOrLast[T](prefix: Short, lastKey: => Key[Int], read: Int => Key[T], default: T) = {
+      def mergedMap(from: Int, to: Int) = {
+        def beforeFromOrLast[T](prefix: Short, lastKey: => Key[Int], read: Int => Key[T]) = {
           def beforeUpper(prefix: Short) = {
             def readFromHeightForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long, height: Int) = {
               db.iterateOverStream(Bytes.concat(
@@ -859,61 +910,59 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             }
 
             readFromHeightForAddress(db)(prefix, addressId, from max 1)
-              .map(e => (Height(Ints.fromByteArray(e.getKey.takeRight(4))), e.getValue))
+              .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), e.getValue))
               .takeWhile(_._1 <= to)
               .closeAfter(_.toVector)
           }
 
-          val base = beforeUpper(prefix).map { case (h, bs) => (h, read(h).parse(bs)) }
+          val base = beforeUpper(prefix).map { case (h, bs) => (h, Some(read(h).parse(bs))) }
           if (base.headOption.exists(_._1 == from)) base
           else {
             val lastHeight = db.get(lastKey)
             val lastValue =
               if (lastHeight == 0)
-                default
+                Option.empty[T]
               else if (lastHeight > from)
                 db.lastValue(prefix, AddressId.toBytes(addressId), from)
                   .map { e =>
                     val (_, _, _, h) = Keys.parseAddressBytesHeight(e.getKey)
                     read(h).parse(e.getValue)
                   }
-                  .getOrElse(default)
               else
-                db.get(read(lastHeight))
+                Some(db.get(read(lastHeight)))
 
             (from -> lastValue) +: base
           }
         }
 
-        val wavesBalances = beforeFromOrLast(Keys.WavesBalancePrefix, Keys.wavesBalanceLastHeight(addressId), Keys.wavesBalance(addressId), 0L)
-        val leaseBalances = beforeFromOrLast(Keys.LeaseBalancePrefix, Keys.leaseBalanceLastHeight(addressId), Keys.leaseBalance(addressId), LeaseBalance.empty)
+        val wavesBalances = beforeFromOrLast(Keys.WavesBalancePrefix, Keys.wavesBalanceLastHeight(addressId), Keys.wavesBalance(addressId))
+        val leaseBalances = beforeFromOrLast(Keys.LeaseBalancePrefix, Keys.leaseBalanceLastHeight(addressId), Keys.leaseBalance(addressId))
 
-        val baseMap = TreeMap(wavesBalances.map(kv => (kv._1, (kv._2, LeaseBalance.empty))): _*)
+        val baseMap = wavesBalances.map(kv => (kv._1, (kv._2, Option.empty[LeaseBalance]))).toMap
         leaseBalances
-          .foldLeft(baseMap: SortedMap[Int, (Long, LeaseBalance)]) {
-            case (map, (height, lb)) =>
-              val withCurrent = {
-                val bs = map.to(height).lastOption.fold(0L)(_._2._1)
-                map + ((height, (bs, lb)))
-              }
-              withCurrent.mapValues(bs => if (bs._1 <= height) bs else (bs._1, lb))
+          .foldLeft(baseMap) {
+            case (map, (height, Some(lb))) =>
+              val bs = map.get(height).flatMap(_._1)
+              map + ((height, (bs, Some(lb))))
+
+            case (map, _) => map
           }
       }
 
-      val current = Option(caches.getIfPresent(addressId)).getOrElse(AddressBalancesCache(TreeMap.empty))
+      val current = Option(caches.getIfPresent(java.lang.Long.valueOf(addressId))).getOrElse(AddressBalancesCache(TreeMap.empty))
       val pre = current.start match {
-        case Some(h) if h > from => mergedIterator(from, h - 1)
-        case None => mergedIterator(from, to)
-        case _ => SortedMap.empty[Height, (Long, LeaseBalance)]
+        case Some(h) if h > from => mergedMap(from, h - 1)
+        case None => mergedMap(from, to)
+        case _ => Map.empty
       }
 
       val post = current.end match {
-        case Some(h) if h < to => mergedIterator(h + 1, to)
-        case _ => SortedMap.empty
+        case Some(h) if h < to => mergedMap(h + 1, to)
+        case _ => Map.empty
       }
 
-      val newCache = current.copy(pre ++ current.snapshots ++ post)
-      caches.put(addressId, newCache)
+      val newCache = current.copy(TreeMap((pre ++ current.snapshots ++ post).toSeq: _*))
+      caches.put(java.lang.Long.valueOf(addressId), newCache)
       newCache
     }
   }
@@ -922,7 +971,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeight = this.heightOf(to).getOrElse(this.height)
       val cache = AddressBalancesCache.load(db, addressId, from, toHeight)
-      cache.snapshots.map { case (h, (balance, lb)) => BalanceSnapshot(h, balance, lb.in, lb.out) }.toVector
+      val result = cache
+        .slice(from, toHeight)
+        .map { case (h, (balance, lb)) => BalanceSnapshot(h, balance, lb.in, lb.out) }
+        .toVector
+
+      result
     }
   }
 
