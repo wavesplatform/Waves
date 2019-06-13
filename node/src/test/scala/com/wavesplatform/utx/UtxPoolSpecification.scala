@@ -595,10 +595,10 @@ class UtxPoolSpecification
           case (time, bcu, transfer) =>
             var timeSourceIsRunning = false
             def nanoTimeSource(): Long =
-              if (timeSourceIsRunning) 0L
+              if (timeSourceIsRunning) 100000L
               else {
                 timeSourceIsRunning = true
-                100000L
+                0L
               }
             val settings = UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
             val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource())
