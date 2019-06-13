@@ -160,7 +160,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/settings/rates")
-  @ApiOperation(value = "Asset rates", notes = "Get current asset rates (asset cost in Waves)", httpMethod = "GET")
+  @ApiOperation(value = "Asset rates", notes = "Get current rates of assets (asset cost in Waves)", httpMethod = "GET")
   def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
 
   @Path("/settings/rates/{assetId}")
@@ -168,7 +168,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset for which rate is added or updated", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "rate", value = "Rate associated with the specified asset", dataType = "double", paramType = "body")
+      new ApiImplicitParam(name = "rate",
+                           value = "Rate associated with the specified asset",
+                           dataType = "double",
+                           paramType = "body",
+                           required = true)
     )
   )
   def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
@@ -190,8 +194,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(value = "Delete rate for the specified asset", httpMethod = "DELETE")
-  @ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
-  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
+    )
+  )
+  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete  & withAuth) { a =>
     withAsset(a) { asset =>
       complete(
         if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
