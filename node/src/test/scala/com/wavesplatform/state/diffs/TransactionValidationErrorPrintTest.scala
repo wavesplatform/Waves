@@ -19,7 +19,7 @@ import org.scalatest.{Inside, PropSpec}
 class TransactionValidationErrorPrintTest extends PropSpec with Inside {
   property("output transaction error should be easy to read") {
     val assetScript =
-      """
+      s"""
         | let NETWORKBYTE = takeRight(toBytes(87), 1)
         |
         | match (tx) {
@@ -37,7 +37,9 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
         |         let recipientAddressFromPublicKey = rpkWithVersionAndByte + checksum
         |         let recipientAddressFromTx = addressFromRecipient(t.recipient).bytes
         |
-        |         if (recipientAddressFromPublicKey != recipientAddressFromTx) then throw(
+        |         let bigByteStr = base64'${"a" * 2000}'
+        |
+        |         if (bigByteStr.size() == 0 || recipientAddressFromPublicKey != recipientAddressFromTx) then throw(
         |             "Recipient address error:" + toBase58String(recipientAddressFromPublicKey)
         |             ) else {
         |           if (!sigVerify(txWithoutAttachment, recipientSignature, recipientPublicKey))
@@ -88,19 +90,19 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
       TestBlock.create(Seq(transferTransaction))
     ) {
       error =>
-        val expected = //regex because of changeable proof
+        val expected = //regex because of changeable fields
           """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
             |	\$match0 = TransferTransaction\(
             |		recipient = Address\(
             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |		\)
             |		timestamp = 0
-            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZ48AaFTA3GoWXEU4UpGCUakckZU1fs9W8oNbBceLDuy52DfTTiBysM3RfXAboKTMsqU44mgsuU2BVK4T3xHhXzYke5BCmDcXQfCqz13QiYerEMcpgZpuD'
-            |		assetId = base58'DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX'
+            |		bodyBytes = base58'\w+'
+            |		assetId = base58'\w+'
             |		feeAssetId = Unit
             |		amount = 1
             |		version = 2
-            |		id = base58'DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM'
+            |		id = base58'\w+'
             |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
             |		attachment = base58''
             |		sender = Address\(
@@ -108,6 +110,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |		\)
             |		fee = 10000000
             |	\)
+            |	bigByteStr = base64'\w+'
             |	@xs = base58'11111112'
             |	@number = 1
             |	@xs = base58'11111112W'
@@ -118,12 +121,12 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |		\)
             |		timestamp = 0
-            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZ48AaFTA3GoWXEU4UpGCUakckZU1fs9W8oNbBceLDuy52DfTTiBysM3RfXAboKTMsqU44mgsuU2BVK4T3xHhXzYke5BCmDcXQfCqz13QiYerEMcpgZpuD'
-            |		assetId = base58'DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX'
+            |		bodyBytes = base58'\w+'
+            |		assetId = base58'\w+'
             |		feeAssetId = Unit
             |		amount = 1
             |		version = 2
-            |		id = base58'DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM'
+            |		id = base58'\w+'
             |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
             |		attachment = base58''
             |		sender = Address\(
@@ -152,10 +155,10 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |  "sender" : "3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5",
             |  "feeAssetId" : null,
             |  "proofs" : \[ "\w+" ],
-            |  "assetId" : "DZynDzmxW8wq4jLQnbAPjUPtiiTwUPG5CGbnV2jA6YyX",
+            |  "assetId" : "8zFTAeRPGcnJinp6otoZfYSFtidTRuNvFamtANUemU6G",
             |  "recipient" : "3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu",
             |  "feeAsset" : null,
-            |  "id" : "DueNrqLCqaehZxoqsw7sAp2MvMEKWhRb9XtvsUi3BKhM",
+            |  "id" : "\w+",
             |  "timestamp" : 0
             |}\)\)""".stripMargin.r
 

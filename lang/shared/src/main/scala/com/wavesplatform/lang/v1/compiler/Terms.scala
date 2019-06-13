@@ -68,13 +68,12 @@ object Terms {
   }
   case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString                 }
   case class CONST_BYTESTR(bs: ByteStr) extends EVALUATED {
-    import com.wavesplatform.common.utils.{Base58, Base64}
     override def toString: String = bs.toString
     override def prettyString(level: Int) : String = {
-      if(bs.size > 1024) {
-        "base64'" ++ Base64.encode(bs) ++ "'"
+      if(bs.isSmall) {
+        "base58'" ++ bs.base58 ++ "'"
       } else {
-        "base58'" ++ Base58.encode(bs) ++ "'"
+        "base64'" ++ bs.base64Raw ++ "'"
       }
     }
 
