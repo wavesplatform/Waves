@@ -1025,8 +1025,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .getOrElse((Height @@ 0, TxNum @@ 0.toShort))
 
     val dst = (for {
-      seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(issueH, issueN))).par
-      addressId <- db.get(Keys.addressesForAsset(issueH, issueN, seqNr)).par
+      addressId <- db
+        .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
+        .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
+        .closeAfter(_.toVector)
+        .par
       balance = loadBalanceForAsset(db)(addressId, asset) if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
@@ -1054,9 +1057,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     lazy val addressIds: Seq[AddressId] = {
       val all = for {
-        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(issueH, issueN))
         addressId <- db
-          .get(Keys.addressesForAsset(issueH, issueN, seqNr))
+          .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
+          .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
+          .closeAfter(_.toVector)
       } yield addressId
 
       takeAfter(all, maybeAddressId)
