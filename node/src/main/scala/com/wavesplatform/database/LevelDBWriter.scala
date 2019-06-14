@@ -173,14 +173,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.lastValue(prefix, bytes, this.height)
       .map(e => read(e.getValue))
 
-  private[this] def loadBalanceForAsset(db: ReadOnlyDB)(addressId: AddressId, ia: IssuedAsset) = {
-    val (lastKey, valueKey) = {
-      val (issueH, issueN) = db.get(Keys.transactionHNById(TransactionId @@ ia.id)).getOrElse((Height @@ 0, TxNum @@ 0.toShort))
-      (Keys.assetBalanceLastHeight(addressId, issueH, issueN), Keys.assetBalance(addressId, issueH, issueN) _)
-    }
+  private[this] def loadBalanceForAssetHN(db: ReadOnlyDB)(addressId: AddressId, issueH: Height, issueN: TxNum) = {
+    val lastHeight = db.get(Keys.assetBalanceLastHeight(addressId, issueH, issueN))
+    if (lastHeight == 0) 0L else db.get(Keys.assetBalance(addressId, issueH, issueN)(lastHeight))
+  }
 
-    val lastHeight = db.get(lastKey)
-    if (lastHeight == 0) 0L else db.get(valueKey(lastHeight))
+  private[this] def loadBalanceForAsset(db: ReadOnlyDB)(addressId: AddressId, ia: IssuedAsset) = {
+    val (issueH, issueN) = db.get(Keys.transactionHNById(TransactionId @@ ia.id)).getOrElse((Height @@ 0, TxNum @@ 0.toShort))
+    loadBalanceForAssetHN(db)(addressId, issueH, issueN)
   }
 
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
@@ -497,9 +497,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
     db.iterateOverStream(KeyHelpers.addr(Keys.AssetBalancePrefix, addressId))
-      .map { e =>
-        val (_, _, assetId, height) = Keys.parseAddressBytesHeight(e.getKey)
-        (IssuedAsset(assetId), height) -> Longs.fromByteArray(e.getValue)
+      .flatMap { e =>
+        val (_, _, hn, height) = Keys.parseAddressBytesHeight(e.getKey)
+        val (h, n) = Keys.parseHeightNum(hn)
+        db.get(Keys.transactionAt(h, n)).map(tx => (IssuedAsset(tx.id()), height) -> Longs.fromByteArray(e.getValue))
       }
   }
 
@@ -714,6 +715,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .getOrElse(CloseableIterator.empty)
       .map { case ((asset, _), _) => asset }
       .closeAfter(_.toVector) // FIXME: Proper reverse iterator
+      .distinct
       .reverseIterator
 
     val issueTxStream = assetIdStream
@@ -1030,7 +1032,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
         .closeAfter(_.toVector)
         .par
-      balance = loadBalanceForAsset(db)(addressId, asset) if balance > 0
+      balance = loadBalanceForAssetHN(db)(addressId, issueH, issueN) if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
     AssetDistribution(dst)
@@ -1040,54 +1042,53 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
-    val (issueH, issueN) = db
+    lazy val (issueH, issueN) = db
       .get(Keys.transactionHNById(TransactionId @@ asset.id))
       .getOrElse((Height @@ 0, TxNum @@ 0.toShort))
 
-    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
+    lazy val page: AssetDistributionPage = {
+      val addressIds: CloseableIterator[AddressId] = {
+        def takeAfter(s: CloseableIterator[AddressId], a: Option[AddressId]): CloseableIterator[AddressId] = {
+          a match {
+            case None => s
+            case Some(v) => s.dropWhile(_ != v).drop(1)
+          }
+        }
 
-    lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
+        val all = for {
+          addressId <- db
+            .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
+            .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.drop(6)))
+        } yield addressId
 
-    def takeAfter(s: Seq[AddressId], a: Option[AddressId]): Seq[AddressId] = {
-      a match {
-        case None    => s
-        case Some(v) => s.dropWhile(_ != v).drop(1)
+        val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
+        takeAfter(all, maybeAddressId)
+      }
+
+      val distribution: CloseableIterator[(Address, Long)] =
+        for {
+          addressId <- addressIds
+          balance <- db
+            .lastValue(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), Keys.heightWithNum(issueH, issueN)), height)
+            .map(e => Longs.fromByteArray(e.getValue))
+            .filter(_ > 0)
+        } yield db.get(Keys.idToAddress(addressId)) -> balance
+
+      distribution.closeAfter { distribution =>
+        val dst = distribution.take(count + 1).toStream
+
+        val hasNext = dst.length > count
+        val items = if (hasNext) dst.init else dst
+        val lastKey = items.lastOption.map(_._1)
+
+        val result: Paged[Address, AssetDistribution] =
+          Paged(hasNext, lastKey, AssetDistribution(items.toMap))
+        AssetDistributionPage(result)
       }
     }
 
-    lazy val addressIds: Seq[AddressId] = {
-      val all = for {
-        addressId <- db
-          .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
-          .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
-          .closeAfter(_.toVector)
-      } yield addressId
 
-      takeAfter(all, maybeAddressId)
-    }
-
-    lazy val distribution: Stream[(Address, Long)] =
-      for {
-        addressId <- addressIds.toStream
-        balance <- db
-          .lastValue(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), Keys.heightWithNum(issueH, issueN)), height)
-          .map(e => Longs.fromByteArray(e.getValue))
-          .filter(_ > 0)
-      } yield db.get(Keys.idToAddress(addressId)) -> balance
-
-    lazy val page: AssetDistributionPage = {
-      val dst = distribution.take(count + 1)
-
-      val hasNext = dst.length > count
-      val items   = if (hasNext) dst.init else dst
-      val lastKey = items.lastOption.map(_._1)
-
-      val result: Paged[Address, AssetDistribution] =
-        Paged(hasNext, lastKey, AssetDistribution(items.toMap))
-
-      AssetDistributionPage(result)
-    }
-
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
     Either
       .cond(
         height > canGetAfterHeight,
