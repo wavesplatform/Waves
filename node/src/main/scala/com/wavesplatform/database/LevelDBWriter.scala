@@ -373,16 +373,17 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         .orElse(maybeHNFromState)
     }
 
-    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[AddressId]]
+    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
+    val assetsByAddress = mutable.LongMap.empty[Set[IssuedAsset]]
+
     for ((addressId, assets) <- assetBalances) {
-      val prevAssets   = rw.get(Keys.assetList(addressId))
-      val prevAssetSet = prevAssets.toSet
-      val newAssets    = assets.keys.filter(!prevAssetSet(_))
+      val prevAssetSet = assetsByAddress.getOrElseUpdate(addressId, assetBalanceIterator(rw, addressId).map(_._1._1).toSet)
+      val newAssets = assets.keys.filter(!prevAssetSet(_))
+      for (asset <- newAssets) newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
+
       for (asset <- newAssets) {
         newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
-      rw.put(Keys.assetList(addressId), newAssets.toList ++ prevAssets)
-
       for ((asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
         rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
         rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
@@ -514,6 +515,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
+  private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
+    db.iterateOverStream(KeyHelpers.addr(Keys.AssetBalancePrefix, addressId))
+      .map { e =>
+        val (_, _, assetId, height) = Keys.parseAddressBytesHeight(e.getKey)
+        (IssuedAsset(assetId), height) -> Longs.fromByteArray(e.getValue)
+      }
+  }
+
   override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
@@ -552,7 +561,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               if (prevHeight == 0) rw.delete(lastHeightKey) else rw.put(lastHeightKey, prevHeight)
             }
 
-            for (assetId <- rw.get(Keys.assetList(addressId))) {
+            for (((assetId, h), _) <- assetBalanceIterator(rw, addressId) if h == currentHeight) {
               balancesToInvalidate += (address -> assetId)
               rw.get(Keys.transactionHNById(TransactionId @@ assetId.id))
                 .foreach {
@@ -721,13 +730,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
     val assetIdStream: CloseableIterator[IssuedAsset] = db
       .get(Keys.addressId(address))
-      .fold(CloseableIterator.empty[IssuedAsset]) { id =>
-        val addressId = AddressId @@ id
-
-        val iter = db.get(Keys.assetList(addressId)).iterator
-
-        CloseableIterator(iter, () => CloseableIterator.close(iter))
-      }
+      .map(assetBalanceIterator(db, _))
+      .getOrElse(CloseableIterator.empty)
+      .map { case ((asset, _), _) => asset }
+      .closeAfter(_.toVector) // FIXME: Proper reverse iterator
+      .reverseIterator
 
     val issueTxStream = assetIdStream
       .flatMap(ia => transactionInfo(ia.id, db).map(_._2))

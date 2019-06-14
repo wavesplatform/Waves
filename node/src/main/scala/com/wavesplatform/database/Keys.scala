@@ -44,9 +44,6 @@ object Keys {
   def wavesBalance(addressId: Long)(height: Int): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetList(addressId: AddressId): Key[List[IssuedAsset]] =
-    Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
-
   def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
     Key("asset-balance-last-height",
       bytes(8, Bytes.concat(AddressId.toBytes(addressId), heightWithNum(issueTxHeight, issueTxNum))),
