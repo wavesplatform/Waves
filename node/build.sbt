@@ -38,6 +38,7 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")
 )
 
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 libraryDependencies ++= Dependencies.node.value
 coverageExcludedPackages := ""
 

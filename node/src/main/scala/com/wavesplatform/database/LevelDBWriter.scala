@@ -11,6 +11,8 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.database.KeyDsl.Implicits._
+import com.wavesplatform.database.KeyDsl.KeyW.ops._
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -333,7 +335,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
     def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
-      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
+      rw.iterateOverStream((prefix, bytes).toKeyBytes)
         .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
         .closeAfter { iterator =>
           val heights = iterator.toStream
@@ -496,7 +498,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
-    db.iterateOverStream(KeyHelpers.addr(Keys.AssetBalancePrefix, addressId))
+    db.iterateOverStream((Keys.AssetBalancePrefix, addressId).toKeyBytes)
       .flatMap { e =>
         val (_, _, hn, height) = Keys.parseAddressBytesHeight(e.getKey)
         val (h, n) = Keys.parseHeightNum(hn)
@@ -532,9 +534,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             balancesToInvalidate += (address -> Waves)
 
             def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte]): Unit = {
-              val prefixBs = KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), prefixBytes))
               val prevHeight = rw
-                .iterateOverStream(prefixBs)
+                .iterateOverStream((prefix, addressId, prefixBytes).toKeyBytes)
                 .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
                 .takeWhile(_ < currentHeight)
                 .closeAfter(_.fold(0)((_, r) => r))

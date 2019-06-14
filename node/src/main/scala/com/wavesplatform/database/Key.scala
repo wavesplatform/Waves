@@ -1,5 +1,7 @@
 package com.wavesplatform.database
 
+import com.wavesplatform.database.KeyDsl.KeyW
+
 trait Key[V] {
   def name: String
   def keyBytes: Array[Byte]
@@ -18,7 +20,7 @@ trait Key[V] {
 }
 
 object Key {
-  def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
+  def raw[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
     override def name: String = keyName
 
     override def keyBytes: Array[Byte] = key
@@ -28,6 +30,11 @@ object Key {
     override def encode(v: V) = encoder(v)
   }
 
-  def opt[V](name: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-    apply[Option[V]](name, key, bs => Option(bs).map(parser), _.fold[Array[Byte]](Array.emptyByteArray)(encoder))
+  def apply[K: KeyW, V](keyName: String, key: K, parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = {
+    raw(keyName, KeyW[K].toBytes(key), parser, encoder)
+  }
+
+
+  def opt[K: KeyW, V](name: String, key: K, parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
+    apply[K, Option[V]](name, key, bs => Option(bs).map(parser), _.fold[Array[Byte]](Array.emptyByteArray)(encoder))
 }
