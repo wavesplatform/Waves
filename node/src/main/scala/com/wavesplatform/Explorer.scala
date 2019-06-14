@@ -307,7 +307,7 @@ object Explorer extends ScorexLogging {
             (txH, txN) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id)).toSeq
             addressId <- db
               .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(txH, txN)))
-              .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
+              .map(e => AddressId.fromBytes(e.getKey.dropRight(4).takeRight(4)))
             balance = db
               .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
               .filter { e =>

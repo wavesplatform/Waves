@@ -1029,7 +1029,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val dst = (for {
       addressId <- db
         .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
-        .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
+        .map(e => AddressId.fromBytes(e.getKey.dropRight(4).takeRight(4)))
         .closeAfter(_.toVector)
         .par
       balance = loadBalanceForAssetHN(db)(addressId, issueH, issueN) if balance > 0
