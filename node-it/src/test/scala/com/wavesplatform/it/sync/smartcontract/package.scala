@@ -1,7 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.transaction.DataTransaction
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{Asset, DataTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
@@ -138,10 +139,16 @@ package object smartcontract {
     tx
   }
 
-  def orders(pair: AssetPair, ord1Ver: Byte, ord2Ver: Byte, fee: Long, time: Time, accounts: KeyPair*): (Order, Order) = {
-    val buyer               = accounts.head // first one
-    val seller              = accounts.tail.head // second one
-    val matcher             = accounts.last
+  def orders(pair: AssetPair,
+             ord1Ver: Byte,
+             ord2Ver: Byte,
+             fee: Long,
+             time: Time,
+             buyer: KeyPair,
+             seller: KeyPair,
+             matcher: KeyPair,
+             matcherFeeOrder1: Asset = Waves,
+             matcherFeeOrder2: Asset = Waves): (Order, Order) = {
     val ts                  = time.correctedTime()
     val expirationTimestamp = ts + Order.MaxLiveTime
     val buyPrice            = 1 * Order.PriceConstant
@@ -149,9 +156,10 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, ord1Ver)
-    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, ord2Ver)
+    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, ord1Ver, matcherFeeOrder1)
+    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, ord2Ver, matcherFeeOrder2)
 
     (buy, sell)
   }
+
 }

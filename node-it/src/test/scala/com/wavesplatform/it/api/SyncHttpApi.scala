@@ -4,7 +4,8 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
@@ -67,12 +68,19 @@ object SyncHttpApi extends Assertions {
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
+
+      val containsError =
+        Seq("details", "message")
+          .map(parse(responseBody).\)
+          .collectFirst { case lookupResult if lookupResult.isDefined => lookupResult.get.toString }
+          .exists(_.contains(errorMessage))
+
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && containsError)
     case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting not found error")
+    case _ => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime: FiniteDuration = 50.seconds
+  val RequestAwaitTime: FiniteDuration = 120.seconds//50.seconds
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)

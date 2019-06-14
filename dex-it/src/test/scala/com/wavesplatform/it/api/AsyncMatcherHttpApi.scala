@@ -113,6 +113,9 @@ object AsyncMatcherHttpApi extends Assertions {
       }
     }
 
+    def transactionsByOrder(orderId:String) : Future[Seq[ExchangeTransaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
+
     def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
         case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
