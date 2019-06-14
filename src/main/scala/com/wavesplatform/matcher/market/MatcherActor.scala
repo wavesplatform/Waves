@@ -34,7 +34,6 @@ class MatcherActor(settings: MatcherSettings,
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
-  private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
   private var lastProcessedNr: Long                   = -1L
 
   private var snapshotsState = SnapshotsState.empty
@@ -79,7 +78,6 @@ class MatcherActor(settings: MatcherSettings,
   private def createOrderBook(pair: AssetPair): ActorRef = {
     log.info(s"Creating order book for $pair")
     val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
-    childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
     orderBook
@@ -159,15 +157,21 @@ class MatcherActor(settings: MatcherSettings,
       context.stop(self)
 
     case Terminated(ref) =>
-      log.error(s"$ref is terminated")
-      orderBooks.getAndUpdate { m =>
-        childrenNames.get(ref).fold(m) { p =>
-          m.get(p) match {
-            case None    => m
-            case Some(_) => m.updated(p, Left(()))
+      val name = ref.path.name
+      val xs   = name.split("-")
+      val pair = if (xs.size == 2) AssetPair.createAssetPair(xs.head, xs(1)).toOption else None
+
+      pair.foreach { p =>
+        orderBooks.getAndUpdate { obs =>
+          obs.get(p) match {
+            case None    => obs
+            case Some(_) => obs.updated(p, Left(()))
           }
         }
       }
+
+      if (pair.fold(true)(orderBooks.get.contains)) log.error(s"$ref is terminated")
+      else log.info(s"$ref is terminated")
 
     case OrderBookRecovered(assetPair, eventNr) =>
       snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, settings.snapshotsInterval)
@@ -206,7 +210,7 @@ class MatcherActor(settings: MatcherSettings,
       context.stop(self)
       recoveryCompletedWithEventNr(Left("Received Shutdown command"))
 
-    case x => stash(sender(), x)
+    case x => stash(x)
   }
 
   private def becomeWorking(oldestSnapshotOffset: Option[EventOffset],

@@ -295,10 +295,9 @@ object AsyncMatcherHttpApi extends Assertions {
       for {
         offset           <- matcherNode.getCurrentOffset
         snapshots        <- matcherNode.getAllSnapshotOffsets
-        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).map(r => x -> r))
+        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).zip(matcherNode.marketStatus(x)).map(r => x -> r))
         orderStatuses    <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
         reservedBalances <- Future.traverse(accounts)(x => matcherNode.reservedBalance(x).map(r => x -> r))
-
         accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
         orderHistory <- Future.traverse(accountsOrderHistory) {
           case (account, pair) => matcherNode.orderHistoryByPair(account, pair).map(r => (account, pair, r))
@@ -326,7 +325,7 @@ object AsyncMatcherHttpApi extends Assertions {
       }
 
     private def clean(x: MatcherState): MatcherState = x.copy(
-      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(timestamp = 0L) }
+      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
     )
   }
 

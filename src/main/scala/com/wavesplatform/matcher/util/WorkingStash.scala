@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.util
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorContext, ActorRef}
 
 import scala.collection.immutable.Queue
 
@@ -10,7 +10,7 @@ trait WorkingStash {
 
   private var stashedMessages = Queue.empty[(ActorRef, Any)]
 
-  def stash(sender: ActorRef, message: Any): Unit = stashedMessages = stashedMessages.enqueue(sender -> message)
+  def stash(message: Any)(implicit actorContext: ActorContext): Unit = stashedMessages = stashedMessages.enqueue(actorContext.sender() -> message)
 
   def unstashAll(): Unit = {
     stashedMessages.foreach { case (sender, message) => self.tell(message, sender) }

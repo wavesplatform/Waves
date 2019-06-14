@@ -16,7 +16,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
-import com.wavesplatform.matcher.db.AssetPairsDB
+import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB}
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -103,7 +103,7 @@ object MatcherTool extends ScorexLogging {
 
           val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
           val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
-          println(s"Snapshots history for $pair: $history")
+          log.info(s"Snapshots history for $pair: $history")
 
           history.headOption.foreach { lastSnapshotNr =>
             val lastSnapshotKey     = MatcherSnapshotStore.kSnapshot(persistenceId, lastSnapshotNr)
@@ -115,8 +115,8 @@ object MatcherTool extends ScorexLogging {
                 lo <- v
               } yield s"${lo.order.id()} -> $lo").mkString("\n")
 
-            println(s"Last snapshot: $lastSnapshot")
-            println(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders)}")
+            log.info(s"Last snapshot: $lastSnapshot")
+            log.info(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders)}")
           }
         } finally {
           Await.ready(system.terminate(), Duration.Inf)
@@ -155,16 +155,16 @@ object MatcherTool extends ScorexLogging {
         }
       case "oi" =>
         val id = ByteStr.decodeBase58(args(2)).get
-        println(s"Loading order '$id'")
+        log.info(s"Loading order '$id'")
 
         val orderKey = MatcherKeys.order(id)
         orderKey.parse(db.get(orderKey.keyBytes)).foreach { o =>
-          println(s"Order (id=${o.id()}): $o")
+          log.info(s"Order (id=${o.id()}): $o")
         }
 
         val orderInfoKey = MatcherKeys.orderInfo(id)
         orderInfoKey.parse(db.get(orderInfoKey.keyBytes)).foreach { oi =>
-          println(s"Order info: $oi")
+          log.info(s"Order info: $oi")
         }
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
@@ -279,7 +279,53 @@ object MatcherTool extends ScorexLogging {
         val knownAssetPairs = apdb.all()
         if (knownAssetPairs.isEmpty) log.info("There are no known asset pairs")
         else log.info(s"Known asset pairs: ${knownAssetPairs.mkString("\n")}")
-      case _ =>
+      case "ob-migrate" =>
+        val defaultOffset    = Option(args(2)).map(_.toLong)
+        val brokenOrderBooks = List.newBuilder[AssetPair]
+        val apdb             = AssetPairsDB(db)
+        val knownAssetPairs  = apdb.all()
+        if (knownAssetPairs.isEmpty) log.info("There are no known asset pairs")
+        else {
+          val obsdb  = OrderBookSnapshotDB(db)
+          val system = ActorSystem("matcher-tool", actualConfig)
+          val se     = SerializationExtension(system)
+          try {
+            val snapshotDB = openDB(settings.matcherSettings.snapshotsDataDir)
+            val total      = knownAssetPairs.size
+            var i          = 0
+            knownAssetPairs.foreach { pair =>
+              val persistenceId = OrderBookActor.name(pair)
+
+              val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
+              val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
+
+              history.headOption.foreach { lastSnapshotNr =>
+                val lastSnapshotKey     = MatcherSnapshotStore.kSnapshot(persistenceId, lastSnapshotNr)
+                val lastSnapshotRawData = lastSnapshotKey.parse(snapshotDB.get(lastSnapshotKey))
+                val lastSnapshot        = se.deserialize(lastSnapshotRawData, classOf[Snapshot]).get.data.asInstanceOf[OrderBookActor.Snapshot]
+
+                lastSnapshot.eventNr match {
+                  case Some(offset) => obsdb.update(pair, offset, Some(lastSnapshot.orderBook))
+                  case None =>
+                    defaultOffset.foreach(obsdb.update(pair, _, Some(lastSnapshot.orderBook)))
+                    brokenOrderBooks += pair
+                }
+              }
+
+              i += 1
+              if (total % i == 10) log.info(s"$i%...")
+            }
+          } finally {
+            log.error(s"Can't migrate order books: ${brokenOrderBooks.result().mkString(", ")}")
+            defaultOffset match {
+              case None         => log.error("It's unsafe to switch the version of DEX!")
+              case Some(offset) => log.info(s"The default offset for these order books is $offset")
+            }
+            Await.ready(system.terminate(), Duration.Inf)
+          }
+        }
+      case x =>
+        log.warn(s"Can't run $x")
     }
 
     log.info(s"Completed in ${(System.currentTimeMillis() - start) / 1000}s")
