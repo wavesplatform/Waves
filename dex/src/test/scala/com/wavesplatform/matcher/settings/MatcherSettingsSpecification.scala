@@ -179,7 +179,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
-    settings.allowOrderV3 shouldBe false
+    settings.allowedOrderVersions shouldBe Set(1, 2)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
     settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
       broadcastUntilConfirmed = true,

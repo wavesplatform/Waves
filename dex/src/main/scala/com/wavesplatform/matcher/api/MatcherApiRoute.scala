@@ -58,7 +58,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
-                           rateCache: RateCache)
+                           rateCache: RateCache,
+                           validatedAllowedOrderVersions: Set[Byte])
     extends ApiRoute
     with ScorexLogging {
 
@@ -151,14 +152,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getSettings: Route = (path("settings") & get) {
     complete(
       StatusCodes.OK -> Json.obj(
-        "priceAssets" -> matcherSettings.priceAssets,
-        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value
+        "priceAssets"   -> matcherSettings.priceAssets,
+        "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+        "orderVersions" -> validatedAllowedOrderVersions.toSeq.sorted
       )
     )
   }
 
   @Path("/settings/rates")
-  @ApiOperation(value = "Asset rates", notes = "Get current asset rates (asset cost in Waves)", httpMethod = "GET")
+  @ApiOperation(value = "Asset rates", notes = "Get current rates of assets (asset cost in Waves)", httpMethod = "GET")
   def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
 
   @Path("/settings/rates/{assetId}")
@@ -166,7 +168,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset for which rate is added or updated", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "rate", value = "Rate associated with the specified asset", dataType = "double", paramType = "body")
+      new ApiImplicitParam(name = "rate",
+                           value = "Rate associated with the specified asset",
+                           dataType = "double",
+                           paramType = "body",
+                           required = true)
     )
   )
   def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
@@ -188,8 +194,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(value = "Delete rate for the specified asset", httpMethod = "DELETE")
-  @ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
-  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
+    )
+  )
+  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete  & withAuth) { a =>
     withAsset(a) { asset =>
       complete(
         if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
@@ -400,7 +410,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         StatusCodes.OK -> orders.map {
           case (id, oi) =>
             Json.obj(
-              "id"        -> id.base58,
+              "id"        -> id.toString,
               "type"      -> oi.side.toString,
               "amount"    -> oi.amount,
               "price"     -> oi.price,

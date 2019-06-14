@@ -189,53 +189,43 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(initialConstraint: MultiDimensionalMiningConstraint,
                                maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
-    val (reversedValidTxs, _, finalConstraint, _, totalIterations) = PoolMetrics.packTimeStats.measure {
+    val (reversedValidTxs, _, finalConstraint, totalIterations) = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
+      type R = (Seq[Transaction], Diff, MultiDimensionalMiningConstraint, Int)
+      @inline def bumpIterations(r: R): R = r.copy(_4 = r._4 + 1)
 
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
-        .scanLeft((Seq.empty[Transaction], Monoid[Diff].empty, initialConstraint, initialConstraint, 0)) {
-          case ((valid, diff, currentConstraint, lastOverfilled, iterations), tx) =>
-            val preUpdatedRest = currentConstraint.put(blockchain, tx, Diff.empty) // TODO: Doesn't handle scriptRuns/scriptComplexity
-            if (preUpdatedRest.isOverfilled) {
-              if (preUpdatedRest != lastOverfilled) {
-                log.trace(
-                  s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, preUpdatedRest).mkString(", ")}")
-              }
-              (valid, diff, currentConstraint, preUpdatedRest, iterations + 1)
+        .foldLeft((Seq.empty[Transaction], Monoid[Diff].empty, initialConstraint, 0)) {
+          case (r @ (packedTransactions, diff, currentConstraint, iterationCount), tx) =>
+            if (currentConstraint.isFull || (packedTransactions.nonEmpty && isTimeLimitReached)) r // don't run any checks here to speed up mining
+            else if (TxCheck.isExpired(tx)) {
+              log.debug(s"Transaction ${tx.id()} expired")
+              remove(tx.id())
+              bumpIterations(r)
             } else {
               val updatedBlockchain = composite(blockchain, diff)
-              if (TxCheck.isExpired(tx)) {
-                log.trace(s"Transaction [${tx.id()}] is expired")
-                remove(tx.id())
-                (valid, diff, currentConstraint, lastOverfilled, iterations + 1)
-              } else {
-                differ(updatedBlockchain, tx).resultE match {
-                  case Right(newDiff) =>
-                    val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
-                    if (updatedConstraint.isOverfilled) {
-                      if (updatedConstraint != lastOverfilled) {
-                        log.trace(
-                          s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}")
-                      }
-                      (valid, diff, currentConstraint, updatedConstraint, iterations + 1)
-                    } else {
-                      (tx +: valid, Monoid.combine(diff, newDiff), updatedConstraint, lastOverfilled, iterations + 1)
-                    }
-                  case Left(error) =>
-                    log.trace(s"Transaction [${tx.id()}] is removed: $error")
-                    remove(tx.id())
-                    (valid, diff, currentConstraint, lastOverfilled, iterations + 1)
-                }
+              differ(updatedBlockchain, tx).resultE match {
+                case Right(newDiff) =>
+                  val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
+                  if (updatedConstraint.isOverfilled) {
+                    log.trace(
+                      s"Transaction ${tx.id()} does not fit into the block: " +
+                        s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}")
+                    bumpIterations(r)
+                  } else {
+                    log.trace(s"Packing transaction ${tx.id()}")
+                    (tx +: packedTransactions, Monoid.combine(diff, newDiff), updatedConstraint, iterationCount + 1)
+                  }
+                case Left(error) =>
+                  log.debug(s"Transaction ${tx.id()} removed due to $error")
+                  remove(tx.id())
+                  bumpIterations(r)
               }
             }
         }
-        .takeWhile {
-          case (packedTransactions, _, constraint, _, _) => !constraint.isOverfilled && (packedTransactions.isEmpty || !isTimeLimitReached)
-        }
-        .reduce((_, right) => right)
     }
 
     val txs = reversedValidTxs.reverse
