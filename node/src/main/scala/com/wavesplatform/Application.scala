@@ -32,6 +32,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils.{LoggerFacade, NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -42,14 +43,13 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
-import monix.execution.Scheduler
-import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -81,12 +81,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
-  private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
-  private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
-  private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
-  private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
-  private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
-  private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
+  private val logReporter: String => UncaughtExceptionReporter = name => log.error(s"Error in $name", _)
+
+  private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = logReporter("Extension Loader"))
+  private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = logReporter("Microblock Synchronizer"))
+  private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = logReporter("Score Observer"))
+  private val appenderScheduler               = singleThread("appender", reporter = logReporter("Appender"))
+  private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = logReporter("History Replier"))
+  private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = logReporter("Miner"))
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None

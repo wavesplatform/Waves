@@ -37,17 +37,18 @@ object Importer extends ScorexLogging {
           override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
         }
 
-        implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
+        implicit val scheduler: Scheduler = Schedulers.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
-          override def putIfNew(tx: Transaction, b: Boolean)                               = ???
-          override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-          override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
-          override def pessimisticPortfolio(addr: Address): Portfolio          = ???
-          override def all                                                     = ???
-          override def size                                                    = ???
-          override def transactionById(transactionId: ByteStr)                 = ???
-          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
-          override def close(): Unit                                           = {}
+          override def putIfNew(tx: Transaction, b: Boolean)                 = ???
+          override def removeAll(txs: Traversable[Transaction]): Unit        = {}
+          override def spendableBalance(addr: Address, assetId: Asset): Long = ???
+          override def pessimisticPortfolio(addr: Address): Portfolio        = ???
+          override def all                                                   = ???
+          override def size                                                  = ???
+          override def transactionById(transactionId: ByteStr)               = ???
+          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
+                                       maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
+          override def close(): Unit                                                                                = {}
         }
 
         val time = new NTP(settings.ntpServer)
