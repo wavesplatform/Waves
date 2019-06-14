@@ -546,7 +546,6 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
                          sellFeeAssetId)),
             f"Required ${insufficientSellMatcherFee + 1} ${sellFeeAssetId.maybeBase58Repr.getOrElse("WAVES")} as fee for this order, but given $insufficientSellMatcherFee"
           )
-
         }
       }
     }
