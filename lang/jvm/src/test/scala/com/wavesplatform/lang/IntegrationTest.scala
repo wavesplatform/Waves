@@ -874,6 +874,23 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
   }
 
+  property("math functions scale limits") {
+    eval("pow(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
+    eval("log(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
+    eval("pow(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
+    eval("log(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
+  }
+
+  property("pow result size max") {
+    eval("pow(2, 0, 62, 0, 0, UP)") shouldBe Right(CONST_LONG(Math.pow(2, 62).toLong))
+    eval("pow(2, 0, 63, 0, 0, UP)") should produce("out of long range")
+  }
+
+  property("pow result size abs min") {
+    eval("pow(10, 0, -8, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(1))
+    eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
+  }
+
   property("concat empty list") {
     val script =
       s"""
