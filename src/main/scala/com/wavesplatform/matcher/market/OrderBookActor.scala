@@ -87,6 +87,8 @@ class OrderBookActor(owner: ActorRef,
           }
       }
 
+    case MatcherActor.Ping => sender() ! MatcherActor.Pong
+
     case ForceStartOrderBook(p) if p == assetPair =>
       sender() ! OrderBookCreated(assetPair)
 

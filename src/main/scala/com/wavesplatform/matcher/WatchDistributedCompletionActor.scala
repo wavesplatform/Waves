@@ -8,7 +8,7 @@ class WatchDistributedCompletionActor(workers: Set[ActorRef], completionReceiver
   override def receive: Receive = state(workers)
 
   private def state(rest: Set[ActorRef]): Receive = {
-    case x if x == workCompleted =>
+    case `workCompleted` =>
       val updatedRest = rest - sender()
       if (updatedRest.isEmpty) {
         completionReceiver ! workCompleted

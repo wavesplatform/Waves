@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 trait MatcherQueue {
-  def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit
+  def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit
 
   /**
     * @return Depending on settings and result:
@@ -13,6 +13,8 @@ trait MatcherQueue {
     *         Future.failed(error)       if storing is enabled and it was failed
     */
   def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]]
+
+  def lastProcessedOffset: QueueEventWithMeta.Offset
 
   /**
     * @return -1 if topic is empty or even it doesn't exist

@@ -5,13 +5,13 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.google.common.base.Charsets
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.OrderBookUnavailable
 import com.wavesplatform.matcher.db.AssetPairsDB
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.util.WorkingStash
+import com.wavesplatform.matcher.{MatcherSettings, WatchDistributedCompletionActor}
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -109,7 +109,7 @@ class MatcherActor(settings: MatcherSettings,
   private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit = {
     snapshotsState.requiredSnapshot(offset).foreach {
       case (assetPair, updatedSnapshotState) =>
-        orderBooks.get.get(assetPair) match {
+        orderBook(assetPair) match {
           case Some(Right(actorRef)) =>
             log.info(
               s"The $assetPair order book should do a snapshot, the current offset is $offset. The next snapshot candidate: ${updatedSnapshotState.nearestSnapshotOffset}")
@@ -178,6 +178,11 @@ class MatcherActor(settings: MatcherSettings,
 
     case OrderBookSnapshotUpdateCompleted(assetPair, currentOffset) =>
       snapshotsState = snapshotsState.updated(assetPair, currentOffset, lastProcessedNr, settings.snapshotsInterval)
+
+    case PingAll(xs) =>
+      val workers = xs.flatMap(pair => context.child(pair.key))
+      val s       = sender()
+      context.actorOf(Props(new WatchDistributedCompletionActor(workers, s, Ping, Pong)))
   }
 
   private def collectOrderBooks(restOrderBooksNumber: Long,
@@ -294,6 +299,10 @@ object MatcherActor {
   case class MatcherRecovered(oldestEventNr: Long)
 
   case object Shutdown
+
+  case class PingAll(pairs: Set[AssetPair])
+  case object Ping
+  case object Pong
 
   case class AssetInfo(decimals: Int)
   implicit val assetInfoFormat: Format[AssetInfo] = Json.format[AssetInfo]

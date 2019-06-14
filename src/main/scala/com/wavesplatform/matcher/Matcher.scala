@@ -7,8 +7,9 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, gracefulStop}
+import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.EitherExt2
@@ -58,8 +59,7 @@ class Matcher(actorSystem: ActorSystem,
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
   import as.dispatcher
 
-  private val status: AtomicReference[Status]                    = new AtomicReference(Status.Starting)
-  @volatile private var currentOffset: QueueEventWithMeta.Offset = -1L // Used only for REST API
+  private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
@@ -133,7 +133,7 @@ class Matcher(actorSystem: ActorSystem,
       () => status.get(),
       db,
       time,
-      () => currentOffset,
+      () => matcherQueue.lastProcessedOffset,
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
@@ -163,15 +163,22 @@ class Matcher(actorSystem: ActorSystem,
           forceStopApplication(ErrorStartingMatcher)
 
         case Right((self, processedOffset)) =>
-          currentOffset = processedOffset
           snapshotsRestore.trySuccess(())
           matcherQueue.startConsume(
             processedOffset + 1,
-            eventWithMeta => {
-              log.debug(s"Consumed $eventWithMeta")
+            xs => {
+              if (xs.isEmpty) Future.successful(())
+              else {
+                val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
+                  log.debug(s"Consumed $eventWithMeta")
 
-              self ! eventWithMeta
-              currentOffset = eventWithMeta.offset
+                  self ! eventWithMeta
+                  eventWithMeta.event.assetPair
+                }(collection.breakOut)
+
+                val timeout = new Timeout(240.days) // All actor are local and have unbounded queues, so it's okay
+                self.ask(MatcherActor.PingAll(assetPairs))(timeout).map(_ => ())
+              }
             }
           )
       },
@@ -303,6 +310,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
+      val currentOffset = matcherQueue.lastProcessedOffset
       log.trace(s"offsets: $currentOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
       if (currentOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
