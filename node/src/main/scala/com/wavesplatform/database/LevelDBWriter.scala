@@ -344,7 +344,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         }
     }
 
-    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte] = Array.emptyByteArray)(
+    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte])(
         key: AddressId => Height => Key[_]): Unit = {
       deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
     }
@@ -530,7 +530,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             val address   = rw.get(Keys.idToAddress(addressId))
             balancesToInvalidate += (address -> Waves)
 
-            def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte] = Array.emptyByteArray) = {
+            def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte]): Unit = {
               val prefixBs = KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), prefixBytes))
               val prevHeight = rw
                 .iterateOverStream(prefixBs)
