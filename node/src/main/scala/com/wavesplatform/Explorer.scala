@@ -37,7 +37,6 @@ object Explorer extends ScorexLogging {
     4  -> "height-of",
     5 -> "waves-balance-history",
     6  -> "waves-balance",
-    7  -> "assets-for-address",
     8  -> "asset-balance-last-height",
     9  -> "asset-balance",
     11 -> "asset-info",
@@ -57,7 +56,6 @@ object Explorer extends ScorexLogging {
     32 -> "data-key-chunk",
     34 -> "data",
     36 -> "sponsorship",
-    39 -> "addresses-for-asset-seq-nr",
     40 -> "addresses-for-asset",
     43 -> "alias-is-disabled",
     45 -> "carry-fee",
@@ -307,11 +305,9 @@ object Explorer extends ScorexLogging {
             assetId <- assets.sorted
             asset = IssuedAsset(assetId)
             (txH, txN) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id)).toSeq
-            seqNr <- {
-              println(s"\n$assetId:")
-              1 to db.get(Keys.addressesForAssetSeqNr(txH, txN))
-            }
-            addressId <- db.get(Keys.addressesForAsset(txH, txN, seqNr))
+            addressId <- db
+              .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(txH, txN)))
+              .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.takeRight(4)))
             balance = db
               .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
               .filter { e =>

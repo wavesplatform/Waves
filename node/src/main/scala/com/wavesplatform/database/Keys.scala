@@ -10,7 +10,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 object Keys {
@@ -130,10 +129,10 @@ object Keys {
 
   def addressesForWaves(seqNr: Int): Key[Seq[AddressId]] = Key("addresses-for-waves", h(38, seqNr), AddressId.readSeq, AddressId.writeSeq)
 
-  def addressesForAssetSeqNr(issueTxHeight: Height, issueTxNum: TxNum): Key[Int] = bytesSeqNr("addresses-for-asset-seq-nr", 39, heightWithNum(issueTxHeight, issueTxNum))
+  val AddressesForAssetPrefix: Short = 40
 
-  def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum, seqNr: Int): Key[Seq[AddressId]] =
-    Key("addresses-for-asset", hBytes(40, heightWithNum(issueTxHeight, issueTxNum), seqNr), AddressId.readSeq, AddressId.writeSeq)
+  def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum, addressId: AddressId): Key[AddressId] =
+    Key("addresses-for-asset", bytes(AddressesForAssetPrefix, Bytes.concat(heightWithNum(issueTxHeight, issueTxNum), AddressId.toBytes(addressId))), _ => addressId, _ => Array.emptyByteArray)
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =

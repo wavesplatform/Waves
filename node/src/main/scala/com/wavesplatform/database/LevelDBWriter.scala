@@ -33,8 +33,8 @@ import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
+import scala.collection.immutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import scala.collection.{immutable, mutable}
 import scala.util.{Success, Try}
 
 object LevelDBWriter {
@@ -332,7 +332,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    /* def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
+    def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
       rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
         .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
         .closeAfter { iterator =>
@@ -347,7 +347,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte] = Array.emptyByteArray)(
         key: AddressId => Height => Key[_]): Unit = {
       deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
-    } */
+    }
 
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
@@ -373,31 +373,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         .orElse(maybeHNFromState)
     }
 
-    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[Long]]
-    val assetsByAddress = mutable.LongMap.empty[Set[IssuedAsset]]
-
-    for ((addressId, assets) <- assetBalances) {
-      val prevAssetSet = assetsByAddress.getOrElseUpdate(addressId, assetBalanceIterator(rw, addressId).map(_._1._1).toSet)
-      val newAssets = assets.keys.filter(!prevAssetSet(_))
-      for (asset <- newAssets) newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
-
-      for (asset <- newAssets) {
-        newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
-      }
-      for ((asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
-        rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
-        rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
-        // deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
-      }
-    }
-
-    for ((asset, newAddressIds) <- newAddressesForAsset; (h, n) <- getHNForAsset(asset)) {
-      val seqNrKey = Keys.addressesForAssetSeqNr(h, n)
-      val nextSeqNr = rw.get(seqNrKey) + 1
-      val key = Keys.addressesForAsset(h, n, nextSeqNr)
-
-      rw.put(seqNrKey, nextSeqNr)
-      rw.put(key, newAddressIds.toSeq)
+    for ((addressId, assets) <- assetBalances; (asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
+      rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
+      rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
+      deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
+      rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
     }
 
     rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
