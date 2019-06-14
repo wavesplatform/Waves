@@ -245,8 +245,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
         (matcherFeeOrder1, matcherFeeOrder2) match {
           case (Waves, IssuedAsset(issuedAssetId)) =>
-            assetBalanceBefore = sender.assetBalance(seller.address, issuedAssetId.base58).balance
-            sender.transfer(buyer.address, seller.address, 300000, minFee + 2*smartFee, Some(issuedAssetId.base58), version = 2, waitForTx = true)
+            assetBalanceBefore = sender.assetBalance(seller.address, issuedAssetId.toString).balance
+            sender.transfer(buyer.address, seller.address, 300000, minFee + 2*smartFee, Some(issuedAssetId.toString), version = 2, waitForTx = true)
           case _ =>
         }
 
@@ -274,9 +274,9 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
         (matcherFeeOrder1, matcherFeeOrder2) match {
           case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == assetId =>
-            sender.assetBalance(seller.address, issuedAssetId.base58).balance shouldBe assetBalanceBefore + (buyMatcherFee - sellMatcherFee) - amount
+            sender.assetBalance(seller.address, issuedAssetId.toString).balance shouldBe assetBalanceBefore + (buyMatcherFee - sellMatcherFee) - amount
           case (Waves, IssuedAsset(issuedAssetId)) if issuedAssetId == smartAssetId =>
-            sender.assetBalance(seller.address, issuedAssetId.base58).balance shouldBe assetBalanceBefore + (buyMatcherFee - sellMatcherFee)
+            sender.assetBalance(seller.address, issuedAssetId.toString).balance shouldBe assetBalanceBefore + (buyMatcherFee - sellMatcherFee)
           case _ =>
         }
       }
