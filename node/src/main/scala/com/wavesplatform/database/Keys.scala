@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.KeyDsl.KeyRW
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -43,9 +44,11 @@ object Keys {
   def wavesBalance(addressId: Long)(height: Int): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
+  import shapeless._, KeyDsl.Implicits._, KeyDsl.KeyRW.ops._
+
   def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
     Key("asset-balance-last-height",
-      bytes(8, Bytes.concat(AddressId.toBytes(addressId), heightWithNum(issueTxHeight, issueTxNum))),
+      (8.toShort :: addressId :: issueTxHeight :: issueTxNum :: HNil).toKeyBytes,
       Option(_).fold(0)(Ints.fromByteArray),
       Ints.toByteArray)
 
