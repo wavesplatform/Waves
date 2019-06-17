@@ -41,8 +41,8 @@ object Keys {
 
   val WavesBalancePrefix: Short = 6
 
-  def wavesBalance(addressId: Long) =
-    Key.prefixed("waves-balance", WavesBalancePrefix, addrBytes(addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+  def wavesBalance(addressId: Long)(height: Int) =
+    Key("waves-balance", Bytes.concat(Shorts.toByteArray(WavesBalancePrefix), addrBytes(addressId)), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
     Key("asset-balance-last-height",

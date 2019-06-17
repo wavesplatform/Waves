@@ -179,7 +179,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     addressId(req._1).fold(0L) { addressId =>
       req._2 match {
         case asset@IssuedAsset(_) => loadBalanceForAsset(db)(addressId, asset)
-        case Waves => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId).withHeightSuffix).getOrElse(0L)
+        case Waves => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
     }
   }
@@ -194,7 +194,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
-    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId).withHeightSuffix).getOrElse(0L),
+    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
     loadLeaseBalance(db, addressId),
     Map.empty
   )
