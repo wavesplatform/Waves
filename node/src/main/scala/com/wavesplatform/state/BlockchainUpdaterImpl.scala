@@ -80,7 +80,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
-    val height = blockchain.height + 1
+    val height = Height(blockchain.height + 1)
 
     val featuresCheckPeriod        = functionalitySettings.activationWindowSize(height)
     val blocksForFeatureActivation = functionalitySettings.blocksForFeatureActivation(height)
@@ -312,22 +312,22 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     service.shutdown()
   }
 
-  private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
+  private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Height])(_.approvedFeatures.map(_ -> height).toMap)
 
-  override def approvedFeatures: Map[Short, Int] = readLock {
+  override def approvedFeatures: Map[Short, Height] = readLock {
     newlyApprovedFeatures ++ blockchain.approvedFeatures
   }
 
-  override def activatedFeatures: Map[Short, Int] = readLock {
-    newlyApprovedFeatures.mapValues(_ + functionalitySettings.activationWindowSize(height)) ++ blockchain.activatedFeatures
+  override def activatedFeatures: Map[Short, Height] = readLock {
+    newlyApprovedFeatures.mapValues(h => Height(h + functionalitySettings.activationWindowSize(height))) ++ blockchain.activatedFeatures
   }
 
-  override def featureVotes(height: Int): Map[Short, Int] = readLock {
+  override def featureVotes(height: Height): Map[Short, Int] = readLock {
     val innerVotes = blockchain.featureVotes(height)
     ngState match {
       case Some(ng) if this.height <= height =>
         val ngVotes = ng.base.featureVotes.map { featureId =>
-          featureId -> (innerVotes.getOrElse(featureId, 0) + 1)
+          featureId -> Height(innerVotes.getOrElse(featureId, 0) + 1)
         }.toMap
 
         innerVotes ++ ngVotes
@@ -343,11 +343,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     liquidBlockHeaderAndSize().filter(_._1.uniqueId == blockId) orElse blockchain.blockHeaderAndSize(blockId)
   }
 
-  override def height: Int = readLock {
-    blockchain.height + ngState.fold(0)(_ => 1)
+  override def height: Height = readLock {
+    Height(blockchain.height + ngState.fold(0)(_ => 1))
   }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = readLock {
+  override def blockBytes(height: Height): Option[Array[Byte]] = readLock {
     blockchain
       .blockBytes(height)
       .orElse(ngState.collect { case ng if height == blockchain.height + 1 => ng.bestLiquidBlock.bytes() })
@@ -359,7 +359,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       .orElse(ngState.collect { case ng if ng.contains(blockId) => blockchain.score + ng.base.blockScore() })
   }
 
-  override def heightOf(blockId: BlockId): Option[Int] = readLock {
+  override def heightOf(blockId: BlockId): Option[Height] = readLock {
     blockchain
       .heightOf(blockId)
       .orElse(ngState.collect { case ng if ng.contains(blockId) => this.height })
@@ -384,7 +384,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     ngState.map(_.bestLiquidBlockId).orElse(blockchain.lastBlockId)
   }
 
-  def blockAt(height: Int): Option[Block] = readLock {
+  def blockAt(height: Height): Option[Block] = readLock {
     if (height == this.height)
       ngState.map(_.bestLiquidBlock)
     else
@@ -443,14 +443,14 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def totalFee(height: Int): Option[Long] = readLock {
+  override def totalFee(height: Height): Option[Long] = readLock {
     if (height == this.height)
       ngState.map(_.bestLiquidDiffAndFees._3)
     else
       blockchain.totalFee(height)
   }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
+  override def blockHeaderAndSize(height: Height): Option[(BlockHeader, Int)] = readLock {
     if (height == blockchain.height + 1)
       ngState.map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes().length))
     else
@@ -469,7 +469,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
+  override def transactionInfo(id: ByteStr): Option[(Height, Transaction)] = readLock {
     ngState
       .fold(Diff.empty)(_.bestLiquidDiff)
       .transactions
@@ -616,13 +616,13 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   }
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
+                                         height: Height,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readLock {
     blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readLock {
+  override def wavesDistribution(height: Height): Either[ValidationError, Map[Address, Long]] = readLock {
     ngState.fold(blockchain.wavesDistribution(height)) { _ =>
       val innerDistribution = blockchain.wavesDistribution(height)
       if (height < this.height) innerDistribution
@@ -677,7 +677,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   } */
 
-  override def transactionHeight(id: ByteStr): Option[Int] = readLock {
+  override def transactionHeight(id: ByteStr): Option[Height] = readLock {
     ngState flatMap { ng =>
       ng.bestLiquidDiff.transactions.get(id).map(_._1)
     } orElse blockchain.transactionHeight(id)

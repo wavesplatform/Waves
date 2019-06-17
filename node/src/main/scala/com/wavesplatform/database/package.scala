@@ -193,17 +193,17 @@ package object database {
     buffer.array()
   }
 
-  def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
+  def readFeatureMap(data: Array[Byte]): Map[Short, Height] = Option(data).fold(Map.empty[Short, Height]) { _ =>
     val b        = ByteBuffer.wrap(data)
-    val features = Map.newBuilder[Short, Int]
+    val features = Map.newBuilder[Short, Height]
     while (b.hasRemaining) {
-      features += b.getShort -> b.getInt
+      features += b.getShort -> Height(b.getInt)
     }
 
     features.result()
   }
 
-  def writeFeatureMap(features: Map[Short, Int]): Array[Byte] = {
+  def writeFeatureMap(features: Map[Short, Height]): Array[Byte] = {
     val b = ByteBuffer.allocate(features.size * 6)
     for ((featureId, height) <- features)
       b.putShort(featureId).putInt(height)

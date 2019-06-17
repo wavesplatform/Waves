@@ -7,6 +7,7 @@ import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state._
+import com.wavesplatform.utils.HeightImplicitConv
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.JsObject
 
@@ -16,7 +17,7 @@ class ConsensusRouteSpec
     with PropertyChecks
     with BlockGen
     with HistoryTest
-    with WithDomain {
+      with WithDomain with HeightImplicitConv {
 
   def routeTest(f: (Blockchain, Route) => Any) = withDomain() { d =>
     d.blockchainUpdater.processBlock(genesisBlock)

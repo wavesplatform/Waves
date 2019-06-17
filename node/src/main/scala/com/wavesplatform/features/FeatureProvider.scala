@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 
 object FeatureProvider {
   implicit class FeatureProviderExt(provider: Blockchain) {
@@ -17,7 +17,8 @@ object FeatureProvider {
       else if (provider.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
 
-    def featureActivationHeight(feature: Short): Option[Int] = provider.activatedFeatures.get(feature)
-    def featureApprovalHeight(feature: Short): Option[Int]   = provider.approvedFeatures.get(feature)
+    def featureActivationHeight(feature: Short): Option[Height] = provider.activatedFeatures.get(feature)
+
+    def featureApprovalHeight(feature: Short): Option[Height] = provider.approvedFeatures.get(feature)
   }
 }

@@ -111,7 +111,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     blockchain.lastBlock.map(block => toBlockInfo(block.getHeader(), height.toInt))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockHeaderAndSize(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize._1, blockHeight))
+    blockchain.blockHeaderAndSize(Height @@ blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize._1, blockHeight))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
     BlockInfo(

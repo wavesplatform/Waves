@@ -15,7 +15,7 @@ import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, TestFunc
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionParser
-import com.wavesplatform.utils.CloseableIterator
+import com.wavesplatform.utils.{CloseableIterator, HeightImplicitConv}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
@@ -36,7 +36,8 @@ class TransactionsRouteSpec
     with TransactionGen
     with BlockGen
     with PropertyChecks
-    with NoShrink {
+      with NoShrink
+      with HeightImplicitConv {
 
   implicit def scheduler = Scheduler.global
 

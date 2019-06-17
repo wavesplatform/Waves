@@ -92,9 +92,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override protected def loadAddressId(address: Address): Option[AddressId] = readOnly(db => db.get(Keys.addressId(address)))
 
-  override protected def loadHeight(): Int = readOnly(_.get(Keys.height))
+  override protected def loadHeight(): Height = readOnly(_.get(Keys.height))
 
-  override protected def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
+  override protected def safeRollbackHeight: Height = readOnly(_.get(Keys.safeRollbackHeight))
 
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
@@ -260,13 +260,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .fold(VolumeAndFee.empty)(e => readVolumeAndFee(e.getValue))
   }
 
-  override protected def loadApprovedFeatures(): Map[Short, Int] = {
+  override protected def loadApprovedFeatures(): Map[Short, Height] = {
     readOnly(_.get(Keys.approvedFeatures))
   }
 
-  override protected def loadActivatedFeatures(): Map[Short, Int] = {
+  override protected def loadActivatedFeatures(): Map[Short, Height] = {
     val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
-    stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
+    stateFeatures ++ settings.functionalitySettings.preActivatedFeatures.mapValues(Height @@ _)
   }
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
@@ -303,7 +303,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
 
     if (previousSafeRollbackHeight < (height - dbSettings.maxRollbackDepth)) {
-      rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
+      rw.put(Keys.safeRollbackHeight, Height(height - dbSettings.maxRollbackDepth))
     }
 
     val transactions: Map[TransactionId, (Transaction, TxNum)] =
@@ -344,8 +344,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         }
     }
 
-    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte])(
-        key: AddressId => Height => Key[_]): Unit = {
+    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte])(key: AddressId => Height => Key[_]): Unit = {
       deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
     }
 
@@ -461,9 +460,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
         rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-        val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
+        val featuresToSave = newlyApprovedFeatures.mapValues(h => Height(h + activationWindowSize)) ++ rw.get(Keys.activatedFeatures)
 
-        activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
+        activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures.mapValues(Height @@ _)
         rw.put(Keys.activatedFeatures, featuresToSave)
       }
     }
@@ -473,7 +472,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     rw.put(Keys.carryFee(height), carry)
-    expiredKeys += Keys.carryFee(threshold - 1).keyBytes
+    expiredKeys += Keys.carryFee(Height(threshold - 1)).keyBytes
 
     rw.put(Keys.blockTransactionsFee(height), totalFee)
 
@@ -508,7 +507,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
+      val discardedBlocks: Seq[Block] = for (ch <- height until targetHeight by -1; currentHeight = Height @@ ch) yield {
         val balancesToInvalidate   = Seq.newBuilder[(Address, Asset)]
         val portfoliosToInvalidate = Seq.newBuilder[Address]
         val assetInfoToInvalidate  = Seq.newBuilder[IssuedAsset]
@@ -516,14 +515,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         val scriptsToDiscard       = Seq.newBuilder[Address]
         val assetScriptsToDiscard  = Seq.newBuilder[IssuedAsset]
 
-        val h = Height(currentHeight)
-
         val discardedBlock = readWrite { rw =>
           log.trace(s"Rolling back to ${currentHeight - 1}")
-          rw.put(Keys.height, currentHeight - 1)
+          rw.put(Keys.height, Height(currentHeight - 1))
 
           val (discardedHeader, _) = rw
-            .get(Keys.blockHeaderAndSizeAt(h))
+            .get(Keys.blockHeaderAndSizeAt(currentHeight))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
@@ -586,7 +583,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             }
           }
 
-          val transactions = transactionsAtHeight(h)
+          val transactions = transactionsAtHeight(currentHeight)
 
           transactions.foreach {
             case (num, tx) =>
@@ -625,7 +622,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                 case _: DataTransaction => // see changed data keys removal
 
                 case _: InvokeScriptTransaction =>
-                  rw.delete(Keys.invokeScriptResult(h, num))
+                  rw.delete(Keys.invokeScriptResult(currentHeight, num))
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
@@ -634,12 +631,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               }
 
               if (tx.builder.typeId != GenesisTransaction.typeId) {
-                rw.delete(Keys.transactionAt(h, num))
+                rw.delete(Keys.transactionAt(currentHeight, num))
                 rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
               }
           }
 
-          rw.delete(Keys.blockHeaderAndSizeAt(h))
+          rw.delete(Keys.blockHeaderAndSizeAt(currentHeight))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -693,9 +690,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     asset
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
+  override def transactionInfo(id: ByteStr): Option[(Height, Transaction)] = readOnly(transactionInfo(id, _))
 
-  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Height, Transaction)] = {
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
@@ -703,7 +700,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     } yield (height, tx)
   }
 
-  override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
+  override def transactionHeight(id: ByteStr): Option[Height] = readOnly { db =>
     val txId = TransactionId(id)
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
@@ -886,11 +883,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+  override def loadBlockHeaderAndSize(height: Height): Option[(BlockHeader, Int)] = {
     writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
-  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
+  def loadBlockHeaderAndSize(height: Height, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
     db.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
@@ -905,10 +902,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .flatMap(loadBlockHeaderAndSize(_, db))
   }
 
-  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
+  override def loadBlockBytes(height: Height): Option[Array[Byte]] = readOnly { db =>
     import com.wavesplatform.crypto._
-
-    val height = Height(h)
 
     val consensuDataOffset = 1 + 8 + SignatureLength
 
@@ -923,7 +918,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           .map { txBytes =>
             Ints.toByteArray(txBytes.length) ++ txBytes
           }
-          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
+          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $height"))
       }
     }
 
@@ -964,7 +959,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockBytes(h))
   }
 
-  override def loadHeightOf(blockId: ByteStr): Option[Int] = {
+  override def loadHeightOf(blockId: ByteStr): Option[Height] = {
     readOnly(_.get(Keys.heightOf(blockId)))
   }
 
@@ -1004,11 +999,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     } yield block
   }
 
-  override def totalFee(height: Int): Option[Long] = readOnly { db =>
+  override def totalFee(height: Height): Option[Long] = readOnly { db =>
     Try(db.get(Keys.blockTransactionsFee(height))).toOption
   }
 
-  override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
+  override def featureVotes(height: Height): Map[Short, Int] = readOnly { db =>
     settings.functionalitySettings
       .activationWindow(height)
       .flatMap { h =>
@@ -1039,7 +1034,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def assetDistributionAtHeight(asset: IssuedAsset,
-                                         height: Int,
+                                         height: Height,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
     lazy val (issueH, issueN) = db
@@ -1087,7 +1082,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
     }
 
-
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
     Either
       .cond(
@@ -1097,7 +1091,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       )
   }
 
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+  override def wavesDistribution(height: Height): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
     def createMap() = {
@@ -1137,7 +1131,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         if (reverse) {
           for {
             height  <- (this.height to 0 by -1).iterator
-            (bh, _) <- this.blockHeaderAndSize(height).iterator
+            (bh, _) <- this.blockHeaderAndSize(Height @@ height).iterator
             txNum   <- bh.transactionCount to 0 by -1
           } yield (Height(height), TxNum(txNum.toShort))
         } else {

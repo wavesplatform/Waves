@@ -7,7 +7,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 
@@ -27,7 +27,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
         .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
     } else {
       commonApi
-        .blockHeadersRange(request.fromHeight, request.toHeight)
+        .blockHeadersRange(Height @@ request.fromHeight, Height @@ request.toHeight)
         .map { case (header, _, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
     }
 
@@ -54,7 +54,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
 
       case Request.Height(height) =>
         commonApi
-          .blockAtHeight(if (height > 0) height else blockchain.height + height)
+          .blockAtHeight(Height(if (height > 0) height else blockchain.height + height))
           .toRight(BlockDoesNotExist)
           .map(block => BlockWithHeight(Some(block.toPB), height))
 

@@ -18,7 +18,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -77,7 +77,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
     val distributionTask = Task.eval(
       blockchain
-        .assetDistributionAtHeight(asset, height, limit, maybeAfter)
+        .assetDistributionAtHeight(asset, Height @@ height, limit, maybeAfter)
     )
 
     distributionTask.map {

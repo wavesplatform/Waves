@@ -17,9 +17,10 @@ object Keys {
 
   val version: Key[Int]               = intKey("version", 0, default = 1)
   val height: Key[Int]                = intKey("height", 1)
-  def score(height: Int): Key[BigInt] = Key("score", h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 
-  def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int]("height-of", hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
+  def score(height: Height): Key[BigInt] = Key("score", h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+
+  def heightOf(blockId: ByteStr): Key[Option[Height]] = Key.opt[Height]("height-of", hash(4, blockId), Height @@ Ints.fromByteArray(_), Ints.toByteArray)
 
   def parseAddressBytesHeight(bs: Array[Byte]): (Short, AddressId, Array[Byte], Height) = {
     val prefix = Shorts.fromByteArray(bs.take(2))
@@ -40,10 +41,11 @@ object Keys {
   def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey("waves-balance-history", 5, AddressId.toBytes(addressId))
 
   val WavesBalancePrefix: Short = 6
-  def wavesBalance(addressId: Long)(height: Int): Key[Long] =
+
+  def wavesBalance(addressId: AddressId)(height: Height): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
+  def assetBalanceLastHeight(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
     Key("asset-balance-last-height",
       bytes(8, Bytes.concat(AddressId.toBytes(addressId), heightWithNum(issueTxHeight, issueTxNum))),
       Option(_).fold(0)(Ints.fromByteArray),
@@ -107,8 +109,8 @@ object Keys {
   def addressScript(addressId: AddressId)(height: Int): Key[Option[Script]] =
     Key.opt("address-script", hAddr(AddressScriptPrefix, addressId, height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
-  val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
-  val activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
+  val approvedFeatures: Key[Map[Short, Height]] = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
+  val activatedFeatures: Key[Map[Short, Height]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
 
   def dataKeyChunkCount(addressId: AddressId): Key[Int] =
     Key("data-key-chunk-count", addr(31, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
@@ -116,7 +118,8 @@ object Keys {
     Key("data-key-chunk", addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
   val DataPrefix: Short = 34
-  def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[_]]] =
+
+  def data(addressId: AddressId, key: String)(height: Height): Key[Option[DataEntry[_]]] =
     Key.opt("data",
       hBytes(DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height),
       DataEntry.parseValue(key, _, 0)._1,
@@ -146,7 +149,7 @@ object Keys {
   def assetScript(issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Option[Script]] =
     Key.opt("asset-script", hBytes(AssetScriptPrefix, heightWithNum(issueTxHeight, issueTxNum), height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
-  val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
+  val safeRollbackHeight: Key[Height] = intKey("safe-rollback-height", 48).map(Height @@ _, identity)
 
   def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, addressId, height), readStrings, writeStrings)

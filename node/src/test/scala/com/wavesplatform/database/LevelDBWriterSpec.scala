@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTrans
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{HeightImplicitConv, Time}
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -25,7 +25,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.util.Random
 
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen with HeightImplicitConv {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)

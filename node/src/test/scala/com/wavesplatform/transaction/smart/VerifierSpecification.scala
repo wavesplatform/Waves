@@ -4,22 +4,23 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier.ValidationResult
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils.HeightImplicitConv
 import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class VerifierSpecification extends PropSpec with PropertyChecks with Matchers with MockFactory with TransactionGen with NTPTime {
+class VerifierSpecification extends PropSpec with PropertyChecks with Matchers with MockFactory with TransactionGen with NTPTime with HeightImplicitConv {
 
   property("ExchangeTransaction - blockchain's functions should be allowed during an order's verification") {
     forAll(exchangeTransactionV2Gen) { tx: ExchangeTransaction =>
@@ -75,7 +76,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
     val blockchain = stub[Blockchain]
 
     def activate(features: (BlockchainFeature, Int)*): Unit = {
-      (blockchain.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()
+      (blockchain.activatedFeatures _).when().returns(features.map(x => x._1.id -> Height(x._2)).toMap).anyNumberOfTimes()
     }
 
     activate(BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0, BlockchainFeatures.SmartAssets -> 0)

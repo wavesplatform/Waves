@@ -9,6 +9,7 @@ import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.utils.HeightImplicitConv
 import com.wavesplatform.{NoShrink, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -21,7 +22,8 @@ class ExchangeTransactionCreatorSpecification
     with BeforeAndAfterAll
     with PathMockFactory
     with PropertyChecks
-    with NoShrink {
+      with NoShrink
+      with HeightImplicitConv {
 
   private val pair = AssetPair(Waves, mkAssetId("BTC"))
 

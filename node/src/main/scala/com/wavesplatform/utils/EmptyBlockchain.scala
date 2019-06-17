@@ -19,13 +19,13 @@ import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 case object EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
 
-  override def height: Int = 0
+  override def height: Height = Height @@ 0
 
   override def score: BigInt = 0
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = None
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = None
+  override def blockHeaderAndSize(height: Height): Option[(BlockHeader, Int)] = None
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = None
 
@@ -33,11 +33,11 @@ case object EmptyBlockchain extends Blockchain {
 
   override def carryFee: Long = 0
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = None
+  override def blockBytes(height: Height): Option[Array[Byte]] = None
 
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = None
 
-  override def heightOf(blockId: ByteStr): Option[Int] = None
+  override def heightOf(blockId: ByteStr): Option[Height] = None
 
   /** Returns the most recent block IDs, starting from the most recent  one */
   override def lastBlockIds(howMany: Int): Seq[ByteStr] = Seq.empty
@@ -47,20 +47,20 @@ case object EmptyBlockchain extends Blockchain {
 
   override def parentHeader(block: BlockHeader, back: Int): Option[Block] = None
 
-  override def totalFee(height: Int): Option[Long] = None
+  override def totalFee(height: Height): Option[Long] = None
 
   /** Features related */
-  override def approvedFeatures: Map[Short, Int] = Map.empty
+  override def approvedFeatures: Map[Short, Height] = Map.empty
 
-  override def activatedFeatures: Map[Short, Int] = Map.empty
+  override def activatedFeatures: Map[Short, Height] = Map.empty
 
-  override def featureVotes(height: Int): Map[Short, Int] = Map.empty
+  override def featureVotes(height: Height): Map[Short, Int] = Map.empty
 
   override def portfolio(a: Address): Portfolio = Portfolio.empty
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = None
+  override def transactionInfo(id: ByteStr): Option[(Height, Transaction)] = None
 
-  override def transactionHeight(id: ByteStr): Option[Int] = None
+  override def transactionHeight(id: ByteStr): Option[Height] = None
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = CloseableIterator.empty
 
@@ -101,12 +101,12 @@ case object EmptyBlockchain extends Blockchain {
 
   override def assetDistribution(assetId: IssuedAsset): AssetDistribution = Monoid.empty[AssetDistribution]
 
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
+  override def wavesDistribution(height: Height): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
   override def allActiveLeases: CloseableIterator[LeaseTransaction] = CloseableIterator.empty
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
+                                         height: Height,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
     Right(AssetDistributionPage(Paged[Address, AssetDistribution](false, None, Monoid.empty[AssetDistribution])))
