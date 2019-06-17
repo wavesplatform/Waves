@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.{ActorRef, Props}
 import akka.persistence.serialization.Snapshot
 import akka.testkit.{ImplicitSender, TestProbe}
+import cats.data.NonEmptyList
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.api.AlreadyProcessed
@@ -13,19 +14,28 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
+import com.wavesplatform.matcher.model.OrderBook.TickSize
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.QueueEvent.Canceled
+import com.wavesplatform.matcher.settings.MatchingRules
 import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
+class OrderBookActorSpecification
+    extends MatcherSpec("OrderBookActor")
+    with NTPTime
+    with ImplicitSender
+    with MatcherTestData
+    with PathMockFactory
+    with Eventually {
 
   private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
@@ -38,13 +48,19 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     f(pair, actor, probe)
   }
 
-  private def obcTestWithTickSize(normalizedTickSize: Option[Long])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
-    obcTestWithPrepare(_ => (), normalizedTickSize) { (pair, actor, probe) =>
+  private def obcTestWithTickSize(tickSize: TickSize)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+    obcTestWithPrepare(_ => (), NonEmptyList(MatchingRules(0L, tickSize), List.empty)) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
-  private def obcTestWithPrepare(prepare: AssetPair => Unit, normalizedTickSize: Option[Long] = None)(
+  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[MatchingRules])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+    obcTestWithPrepare(_ => (), matchingRules) { (pair, actor, probe) =>
+      probe.expectMsg(OrderBookRecovered(pair, None))
+      f(pair, actor, probe)
+    }
+
+  private def obcTestWithPrepare(prepare: AssetPair => Unit, matchingRules: NonEmptyList[MatchingRules] = MatchingRules.DefaultNel)(
       f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
@@ -64,7 +80,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           p => Option(md.get(p)),
           txFactory,
           ntpTime,
-          normalizedTickSize
+          matchingRules
         ) with RestartableActor))
 
     f(pair, actor, tp)
@@ -96,7 +112,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
       orderBook ! RestartActor
 
-      tp.receiveN(2) shouldEqual Seq(ord2, ord1).map(o => OrderAdded(LimitOrder(o), o.timestamp))
+      tp.receiveN(2) shouldEqual Seq(ord1, ord2).map(o => OrderAdded(LimitOrder(o), o.timestamp))
     }
 
     "execute partial market orders and preserve remaining after restart" in obcTest { (pair, actor, tp) =>
@@ -175,21 +191,21 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
         ))
     }
 
-    "place orders and restart without waiting for response" in obcTest { (pair, actor, tp) =>
+    "place orders and restart without waiting for response" in obcTest { (pair, orderBook, tp) =>
       val ord1 = sell(pair, 10 * Order.PriceConstant, 100)
       val ts   = System.currentTimeMillis()
 
-      (1 to 100).foreach({ i =>
-        actor ! wrap(ord1.updateTimestamp(ts + i))
-      })
+      (1 to 100) foreach { i =>
+        orderBook ! wrap(ord1.updateTimestamp(ts + i))
+      }
 
       within(10.seconds) {
         tp.receiveN(100)
       }
 
-      actor ! SaveSnapshot(Long.MaxValue)
+      orderBook ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdated]
-      actor ! RestartActor
+      orderBook ! RestartActor
 
       within(10.seconds) {
         tp.receiveN(100)
@@ -248,7 +264,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       tp.expectMsgType[OrderBookSnapshotUpdated]
     }
 
-    "cancel order in merge small prices mode" in obcTestWithTickSize(Some(100)) { (pair, orderBook, tp) =>
+    "cancel order in merge small prices mode" in obcTestWithTickSize(TickSize.Enabled(100)) { (pair, orderBook, tp) =>
       val buyOrder = buy(pair, 100000000, 0.0000041)
 
       orderBook ! wrap(1, buyOrder)
@@ -256,6 +272,101 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
       orderBook ! wrap(2, Canceled(buyOrder.assetPair, buyOrder.id()))
       tp.expectMsgType[OrderCanceled]
+    }
+
+    val switchRulesTest = NonEmptyList(
+      MatchingRules.Default,
+      List(
+        MatchingRules(4, OrderBook.TickSize.Enabled(100)),
+        MatchingRules(10, OrderBook.TickSize.Enabled(300))
+      )
+    )
+
+    "rules are switched" in obcTestWithMatchingRules(switchRulesTest) { (pair, orderBook, tp) =>
+      val buyOrder = buy(pair, 100000000, 0.0000041)
+      (0 to 17).foreach { i =>
+        orderBook ! wrap(i, buyOrder)
+        tp.expectMsgType[OrderAdded]
+      }
+
+      eventually {
+        val bids = obc.get(pair).bids
+        bids.size shouldBe 3
+
+        val level41 = bids.head
+        level41.price shouldBe buyOrder.price
+        level41.amount shouldBe buyOrder.amount * 4
+
+        val level40 = bids(1)
+        level40.price shouldBe (0.000004 * Order.PriceConstant)
+        level40.amount shouldBe buyOrder.amount * 6
+
+        val level30 = bids(2)
+        level30.price shouldBe (0.000003 * Order.PriceConstant)
+        level30.amount shouldBe buyOrder.amount * 8
+      }
+    }
+
+    val disableRulesTest = NonEmptyList(
+      MatchingRules(0, OrderBook.TickSize.Enabled(100)),
+      List(
+        MatchingRules(3, OrderBook.TickSize.Disabled)
+      )
+    )
+
+    "rules can be disabled" in obcTestWithMatchingRules(disableRulesTest) { (pair, orderBook, tp) =>
+      val buyOrder = buy(pair, 100000000, 0.0000041)
+      (0 to 10).foreach { i =>
+        orderBook ! wrap(i, buyOrder)
+        tp.expectMsgType[OrderAdded]
+      }
+
+      eventually {
+        val bids = obc.get(pair).bids
+        bids.size shouldBe 2
+
+        val level41 = bids.head
+        level41.price shouldBe buyOrder.price
+        level41.amount shouldBe buyOrder.amount * 8
+
+        val level40 = bids(1)
+        level40.price shouldBe (0.000004 * Order.PriceConstant)
+        level40.amount shouldBe buyOrder.amount * 3
+      }
+    }
+
+    val matchingRulesForCancelTest = NonEmptyList(
+      MatchingRules.Default,
+      List(
+        MatchingRules.Default,
+        MatchingRules(1, OrderBook.TickSize.Enabled(100))
+      )
+    )
+
+    "correctly cancel order when rules are switched" in obcTestWithMatchingRules(matchingRulesForCancelTest) { (pair, orderBook, tp) =>
+      val buyOrder1, buyOrder2 = buy(pair, 100000000, 0.0000041)
+
+      orderBook ! wrap(0, buyOrder1) // order book places order to the price level 41
+      tp.expectMsgType[OrderAdded]
+
+      orderBook ! wrap(1, buyOrder2) // now order book places the same order to the price level 40
+      tp.expectMsgType[OrderAdded]
+
+      eventually {
+        val bids = obc.get(pair).bids
+        bids.size shouldBe 2
+        bids.head.price shouldBe buyOrder1.price
+        bids.last.price shouldBe 0.0000040 * Order.PriceConstant
+      }
+
+      orderBook ! wrap(2, Canceled(buyOrder1.assetPair, buyOrder1.id())) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
+      tp.expectMsgType[OrderCanceled]
+
+      eventually {
+        val bids = obc.get(pair).bids
+        bids.size shouldBe 1
+        bids.head.price shouldBe 0.000004 * Order.PriceConstant
+      }
     }
   }
 }

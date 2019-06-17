@@ -7,7 +7,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.matcher.settings.MatcherSettings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.matcher.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs

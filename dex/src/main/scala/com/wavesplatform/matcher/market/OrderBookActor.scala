@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
 import akka.persistence._
+import cats.data.NonEmptyList
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
@@ -10,7 +11,7 @@ import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.matcher.settings.{MatcherSettings, MatchingRules}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
@@ -25,7 +26,7 @@ class OrderBookActor(owner: ActorRef,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     normalizedTickSize: Option[Long] = None)
+                     var matchingRules: NonEmptyList[MatchingRules])
     extends PersistentActor
     with ScorexLogging {
 
@@ -43,10 +44,13 @@ class OrderBookActor(owner: ActorRef,
 
   private var lastTrade = Option.empty[LastTrade]
 
+  private def actualRules: MatchingRules = matchingRules.head
+
   private def fullCommands: Receive = executeCommands orElse snapshotsCommands
 
   private def executeCommands: Receive = {
     case request: QueueEventWithMeta =>
+      matchingRules = MatchingRules.skipOutdated(request.offset, matchingRules)
       lastProcessedOffset match {
         case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
         case _ =>
@@ -55,7 +59,7 @@ class OrderBookActor(owner: ActorRef,
             case x: QueueEvent.Placed   => onAddOrder(request, x.order)
             case x: QueueEvent.Canceled => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
-              sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
+              sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq.empty, Seq.empty))
               updateSnapshot(OrderBook.AggregatedSnapshot())
               processEvents(orderBook.cancelAll(request.timestamp))
               context.stop(self)
@@ -112,7 +116,7 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp, normalizedTickSize) match {
+    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp, actualRules.tickSize) match {
       case Some(cancelEvent) =>
         processEvents(List(cancelEvent))
       case None =>
@@ -121,7 +125,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, normalizedTickSize))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.tickSize))
   }
 
   override def receiveCommand: Receive = fullCommands
@@ -129,11 +133,13 @@ class OrderBookActor(owner: ActorRef,
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
       lastProcessedOffset match {
-        case None    => log.debug("Recovery completed")
-        case Some(x) => log.debug(s"Recovery completed at $x: $orderBook")
+        case None => log.debug("Recovery completed")
+        case Some(x) =>
+          log.debug(s"Recovery completed at $x: $orderBook")
+          matchingRules = MatchingRules.skipOutdated(x, matchingRules)
       }
 
-      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
+      processEvents(orderBook.allOrders.map { case (_, lo) => OrderAdded(lo, lo.order.timestamp) })
       updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
@@ -165,8 +171,18 @@ object OrderBookActor {
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            normalizedTickSize: Option[Long] = None): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, normalizedTickSize))
+            matchingRules: NonEmptyList[MatchingRules]): Props =
+    Props(
+      new OrderBookActor(
+        parent,
+        addressActor,
+        assetPair,
+        updateSnapshot,
+        updateMarketStatus,
+        createTransaction,
+        time,
+        matchingRules
+      ))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

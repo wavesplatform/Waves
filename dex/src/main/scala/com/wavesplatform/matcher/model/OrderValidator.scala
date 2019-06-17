@@ -105,7 +105,6 @@ object OrderValidator {
                                      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]): Result[Order] = {
     if (!(orderRestrictions contains order.assetPair)) lift(order)
     else {
-
       val (amountAssetDecimals, priceAssetDecimals) = decimalsPair
       val restrictions                              = orderRestrictions(order.assetPair)
 
@@ -115,11 +114,11 @@ object OrderValidator {
       lift(order)
         .ensure(MatcherError.OrderInvalidAmount(order, restrictions, amountAssetDecimals)) { o =>
           normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
-          BigDecimal(o.amount).remainder(normalizeAmount(restrictions.stepSize).max(1)) == 0
+          o.amount % normalizeAmount(restrictions.stepAmount).max(1) == 0
         }
         .ensure(MatcherError.OrderInvalidPrice(order, restrictions, amountAssetDecimals, priceAssetDecimals)) { o =>
           normalizePrice(restrictions.minPrice) <= o.price && o.price <= normalizePrice(restrictions.maxPrice) &&
-          (restrictions.mergeSmallPrices || BigDecimal(o.price).remainder(normalizePrice(restrictions.tickSize).max(1)) == 0)
+          o.price % normalizePrice(restrictions.stepPrice).max(1) == 0
         }
     }
   }

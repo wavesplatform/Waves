@@ -22,7 +22,7 @@ import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, Matc
 import com.wavesplatform.matcher.model.MatcherModel.Normalization
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.matcher.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -81,24 +81,29 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = {
+  private def normalizeTickSize(assetPair: AssetPair, tickSize: Double): Long =
+    Normalization.normalizePrice(tickSize, context.blockchain, assetPair).max(1)
 
-    val normalizedTickSize = settings.orderRestrictions.get(pair).withFilter(_.mergeSmallPrices).map { restrictions =>
-      Normalization.normalizePrice(restrictions.tickSize, context.blockchain, pair).max(1)
-    }
+  private def convert(assetPair: AssetPair, rawMatchingRules: RawMatchingRules): MatchingRules =
+    MatchingRules(
+      rawMatchingRules.startOffset,
+      tickSize =
+        if (rawMatchingRules.mergePrices) OrderBook.TickSize.Enabled(normalizeTickSize(assetPair, rawMatchingRules.tickSize))
+        else OrderBook.TickSize.Disabled
+    )
 
+  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props =
     OrderBookActor.props(
       matcherActor,
       addressActors,
-      pair,
-      updateOrderBookCache(pair),
-      marketStatuses.put(pair, _),
+      assetPair,
+      updateOrderBookCache(assetPair),
+      marketStatuses.put(assetPair, _),
       settings,
       transactionCreator.createTransaction,
       context.time,
-      normalizedTickSize
+      settings.matchingRules.get(assetPair).map(_.map(convert(assetPair, _))).getOrElse(MatchingRules.DefaultNel)
     )
-  }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
