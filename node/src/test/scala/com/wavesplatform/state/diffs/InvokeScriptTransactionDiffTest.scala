@@ -1118,4 +1118,20 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         }
     }
   }
+
+  property("Default function invocation should produce error if contract does't have default function") {
+    forAll(for {
+      a             <- accountGen
+      am            <- smallFeeGen
+      senderBinging <- validAliasStringGen
+      argBinding    <- validAliasStringGen
+      contractGen   <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "undefault", a, am, List(Waves))))
+      r             <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, am, r._1, r._2, r._3)) {
+      case (acc, amount, genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce(s"doesn't exist in the script")
+        }
+    }
+  }
 }
