@@ -161,14 +161,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private[this] def readFromStartForAddress(db: ReadOnlyDB)(prefix: Short, addressId: Long) = {
-    val prefixBytes = Bytes.concat(
-      Shorts.toByteArray(prefix),
-      AddressId.toBytes(addressId)
-    )
-    db.iterateOverStream(prefixBytes)
-  }
-
   private[this] def readLastValue[T](db: ReadOnlyDB)(prefix: Short, bytes: Array[Byte], read: Array[Byte] => T) =
     db.lastValue(prefix, bytes, this.height)
       .map(e => read(e.getValue))
@@ -208,7 +200,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   )
 
   private def loadFullPortfolio(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+    assets = db.iterateOverStream(Keys.addressAssetBalances(addressId)).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val (txH, txN) = Keys.parseHeightNum(bs)
       val tx = db.get(Keys.transactionAt(txH, txN))
@@ -217,7 +209,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   )
 
   private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+    assets = db.iterateOverStream(Keys.addressAssetBalances(addressId)).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val (txH, txN) = Keys.parseHeightNum(bs)
       val tx = db.get(Keys.transactionAt(txH, txN))
@@ -346,7 +338,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte])(
         key: AddressId => Height => Key[_]): Unit = {
-      deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
+      deleteOldKeys(prefix, KeyHelpers.addrBytes(addressId, bytes))(key(addressId))
     }
 
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
@@ -377,7 +369,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
       rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
       deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n).withHeightSuffix)
-      rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
+      rw.put(Keys.addressesForAsset(h, n).withSuffix(AddressId.toBytes(addressId)), addressId)
     }
 
     rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
@@ -495,8 +487,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
-    db.iterateOverStream(KeyHelpers.addr(Keys.AssetBalancePrefix, addressId))
+  private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: AddressId) = {
+    db.iterateOverStream(Keys.addressAssetBalances(addressId).stableBytes)
       .flatMap { e =>
         val (_, _, hn, height) = Keys.parseAddressBytesHeight(e.getKey)
         val (h, n) = Keys.parseHeightNum(hn)
@@ -1028,7 +1020,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     val dst = (for {
       addressId <- db
-        .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
+        .iterateOverStream(Keys.addressesForAsset(issueH, issueN))
         .map(e => AddressId.fromBytes(e.getKey.takeRight(4)))
         .closeAfter(_.toVector)
         .par
@@ -1057,7 +1049,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
         val all = for {
           addressId <- db
-            .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
+            .iterateOverStream(Keys.addressesForAsset(issueH, issueN))
             .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.drop(6)))
         } yield addressId
 

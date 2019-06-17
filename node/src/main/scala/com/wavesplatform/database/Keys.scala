@@ -126,8 +126,8 @@ object Keys {
 
   val AddressesForAssetPrefix: Short = 40
 
-  def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum, addressId: AddressId): Key[AddressId] =
-    Key("addresses-for-asset", bytes(AddressesForAssetPrefix, Bytes.concat(heightWithNum(issueTxHeight, issueTxNum), AddressId.toBytes(addressId))), _ => addressId, _ => Array.emptyByteArray)
+  def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum) =
+    Key.prefixed("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => addressId, _ => Array.emptyByteArray)
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =

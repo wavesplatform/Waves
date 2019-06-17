@@ -1,6 +1,7 @@
 package com.wavesplatform.database
 
 import com.google.common.primitives.{Bytes, Ints, Shorts}
+import com.wavesplatform.database.Key.PrefixedKey
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
 import com.wavesplatform.utils.CloseableIterator
@@ -30,6 +31,8 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
   def iterateOverStream(): CloseableIterator[DBEntry] = db.iterateOverStream()
 
   def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = db.iterateOverStream(prefix, suffix)
+
+  def iterateOverStream(key: PrefixedKey[_]): CloseableIterator[DBEntry] = db.iterateOverStream(key.stableBytes)
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
