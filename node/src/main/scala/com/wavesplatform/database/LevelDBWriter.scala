@@ -175,7 +175,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private[this] def loadBalanceForAssetHN(db: ReadOnlyDB)(addressId: AddressId, issueH: Height, issueN: TxNum) = {
     val lastHeight = db.get(Keys.assetBalanceLastHeight(addressId, issueH, issueN))
-    if (lastHeight == 0) 0L else db.get(Keys.assetBalance(addressId, issueH, issueN)(lastHeight))
+    if (lastHeight == 0) 0L else db.get(Keys.assetBalance(addressId, issueH, issueN).withHeightSuffix(lastHeight))
   }
 
   private[this] def loadBalanceForAsset(db: ReadOnlyDB)(addressId: AddressId, ia: IssuedAsset) = {
@@ -187,7 +187,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     addressId(req._1).fold(0L) { addressId =>
       req._2 match {
         case asset@IssuedAsset(_) => loadBalanceForAsset(db)(addressId, asset)
-        case Waves => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
+        case Waves => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId).withHeightSuffix).getOrElse(0L)
       }
     }
   }
@@ -202,7 +202,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
-    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
+    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId).withHeightSuffix).getOrElse(0L),
     loadLeaseBalance(db, addressId),
     Map.empty
   )
@@ -352,7 +352,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
+      expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId).withHeightSuffix)
       addressId
     }
 
@@ -376,7 +376,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     for ((addressId, assets) <- assetBalances; (asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
       rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
       rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
-      deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
+      deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n).withHeightSuffix)
       rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
     }
 

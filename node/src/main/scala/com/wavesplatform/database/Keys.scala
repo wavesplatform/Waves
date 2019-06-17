@@ -40,8 +40,9 @@ object Keys {
   def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey("waves-balance-history", 5, AddressId.toBytes(addressId))
 
   val WavesBalancePrefix: Short = 6
-  def wavesBalance(addressId: Long)(height: Int): Key[Long] =
-    Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+
+  def wavesBalance(addressId: Long) =
+    Key.prefixed("waves-balance", WavesBalancePrefix, addrBytes(addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
     Key("asset-balance-last-height",
@@ -50,22 +51,16 @@ object Keys {
       Ints.toByteArray)
 
   val AssetBalancePrefix: Short = 9
-  def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Long] = {
-    val keyBytes =
-      hBytes(
-        AssetBalancePrefix,
-        Bytes.concat(
-          AddressId.toBytes(addressId),
-          heightWithNum(issueTxHeight, issueTxNum)
-        ),
-        height
-      )
 
+  def addressAssetBalances(addressId: AddressId) = {
     val balanceDecoder = (arr: Array[Byte]) => Option(arr).fold(0L)(Longs.fromByteArray)
     val balanceEncoder = (b: Long) => Longs.toByteArray(b)
 
-    Key("asset-balance", keyBytes, balanceDecoder, balanceEncoder)
+    Key.prefixed("asset-balance", AssetBalancePrefix, addrBytes(addressId), balanceDecoder, balanceEncoder)
   }
+
+  def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum) =
+    addressAssetBalances(addressId).copy(bytesPrefix = addressAndAsset(addressId, issueTxHeight, issueTxNum))
 
   val AssetInfoPrefix: Short = 11
 
