@@ -10,7 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
+import com.wavesplatform.database.{DBExt, KeyHelpers, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
@@ -108,7 +108,7 @@ object Explorer extends ScorexLogging {
         case "O" =>
           val orderId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
-            val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get)(blockchainHeight)
+            val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get).atHeight(blockchainHeight)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
             val v             = kVolumeAndFee.parse(bytes1)
             log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: Volume = ${v.volume}, Fee = ${v.fee}")
@@ -174,7 +174,7 @@ object Explorer extends ScorexLogging {
           db.iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
             .filter { e =>
               val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
-              ByteStr(Keys.heightWithNum(txH, txN)) == ByteStr(assetId)
+              ByteStr(KeyHelpers.assetId(txH, txN)) == ByteStr(assetId)
             }
             .map(e => (Ints.fromByteArray(e.getKey.takeRight(4)), Longs.fromByteArray(e.getValue)))
             .foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
@@ -306,13 +306,13 @@ object Explorer extends ScorexLogging {
             asset = IssuedAsset(assetId)
             (txH, txN) <- db.get(Keys.transactionHNById(TransactionId @@ asset.id)).toSeq
             addressId <- db
-              .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(txH, txN)))
+              .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), KeyHelpers.assetId(txH, txN)))
               .map(e => AddressId.fromBytes(e.getKey.dropRight(4).takeRight(4)))
             balance = db
               .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AssetBalancePrefix), AddressId.toBytes(addressId)))
               .filter { e =>
                 val (_, _, assetId, _) = Keys.parseAddressBytesHeight(e.getKey)
-                ByteStr(assetId) == ByteStr(Keys.heightWithNum(txH, txN))
+                ByteStr(assetId) == ByteStr(KeyHelpers.assetId(txH, txN))
               }
               .map(e => Longs.fromByteArray(e.getValue))
               .closeAfter(_.toStream.headOption)

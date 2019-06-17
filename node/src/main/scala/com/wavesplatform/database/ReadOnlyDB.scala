@@ -36,7 +36,7 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
-  def lastValue(prefix: Short, bytes: Array[Byte], height: Int): Option[DBEntry] = {
+  def lastEntry(prefix: Short, bytes: Array[Byte], height: Int): Option[DBEntry] = {
     val stableBytes = Bytes.concat(
       Shorts.toByteArray(prefix),
       bytes
@@ -47,11 +47,14 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
       .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
   }
 
-  def lastValue(prefix: KeyPrefix[_], height: Int): Option[DBEntry] = {
-    iterateOverStream(prefix)
-      .takeWhile(e => Ints.fromByteArray(e.getKey.takeRight(Ints.BYTES)) <= height)
-      .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
-  }
+  def lastEntry(prefix: KeyPrefix[_], height: Int): Option[DBEntry] =
+    lastEntry(prefix.shortPrefix, prefix.bytesPrefix, height)
+
+  def lastKeyValue[V](prefix: KeyPrefix[V], height: Int): Option[(Array[Byte], V)] =
+    lastEntry(prefix, height).map(e => (e.getKey.drop(prefix.stableBytes.length), prefix.parseF(e.getValue)))
+
+  def lastValue[V](prefix: KeyPrefix[V], height: Int): Option[V] =
+    lastKeyValue(prefix, height).map(_._2)
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator

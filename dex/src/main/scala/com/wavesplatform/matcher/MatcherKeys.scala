@@ -17,13 +17,13 @@ object MatcherKeys {
 
   def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
     "matcher-order",
-    bytes(1, orderId.arr),
+    pBytes(1, orderId.arr),
     xs => Order.fromBytes(xs.head, xs.tail),
     o => o.version +: o.bytes()
   )
 
   def orderInfo(orderId: ByteStr): Key[Option[FinalOrderInfo]] =
-    Key.opt("matcher-order-info", bytes(2, orderId.arr), OrderInfo.decode, OrderInfo.encode)
+    Key.opt("matcher-order-info", pBytes(2, orderId.arr), OrderInfo.decode, OrderInfo.encode)
 
   // activeOrdersOldestSeqNr = 3
   // activeOrdersSeqNr = 4
@@ -33,10 +33,11 @@ object MatcherKeys {
   // openVolumeAsset = 8
 
   def orderTxIdsSeqNr(orderId: ByteStr): Key[Int]           = bytesSeqNr("matcher-order-tx-ids-seq-nr", 9, orderId.arr)
-  def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", hBytes(10, orderId.arr, seqNr), ByteStr(_), _.arr)
+
+  def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", pBytesAndHeight(10, orderId.arr, seqNr), ByteStr(_), _.arr)
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
-    Key.opt("matcher-exchange-transaction", bytes(11, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())
+    Key.opt("matcher-exchange-transaction", pBytes(11, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())
 
   // activeOrdersSize = 12
   // activeOrdersSeqNr = 13
@@ -45,16 +46,16 @@ object MatcherKeys {
     bytesSeqNr("matcher-finalized-common-seq-nr", 14, address.bytes.arr)
 
   def finalizedCommon(address: Address, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt("matcher-finalized-common", bytes(15, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+    Key.opt("matcher-finalized-common", pBytes(15, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
   def finalizedPairSeqNr(address: Address, pair: AssetPair): Key[Int] =
     bytesSeqNr("matcher-finalized-pair-seq-nr", 16, address.bytes.arr ++ pair.bytes)
 
   def finalizedPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt("matcher-finalized-pair", bytes(17, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+    Key.opt("matcher-finalized-pair", pBytes(17, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
   def lastCommandTimestamp(address: Address): Key[Option[Long]] =
-    Key.opt("matcher-last-command-timestamp", bytes(18, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
+    Key.opt("matcher-last-command-timestamp", pBytes(18, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
 
   // lq - local queue
   val lqOldestIdx: Key[Long] = longKey("lq-oldest-idx", 19: Short, default = -1)
@@ -67,7 +68,7 @@ object MatcherKeys {
   def lpqElement(idx: Long): Key[Option[QueueEventWithMeta]] =
     Key.opt(
       LqElementKeyName,
-      bytes(LqElementPrefix, Longs.toByteArray(idx)),
+      pBytes(LqElementPrefix, Longs.toByteArray(idx)),
       xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
       QueueEventWithMeta.toBytes(_).drop(8)
     )
@@ -80,7 +81,7 @@ object MatcherKeys {
 
     Key(
       keyName = "matcher-rate",
-      key = bytes(ratePrefix, asset.id.arr),
+      key = pBytes(ratePrefix, asset.id.arr),
       parser = arr => longBitsToDouble(Longs.fromByteArray(arr)),
       encoder = double => Longs.toByteArray(doubleToLongBits(double))
     )

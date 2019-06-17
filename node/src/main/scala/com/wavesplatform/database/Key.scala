@@ -35,7 +35,7 @@ object Key {
       override def encode(v: V): Array[Byte] = encodeF(v)
     }
 
-    def withHeightSuffix(height: Int) = withSuffix(Ints.toByteArray(height))
+    def atHeight(height: Int) = withSuffix(Ints.toByteArray(height))
   }
 
   def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
