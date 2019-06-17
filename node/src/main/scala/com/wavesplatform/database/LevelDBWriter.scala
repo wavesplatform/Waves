@@ -366,7 +366,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     for ((addressId, assets) <- assetBalances; (asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
-      rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
+      rw.put(Keys.assetBalance(addressId, h, n).withHeightSuffix(height), balance)
       rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
       deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n).withHeightSuffix)
       rw.put(Keys.addressesForAsset(h, n).withSuffix(AddressId.toBytes(addressId)), addressId)

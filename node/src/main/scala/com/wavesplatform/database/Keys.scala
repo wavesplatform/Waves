@@ -56,7 +56,7 @@ object Keys {
     val balanceDecoder = (arr: Array[Byte]) => Option(arr).fold(0L)(Longs.fromByteArray)
     val balanceEncoder = (b: Long) => Longs.toByteArray(b)
 
-    Key.prefixed("asset-balance", AssetBalancePrefix, addrBytes(addressId), balanceDecoder, balanceEncoder)
+    Key.prefix("asset-balance", AssetBalancePrefix, addrBytes(addressId), balanceDecoder, balanceEncoder)
   }
 
   def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum) =
@@ -127,7 +127,7 @@ object Keys {
   val AddressesForAssetPrefix: Short = 40
 
   def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum) =
-    Key.prefixed("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => addressId, _ => Array.emptyByteArray)
+    Key.prefix("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => addressId, _ => Array.emptyByteArray)
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =

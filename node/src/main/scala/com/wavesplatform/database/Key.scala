@@ -22,17 +22,20 @@ trait Key[V] {
 
 object Key {
 
-  final case class PrefixedKey[V](name: String, shortPrefix: Short, bytesPrefix: Array[Byte], suffix: Array[Byte], parseF: Array[Byte] => V, encodeF: V => Array[Byte]) extends Key[V] {
+  final case class KeyPrefix[V](name: String, shortPrefix: Short, bytesPrefix: Array[Byte], parseF: Array[Byte] => V, encodeF: V => Array[Byte]) {
     lazy val stableBytes: Array[Byte] = Bytes.concat(Shorts.toByteArray(shortPrefix), bytesPrefix)
-    override lazy val keyBytes: Array[Byte] = Bytes.concat(stableBytes, suffix)
 
-    def withSuffix(suffix: Array[Byte]) = copy(suffix = suffix)
+    def withSuffix(suffix: Array[Byte]) = new Key[V] {
+      override def name: String = KeyPrefix.this.name
+
+      override def keyBytes: Array[Byte] = Bytes.concat(stableBytes, suffix)
+
+      override def parse(bytes: Array[Byte]): V = parseF(bytes)
+
+      override def encode(v: V): Array[Byte] = encodeF(v)
+    }
 
     def withHeightSuffix(height: Int) = withSuffix(Ints.toByteArray(height))
-
-    override def parse(bytes: Array[Byte]): V = parseF(bytes)
-
-    override def encode(v: V): Array[Byte] = encodeF(v)
   }
 
   def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
@@ -45,8 +48,8 @@ object Key {
     override def encode(v: V) = encoder(v)
   }
 
-  def prefixed[V](keyName: String, shortPrefix: Short, prefixBytes: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]) =
-    PrefixedKey[V](keyName, shortPrefix, prefixBytes, Array.emptyByteArray, parser, encoder)
+  def prefix[V](keyName: String, shortPrefix: Short, prefixBytes: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]) =
+    KeyPrefix[V](keyName, shortPrefix, prefixBytes, parser, encoder)
 
   def opt[V](name: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
     apply[Option[V]](name, key, bs => Option(bs).map(parser), _.fold[Array[Byte]](Array.emptyByteArray)(encoder))
