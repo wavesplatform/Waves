@@ -36,7 +36,7 @@ object ContractEvaluator {
         val message =
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
-          else s"@Callable function '$functionName doesn't exist in the script"
+          else s"@Callable function '$functionName' doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
 
       case Some((f, fc)) =>
