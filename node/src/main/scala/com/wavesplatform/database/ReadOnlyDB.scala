@@ -47,6 +47,12 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
       .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
   }
 
+  def lastValue(prefix: KeyPrefix[_], height: Int): Option[DBEntry] = {
+    iterateOverStream(prefix)
+      .takeWhile(e => Ints.fromByteArray(e.getKey.takeRight(Ints.BYTES)) <= height)
+      .closeAfter(_.foldLeft(Option.empty[DBEntry])((_, last) => Option(last)))
+  }
+
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator
     @tailrec def loop(aux: Vector[T], restN: Int, totalBytesRead: Long): (Vector[T], Long) = {

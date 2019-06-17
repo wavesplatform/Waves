@@ -42,13 +42,18 @@ object Keys {
   val WavesBalancePrefix: Short = 6
 
   def wavesBalance(addressId: Long)(height: Int) =
-    Key("waves-balance", Bytes.concat(Shorts.toByteArray(WavesBalancePrefix), addrBytes(addressId)), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+    Key("waves-balance",
+      Bytes.concat(Shorts.toByteArray(WavesBalancePrefix), addrBytes(addressId)),
+      Option(_).fold(0L)(Longs.fromByteArray),
+      Longs.toByteArray)
 
   def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
-    Key("asset-balance-last-height",
+    Key(
+      "asset-balance-last-height",
       bytes(8, Bytes.concat(AddressId.toBytes(addressId), heightWithNum(issueTxHeight, issueTxNum))),
       Option(_).fold(0)(Ints.fromByteArray),
-      Ints.toByteArray)
+      Ints.toByteArray
+    )
 
   val AssetBalancePrefix: Short = 9
 
@@ -94,9 +99,11 @@ object Keys {
 
   val lastAddressId: Key[Option[AddressId]] = Key.opt("last-address-id", Array[Byte](0, 24), AddressId.fromBytes, AddressId.toBytes)
 
-  def addressId(address: Address): Key[Option[AddressId]] = Key.opt("address-id", bytes(25, address.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
+  def addressId(address: Address): Key[Option[AddressId]] =
+    Key.opt("address-id", bytes(25, address.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
 
-  def idToAddress(id: AddressId): Key[Address] = Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
+  def idToAddress(id: AddressId): Key[Address] =
+    Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   val AddressScriptPrefix: Short = 28
   def addressScript(addressId: AddressId)(height: Int): Key[Option[Script]] =
@@ -111,11 +118,9 @@ object Keys {
     Key("data-key-chunk", addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
   val DataPrefix: Short = 34
-  def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[_]]] =
-    Key.opt("data",
-      hBytes(DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), height),
-      DataEntry.parseValue(key, _, 0)._1,
-      _.valueBytes)
+
+  def data(addressId: AddressId, key: String) =
+    Key.prefix("data", DataPrefix, addrBytes(addressId, key.getBytes(UTF_8)), DataEntry.parseValue(key, _, 0)._1, (_: DataEntry[_]).valueBytes)
 
   val SponsorshipPrefix: Short = 36
 
@@ -139,7 +144,10 @@ object Keys {
   val AssetScriptPrefix: Short = 47
 
   def assetScript(issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Option[Script]] =
-    Key.opt("asset-script", hBytes(AssetScriptPrefix, heightWithNum(issueTxHeight, issueTxNum), height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
+    Key.opt("asset-script",
+      hBytes(AssetScriptPrefix, heightWithNum(issueTxHeight, issueTxNum), height),
+      ScriptReader.fromBytes(_).explicitGet(),
+      _.bytes().arr)
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 

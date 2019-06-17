@@ -11,6 +11,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.database.Key.KeyPrefix
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -153,7 +154,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
     addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
-      db.lastValue(Keys.DataPrefix, Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8)), this.height)
+      db.lastValue(Keys.data(addressId, key), this.height)
         .map { e =>
           val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
           DataEntry.parseValue(new String(bs, UTF_8), e.getValue, 0)._1
@@ -344,7 +345,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId).withHeightSuffix)
+      expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
 
@@ -405,9 +406,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val newKeys = (
         for {
           (key, value) <- addressData.data
-          dataKeySuffix = Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))
-          isNew = rw.lastValue(Keys.DataPrefix, dataKeySuffix, this.height).isEmpty
-          _ = rw.put(Keys.data(addressId, key)(height), Some(value))
+          keyPrefix = Keys.data(addressId, key)
+          isNew = rw.lastValue(keyPrefix, this.height).isEmpty
+          _ = rw.put(keyPrefix.withHeightSuffix(height), Some(value))
           // _             = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
           if isNew
         } yield key
@@ -523,10 +524,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             val address   = rw.get(Keys.idToAddress(addressId))
             balancesToInvalidate += (address -> Waves)
 
-            def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte]): Unit = {
-              val prefixBs = KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), prefixBytes))
+            def resetLastForAddress(lastHeightKey: Key[Int], prefix: KeyPrefix[_]): Unit = {
               val prevHeight = rw
-                .iterateOverStream(prefixBs)
+                .iterateOverStream(prefix)
                 .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
                 .takeWhile(_ < currentHeight)
                 .closeAfter(_.fold(0)((_, r) => r))
@@ -540,13 +540,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                 .foreach {
                   case (txH, txN) =>
                     rw.delete(Keys.assetBalance(addressId, txH, txN)(currentHeight))
-                    resetLastForAddress(Keys.assetBalanceLastHeight(addressId, txH, txN), Keys.AssetBalancePrefix, Keys.heightWithNum(txH, txN))
+                    resetLastForAddress(Keys.assetBalanceLastHeight(addressId, txH, txN), Keys.assetBalance(addressId, txH, txN))
                 }
             }
 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
-              rw.delete(Keys.data(addressId, k)(currentHeight))
+              rw.delete(Keys.data(addressId, k).withHeightSuffix(currentHeight))
             }
 
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))
