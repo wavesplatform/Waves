@@ -104,11 +104,13 @@ trait BaseGlobal {
       complexity <- ScriptEstimator(vars, costs, ex)
     } yield (x, ex, complexity)
 
-  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, (Array[Byte], DApp, Long)] =
+  type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])
+
+  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, ContractInfo] =
     for {
       dapp       <- ContractCompiler.compile(input, ctx)
       complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp)
-    } yield (serializeContract(dapp, stdLibVersion), dapp, complexity._2)
+    } yield (serializeContract(dapp, stdLibVersion), dapp, complexity._1, complexity._2)
 
   def decompile(compiledCode: String): Either[ScriptParseError, String] = {
     Script.fromBase64String(compiledCode, checkComplexity = false).right.map { script =>

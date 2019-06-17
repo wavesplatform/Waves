@@ -386,6 +386,27 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
 
+  property("LIST access IndexOutOfBounds") {
+    val src =
+      """
+        |[1].getElement(1)
+      """.stripMargin
+    eval(src) should produce("Index 1 out of bounds for length 1")
+
+    def testListAccessError(length: Int, index: Int): Unit = {
+      eval(
+        s"""
+           | let a = ${List.fill(length)(1).mkString("[", ", ", "]")}
+           | a[$index]
+         """.stripMargin
+      ) should produce(s"Index $index out of bounds for length $length")
+    }
+
+    testListAccessError(length = 3, index = 3)
+    testListAccessError(length = 3, index = -1)
+    testListAccessError(length = 0, index = 1)
+  }
+
   property("list constructor for different data entries") {
     val src =
       """
@@ -614,6 +635,82 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(0))
   }
 
+  property("lastIndexOf") {
+    val src =
+      """ "qweqwe".lastIndexOf("we") """
+    eval(src) shouldBe Right(CONST_LONG(4))
+  }
+
+  property("lastIndexOf with zero offset") {
+    val src =
+      """ "qweqwe".lastIndexOf("qw", 0) """
+    eval(src) shouldBe Right(CONST_LONG(0))
+  }
+
+  property("lastIndexOf with start offset") {
+    val src =
+      """ "qweqwe".lastIndexOf("we", 4) """
+    eval(src) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("lastIndexOf from end of max sized string") {
+    val str = "a" * 32766 + "z"
+    val src =
+      """ str.lastIndexOf("z", 32766) """
+    eval(src, ctxt = CTX(Seq(),
+      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str))))), Array())
+    ) shouldBe Right(CONST_LONG(32766L))
+  }
+
+  property("lastIndexOf (not present)") {
+    val src =
+      """ "qweqwe".lastIndexOf("ww") """
+    eval(src) shouldBe Right(unit)
+  }
+
+  property("lastIndexOf from empty string") {
+    val src =
+      """ "".lastIndexOf("!") """
+    eval(src) shouldBe Right(unit)
+  }
+
+  property("lastIndexOf from empty string with offset") {
+    val src =
+      """ "".lastIndexOf("!", 1) """
+    eval(src) shouldBe Right(unit)
+  }
+
+  property("lastIndexOf from string with Long.MaxValue offset") {
+    val src =
+      s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """
+    eval(src) shouldBe Right(unit)
+  }
+
+  property("lastIndexOf from string with negative offset") {
+    val src =
+      """ "abc".lastIndexOf("a", -1) """
+    eval(src) shouldBe Right(unit)
+  }
+
+  property("lastIndexOf from string with negative Long.MinValue offset") {
+    val src =
+      s""" "abc".lastIndexOf("a", ${Long.MinValue}) """
+    eval(src) shouldBe Right(unit)
+  }
+
+  property("lastIndexOf empty string from non-empty string") {
+    val str = "abcde"
+    val src =
+      s""" "$str".lastIndexOf("") """
+    eval(src) shouldBe Right(CONST_LONG(str.length))
+  }
+
+  property("lastIndexOf empty string from empty string") {
+    val src =
+      """ "".lastIndexOf("") """
+    eval(src) shouldBe Right(CONST_LONG(0))
+  }
+
   property("split") {
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
@@ -775,6 +872,23 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
     eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
     eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
+  }
+
+  property("math functions scale limits") {
+    eval("pow(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
+    eval("log(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
+    eval("pow(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
+    eval("log(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
+  }
+
+  property("pow result size max") {
+    eval("pow(2, 0, 62, 0, 0, UP)") shouldBe Right(CONST_LONG(Math.pow(2, 62).toLong))
+    eval("pow(2, 0, 63, 0, 0, UP)") should produce("out of long range")
+  }
+
+  property("pow result size abs min") {
+    eval("pow(10, 0, -8, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(1))
+    eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
   }
 
   property("concat empty list") {

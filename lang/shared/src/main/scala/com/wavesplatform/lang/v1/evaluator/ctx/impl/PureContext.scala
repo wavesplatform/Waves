@@ -381,6 +381,51 @@ object PureContext {
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
+  lazy val lastIndexOf: BaseFunction =
+    NativeFunction(
+      "lastIndexOf",
+      20,
+      LASTINDEXOF,
+      optionLong,
+      "last index of substring",
+      ("str",    STRING, "String for analyze"),
+      ("substr", STRING, "String for searching")
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right({
+        val i = m.lastIndexOf(sub)
+         if( i != -1 ) {
+           CONST_LONG(i.toLong)
+         } else {
+           unit
+         }
+      })
+      case xs                      => notImplemented("lastIndexOf(STRING, STRING)", xs)
+    }
+
+  lazy val lastIndexOfWithOffset: BaseFunction =
+    NativeFunction(
+      "lastIndexOf",
+      20,
+      LASTINDEXOFN,
+      optionLong,
+      "last index of substring after offset",
+      ("str",    STRING, "String for analyze"),
+      ("substr", STRING, "String for searching"),
+      ("offset", LONG,   "The index to start the search from")
+    ) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right( if(off >= 0 && off <= m.length) {
+         val i = m.lastIndexOf(sub, off.toInt)
+         if( i != -1 ) {
+           CONST_LONG(i.toLong)
+         } else {
+           unit
+         }
+      } else {
+        unit
+      } )
+      case xs                      => notImplemented("lastIndexOf(STRING, STRING)", xs)
+    }
+
   lazy val splitStr: BaseFunction =
     NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil => Right(ARR(split(str, sep).map(CONST_STRING)))
@@ -466,7 +511,10 @@ object PureContext {
       ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')), "list"),
       ("pos", LONG, "element position")
     ) {
-      case ARR(arr) :: CONST_LONG(pos) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
+      case ARR(arr) :: CONST_LONG(pos) :: Nil => Try(arr(pos.toInt)).toEither.left.map({
+        case e: java.lang.IndexOutOfBoundsException => s"Index $pos out of bounds for length ${arr.size}"
+        case e: Throwable => e.toString
+      })
       case _                                  => ???
     }
 
@@ -645,6 +693,7 @@ object PureContext {
               toUtf8String,
               toLong, toLongOffset,
               indexOf, indexOfN,
+              lastIndexOf, lastIndexOfWithOffset,
               splitStr,
               parseInt, parseIntVal,
               pow, log

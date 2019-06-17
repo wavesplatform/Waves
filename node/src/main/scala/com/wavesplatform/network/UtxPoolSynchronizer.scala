@@ -54,13 +54,10 @@ object UtxPoolSynchronizer extends ScorexLogging {
         case (sender, transaction) =>
           Task {
             concurrent.blocking(utx.putIfNew(transaction).resultE) match {
-              case Right(shouldBroadcast) =>
-                if (shouldBroadcast) Some(allChannels.write(transaction, (_: Channel) != sender))
-                else None
-
-              case Left(error) =>
-                log.debug(s"Error adding transaction to UTX pool: $error")
-                None
+              case Right(true) =>
+                log.trace(s"Broadcasting ${transaction.id()} to ${allChannels.size()} peers except $sender")
+                Some(allChannels.write(transaction, (_: Channel) != sender))
+              case _ => None
             }
           }
       }

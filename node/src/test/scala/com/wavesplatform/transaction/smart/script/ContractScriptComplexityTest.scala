@@ -60,7 +60,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("third", 41))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right((41, Vector(("first", 32), ("default", 20), ("third", 41))))
   }
 
   property("estimate contract script with context correctly") {
@@ -112,7 +112,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("first", 68))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right((68, Vector(("first", 68), ("default", 30), ("third", 51))))
   }
 
   property("estimate contract script with context correctly 2") {
@@ -164,6 +164,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("first", 68))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right((68, Vector(("first", 68), ("default", 30), ("second", 51))))
   }
 }

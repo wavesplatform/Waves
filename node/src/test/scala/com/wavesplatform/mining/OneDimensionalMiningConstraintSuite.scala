@@ -10,10 +10,10 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with PathMockFactory with TransactionGen with NoShrink {
   "OneDimensionalMiningConstraint" - {
-    "should be empty if the limit is 0, but not overfilled" in {
+    "should be full if the limit is 0, but not overfilled" in {
       val tank = createConstConstraint(0, 1)
-      tank.isEmpty shouldBe true
-      tank.isOverfilled shouldBe false
+      tank shouldBe 'full
+      tank should not be ('overfilled)
     }
 
     "put(transaction)" - tests { (maxTxs, txs) =>
@@ -30,8 +30,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items don't reach the limit" in forAll(dontReachLimitGen) { updatedConstraint =>
-      updatedConstraint.isEmpty shouldBe false
-      updatedConstraint.isOverfilled shouldBe false
+      updatedConstraint should not be ('full)
+      updatedConstraint should not be ('overfilled)
     }
 
     val reachSoftLimitGen: Gen[MiningConstraint] = for {
@@ -40,8 +40,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items reach the limit softly" in forAll(reachSoftLimitGen) { updatedConstraint =>
-      updatedConstraint.isEmpty shouldBe true
-      updatedConstraint.isOverfilled shouldBe false
+      updatedConstraint shouldBe 'full
+      updatedConstraint should not be ('overfilled)
     }
 
     val reachHardLimitGen: Gen[MiningConstraint] = for {
@@ -51,8 +51,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items reach the limit with gap" in forAll(reachHardLimitGen) { updatedConstraint =>
-      updatedConstraint.isEmpty shouldBe true
-      updatedConstraint.isOverfilled shouldBe true
+      updatedConstraint shouldBe 'full
+      updatedConstraint shouldBe 'overfilled
     }
   }
 }

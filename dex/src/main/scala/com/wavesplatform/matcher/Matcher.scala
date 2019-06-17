@@ -155,7 +155,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
       Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption,
-      rateCache
+      rateCache,
+      settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
     )
   )
 
