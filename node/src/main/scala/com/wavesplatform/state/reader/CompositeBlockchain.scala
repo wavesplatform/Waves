@@ -104,8 +104,19 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
-    addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+
+    val fromDiff = maybeDiff
+      .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { diff =>
+        diff
+          .reverseIterator(_.transactions)
+          .map {
+            case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
+          }
+      }
+
+    addressTransactionsCompose(inner, fromDiff)(address, types, fromId)
+  }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
