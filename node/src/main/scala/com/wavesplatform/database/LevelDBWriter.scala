@@ -496,7 +496,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
+  private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: AddressId) = {
     db.iterateOverStream((Keys.AssetBalancePrefix, addressId).toKeyBytes)
       .flatMap { e =>
         val (_, _, hn, height) = Keys.parseAddressBytesHeight(e.getKey)
@@ -707,28 +707,29 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
-    val assetIdStream: CloseableIterator[IssuedAsset] = db
+    val assetIdStream = db
       .get(Keys.addressId(address))
       .map(assetBalanceIterator(db, _))
       .getOrElse(CloseableIterator.empty)
       .map { case ((asset, _), _) => asset }
       .closeAfter(_.toVector) // FIXME: Proper reverse iterator
+      .reverse
       .distinct
-      .reverseIterator
 
     val issueTxStream = assetIdStream
-      .flatMap(ia => transactionInfo(ia.id, db).map(_._2))
+      .iterator
+      .flatMap(asset => transactionInfo(asset.id, db).map(_._2))
       .collect {
         case itx: IssueTransaction if itx.isNFT => itx
       }
 
     from
-      .flatMap(ia => transactionInfo(ia.id, db))
+      .flatMap(asset => transactionInfo(asset.id, db))
       .fold(issueTxStream) {
         case (_, afterTx) =>
           issueTxStream
             .dropWhile(_.id() != afterTx.id())
-            .drop(1)
+            .dropWhile(_.id() == afterTx.id())
       }
   }
 
