@@ -305,6 +305,38 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   }
 
+  property("Invoke contract decompilation with meta") {
+    val contract = DApp(
+      ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+      List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
+      List(
+        CallableFunction(
+          CallableAnnotation("i"),
+          Terms.FUNC(
+            "testfunc",
+            List("amount"),
+            BLOCK(
+              LET("pmt", CONST_LONG(1)),
+              TRUE
+            )
+          )
+        )),
+      None
+    )
+    Decompiler(contract, decompilerContext) shouldEq
+      """func foo (bar,buz) = true
+        |
+        |
+        |@Callable(i)
+        |func testfunc (amount) = {
+        |    let pmt = 1
+        |    true
+        |    }
+        |
+        |""".stripMargin
+
+  }
+
   property("bytestring") {
     val test = Base58.encode("abc".getBytes("UTF-8"))
     // ([REVIEW]: may be i`am make a mistake here)
