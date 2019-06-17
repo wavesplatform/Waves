@@ -15,12 +15,12 @@ object KeyDsl {
   object KeyBytes {
     final case class Strict(bytes: Array[Byte]) extends KeyBytes
     final case class SeqBS(bytesSeq: KeyBytes*) extends KeyBytes {
-      private lazy val arrays: Seq[Array[Byte]] = bytesSeq.flatMap {
-        case Strict(bs) => Seq(bs)
+      private def arrays: Iterator[Array[Byte]] = bytesSeq.iterator.flatMap {
+        case Strict(bs) => Iterator.single(bs)
         case seq: SeqBS => seq.arrays
       }
 
-      override lazy val bytes: Array[Byte] = Bytes.concat(arrays: _*)
+      override lazy val bytes: Array[Byte] = Bytes.concat(arrays.toSeq: _*)
     }
 
     val empty = Strict(Array.emptyByteArray)
