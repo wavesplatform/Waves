@@ -25,6 +25,9 @@ object KeyHelpers {
 
   def hNum(prefix: Short, height: Int, num: TxNum) = Bytes.concat(Shorts.toByteArray(prefix), Ints.toByteArray(height), Shorts.toByteArray(num))
 
+  def prefixed(prefix: Short, bs: Array[Byte]) =
+    Bytes.concat(Shorts.toByteArray(prefix), bs)
+
   def assetId(height: Height, txNum: TxNum) =
     ByteBuffer.allocate(6).putInt(height).putShort(txNum).array()
 

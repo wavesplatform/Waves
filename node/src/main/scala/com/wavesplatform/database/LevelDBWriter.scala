@@ -387,12 +387,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     for ((leaseId, state) <- leaseStates) {
-      rw.put(Keys.leaseStatus(leaseId)(height), state)
+      rw.put(Keys.leaseStatus(leaseId).withHeightSuffix(height), state)
       // deleteOldKeys(Keys.AddressScriptPrefix, leaseId)(Keys.leaseStatus(leaseId))
     }
 
     for ((addressId, script) <- scripts) {
-      rw.put(Keys.addressScript(addressId)(height), script)
+      rw.put(Keys.addressScript(addressId).withHeightSuffix(height), script)
       // deleteOldKeysForAddress(Keys.AddressScriptPrefix, addressId)(Keys.addressScript)
     }
 
@@ -676,7 +676,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
-    rw.delete(Keys.leaseStatus(leaseId)(currentHeight))
+    rw.delete(Keys.leaseStatus(leaseId).withHeightSuffix(currentHeight))
   }
 
   private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
@@ -1200,6 +1200,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[this] def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
-    db.lastValue(Keys.LeaseStatusPrefix, leaseId, this.height)
+    db.lastValue(Keys.leaseStatus(leaseId), this.height)
       .exists(e => e.getValue.headOption.contains(1: Byte))
 }

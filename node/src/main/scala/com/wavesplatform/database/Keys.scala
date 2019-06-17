@@ -81,8 +81,9 @@ object Keys {
     Key("lease-balance", hAddr(LeaseBalancePrefix, addressId, height), readLeaseBalance, writeLeaseBalance)
 
   val LeaseStatusPrefix: Short = 15
-  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
-    Key("lease-status", hBytes(LeaseStatusPrefix, leaseId.arr, height), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
+
+  def leaseStatus(leaseId: ByteStr) =
+    Key.prefix("lease-status", LeaseStatusPrefix, leaseId.arr, _ (0) == 1, active => Array[Byte](if (active) 1 else 0))
 
   val FilledVolumeAndFeePrefix: Short = 17
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
@@ -106,8 +107,9 @@ object Keys {
     Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   val AddressScriptPrefix: Short = 28
-  def addressScript(addressId: AddressId)(height: Int): Key[Option[Script]] =
-    Key.opt("address-script", hAddr(AddressScriptPrefix, addressId, height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
+
+  def addressScript(addressId: AddressId) =
+    Key.prefix("address-script", AddressScriptPrefix, addrBytes(addressId), ScriptReader.fromBytes(_).explicitGet(), (_: Script).bytes().arr)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
@@ -124,15 +126,15 @@ object Keys {
 
   val SponsorshipPrefix: Short = 36
 
-  def sponsorship(issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[SponsorshipValue] =
-    Key("sponsorship", hBytes(SponsorshipPrefix, heightWithNum(issueTxHeight, issueTxNum), height), readSponsorship, writeSponsorship)
+  def sponsorship(issueTxHeight: Height, issueTxNum: TxNum) =
+    Key.prefix("sponsorship", SponsorshipPrefix, assetId(issueTxHeight, issueTxNum), readSponsorship, writeSponsorship)
 
   def addressesForWaves(seqNr: Int): Key[Seq[AddressId]] = Key("addresses-for-waves", h(38, seqNr), AddressId.readSeq, AddressId.writeSeq)
 
   val AddressesForAssetPrefix: Short = 40
 
   def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum) =
-    Key.prefix("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => addressId, _ => Array.emptyByteArray)
+    Key.prefix("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => (), _ => Array.emptyByteArray)
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
@@ -143,11 +145,12 @@ object Keys {
 
   val AssetScriptPrefix: Short = 47
 
-  def assetScript(issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Option[Script]] =
-    Key.opt("asset-script",
-      hBytes(AssetScriptPrefix, heightWithNum(issueTxHeight, issueTxNum), height),
+  def assetScript(issueTxHeight: Height, issueTxNum: TxNum) =
+    Key.prefix("asset-script",
+      AssetScriptPrefix,
+      assetId(issueTxHeight, issueTxNum),
       ScriptReader.fromBytes(_).explicitGet(),
-      _.bytes().arr)
+      (_: Script).bytes().arr)
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 
