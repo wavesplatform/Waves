@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{AddressId, Height, TxNum}
+import monix.eval.Coeval
 import simulacrum.{op, typeclass}
 
 object KeyDsl {
@@ -13,21 +14,27 @@ object KeyDsl {
   }
 
   object KeyBytes {
-    final case class Strict(bytes: Array[Byte]) extends KeyBytes
-    final case class SeqBS(bytesSeq: KeyBytes*) extends KeyBytes {
-      private def arrays: Iterator[Array[Byte]] = bytesSeq.iterator.flatMap {
-        case Strict(bs) => Iterator.single(bs)
+
+    private[KeyDsl] final case class Strict(bytesCoeval: Coeval[Array[Byte]]) extends KeyBytes {
+      override def bytes: Array[Byte] = bytesCoeval()
+    }
+
+    private[KeyDsl] final case class SeqBS(bytesSeq: Coeval[KeyBytes]*) extends KeyBytes {
+      private def arrays: Iterator[Array[Byte]] = bytesSeq.iterator.map(_ ()).flatMap {
+        case Strict(bs) => Iterator.single(bs).map(_ ())
         case seq: SeqBS => seq.arrays
       }
 
       override lazy val bytes: Array[Byte] = Bytes.concat(arrays.toSeq: _*)
     }
 
-    val empty = Strict(Array.emptyByteArray)
+    val empty: KeyBytes = Strict(Coeval.now(Array.emptyByteArray))
 
     implicit def toBytes(kb: KeyBytes): Array[Byte]   = kb.bytes
-    implicit def fromBytes(bs: Array[Byte]): KeyBytes = Strict(bs)
-    implicit def fromByteStr(bs: ByteStr): KeyBytes   = Strict(bs)
+
+    implicit def fromBytes(bs: Array[Byte]): KeyBytes = Strict(Coeval.now(bs))
+
+    implicit def fromByteStr(bs: ByteStr): KeyBytes = Strict(Coeval.now(bs.arr))
   }
 
   @typeclass
@@ -108,10 +115,12 @@ object KeyDsl {
     }
 
     implicit def hconsRW[H, T <: HList](implicit hev: Lazy[KeyFS[H]], tev: KeyFS[T]): KeyFS[H :: T] = new KeyFS[H :: T] {
-      override def bytesSize: Int = hev.value.bytesSize + tev.bytesSize
-      override def toBytes(v: H :: T): KeyBytes = {
-        KeyBytes.SeqBS(hev.value.toBytes(v.head), tev.toBytes(v.tail))
-      }
+      override def bytesSize: Int =
+        hev.value.bytesSize + tev.bytesSize
+
+      override def toBytes(v: H :: T): KeyBytes =
+        KeyBytes.SeqBS(Coeval.evalOnce(hev.value.toBytes(v.head)), Coeval.evalOnce(tev.toBytes(v.tail)))
+
       override def fromBytes(bs: KeyBytes): H :: T = {
         val (hb, tb) = bs.bytes.splitAt(hev.value.bytesSize)
         val headV = hev.value.fromBytes(hb)
@@ -128,7 +137,7 @@ object KeyDsl {
       }
 
     implicit def hconsW[H, T <: HList](implicit hev: Lazy[KeyW[H]], tev: KeyW[T]): KeyW[H :: T] = (v: H :: T) => {
-      KeyBytes.SeqBS(hev.value.toBytes(v.head), tev.toBytes(v.tail))
+      KeyBytes.SeqBS(Coeval.evalOnce(hev.value.toBytes(v.head)), Coeval.evalOnce(tev.toBytes(v.tail)))
     }
 
     implicit def genericW[T, L <: HList](implicit g: Generic.Aux[T, L], lev: KeyW[L]): KeyW[T] =
