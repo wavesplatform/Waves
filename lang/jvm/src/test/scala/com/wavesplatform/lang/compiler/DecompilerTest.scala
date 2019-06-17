@@ -415,15 +415,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )
       )
     )
+    println(Decompiler(expr, decompilerContext))
     Decompiler(expr, decompilerContext) shouldEq
       """let startHeight = 1375557
         |let startPrice = 100000
         |let interval = (24 * 60)
         |let exp = ((100 * 60) * 1000)
-        |let $match0 = tx
-        |if (_isInstanceOf($match0, "ExchangeTransaction"))
-        |    then {
-        |        let e = $match0
+        |match     tx {
+        |    case e :ExchangeTransaction => 
         |        let days = ((height - startHeight) / interval)
         |        if (if (if ((e.price >= (startPrice * (1 + (days * days)))))
         |            then !(isDefined(e.sellOrder.assetPair.priceAsset))
@@ -432,13 +431,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |            else false)
         |            then (exp >= (e.buyOrder.expiration - e.buyOrder.timestamp))
         |            else false
-        |        }
-        |    else if (_isInstanceOf($match0, "BurnTransaction"))
-        |        then {
-        |            let tx = $match0
-        |            true
-        |            }
-        |        else false""".stripMargin
+        |    case tx :BurnTransaction => 
+        |        true
+        |    case _ => 
+        |        false
+        |}""".stripMargin
   }
 
 }

@@ -37,9 +37,45 @@ object Decompiler {
         expr(pure(value), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
     }
 
+  private def caseExpr(Name: String, e: EXPR, ctx: DecompilerContext): Coeval[(String, Option[EXPR])] = {
+    e match {
+      case IF(
+            FUNCTION_CALL(FunctionHeader.Native(1), List(REF(Name), CONST_STRING(typeName))),
+            BLOCK(
+              LET(name, REF(Name)),
+              cExpr),
+      tailExpr) => expr(pure(cExpr), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+        ("case " ++ name ++ " :" ++ typeName ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
+      }
+      case _ => expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+        ("case _ => " ++ NEWLINE ++ e, None)
+      }
+    }
+  }
+
+  private def matchBlock(name: String, body: Coeval[EXPR], ctx: DecompilerContext): Coeval[String] = {
+    for {
+      e <- body
+      p <- caseExpr(name, e, ctx)
+      c = p._1 ++ NEWLINE
+      t <- p._2.fold(pure(Option.empty[String]))(e => matchBlock(name, pure(e), ctx).map(Some.apply))
+    } yield {
+      t.fold(out(c, ctx.ident)) { t => out(c, ctx.ident) ++ t }
+    }
+  }
+
+  val MatchRef = """(\$match\d*)""".r
+
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
     val i = if (braces == BracesWhenNeccessary) 0 else ctx.ident
     e flatMap {
+      case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b => 
+        expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>
+          out("match " ++ ex ++ " {" ++ NEWLINE, ctx.ident) ++
+          out( b, 0) ++
+          out("}", ctx.ident)
+        }
+      }
       case Terms.BLOCK(declPar, body) =>
         val braceThis = braces match {
           case NoBraces             => false
