@@ -7,8 +7,9 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, gracefulStop}
+import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -16,9 +17,10 @@ import com.wavesplatform.db._
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.matcher.history.HistoryRouter
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market.{ExchangeTransactionBroadcastActor, MatcherActor, MatcherTransactionWriter, OrderBookActor}
+import com.wavesplatform.matcher.market._
 import com.wavesplatform.matcher.model.MatcherModel.Normalization
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
@@ -49,21 +51,17 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   import as.dispatcher
 
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
-  private var currentOffset                   = -1L // Used only for REST API
 
   private val blacklistedAssets: Set[IssuedAsset] = settings.blacklistedAssets
-    .map { assetName =>
-      val asset = AssetPair
-        .extractAssetId(assetName)
-        .get
-
-      asset match {
-        case Waves              => throw new IllegalArgumentException("Can't blacklist the main coin")
-        case a @ IssuedAsset(_) => a
+    .map { assetId =>
+      AssetPair.extractAssetId(assetId) match {
+        case Success(Waves)          => throw new IllegalArgumentException("Can't blacklist the main coin")
+        case Success(a: IssuedAsset) => a
+        case Failure(e)              => throw new IllegalArgumentException("Can't parse asset id", e)
       }
     }
 
-  private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain)
+  private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain, blacklistedAssets)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
 
@@ -90,6 +88,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     OrderBookActor.props(
       matcherActor,
       addressActors,
+      orderBookSnapshotStore,
       pair,
       updateOrderBookCache(pair),
       marketStatuses.put(pair, _),
@@ -115,10 +114,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
   private val rateCache                                          = RateCache(db)
 
-  private def validateOrder(o: Order) = {
-
-    import com.wavesplatform.matcher.error._
-
+  private def validateOrder(o: Order) =
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
@@ -132,9 +128,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         settings.orderRestrictions,
         rateCache
       )(o)
-      _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(o.assetPair, x))
+      _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
-  }
 
   lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
     MatcherApiRoute(
@@ -151,7 +146,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       () => status.get(),
       db,
       context.time,
-      () => currentOffset,
+      () => matcherQueue.lastProcessedOffset,
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
       Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption,
@@ -166,23 +161,40 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private val snapshotsRestore = Promise[Unit]()
 
+  private lazy val assetPairsDb = AssetPairsDB(db)
+
+  private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+
+  lazy val orderBookSnapshotStore: ActorRef = context.actorSystem.actorOf(
+    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
+    "order-book-snapshot-store"
+  )
+
   lazy val matcher: ActorRef = context.actorSystem.actorOf(
     MatcherActor.props(
-      settings, {
+      settings,
+      assetPairsDb, {
         case Left(msg) =>
           log.error(s"Can't start matcher: $msg")
           forceStopApplication(ErrorStartingMatcher)
 
         case Right((self, processedOffset)) =>
-          currentOffset = processedOffset
           snapshotsRestore.trySuccess(())
           matcherQueue.startConsume(
             processedOffset + 1,
-            eventWithMeta => {
-              log.debug(s"Consumed $eventWithMeta")
+            xs => {
+              if (xs.isEmpty) Future.successful(())
+              else {
+                val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
+                  log.debug(s"Consumed $eventWithMeta")
 
-              self ! eventWithMeta
-              currentOffset = eventWithMeta.offset
+                  self ! eventWithMeta
+                  eventWithMeta.event.assetPair
+                }(collection.breakOut)
+
+                val timeout = new Timeout(240.days) // All actor are local and have unbounded queues, so it's okay
+                self.ask(MatcherActor.PingAll(assetPairs))(timeout).map(_ => ())
+              }
             }
           )
       },
@@ -205,7 +217,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         new AddressDirectory(
           context.spendableBalanceChanged,
           settings,
-          address =>
+          (address, startSchedules) =>
             Props(new AddressActor(
               address,
               context.utx.spendableBalance(address, _),
@@ -213,7 +225,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               context.time,
               orderDb,
               id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
-              matcherQueue.storeEvent
+              matcherQueue.storeEvent,
+              startSchedules
             )),
           historyRouter
         )),
@@ -284,7 +297,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       lastOffsetQueue <- getLastOffset(deadline)
       _ = log.info(s"Last queue offset is $lastOffsetQueue")
       _ <- waitOffsetReached(lastOffsetQueue, deadline)
-    } yield ()
+      _ = log.info("Last offset has been reached, notify addresses")
+    } yield addressActors ! AddressDirectory.StartSchedules
 
     startGuard.onComplete {
       case Success(_) => setStatus(Status.Working)
@@ -315,16 +329,17 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   }
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
-    val p = Promise[Unit]()
-
-    def loop(): Unit = {
-      if (currentOffset >= lastQueueOffset) p.trySuccess(())
+    def loop(p: Promise[Unit]): Unit = {
+      val currentOffset = matcherQueue.lastProcessedOffset
+      log.trace(s"offsets: $currentOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
+      if (currentOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
-        p.tryFailure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
-      else context.actorSystem.scheduler.scheduleOnce(1.second)(loop())
+        p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
+      else context.actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
     }
 
-    loop()
+    val p = Promise[Unit]()
+    loop(p)
     p.future
   }
 }

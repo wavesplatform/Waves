@@ -158,6 +158,7 @@ object Dependencies {
 
   lazy val matcher = Seq(
     akkaModule("actor"),
+    akkaModule("persistence-query"),
     akkaHttp,
     "com.typesafe.akka" %% "akka-stream-kafka" % "1.0"
   ) ++ Seq(

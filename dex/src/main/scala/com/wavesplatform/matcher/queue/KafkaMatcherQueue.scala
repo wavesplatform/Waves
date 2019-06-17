@@ -8,14 +8,15 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
-import com.wavesplatform.matcher.queue.KafkaMatcherQueue.{Settings, KafkaProducer, eventDeserializer}
+import com.wavesplatform.matcher.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
 import com.wavesplatform.matcher.queue.MatcherQueue.{IgnoreProducer, Producer}
+import com.wavesplatform.matcher.queue.QueueEventWithMeta.Offset
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization._
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContextExecutor, Future, Promise}
 
 class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) extends MatcherQueue with ScorexLogging {
@@ -40,8 +41,9 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     "meta-consumer"
   )
 
-  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
-    var currentOffset  = fromOffset // Store locally to know a previous processed offset when the source is restarted
+  @volatile private var lastProcessedOffsetInternal = -1L
+
+  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
     val topicPartition = new TopicPartition(settings.topic, 0)
 
     RestartSource
@@ -51,22 +53,30 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
         randomFactor = 0.2,
         maxRestarts = -1
       ) { () =>
-        log.info(s"Start consuming from $currentOffset")
+        val startOffset = math.max(lastProcessedOffsetInternal, fromOffset)
+        log.info(s"Start consuming from $startOffset")
         Consumer
-          .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> currentOffset))
+          .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> startOffset))
           .mapMaterializedValue(consumerControl.set)
-          .buffer(settings.consumer.bufferSize, OverflowStrategy.backpressure)
-          .map { msg =>
+          .groupedWithin(settings.consumer.bufferSize, 10.millis)
+          .mapAsyncUnordered(1) { messages =>
             // We can do it in parallel, because we're just applying verified events
-            val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
-            process(req)
-            currentOffset = msg.offset() // Messages are received one-by-one, e.g. offsets: 1, 2, 3, ...
+            // Messages are received one-by-one, e.g. offsets: 1, 2, 3, ...
+            var lastOffset = lastProcessedOffsetInternal
+            val xs = messages.map { msg =>
+              val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
+              lastOffset = req.offset
+              req
+            }
+            process(xs).andThen { case _ => lastProcessedOffsetInternal = lastOffset }
           }
       }
       .runWith(Sink.ignore)
   }
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
+
+  override def lastProcessedOffset: Offset = lastProcessedOffsetInternal
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
     implicit val timeout: Timeout = Timeout(consumerSettings.metadataRequestTimeout)

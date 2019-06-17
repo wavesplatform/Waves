@@ -6,9 +6,9 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.metrics._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
@@ -16,8 +16,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
-import monix.eval.Task
 import kamon.Kamon
+import monix.eval.Task
 
 import scala.util.{Left, Right}
 
@@ -92,7 +92,7 @@ package object appender extends ScorexLogging {
     metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
-        metrics.utxPutIfNew.measure(discarded.foreach(utxStorage.putIfNew(_, verify = false)))
+        metrics.utxDiscardedPut.measure(discarded.foreach(utxStorage.putIfNew(_, verify = false)))
         blockchainUpdater.height
       }
     }
@@ -104,21 +104,23 @@ package object appender extends ScorexLogging {
 
         val blockTime = block.timestamp
 
-    for {
-      height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-      parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
-      grandParent = blockchain.parentHeader(parent, 2)
-      effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
-      _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
-      _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
-      _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-      _                <- pos.validateGeneratorSignature(height, block)
-      _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
-    } yield ()
-  }.left.map {
-    case GenericError(x) => GenericError(s"Block $block is invalid: $x")
-    case x               => x
-  }
+        for {
+          height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
+          parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+          grandParent = blockchain.parentHeader(parent, 2)
+          effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
+          _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
+          _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
+          _                <- pos.validateBaseTarget(height, block, parent, grandParent)
+          _                <- pos.validateGeneratorSignature(height, block)
+          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
+        } yield ()
+      }
+      .left
+      .map {
+        case GenericError(x) => GenericError(s"Block $block is invalid: $x")
+        case x               => x
+      }
 
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either
@@ -144,6 +146,6 @@ package object appender extends ScorexLogging {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block")
     val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all")
-    val utxPutIfNew              = Kamon.timer("block-appender.utx-put-if-new")
+    val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put")
   }
 }

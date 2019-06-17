@@ -1,16 +1,19 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, Props}
-import akka.persistence._
+import akka.actor.{Actor, ActorRef, Props}
+import cats.instances.option.catsStdInstancesForOption
+import cats.syntax.apply._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
+import com.wavesplatform.matcher.model.OrderBook.LastTrade
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.matcher.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
@@ -20,16 +23,16 @@ import play.api.libs.json._
 
 class OrderBookActor(owner: ActorRef,
                      addressActor: ActorRef,
+                     snapshotStore: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
                      time: Time,
                      normalizedTickSize: Option[Long] = None)
-    extends PersistentActor
+    extends Actor
+    with WorkingStash
     with ScorexLogging {
-
-  override def persistenceId: String = OrderBookActor.name(assetPair)
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
@@ -41,11 +44,32 @@ class OrderBookActor(owner: ActorRef,
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
   private var orderBook   = OrderBook.empty
 
-  private var lastTrade = Option.empty[LastTrade]
+  override def receive: Receive = recovering
 
-  private def fullCommands: Receive = executeCommands orElse snapshotsCommands
+  private def recovering: Receive = {
+    case OrderBookSnapshotStoreActor.Response.GetSnapshot(result) =>
+      result.foreach { case (_, snapshot) => orderBook = OrderBook(snapshot) }
 
-  private def executeCommands: Receive = {
+      lastSavedSnapshotOffset = result.map(_._1)
+      lastProcessedOffset = lastSavedSnapshotOffset
+
+      log.debug(lastSavedSnapshotOffset match {
+        case None    => "Recovery completed"
+        case Some(x) => s"Recovery completed at $x: $orderBook"
+      })
+
+      updateMarketStatus(MarketStatus(orderBook))
+      updateSnapshot(orderBook.aggregatedSnapshot)
+      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
+
+      owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
+      context.become(working)
+      unstashAll()
+
+    case x => stash(x)
+  }
+
+  private def working: Receive = {
     case request: QueueEventWithMeta =>
       lastProcessedOffset match {
         case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
@@ -58,28 +82,25 @@ class OrderBookActor(owner: ActorRef,
               sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
               updateSnapshot(OrderBook.AggregatedSnapshot())
               processEvents(orderBook.cancelAll(request.timestamp))
+              // We don't delete the snapshot, because it could be required after restart
+              // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               context.stop(self)
           }
       }
+
+    case MatcherActor.Ping => sender() ! MatcherActor.Pong
+
     case ForceStartOrderBook(p) if p == assetPair =>
       sender() ! OrderBookCreated(assetPair)
-  }
 
-  private def snapshotsCommands: Receive = {
-    case SaveSnapshotSuccess(metadata) =>
-      val snapshotOffsetId = savingSnapshot.getOrElse(throw new IllegalStateException("Impossible"))
-      log.info(s"Snapshot has been saved at offset $snapshotOffsetId: $metadata")
-      owner ! OrderBookSnapshotUpdated(assetPair, snapshotOffsetId)
-      lastSavedSnapshotOffset = Some(snapshotOffsetId)
+    case OrderBookSnapshotStoreActor.Response.Updated(offset) =>
+      log.info(s"Snapshot has been saved at offset $offset")
+      lastSavedSnapshotOffset = Some(offset)
+      owner ! OrderBookSnapshotUpdateCompleted(assetPair, lastSavedSnapshotOffset)
       savingSnapshot = None
-
-    case SaveSnapshotFailure(metadata, reason) =>
-      savingSnapshot = None
-      log.error(s"Failed to save snapshot: $metadata", reason)
 
     case SaveSnapshot(globalEventNr) =>
       if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-1L) < globalEventNr) {
-        log.debug(s"About to save snapshot $orderBook")
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
       }
@@ -92,13 +113,12 @@ class OrderBookActor(owner: ActorRef,
           log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
         case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
-          lastTrade = Some(LastTrade(counter.price, x.executedAmount, x.submitted.order.orderType))
           createTransaction(submitted, counter, timestamp) match {
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
-                          |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-                          |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
+                   |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
+                   |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
           }
         case Events.OrderCanceled(order, unmatchable, _) =>
           log.info(s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)")
@@ -107,7 +127,7 @@ class OrderBookActor(owner: ActorRef,
       addressActor ! e
     }
 
-    updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
+    updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
   }
 
@@ -124,41 +144,33 @@ class OrderBookActor(owner: ActorRef,
     processEvents(orderBook.add(order, eventWithMeta.timestamp, normalizedTickSize))
   }
 
-  override def receiveCommand: Receive = fullCommands
-
-  override def receiveRecover: Receive = {
-    case RecoveryCompleted =>
-      lastProcessedOffset match {
-        case None    => log.debug("Recovery completed")
-        case Some(x) => log.debug(s"Recovery completed at $x: $orderBook")
-      }
-
-      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
-      updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
-      updateSnapshot(orderBook.aggregatedSnapshot)
-      owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
-
-    case SnapshotOffer(_, snapshot: Snapshot) =>
-      log.debug(s"Recovering from Snapshot(eventNr=${snapshot.eventNr})")
-      orderBook = OrderBook(snapshot.orderBook)
-      lastSavedSnapshotOffset = snapshot.eventNr
-      lastProcessedOffset = lastSavedSnapshotOffset
-  }
-
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     log.warn(s"Restarting actor because of $message", reason)
     super.preRestart(reason, message)
   }
 
   private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit = {
-    log.trace(s"Saving snapshot. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset")
-    saveSnapshot(Snapshot(Some(globalEventNr), orderBook.snapshot))
+    val saveSnapshot = (lastSavedSnapshotOffset, lastProcessedOffset).tupled.forall { case (saved, processed) => saved < processed }
+    val toSave       = if (saveSnapshot) Some(orderBook.snapshot) else None
+
+    if (saveSnapshot) {
+      log.trace(s"About to save snapshot $orderBook")
+      log.debug(
+        s"Saving both offset and snapshot. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset, current offset = $lastSavedSnapshotOffset")
+    } else {
+      log.debug(s"Saving offset only. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset, current offset = $lastSavedSnapshotOffset")
+    }
+
+    snapshotStore ! OrderBookSnapshotStoreActor.Message.Update(assetPair, globalEventNr, toSave)
   }
+
+  snapshotStore ! OrderBookSnapshotStoreActor.Message.GetSnapshot(assetPair)
 }
 
 object OrderBookActor {
   def props(parent: ActorRef,
             addressActor: ActorRef,
+            snapshotStore: ActorRef,
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
@@ -166,7 +178,7 @@ object OrderBookActor {
             createTransaction: CreateTransaction,
             time: Time,
             normalizedTickSize: Option[Long] = None): Props =
-    Props(new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, normalizedTickSize))
+    Props(new OrderBookActor(parent, addressActor, snapshotStore, assetPair, updateSnapshot, updateMarketStatus, createTransaction, time, normalizedTickSize))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -188,12 +200,13 @@ object OrderBookActor {
         "askAmount"  -> ms.bestAsk.map(_.amount)
       )
     }
+
+    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.getLastTrade, ob.bestBid, ob.bestAsk)
   }
 
-  case class LastTrade(price: Long, amount: Long, side: OrderType)
   case class Snapshot(eventNr: Option[Long], orderBook: OrderBook.Snapshot)
 
   // Internal messages
   case class OrderBookRecovered(assetPair: AssetPair, eventNr: Option[Long])
-  case class OrderBookSnapshotUpdated(assetPair: AssetPair, eventNr: Long)
+  case class OrderBookSnapshotUpdateCompleted(assetPair: AssetPair, currentOffset: Option[Long])
 }

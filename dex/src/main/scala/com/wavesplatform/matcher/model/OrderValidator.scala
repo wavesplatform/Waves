@@ -272,11 +272,6 @@ object OrderValidator {
         .ensure(MatcherError.OrderVersionIsNotAllowed(order.version, matcherSettings.allowedOrderVersions)) { o =>
           matcherSettings.allowedOrderVersions(o.version)
         }
-        .ensure(MatcherError.AssetPairIsNotAllowed(order.assetPair)) { o =>
-          matcherSettings.allowedAssetPairs.isEmpty || matcherSettings.allowedAssetPairs(o.assetPair)
-        }
-      _ <- validateBlacklistedAsset(order.assetPair.amountAsset, MatcherError.AmountAssetBlacklisted)
-      _ <- validateBlacklistedAsset(order.assetPair.priceAsset, MatcherError.PriceAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.matcherFeeAssetId, MatcherError.FeeAssetBlacklisted)
       _ <- validateOrderFee(order, matcherSettings.orderFee, rateCache)
     } yield order
