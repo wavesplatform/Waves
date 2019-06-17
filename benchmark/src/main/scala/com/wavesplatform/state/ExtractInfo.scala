@@ -53,9 +53,10 @@ object ExtractInfo extends App with ScorexLogging {
   try {
     val state = new LevelDBWriter(db, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
 
-    def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
+    def nonEmptyBlockHeights(from: Int): Iterator[Height] =
       for {
-        height     <- randomInts(from, state.height)
+        h <- randomInts(from, state.height)
+        height = Height(h.toInt)
         (block, _) <- state.blockHeaderAndSize(height)
         if block.transactionCount > 0
       } yield height

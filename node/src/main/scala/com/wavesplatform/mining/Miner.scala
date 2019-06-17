@@ -96,7 +96,7 @@ class MinerImpl(allChannels: ChannelGroup,
     }.delayExecution(delay)
   }
 
-  private def consensusData(height: Int,
+  private def consensusData(height: Height,
                             account: KeyPair,
                             lastBlock: Block,
                             refBlockBT: Long,
@@ -252,7 +252,7 @@ class MinerImpl(allChannels: ChannelGroup,
       }
   }
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Height, block: Block, account: PublicKey): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {

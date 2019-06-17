@@ -11,7 +11,7 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
@@ -67,7 +67,7 @@ object Exporter extends ScorexLogging {
       Try(new FileOutputStream(filename))
 
     def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
-      val maybeBlockBytes = blockchain.blockBytes(height)
+      val maybeBlockBytes = blockchain.blockBytes(Height @@ height)
       maybeBlockBytes
         .map { oldBytes =>
           val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
@@ -82,7 +82,7 @@ object Exporter extends ScorexLogging {
     }
 
     def exportBlockToJson(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
-      val maybeBlock = blockchain.blockAt(height)
+      val maybeBlock = blockchain.blockAt(Height @@ height)
       maybeBlock
         .map { block =>
           val len = if (height != 2) {

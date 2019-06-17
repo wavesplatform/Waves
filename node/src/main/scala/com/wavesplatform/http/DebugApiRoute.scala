@@ -21,7 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, TransactionId}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -165,7 +165,7 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
     ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
-    complete(ng.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    complete(ng.wavesDistribution(Height @@ height).map(_.map { case (a, b) => a.stringRepr -> b }))
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit ec: ExecutionContext): Future[ToResponseMarshallable] = {
@@ -200,7 +200,7 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes) & extractExecutionContext) { implicit ec =>
     json[RollbackParams] { params =>
-      ng.blockAt(params.rollbackTo) match {
+      ng.blockAt(Height @@ params.rollbackTo) match {
         case Some(block) =>
           rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
         case None =>
@@ -218,7 +218,7 @@ case class DebugApiRoute(ws: WavesSettings,
   def info: Route = (path("info") & get & withAuth) {
     complete(
       Json.obj(
-        "stateHeight"                      -> ng.height,
+        "stateHeight" -> (ng.height: Int),
         "extensionLoaderState"             -> extLoaderStateReporter().toString,
         "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
         "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),

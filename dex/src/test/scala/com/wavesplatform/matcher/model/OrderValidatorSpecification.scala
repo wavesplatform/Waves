@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Proofs}
-import com.wavesplatform.utils.randomBytes
+import com.wavesplatform.utils.{HeightImplicitConv, randomBytes}
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -40,7 +40,8 @@ class OrderValidatorSpecification
     with BeforeAndAfterAll
     with PathMockFactory
     with PropertyChecks
-    with NoShrink {
+      with NoShrink
+      with HeightImplicitConv {
 
   private val wbtc               = mkAssetId("WBTC")
   private val pairWavesBtc       = AssetPair(Waves, wbtc)

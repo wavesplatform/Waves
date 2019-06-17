@@ -10,7 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.{BlockchainSettings, SynchronizationSettings}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{BaseTargetReachedMaximum, ScorexLogging, forceStopApplication}
 
@@ -20,12 +20,12 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
   import PoSCalculator._
 
-  protected def pos(height: Int): PoSCalculator =
+  protected def pos(height: Height): PoSCalculator =
     if (fairPosActivated(height)) FairPoSCalculator
     else NxtPoSCalculator
 
   def consensusData(accountPublicKey: PublicKey,
-                    height: Int,
+                    height: Height,
                     targetBlockDelay: FiniteDuration,
                     refBlockBT: Long,
                     refBlockTS: Long,
@@ -41,7 +41,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           .toRight(GenericError("No blocks in blockchain")))
   }
 
-  def getValidBlockDelay(height: Int, accountPublicKey: PublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
+  def getValidBlockDelay(height: Height, accountPublicKey: PublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
     val pc = pos(height)
 
     getHit(height, accountPublicKey)
@@ -49,14 +49,14 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .toRight(GenericError("No blocks in blockchain"))
   }
 
-  def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
+  def validateBlockDelay(height: Height, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
     getValidBlockDelay(height, block.signerData.generator, parent.consensusData.baseTarget, effectiveBalance)
       .map(_ + parent.timestamp)
       .ensureOr(mvt => GenericError(s"Block timestamp ${block.timestamp} less than min valid timestamp $mvt"))(ts => ts <= block.timestamp)
       .map(_ => ())
   }
 
-  def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, Unit] = {
+  def validateGeneratorSignature(height: Height, block: Block): Either[ValidationError, Unit] = {
     val blockGS = block.consensusData.generationSignature.arr
     blockchain.lastBlock
       .toRight(GenericError("No blocks in blockchain"))
@@ -66,7 +66,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .map(_ => ())
   }
 
-  def checkBaseTargetLimit(baseTarget: Long, height: Int): Either[ValidationError, Unit] = {
+  def checkBaseTargetLimit(baseTarget: Long, height: Height): Either[ValidationError, Unit] = {
     def stopNode(): ValidationError = {
       log.error(
         s"Base target reached maximum value (settings: synchronization.max-base-target=${syncSettings.maxBaseTargetOpt.getOrElse(-1)}). Anti-fork protection.")
@@ -83,7 +83,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     )
   }
 
-  def validateBaseTarget(height: Int, block: Block, parent: BlockHeader, grandParent: Option[BlockHeader]): Either[ValidationError, Unit] = {
+  def validateBaseTarget(height: Height, block: Block, parent: BlockHeader, grandParent: Option[BlockHeader]): Either[ValidationError, Unit] = {
     val blockBT = block.consensusData.baseTarget
     val blockTS = block.timestamp
 
@@ -103,9 +103,9 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     )
   }
 
-  private def getHit(height: Int, accountPublicKey: PublicKey): Option[BigInt] = {
+  private def getHit(height: Height, accountPublicKey: PublicKey): Option[BigInt] = {
     val blockForHit =
-      if (fairPosActivated(height) && height > 100) blockchain.blockAt(height - 100)
+      if (fairPosActivated(height) && height > 100) blockchain.blockAt(Height(height - 100))
       else blockchain.lastBlock
 
     blockForHit.map(b => {
@@ -114,5 +114,5 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     })
   }
 
-  private def fairPosActivated(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
+  private def fairPosActivated(height: Height): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
 }

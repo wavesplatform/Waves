@@ -4,19 +4,19 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.NG
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.state.{Height, NG}
 import com.wavesplatform.transaction.BlockchainUpdater
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.ScorexLogging
 
 package object wavesplatform extends ScorexLogging {
   private def checkOrAppend(block: Block, blockchainUpdater: BlockchainUpdater with NG): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
       blockchainUpdater.processBlock(block).right.map { _ =>
-        log.info(s"Genesis block ${blockchainUpdater.blockHeaderAndSize(1).get._1} has been added to the state")
+        log.info(s"Genesis block ${blockchainUpdater.blockHeaderAndSize(Height.Genesis).get._1} has been added to the state")
       }
     } else {
-      val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeaderAndSize(1).map(_._1.signerData.signature)
+      val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeaderAndSize(Height.Genesis).map(_._1.signerData.signature)
       Either.cond(existingGenesisBlockId.fold(false)(_ == block.uniqueId),
                   (),
                   GenericError("Mismatched genesis blocks in configuration and blockchain"))

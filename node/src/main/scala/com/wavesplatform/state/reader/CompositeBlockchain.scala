@@ -82,20 +82,19 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
       }
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
+  override def transactionInfo(id: ByteStr): Option[(Height, Transaction)] =
     diff.transactions
       .get(id)
       .map(t => (t._1, t._2))
       .orElse(inner.transactionInfo(id))
 
-  override def transactionHeight(id: ByteStr): Option[Int] =
+  override def transactionHeight(id: ByteStr): Option[Height] =
     diff.transactions
       .get(id)
       .map(_._1)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
-
+  override def height: Height = Height(inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length)
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
     nftListFromDiff(inner, maybeDiff)(address, from)
@@ -209,13 +208,13 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
   }
 
   override def assetDistributionAtHeight(asset: IssuedAsset,
-                                         height: Int,
+                                         height: Height,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
     inner.assetDistributionAtHeight(asset, height, count, fromAddress)
   }
 
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = {
+  override def wavesDistribution(height: Height): Either[ValidationError, Map[Address, Long]] = {
     val innerDistribution = inner.wavesDistribution(height)
     if (height < this.height) innerDistribution
     else {
@@ -227,7 +226,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = inner.scoreOf(blockId)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(height)
+  override def blockHeaderAndSize(height: Height): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(height)
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 
@@ -235,11 +234,11 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def carryFee: Long = carry
 
-  override def blockBytes(height: Int): Option[Array[Type]] = inner.blockBytes(height)
+  override def blockBytes(height: Height): Option[Array[Type]] = inner.blockBytes(height)
 
   override def blockBytes(blockId: ByteStr): Option[Array[Type]] = inner.blockBytes(blockId)
 
-  override def heightOf(blockId: ByteStr): Option[Int] = inner.heightOf(blockId)
+  override def heightOf(blockId: ByteStr): Option[Height] = inner.heightOf(blockId)
 
   /** Returns the most recent block IDs, starting from the most recent  one */
   override def lastBlockIds(howMany: Int): Seq[ByteStr] =
@@ -254,14 +253,14 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
 
-  override def totalFee(height: Int): Option[Long] = inner.totalFee(height)
+  override def totalFee(height: Height): Option[Long] = inner.totalFee(height)
 
   /** Features related */
-  override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures
+  override def approvedFeatures: Map[Short, Height] = inner.approvedFeatures
 
-  override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
+  override def activatedFeatures: Map[Short, Height] = inner.activatedFeatures
 
-  override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
+  override def featureVotes(height: Height): Map[Short, Int] = inner.featureVotes(height)
 }
 
 object CompositeBlockchain {

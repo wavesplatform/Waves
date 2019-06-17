@@ -6,7 +6,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction._
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -137,9 +137,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
 
     (if (includeTransactions) {
-       commonApi.blockAtHeight(height).map(_.json())
+      commonApi.blockAtHeight(Height @@ height).map(_.json())
      } else {
-       commonApi.blockHeaderAtHeight(height).map { case (bh, s) => BlockHeader.json(bh, s) }
+      commonApi.blockHeaderAtHeight(Height @@ height).map { case (bh, s) => BlockHeader.json(bh, s) }
      }) match {
       case Some(json) => complete(json.addBlockFields(height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -154,7 +154,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
     ))
   def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) =>
-    seq(start, end, includeTransactions = true)
+    seq(Height @@ start, Height @@ end, includeTransactions = true)
   }
 
   @Path("/headers/seq/{from}/{to}")
@@ -165,10 +165,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
     ))
   def seqHeaderOnly: Route = (path("headers" / "seq" / IntNumber / IntNumber) & get) { (start, end) =>
-    seq(start, end, includeTransactions = false)
+    seq(Height @@ start, Height @@ end, includeTransactions = false)
   }
 
-  private def seq(start: Int, end: Int, includeTransactions: Boolean): StandardRoute = {
+  private def seq(start: Height, end: Height, includeTransactions: Boolean): StandardRoute = {
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
       val blocks = if (includeTransactions) {
         commonApi
@@ -238,10 +238,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     def addBlockFields(blockId: ByteStr): JsObject =
       json ++ blockchain
         .heightOf(blockId)
-        .map(height => Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))))
+        .map(height => Json.obj("height" -> height.toInt, "totalFee" -> blockchain.totalFee(Height @@ height).fold(JsNull: JsValue)(JsNumber(_))))
         .getOrElse(JsObject.empty)
 
     def addBlockFields(height: Int): JsObject =
-      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)))
+      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(Height @@ height).fold(JsNull: JsValue)(JsNumber(_)))
   }
 }

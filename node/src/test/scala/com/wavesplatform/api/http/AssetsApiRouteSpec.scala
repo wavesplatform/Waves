@@ -5,8 +5,9 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.utils.HeightImplicitConv
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
@@ -22,7 +23,7 @@ class AssetsApiRouteSpec
     with RestAPISettingsHelper
     with TestWallet
     with TransactionGen
-    with NoShrink {
+      with NoShrink with HeightImplicitConv {
 
   private val blockchain = stub[Blockchain]
 
@@ -41,7 +42,7 @@ class AssetsApiRouteSpec
     sponsorship = 0
   )
 
-  (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
+  (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((Height @@ 1, smartAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
   routePath(s"/details/${smartAssetTx.id().base58}") in {
     Get(routePath(s"/details/${smartAssetTx.id().base58}")) ~> route ~> check {
@@ -70,7 +71,7 @@ class AssetsApiRouteSpec
     script = sillyAssetTx.script,
     sponsorship = 0
   )
-  (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
+  (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((Height @@ 1, sillyAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
   routePath(s"/details/${sillyAssetTx.id().base58}") in {
     Get(routePath(s"/details/${sillyAssetTx.id().base58}")) ~> route ~> check {

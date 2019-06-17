@@ -28,10 +28,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   @volatile
   private var current = (loadHeight(), loadScore(), loadLastBlock())
 
-  protected def loadHeight(): Int
-  override def height: Int = current._1
+  protected def loadHeight(): Height
 
-  protected def safeRollbackHeight: Int
+  override def height: Height = current._1
+
+  protected def safeRollbackHeight: Height
 
   protected def loadScore(): BigInt
   override def score: BigInt = current._2
@@ -49,8 +50,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
   }
 
-  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+  def loadBlockHeaderAndSize(height: Height): Option[(BlockHeader, Int)]
+
+  override def blockHeaderAndSize(height: Height): Option[(BlockHeader, Int)] = {
     val c = current
     if (height == c._1) {
       c._3.map(b => (b, b.bytes().length))
@@ -69,8 +71,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
   }
 
-  def loadBlockBytes(height: Int): Option[Array[Byte]]
-  override def blockBytes(height: Int): Option[Array[Byte]] = {
+  def loadBlockBytes(height: Height): Option[Array[Byte]]
+
+  override def blockBytes(height: Height): Option[Array[Byte]] = {
     val c = current
     if (height == c._1) {
       c._3.map(_.bytes())
@@ -89,8 +92,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
   }
 
-  def loadHeightOf(blockId: ByteStr): Option[Int]
-  override def heightOf(blockId: ByteStr): Option[Int] = {
+  def loadHeightOf(blockId: ByteStr): Option[Height]
+
+  override def heightOf(blockId: ByteStr): Option[Height] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
       Some(c._1)
@@ -182,14 +186,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
 
   @volatile
-  protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
-  protected def loadApprovedFeatures(): Map[Short, Int]
-  override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
+  protected var approvedFeaturesCache: Map[Short, Height] = loadApprovedFeatures()
+
+  protected def loadApprovedFeatures(): Map[Short, Height]
+
+  override def approvedFeatures: Map[Short, Height] = approvedFeaturesCache
 
   @volatile
-  protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
-  protected def loadActivatedFeatures(): Map[Short, Int]
-  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
+  protected var activatedFeaturesCache: Map[Short, Height] = loadActivatedFeatures()
+
+  protected def loadActivatedFeatures(): Map[Short, Height]
+
+  override def activatedFeatures: Map[Short, Height] = activatedFeaturesCache
 
   //noinspection ScalaStyle
   protected def doAppend(block: Block,
@@ -292,7 +300,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
           case (_, txId) => txId
         })
 
-    current = (newHeight, current._2 + block.blockScore(), Some(block))
+    current = (Height @@ newHeight, current._2 + block.blockScore(), Some(block))
 
     doAppend(
       block,

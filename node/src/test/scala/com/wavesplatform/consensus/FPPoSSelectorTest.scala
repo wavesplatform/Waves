@@ -14,7 +14,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{HeightImplicitConv, Time}
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
@@ -224,7 +224,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 }
 
-object FPPoSSelectorTest {
+object FPPoSSelectorTest extends HeightImplicitConv {
 
   implicit class KComb[A](a: A) {
     def |<(f: A => Unit): A = {

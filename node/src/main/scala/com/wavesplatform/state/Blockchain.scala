@@ -17,19 +17,20 @@ import com.wavesplatform.utils.CloseableIterator
 trait Blockchain {
   def settings: BlockchainSettings
 
-  def height: Int
+  def height: Height
   def score: BigInt
   def scoreOf(blockId: ByteStr): Option[BigInt]
 
-  def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
+  def blockHeaderAndSize(height: Height): Option[(BlockHeader, Int)]
   def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
 
   def lastBlock: Option[Block]
   def carryFee: Long
-  def blockBytes(height: Int): Option[Array[Byte]]
+
+  def blockBytes(height: Height): Option[Array[Byte]]
   def blockBytes(blockId: ByteStr): Option[Array[Byte]]
 
-  def heightOf(blockId: ByteStr): Option[Int]
+  def heightOf(blockId: ByteStr): Option[Height]
 
   /** Returns the most recent block IDs, starting from the most recent  one */
   def lastBlockIds(howMany: Int): Seq[ByteStr]
@@ -39,17 +40,20 @@ trait Blockchain {
 
   def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader]
 
-  def totalFee(height: Int): Option[Long]
+  def totalFee(height: Height): Option[Long]
 
   /** Features related */
-  def approvedFeatures: Map[Short, Int]
-  def activatedFeatures: Map[Short, Int]
-  def featureVotes(height: Int): Map[Short, Int]
+  def approvedFeatures: Map[Short, Height]
+
+  def activatedFeatures: Map[Short, Height]
+
+  def featureVotes(height: Height): Map[Short, Int]
 
   def portfolio(a: Address): Portfolio
 
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
-  def transactionHeight(id: ByteStr): Option[Int]
+  def transactionInfo(id: ByteStr): Option[(Height, Transaction)]
+
+  def transactionHeight(id: ByteStr): Option[Height]
 
   def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction]
 
@@ -101,10 +105,11 @@ trait Blockchain {
 
   def assetDistribution(asset: IssuedAsset): AssetDistribution
   def assetDistributionAtHeight(asset: IssuedAsset,
-                                height: Int,
+                                height: Height,
                                 count: Int,
                                 fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
-  def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
+
+  def wavesDistribution(height: Height): Either[ValidationError, Map[Address, Long]]
 
   // the following methods are used exclusively by patches
   def allActiveLeases: CloseableIterator[LeaseTransaction]

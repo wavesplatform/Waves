@@ -114,16 +114,17 @@ package object state {
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
     def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
-    def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
+
+    def blockAt(height: Height): Option[Block] = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
     def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
     def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.timestamp)
 
     def lastBlocks(howMany: Int): Seq[Block] = {
-      (Math.max(1, blockchain.height - howMany + 1) to blockchain.height).flatMap(blockchain.blockAt).reverse
+      (Math.max(1, blockchain.height - howMany + 1) to blockchain.height).flatMap(h => blockchain.blockAt(Height @@ h)).reverse
     }
 
-    def genesis: Block = blockchain.blockAt(1).get
+    def genesis: Block = blockchain.blockAt(Height.Genesis).get
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
@@ -142,7 +143,7 @@ package object state {
       if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
     }
 
-    def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
+    def balance(address: Address, atHeight: Height, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
       val block       = blockchain.blockAt(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, block.uniqueId)
@@ -211,7 +212,9 @@ package object state {
     )
   }
 
-  object Height extends TaggedType[Int]
+  object Height extends TaggedType[Int] {
+    val Genesis: Height = apply(1)
+  }
   type Height = Height.Type
 
   object TxNum extends TaggedType[Short]

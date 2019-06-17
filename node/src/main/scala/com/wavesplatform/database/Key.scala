@@ -37,4 +37,16 @@ object Key {
 
   def opt[K: KeyW, V](name: String, key: K, parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
     apply[K, Option[V]](name, key, bs => Option(bs).map(parser), _.fold[Array[Byte]](Array.emptyByteArray)(encoder))
+
+  implicit class KeyExt[V](private val key: Key[V]) extends AnyVal {
+    def map[V1](implicit f: V => V1, f1: V1 => V): Key[V1] = new Key[V1] {
+      override def name: String = key.name
+
+      override def keyBytes: Array[Byte] = key.keyBytes
+
+      override def parse(bytes: Array[Byte]): V1 = f(key.parse(bytes))
+
+      override def encode(v: V1): Array[Byte] = key.encode(f1(v))
+    }
+  }
 }
