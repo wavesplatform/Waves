@@ -40,10 +40,11 @@ object Keys {
   def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey("waves-balance-history", 5, AddressId.toBytes(addressId))
 
   val WavesBalancePrefix: Short = 6
-  def wavesBalance(addressId: Long)(height: Int): Key[Long] =
+
+  def wavesBalance(addressId: AddressId)(height: Int): Key[Long] =
     Key("waves-balance", (WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetBalanceLastHeight(addressId: Long, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
+  def assetBalanceLastHeight(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
     Key("asset-balance-last-height",
       (8.toShort, addressId, issueTxHeight, issueTxNum),
       Option(_).fold(0)(Ints.fromByteArray),
@@ -131,7 +132,7 @@ object Keys {
     Key("alias-is-disabled", (AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_ (0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
 
   /* 44: carryFeeHistory, obsolete */
-  def carryFee(height: Int): Key[Long] = Key("carry-fee", (45.toShort, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+  def carryFee(height: Height): Key[Long] = Key("carry-fee", (45.toShort, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   val AssetScriptPrefix: Short = 47
 
@@ -140,7 +141,7 @@ object Keys {
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 
-  def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
+  def changedDataKeys(height: Height, addressId: AddressId): Key[Seq[String]] =
     Key("changed-data-keys", (49.toShort, addressId, height), readStrings, writeStrings)
 
   val BlockHeaderPrefix: Short = 50
@@ -196,7 +197,8 @@ object Keys {
     )
 
   val BlockTransactionsFeePrefix: Short = 55
-  def blockTransactionsFee(height: Int): Key[Long] =
+
+  def blockTransactionsFee(height: Height): Key[Long] =
     Key(
       "block-transactions-fee",
       (BlockTransactionsFeePrefix, height),
@@ -205,6 +207,7 @@ object Keys {
     )
 
   val InvokeScriptResultPrefix: Short = 56
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
+
+  def invokeScriptResult(height: Height, txNum: TxNum): Key[InvokeScriptResult] =
     Key("invoke-script-result", (InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 }
