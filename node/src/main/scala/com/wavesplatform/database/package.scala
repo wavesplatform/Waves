@@ -397,7 +397,7 @@ package object database {
       } finally iterator.close()
     }
 
-    def iterateOverStream(): CloseableIterator[DBEntry] = {
+    def iterateOverStream(): CloseableIterator[DBEntry] = CloseableIterator.defer {
       import scala.collection.JavaConverters._
       val dbIter = db.iterator()
       CloseableIterator(
@@ -406,13 +406,38 @@ package object database {
       )
     }
 
-    def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = {
+    def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = CloseableIterator.defer {
       import scala.collection.JavaConverters._
       val dbIter = db.iterator()
       try {
         dbIter.seek(Bytes.concat(prefix, suffix))
         CloseableIterator(
           dbIter.asScala.takeWhile(_.getKey.startsWith(prefix)),
+          () => dbIter.close()
+        )
+      } catch {
+        case NonFatal(err) =>
+          dbIter.close()
+          throw new IOException("Couldn't create DB iterator", err)
+      }
+    }
+
+    def iterateOverStream(prefixes: Iterable[Array[Byte]]): CloseableIterator[DBEntry] = CloseableIterator.defer {
+      import scala.collection.JavaConverters._
+      val dbIter = db.iterator()
+
+      def createIter(prefix: ByteStr, next: Seq[ByteStr]): Iterator[DBEntry] = {
+        dbIter.seek(prefix)
+        dbIter.asScala.takeWhile(_.getKey.startsWith(prefix.arr)) ++ (next match {
+          case x +: xs => createIter(x, xs)
+          case Nil => Iterator.empty
+        })
+      }
+
+      try {
+        val sortedPrefixes = prefixes.toList.map(ByteStr(_)).sorted
+        CloseableIterator(
+          if (prefixes.isEmpty) Iterator.empty else createIter(sortedPrefixes.head, sortedPrefixes.tail),
           () => dbIter.close()
         )
       } catch {

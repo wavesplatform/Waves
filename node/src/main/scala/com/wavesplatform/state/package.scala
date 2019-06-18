@@ -221,6 +221,7 @@ package object state {
   type TxNum = TxNum.Type
 
   object AddressId extends TaggedType[Long] {
+    val Bytes = Ints.BYTES
     def toBytes(addrId: Long) = Ints.toByteArray(addrId.toInt)
     def fromBytes(bs: Array[Byte]) = apply(Integer.toUnsignedLong(Ints.fromByteArray(bs)))
 

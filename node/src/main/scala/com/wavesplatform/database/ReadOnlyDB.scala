@@ -33,6 +33,8 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 
+  def iterateOverStream(prefixes: Iterable[Array[Byte]]): CloseableIterator[DBEntry] = db.iterateOverStream(prefixes)
+
   def lastValue(prefix: Short, bytes: Array[Byte], height: Int): Option[DBEntry] = {
     val stableBytes = Bytes.concat(
       Shorts.toByteArray(prefix),
