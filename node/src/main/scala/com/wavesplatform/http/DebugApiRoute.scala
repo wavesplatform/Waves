@@ -383,11 +383,11 @@ case class DebugApiRoute(ws: WavesSettings,
           .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
         complete(resultE)
 
+      case Some((h, tx)) =>
+        complete(tx.json() ++ Json.obj("height" -> h))
+
       case None =>
         complete(StatusCodes.NotFound)
-
-      case _ =>
-        complete(StatusCodes.NotImplemented)
     }
   }
 
