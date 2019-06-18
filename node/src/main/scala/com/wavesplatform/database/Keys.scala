@@ -82,7 +82,7 @@ object Keys {
   val LeaseStatusPrefix: Short = 15
 
   def leaseStatus(leaseId: ByteStr) =
-    Key.prefix("lease-status", LeaseStatusPrefix, leaseId.arr, _ (0) == 1, active => Array[Byte](if (active) 1 else 0))
+    Key.prefix("lease-status", LeaseStatusPrefix, leaseId.arr, _ (0) == 1, (active: Boolean) => Array[Byte](if (active) 1 else 0))
 
   val FilledVolumeAndFeePrefix: Short = 17
 
@@ -134,7 +134,7 @@ object Keys {
   val AddressesForAssetPrefix: Short = 40
 
   def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum) =
-    Key.prefix("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => (), _ => Array.emptyByteArray)
+    Key.prefix("addresses-for-asset", AddressesForAssetPrefix, assetId(issueTxHeight, issueTxNum), _ => (), (_: Unit) => Array.emptyByteArray)
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =

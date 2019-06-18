@@ -25,7 +25,7 @@ object Key {
   final case class KeyPrefix[V](name: String, shortPrefix: Short, bytesPrefix: Array[Byte], parseF: Array[Byte] => V, encodeF: V => Array[Byte]) {
     lazy val stableBytes: Array[Byte] = Bytes.concat(Shorts.toByteArray(shortPrefix), bytesPrefix)
 
-    def withSuffix(suffix: Array[Byte]) = new Key[V] {
+    def withSuffix(suffix: Array[Byte]): Key[V] = new Key[V] {
       override def name: String = KeyPrefix.this.name
 
       override def keyBytes: Array[Byte] = Bytes.concat(stableBytes, suffix)
@@ -35,7 +35,7 @@ object Key {
       override def encode(v: V): Array[Byte] = encodeF(v)
     }
 
-    def atHeight(height: Int) = withSuffix(Ints.toByteArray(height))
+    def atHeight(height: Int): Key[V] = withSuffix(Ints.toByteArray(height))
   }
 
   def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
@@ -55,7 +55,7 @@ object Key {
     apply[Option[V]](name, key, bs => Option(bs).map(parser), _.fold[Array[Byte]](Array.emptyByteArray)(encoder))
 
   implicit class KeyExt[V](private val key: Key[V]) extends AnyVal {
-    def optional = new Key[Option[V]] {
+    def optional: Key[Option[V]] = new Key[Option[V]] {
       override def name: String = key.name
 
       override def keyBytes: Array[Byte] = key.keyBytes

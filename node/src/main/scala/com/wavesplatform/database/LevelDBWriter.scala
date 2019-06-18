@@ -238,7 +238,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         val sponsorship = db.lastValue(Keys.sponsorship(h, n), this.height)
           .fold(0L)(_.minFee)
 
-        val script = db.lastValue(Keys.assetScript(h, n), this.height).flatten
+        val script = db.lastValue(Keys.assetScript(h, n), this.height)
         val description = AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship)
         (description, (h, n))
     }
@@ -366,7 +366,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       rw.put(Keys.assetBalance(addressId, h, n).atHeight(height), balance)
       rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
       deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, KeyHelpers.assetId(h, n))(Keys.assetBalance(_, h, n).atHeight)
-      rw.put(Keys.addressesForAsset(h, n).withSuffix(AddressId.toBytes(addressId)), addressId)
+      rw.put(Keys.addressesForAsset(h, n).withSuffix(AddressId.toBytes(addressId)), ())
     }
 
     rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
@@ -387,12 +387,12 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     for ((addressId, script) <- scripts) {
-      rw.put(Keys.addressScript(addressId).atHeight(height), script)
+      rw.put(Keys.addressScript(addressId).atHeight(height).optional, script)
       // deleteOldKeysForAddress(Keys.AddressScriptPrefix, addressId)(Keys.addressScript)
     }
 
     for ((asset, script) <- assetScripts; (h, n) <- getHNForAsset(asset)) {
-      rw.put(Keys.assetScript(h, n)(height), script)
+      rw.put(Keys.assetScript(h, n).atHeight(height).optional, script)
       // deleteOldKeys(Keys.AssetScriptPrefix, asset.id)(Keys.assetScript(h, n))
     }
 
@@ -403,7 +403,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           (key, value) <- addressData.data
           keyPrefix = Keys.data(addressId, key)
           isNew = rw.lastEntry(keyPrefix, this.height).isEmpty
-          _ = rw.put(keyPrefix.atHeight(height), Some(value))
+          _ = rw.put(keyPrefix.atHeight(height), value)
           // _             = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
           if isNew
         } yield key
@@ -457,7 +457,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     for ((asset, sp: SponsorshipValue) <- sponsorship; (h, n) <- getHNForAsset(asset)) {
-      rw.put(Keys.sponsorship(h, n)(height), sp)
+      rw.put(Keys.sponsorship(h, n).atHeight(height), sp)
     }
 
     rw.put(Keys.carryFee(height), carry)
@@ -534,7 +534,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               rw.get(Keys.transactionHNById(TransactionId @@ assetId.id))
                 .foreach {
                   case (txH, txN) =>
-                    rw.delete(Keys.assetBalance(addressId, txH, txN)(currentHeight))
+                    rw.delete(Keys.assetBalance(addressId, txH, txN).atHeight(currentHeight))
                     resetLastForAddress(Keys.assetBalanceLastHeight(addressId, txH, txN), Keys.assetBalance(addressId, txH, txN))
                 }
             }
@@ -600,14 +600,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                   val address = tx.sender.toAddress
                   scriptsToDiscard += address
                   for (addressId <- addressId(address)) {
-                    rw.delete(Keys.addressScript(addressId)(currentHeight))
+                    rw.delete(Keys.addressScript(addressId).atHeight(currentHeight))
                   }
 
                 case tx: SetAssetScriptTransaction =>
                   val asset = tx.asset
                   assetScriptsToDiscard += asset
                   for ((h, n) <- rw.get(Keys.transactionHNById(TransactionId @@ asset.id)))
-                    rw.delete(Keys.assetScript(h, n)(currentHeight))
+                    rw.delete(Keys.assetScript(h, n).atHeight(currentHeight))
 
                 case _: DataTransaction => // see changed data keys removal
 
@@ -661,7 +661,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
     for ((h, n) <- rw.get(Keys.transactionHNById(TransactionId @@ asset.id)))
-      rw.delete(Keys.assetInfo(h, n)(currentHeight))
+      rw.delete(Keys.assetInfo(h, n).atHeight(currentHeight))
     asset
   }
 
@@ -676,7 +676,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
     for ((h, n) <- rw.get(Keys.transactionHNById(TransactionId @@ asset.id)))
-      rw.delete(Keys.sponsorship(h, n)(currentHeight))
+      rw.delete(Keys.sponsorship(h, n).atHeight(currentHeight))
     asset
   }
 
