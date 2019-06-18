@@ -195,8 +195,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .mapTask(scala.Function.tupled(processBlock))
 
     Observable.merge(microBlockSink, blockSink).subscribe()
+
+    lastBlockInfo
+      .map(_.height)
+      .distinctUntilChanged
+      .whileBusyDropEvents
+      .doOnNextTask(_ => utxStorage.cleanupTask)
+      .subscribe()
+
     miner.scheduleMining()
-    utxStorage.cleanup.runCleanupOn(blockSink)
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
@@ -394,12 +401,12 @@ object Application {
     System.setProperty("org.aspectj.tracing.factory", "default")
 
     args.headOption.getOrElse("") match {
-      case "export" => Exporter.main(args.tail)
-      case "import" => Importer.main(args.tail)
-      case "explore" => Explorer.main(args.tail)
-      case "util" => UtilApp.main(args.tail)
+      case "export"                 => Exporter.main(args.tail)
+      case "import"                 => Importer.main(args.tail)
+      case "explore"                => Explorer.main(args.tail)
+      case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _ => startNode(args.headOption)
+      case _                        => startNode(args.headOption)
     }
   }
 
