@@ -65,7 +65,7 @@ object MatcherContext {
       DATA_BOOLEAN_FROM_STATE -> "getBoolean",
       DATA_BYTES_FROM_STATE   -> "getBinary",
       DATA_STRING_FROM_STATE  -> "getString",
-      GETTRANSACTIONBYID      -> "txById",
+      GETTRANSACTIONBYID      -> "transactionById",
       ADDRESSFROMRECIPIENT    -> "addressFromRecipient",
       ACCOUNTASSETBALANCE     -> "assetBalance",
       GETASSETINFOBYID        -> "assetInfo",
@@ -79,8 +79,6 @@ object MatcherContext {
       "getBooleanValue",
       "getBinaryValue",
       "getStringValue",
-      "addressFromPublicKey",
-      "addressFromString",
       "wavesBalance"
     ).map(inaccessibleUserFunction)
 
