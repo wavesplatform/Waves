@@ -33,7 +33,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     blockchain
       .transactionInfo(ByteStr(id))
       .map(_._2)
-      .map(RealTransactionWrapper(_))
+      .map(tx => RealTransactionWrapper(tx, Some(id)))
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
@@ -96,14 +96,14 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
       ScriptAssetInfo(
-        id         = id,
-        quantity   = assetDesc.totalVolume.toLong,
-        decimals   = assetDesc.decimals,
-        issuer     = Address(assetDesc.issuer.toAddress.bytes),
-        issuerPk   = assetDesc.issuer,
+        id = id,
+        quantity = assetDesc.totalVolume.toLong,
+        decimals = assetDesc.decimals,
+        issuer = Address(assetDesc.issuer.toAddress.bytes),
+        issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
-        scripted   = assetDesc.script.nonEmpty,
-        sponsored  = assetDesc.sponsorship != 0
+        scripted = assetDesc.script.nonEmpty,
+        sponsored = assetDesc.sponsorship != 0
       )
     }
   }
