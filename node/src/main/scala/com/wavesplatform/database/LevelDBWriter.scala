@@ -370,7 +370,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
           .toStream
         heights
-          .zip(heights.tail)
+          .zip(heights.drop(1))
           .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
           .foreach { case (h, _) => rw.delete(getKey(aid, bs, h)) }
       }
