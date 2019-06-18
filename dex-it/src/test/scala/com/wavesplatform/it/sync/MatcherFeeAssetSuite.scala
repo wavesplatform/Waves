@@ -500,7 +500,6 @@ class MatcherFeeAssetSuite extends MatcherSuiteBase with NTPTime {
               assetType = percentAssetType,
               minFeePercent = minFeePercent
             ))
-          val amountAssetBase58   = aliceAsset.id.toString
           val someWavesPair       = AssetPair(aliceAsset, Waves)
           val ts                  = ntpTime.correctedTime()
           val expirationTimestamp = ts + Order.MaxLiveTime - 10000
