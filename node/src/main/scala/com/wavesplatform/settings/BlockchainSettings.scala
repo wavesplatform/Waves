@@ -2,6 +2,7 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.Height
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
@@ -32,20 +33,20 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
     s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod"
   )
 
-  def activationWindowSize(height: Int): Int =
+  def activationWindowSize(height: Height): Int =
     featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
 
-  def activationWindow(height: Int): Range =
+  def activationWindow(height: Height): Range =
     if (height < 1) Range(0, 0)
     else {
       val ws = activationWindowSize(height)
       Range.inclusive((height - 1) / ws * ws + 1, ((height - 1) / ws + 1) * ws)
     }
 
-  def blocksForFeatureActivation(height: Int): Int =
+  def blocksForFeatureActivation(height: Height): Int =
     blocksForFeatureActivation * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
 
-  def generatingBalanceDepth(height: Int): Int =
+  def generatingBalanceDepth(height: Height): Int =
     if (height >= generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
 }
 

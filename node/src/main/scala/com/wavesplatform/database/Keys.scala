@@ -9,18 +9,19 @@ import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.state._
+import com.wavesplatform.state.{Height, _}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 object Keys {
   import KeyHelpers._
 
-  val version: Key[Int]               = intKey("version", 0, default = 1)
-  val height: Key[Int]                = intKey("height", 1)
+  val version: Key[Int] = intKey("version", 0, default = 1)
+  val height: Key[Height] = intKey("height", 1).map(Height @@ _, identity)
 
   def score(height: Height): Key[BigInt] = Key("score", h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 
-  def heightOf(blockId: ByteStr): Key[Option[Height]] = Key.opt[Height]("height-of", hash(4, blockId), Height @@ Ints.fromByteArray(_), Ints.toByteArray)
+  def heightOf(blockId: ByteStr): Key[Option[Height]] =
+    Key.opt[Height]("height-of", hash(4, blockId), Height @@ Ints.fromByteArray(_), Ints.toByteArray)
 
   def parseAddressBytesHeight(bs: Array[Byte]): (Short, AddressId, Array[Byte], Height) = {
     val prefix = Shorts.fromByteArray(bs.take(2))
@@ -45,21 +46,25 @@ object Keys {
     (Height @@ bb.getInt, TxNum @@ bb.getShort)
   }
 
-  def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey("waves-balance-history", 5, AddressId.toBytes(addressId))
+  def wavesBalanceHistory(addressId: AddressId) =
+    historyKey("waves-balance-history", 5, AddressId.toBytes(addressId))
 
   val WavesBalancePrefix: Short = 6
 
   def wavesBalance(addressId: AddressId)(height: Height): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, addressId, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetBalanceLastHeight(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum): Key[Int] =
-    Key("asset-balance-last-height",
+  def assetBalanceLastHeight(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum): Key[Height] =
+    Key(
+      "asset-balance-last-height",
       bytes(8, Bytes.concat(AddressId.toBytes(addressId), heightWithNum(issueTxHeight, issueTxNum))),
-      Option(_).fold(0)(Ints.fromByteArray),
-      Ints.toByteArray)
+      Height @@ Option(_).fold(0)(Ints.fromByteArray),
+      Ints.toByteArray
+    )
 
   val AssetBalancePrefix: Short = 9
-  def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Long] = {
+
+  def assetBalance(addressId: AddressId, issueTxHeight: Height, issueTxNum: TxNum)(height: Height): Key[Long] = {
     val keyBytes =
       hBytes(
         AssetBalancePrefix,
@@ -78,29 +83,31 @@ object Keys {
 
   val AssetInfoPrefix: Short = 11
 
-  def assetInfo(issueH: Height, issueN: TxNum)(height: Int): Key[AssetInfo] =
+  def assetInfo(issueH: Height, issueN: TxNum)(height: Height): Key[AssetInfo] =
     Key("asset-info", hBytes(AssetInfoPrefix, heightWithNum(issueH, issueN), height), readAssetInfo, writeAssetInfo)
 
-  def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] =
+  def leaseBalanceHistory(addressId: AddressId) =
     historyKey("lease-balance-history", 12, AddressId.toBytes(addressId))
 
   val LeaseBalancePrefix: Short = 13
 
-  def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
+  def leaseBalance(addressId: AddressId)(height: Height): Key[LeaseBalance] =
     Key("lease-balance", hAddr(LeaseBalancePrefix, addressId, height), readLeaseBalance, writeLeaseBalance)
 
   val LeaseStatusPrefix: Short = 15
-  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
+
+  def leaseStatus(leaseId: ByteStr)(height: Height): Key[Boolean] =
     Key("lease-status", hBytes(LeaseStatusPrefix, leaseId.arr, height), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
 
   val FilledVolumeAndFeePrefix: Short = 17
-  def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
+
+  def filledVolumeAndFee(orderId: ByteStr)(height: Height): Key[VolumeAndFee] =
     Key("filled-volume-and-fee", hBytes(FilledVolumeAndFeePrefix, orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
 
   // 3, 10, 14, 16, 18, 22, 27, 33, 35, 37, 38, 41, 42, 44, 46 not used
   // 19, 20 were never used
 
-  def changedAddresses(height: Int): Key[Seq[AddressId]] =
+  def changedAddresses(height: Height): Key[Seq[AddressId]] =
     Key("changed-addresses", h(21, height), AddressId.readSeq, AddressId.writeSeq)
 
   def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] =
@@ -108,12 +115,15 @@ object Keys {
 
   val lastAddressId: Key[Option[AddressId]] = Key.opt("last-address-id", Array[Byte](0, 24), AddressId.fromBytes, AddressId.toBytes)
 
-  def addressId(address: Address): Key[Option[AddressId]] = Key.opt("address-id", bytes(25, address.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
+  def addressId(address: Address): Key[Option[AddressId]] =
+    Key.opt("address-id", bytes(25, address.bytes.arr), AddressId.fromBytes, AddressId.toBytes)
 
-  def idToAddress(id: AddressId): Key[Address] = Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
+  def idToAddress(id: AddressId): Key[Address] =
+    Key("id-to-address", bytes(26, AddressId.toBytes(id)), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   val AddressScriptPrefix: Short = 28
-  def addressScript(addressId: AddressId)(height: Int): Key[Option[Script]] =
+
+  def addressScript(addressId: AddressId)(height: Height): Key[Option[Script]] =
     Key.opt("address-script", hAddr(AddressScriptPrefix, addressId, height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
   val approvedFeatures: Key[Map[Short, Height]] = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
@@ -134,31 +144,39 @@ object Keys {
 
   val SponsorshipPrefix: Short = 36
 
-  def sponsorship(issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[SponsorshipValue] =
+  def sponsorship(issueTxHeight: Height, issueTxNum: TxNum)(height: Height): Key[SponsorshipValue] =
     Key("sponsorship", hBytes(SponsorshipPrefix, heightWithNum(issueTxHeight, issueTxNum), height), readSponsorship, writeSponsorship)
 
-  def addressesForWaves(seqNr: Int): Key[Seq[AddressId]] = Key("addresses-for-waves", h(38, seqNr), AddressId.readSeq, AddressId.writeSeq)
+  def addressesForWaves(seqNr: Int): Key[Seq[AddressId]] = Key("addresses-for-waves", number(38, seqNr), AddressId.readSeq, AddressId.writeSeq)
 
   val AddressesForAssetPrefix: Short = 40
 
   def addressesForAsset(issueTxHeight: Height, issueTxNum: TxNum, addressId: AddressId): Key[AddressId] =
-    Key("addresses-for-asset", bytes(AddressesForAssetPrefix, Bytes.concat(heightWithNum(issueTxHeight, issueTxNum), AddressId.toBytes(addressId))), _ => addressId, _ => Array.emptyByteArray)
+    Key(
+      "addresses-for-asset",
+      bytes(AddressesForAssetPrefix, Bytes.concat(heightWithNum(issueTxHeight, issueTxNum), AddressId.toBytes(addressId))),
+      _ => addressId,
+      _ => Array.emptyByteArray
+    )
 
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
     Key("alias-is-disabled", bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
 
   /* 44: carryFeeHistory, obsolete */
-  def carryFee(height: Int): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+  def carryFee(height: Height): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   val AssetScriptPrefix: Short = 47
 
-  def assetScript(issueTxHeight: Height, issueTxNum: TxNum)(height: Int): Key[Option[Script]] =
-    Key.opt("asset-script", hBytes(AssetScriptPrefix, heightWithNum(issueTxHeight, issueTxNum), height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
+  def assetScript(issueTxHeight: Height, issueTxNum: TxNum)(height: Height): Key[Option[Script]] =
+    Key.opt("asset-script",
+      hBytes(AssetScriptPrefix, heightWithNum(issueTxHeight, issueTxNum), height),
+      ScriptReader.fromBytes(_).explicitGet(),
+      _.bytes().arr)
 
   val safeRollbackHeight: Key[Height] = intKey("safe-rollback-height", 48).map(Height @@ _, identity)
 
-  def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
+  def changedDataKeys(height: Height, addressId: AddressId): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, addressId, height), readStrings, writeStrings)
 
   val BlockHeaderPrefix: Short = 50
@@ -199,7 +217,7 @@ object Keys {
   def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
     Key.opt(
       "address-transaction-height-type-and-nums",
-      hBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
+      numBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
       readTransactionHNSeqAndType,
       writeTransactionHNSeqAndType
     )
@@ -214,7 +232,8 @@ object Keys {
     )
 
   val BlockTransactionsFeePrefix: Short = 55
-  def blockTransactionsFee(height: Int): Key[Long] =
+
+  def blockTransactionsFee(height: Height): Key[Long] =
     Key(
       "block-transactions-fee",
       h(BlockTransactionsFeePrefix, height),
@@ -223,6 +242,7 @@ object Keys {
     )
 
   val InvokeScriptResultPrefix: Short = 56
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
+
+  def invokeScriptResult(height: Height, txNum: TxNum): Key[InvokeScriptResult] =
     Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 }

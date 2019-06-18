@@ -45,8 +45,8 @@ object Exporter extends ScorexLogging {
             val start         = System.currentTimeMillis()
             exportedBytes += IO.writeHeader(bos, format)
             (2 to height).foreach { h =>
-              exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, blockchain, h)
-                                else IO.exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
+              exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, blockchain, Height @@ h)
+              else IO.exportBlockToBinary(bos, blockchain, Height @@ h, format == "BINARY_OLD"))
               if (h % (height / 10) == 0)
                 log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
             }
@@ -66,8 +66,8 @@ object Exporter extends ScorexLogging {
     def createOutputStream(filename: String): Try[FileOutputStream] =
       Try(new FileOutputStream(filename))
 
-    def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
-      val maybeBlockBytes = blockchain.blockBytes(Height @@ height)
+    def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Height, legacy: Boolean): Int = {
+      val maybeBlockBytes = blockchain.blockBytes(height)
       maybeBlockBytes
         .map { oldBytes =>
           val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
@@ -81,7 +81,7 @@ object Exporter extends ScorexLogging {
         .getOrElse(0)
     }
 
-    def exportBlockToJson(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
+    def exportBlockToJson(stream: OutputStream, blockchain: Blockchain, height: Height): Int = {
       val maybeBlock = blockchain.blockAt(Height @@ height)
       maybeBlock
         .map { block =>

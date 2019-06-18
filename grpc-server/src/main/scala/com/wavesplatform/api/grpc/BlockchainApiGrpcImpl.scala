@@ -15,15 +15,16 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
   override def getActivationStatus(request: ActivationStatusRequest): Future[ActivationStatusResponse] = Future {
     val functionalitySettings = blockchain.settings.functionalitySettings
 
+    val height = Height @@ request.height
     ActivationStatusResponse(
-      request.height,
-      functionalitySettings.activationWindowSize(request.height),
-      functionalitySettings.blocksForFeatureActivation(request.height),
-      functionalitySettings.activationWindow(request.height).last,
-      (blockchain.featureVotes(Height @@ request.height).keySet ++
+      height,
+      functionalitySettings.activationWindowSize(height),
+      functionalitySettings.blocksForFeatureActivation(height),
+      functionalitySettings.activationWindow(height).last,
+      (blockchain.featureVotes(height).keySet ++
         blockchain.approvedFeatures.keySet ++
         BlockchainFeatures.implemented).toSeq.sorted.map(id => {
-        val status = blockchain.featureStatus(id, request.height) match {
+        val status = blockchain.featureStatus(id, height) match {
           case BlockchainFeatureStatus.Undefined => FeatureActivationStatus.BlockchainFeatureStatus.UNDEFINED
           case BlockchainFeatureStatus.Approved  => FeatureActivationStatus.BlockchainFeatureStatus.APPROVED
           case BlockchainFeatureStatus.Activated => FeatureActivationStatus.BlockchainFeatureStatus.ACTIVATED
@@ -39,7 +40,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
             case _          => FeatureActivationStatus.NodeFeatureStatus.IMPLEMENTED
           },
           blockchain.featureActivationHeight(id).getOrElse(0),
-          if (status.isUndefined) blockchain.featureVotes(Height @@ request.height).getOrElse(id, 0) else 0
+          if (status.isUndefined) blockchain.featureVotes(height).getOrElse(id, 0) else 0
         )
       })
     )

@@ -135,7 +135,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       (assetParam, heightParam, limitParam, afterParam) =>
         val paramsEi: Either[ValidationError, DistributionParams] =
           AssetsApiRoute
-            .validateDistributionParams(blockchain, assetParam, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
+            .validateDistributionParams(blockchain, assetParam, Height @@ heightParam, limitParam, settings.distributionAddressLimit, afterParam)
 
         val resultTask = paramsEi match {
           case Left(err)     => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
@@ -333,7 +333,7 @@ object AssetsApiRoute {
 
   def validateDistributionParams(blockchain: Blockchain,
                                  assetParam: String,
-                                 heightParam: Int,
+                                 heightParam: Height,
                                  limitParam: Int,
                                  maxLimit: Int,
                                  afterParam: Option[String]): Either[ValidationError, DistributionParams] = {
@@ -357,7 +357,7 @@ object AssetsApiRoute {
     } yield assetId
   }
 
-  def validateHeight(blockchain: Blockchain, height: Int): Either[ValidationError, Int] = {
+  def validateHeight(blockchain: Blockchain, height: Height): Either[ValidationError, Int] = {
     for {
       _ <- Either
         .cond(height > 0, (), GenericError(s"Height should be greater than zero"))

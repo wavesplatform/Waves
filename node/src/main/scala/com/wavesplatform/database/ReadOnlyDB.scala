@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.primitives.{Bytes, Ints, Shorts}
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
+import com.wavesplatform.state.Height
 import com.wavesplatform.utils.CloseableIterator
 import org.iq80.leveldb.{DB, DBIterator, ReadOptions}
 
@@ -35,7 +36,7 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(prefixes: Iterable[Array[Byte]]): CloseableIterator[DBEntry] = db.iterateOverStream(prefixes)
 
-  def lastValue(prefix: Short, bytes: Array[Byte], height: Int): Option[DBEntry] = {
+  def lastValue(prefix: Short, bytes: Array[Byte], height: Height): Option[DBEntry] = {
     val stableBytes = Bytes.concat(
       Shorts.toByteArray(prefix),
       bytes

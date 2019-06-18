@@ -40,7 +40,7 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Height)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
@@ -205,7 +205,7 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def payableAndDataPart(height: Int,
+  private def payableAndDataPart(height: Height,
                                  tx: InvokeScriptTransaction,
                                  dAppAddress: Address,
                                  dataEntries: List[DataEntry[_]],

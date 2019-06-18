@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.transfer._
 import scala.util.{Right, Try}
 
 object TransferTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int, blockTime: Long)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Height, blockTime: Long)(tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender)
 
     val isSmartAsset = tx.feeAssetId match {

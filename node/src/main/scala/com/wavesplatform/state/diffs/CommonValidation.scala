@@ -99,7 +99,7 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             height: Int,
+                                             height: Height,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
     case _ =>
@@ -107,7 +107,7 @@ object CommonValidation {
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
+  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Height, tx: T): Either[ValidationError, T] = {
 
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
@@ -217,7 +217,7 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  private def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = {
+  private def feeInUnits(blockchain: Blockchain, height: Height, tx: Transaction): Either[ValidationError, Long] = {
     FeeConstants
       .get(tx.builder.typeId)
       .map { baseFee =>
@@ -241,7 +241,7 @@ object CommonValidation {
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def getMinFee(blockchain: Blockchain, height: Height, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
     type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
     def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
@@ -311,7 +311,7 @@ object CommonValidation {
       }
   }
 
-  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+  def checkFee(blockchain: Blockchain, height: Height, tx: Transaction): Either[ValidationError, Unit] = {
     if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         minAFee <- getMinFee(blockchain, height, tx)

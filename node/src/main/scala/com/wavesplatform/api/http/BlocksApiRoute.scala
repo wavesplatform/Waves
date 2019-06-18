@@ -124,7 +124,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     Array(
       new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
     ))
-  def at: Route = (path("at" / IntNumber) & get)(at(_, includeTransactions = true))
+  def at: Route = (path("at" / IntNumber) & get) (h => at(Height @@ h, includeTransactions = true))
 
   @Path("/headers/at/{height}")
   @ApiOperation(value = "Block header at height", notes = "Get block header at specified height", httpMethod = "GET")
@@ -132,16 +132,16 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     Array(
       new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
     ))
-  def atHeaderOnly: Route = (path("headers" / "at" / IntNumber) & get)(at(_, includeTransactions = false))
+  def atHeaderOnly: Route = (path("headers" / "at" / IntNumber) & get) (h => at(Height @@ h, includeTransactions = false))
 
-  private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
+  private def at(height: Height, includeTransactions: Boolean): StandardRoute = {
 
     (if (includeTransactions) {
       commonApi.blockAtHeight(Height @@ height).map(_.json())
      } else {
       commonApi.blockHeaderAtHeight(Height @@ height).map { case (bh, s) => BlockHeader.json(bh, s) }
      }) match {
-      case Some(json) => complete(json.addBlockFields(height))
+      case Some(json) => complete(json.addBlockFields(Height @@ height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
     }
   }
@@ -208,7 +208,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   @Path("/first")
   @ApiOperation(value = "Genesis block", notes = "Get genesis block", httpMethod = "GET")
   def first: Route = (path("first") & get) {
-    complete(commonApi.firstBlock().json().addBlockFields(1))
+    complete(commonApi.firstBlock().json().addBlockFields(Height.Genesis))
   }
 
   @Path("/signature/{signature}")
@@ -241,7 +241,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
         .map(height => Json.obj("height" -> height.toInt, "totalFee" -> blockchain.totalFee(Height @@ height).fold(JsNull: JsValue)(JsNumber(_))))
         .getOrElse(JsObject.empty)
 
-    def addBlockFields(height: Int): JsObject =
-      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(Height @@ height).fold(JsNull: JsValue)(JsNumber(_)))
+    def addBlockFields(height: Height): JsObject =
+      json ++ Json.obj("height" -> height.toInt, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)))
   }
 }

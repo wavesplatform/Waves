@@ -15,7 +15,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(blockchain: Blockchain, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Height)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
 
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress

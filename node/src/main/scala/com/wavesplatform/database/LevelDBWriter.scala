@@ -18,7 +18,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{TxNum, _}
+import com.wavesplatform.state.{Height, TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
@@ -50,19 +50,19 @@ object LevelDBWriter {
   }
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
-    def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+    def fromHistory[A](historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =
       for {
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
 
-    def hasInHistory(historyKey: Key[Seq[Int]], v: Int => Key[_]): Boolean =
+    def hasInHistory(historyKey: Key[Seq[Height]], v: Height => Key[_]): Boolean =
       db.get(historyKey)
         .headOption
         .exists(h => db.has(v(h)))
   }
 
   implicit class RWExt(val db: RW) extends AnyVal {
-    def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+    def fromHistory[A](historyKey: Key[Seq[Height]], valueKey: Height => Key[A]): Option[A] =
       for {
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
@@ -115,7 +115,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private[this] def getAddressScript(address: Long): Option[() => Script] = readOnly { db =>
+  private[this] def getAddressScript(address: AddressId): Option[() => Script] = readOnly { db =>
     db.lastValue(Keys.AddressScriptPrefix, AddressId.toBytes(address), this.height)
       .flatMap(e => Option(e.getValue).filter(_.nonEmpty).map(bs => () => ScriptReader.fromBytes(bs).explicitGet()))
   }
@@ -269,10 +269,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures.mapValues(Height @@ _)
   }
 
-  private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
+  private def updateHistory(rw: RW, key: Key[Seq[Height]], threshold: Height, kf: Height => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
 
-  private def updateHistory(rw: RW, history: Seq[Int], key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] = {
+  private def updateHistory(rw: RW, history: Seq[Height], key: Key[Seq[Height]], threshold: Height, kf: Height => Key[_]): Seq[Array[Byte]] = {
     val (c1, c2) = history.partition(_ > threshold)
     rw.put(key, (height +: c1) ++ c2.headOption)
     c2.drop(1).map(kf(_).keyBytes)
@@ -320,7 +320,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val lastAddressId = AddressId @@ (loadMaxAddressId() + newAddresses.size)
 
     rw.put(Keys.lastAddressId, Some(lastAddressId))
-    rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
+    rw.put(Keys.score(height), rw.get(Keys.score(height.prev)) + block.blockScore())
 
     for ((address, id) <- newAddresses) {
       rw.put(Keys.addressId(address), Some(id))
@@ -329,8 +329,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
-    val threshold = height - dbSettings.maxRollbackDepth
-    val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
+    val threshold = height.offset(-dbSettings.maxRollbackDepth)
+    val balanceThreshold = height.offset(-balanceSnapshotMaxRollbackDepth)
 
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
@@ -541,13 +541,13 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             val address   = rw.get(Keys.idToAddress(addressId))
             balancesToInvalidate += (address -> Waves)
 
-            def resetLastForAddress(lastHeightKey: Key[Int], prefix: Short, prefixBytes: Array[Byte]): Unit = {
+            def resetLastForAddress(lastHeightKey: Key[Height], prefix: Short, prefixBytes: Array[Byte]): Unit = {
               val prefixBs = KeyHelpers.bytes(prefix, Bytes.concat(AddressId.toBytes(addressId), prefixBytes))
               val prevHeight = rw
                 .iterateOverStream(prefixBs)
                 .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
                 .takeWhile(_ < currentHeight)
-                .closeAfter(_.fold(0)((_, r) => r))
+                .closeAfter(_.fold(Height.Zero)((_, r) => r))
 
               if (prevHeight == 0) rw.delete(lastHeightKey) else rw.put(lastHeightKey, prevHeight)
             }
@@ -682,22 +682,22 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
   }
 
-  private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
+  private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Height): IssuedAsset = {
     for ((h, n) <- rw.get(Keys.transactionHNById(TransactionId @@ asset.id)))
       rw.delete(Keys.assetInfo(h, n)(currentHeight))
     asset
   }
 
-  private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): ByteStr = {
+  private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Height): ByteStr = {
     rw.delete(Keys.filledVolumeAndFee(orderId)(currentHeight))
     orderId
   }
 
-  private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
+  private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Height): Unit = {
     rw.delete(Keys.leaseStatus(leaseId)(currentHeight))
   }
 
-  private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
+  private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Height): IssuedAsset = {
     for ((h, n) <- rw.get(Keys.transactionHNById(TransactionId @@ asset.id)))
       rw.delete(Keys.sponsorship(h, n)(currentHeight))
     asset
@@ -823,15 +823,15 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     .build[(Int, BigInt), LeaseBalance]()
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
-    db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
+    db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(Height.Genesis, 0, 0, 0))) { addressId =>
       val toHeigth = this.heightOf(to).getOrElse(this.height)
       val wbh = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
       val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
       for {
         (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
-      } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
+        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(Height @@ wh)))
+        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(Height @@ lh)))
+      } yield BalanceSnapshot(Height @@ wh.max(lh), wb, lb.in, lb.out)
     }
   }
 

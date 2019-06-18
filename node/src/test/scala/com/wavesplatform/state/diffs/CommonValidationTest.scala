@@ -15,12 +15,13 @@ import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactio
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.utils.HeightImplicitConv
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
+class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink with HeightImplicitConv {
 
   property("disallows double spending") {
     val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransactionV1)] = for {

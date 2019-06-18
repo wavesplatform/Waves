@@ -8,20 +8,20 @@ import com.wavesplatform.state.{Blockchain, Height}
 import monix.reactive.Observable
 
 private[api] class CommonBlocksApi(blockchain: Blockchain) {
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
+  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Height)] = {
     def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
 
     Observable
       .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
       .map(height => (blockchain.blockAt(Height @@ height), height))
-      .collect { case (Some(block), height) => (block, height) }
+      .collect { case (Some(block), height) => (block, Height @@ height) }
   }
 
-  def childBlock(blockId: BlockId): Option[(VanillaBlock, Int)] = {
+  def childBlock(blockId: BlockId): Option[(VanillaBlock, Height)] = {
     for {
       height     <- blockchain.heightOf(blockId)
       childBlock <- blockchain.blockAt(Height(height + 1))
-    } yield (childBlock, height + 1)
+    } yield (childBlock, Height(height + 1))
   }
 
   def calcBlocksDelay(blockId: BlockId, blockNum: Int): Either[ApiError, Long] = {
@@ -49,10 +49,11 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.blockHeaderAndSize(height)
   }
 
-  def blockHeadersRange(fromHeight: Height, toHeight: Height): Observable[(BlockHeader, Int, Int)] = {
+  def blockHeadersRange(fromHeight: Height, toHeight: Height): Observable[(BlockHeader, Int, Height)] = {
     Observable
       .fromIterable(fromHeight to toHeight)
-      .map(height => (height, blockchain.blockHeaderAndSize(Height @@ height)))
+      .map(Height @@ _)
+      .map(height => (height, blockchain.blockHeaderAndSize(height)))
       .collect { case (height, Some((header, size))) => (header, size, height) }
   }
 

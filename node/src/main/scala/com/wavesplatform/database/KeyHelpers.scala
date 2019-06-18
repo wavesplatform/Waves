@@ -4,15 +4,21 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{AddressId, TxNum}
+import com.wavesplatform.state.{AddressId, Height, TxNum}
 
 //noinspection ScalaStyle,TypeAnnotation
 object KeyHelpers {
-  def h(prefix: Short, height: Int) =
+  def h(prefix: Short, height: Height) =
     ByteBuffer.allocate(6).putShort(prefix).putInt(height).array()
 
-  def hBytes(prefix: Short, bytes: Array[Byte], height: Int) =
+  def number(prefix: Short, num: Int) =
+    ByteBuffer.allocate(6).putShort(prefix).putInt(num).array()
+
+  def hBytes(prefix: Short, bytes: Array[Byte], height: Height) =
     ByteBuffer.allocate(6 + bytes.length).putShort(prefix).put(bytes).putInt(height).array()
+
+  def numBytes(prefix: Short, bytes: Array[Byte], num: Int) =
+    ByteBuffer.allocate(6 + bytes.length).putShort(prefix).put(bytes).putInt(num).array()
 
   def bytes(prefix: Short, bytes: Array[Byte]) =
     ByteBuffer.allocate(2 + bytes.length).putShort(prefix).put(bytes).array()
@@ -21,11 +27,12 @@ object KeyHelpers {
 
   def hash(prefix: Short, hashBytes: ByteStr) = bytes(prefix, hashBytes.arr)
 
-  def hAddr(prefix: Short, addressId: Long, height: Int) = hBytes(prefix, AddressId.toBytes(addressId), height)
+  def hAddr(prefix: Short, addressId: Long, height: Height) = hBytes(prefix, AddressId.toBytes(addressId), height)
 
-  def hNum(prefix: Short, height: Int, num: TxNum) = Bytes.concat(Shorts.toByteArray(prefix), Ints.toByteArray(height), Shorts.toByteArray(num))
+  def hNum(prefix: Short, height: Height, num: TxNum) = Bytes.concat(Shorts.toByteArray(prefix), Ints.toByteArray(height), Shorts.toByteArray(num))
 
-  def historyKey(name: String, prefix: Short, b: Array[Byte]) = Key(name, bytes(prefix, b), readIntSeq, writeIntSeq)
+  def historyKey(name: String, prefix: Short, b: Array[Byte]) =
+    Key(name, bytes(prefix, b), readIntSeq, writeIntSeq).map(_.asInstanceOf[Seq[Height]], (_: Seq[Height]).asInstanceOf[Seq[Int]])
 
   def intKey(name: String, prefix: Short, default: Int = 0): Key[Int] =
     Key(name, Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)

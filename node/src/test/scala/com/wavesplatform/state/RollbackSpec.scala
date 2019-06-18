@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
@@ -8,6 +8,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features._
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -16,15 +17,15 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.utils.HeightImplicitConv
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
+class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink with HeightImplicitConv {
   private val time   = new TestTime
   private def nextTs = time.getTimestamp()
 

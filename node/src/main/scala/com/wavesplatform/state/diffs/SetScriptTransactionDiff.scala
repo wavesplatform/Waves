@@ -1,13 +1,13 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Height, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 import scala.util.Right
 
 object SetScriptTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Height)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
     val scriptOpt = tx.script
     Right(
       Diff(

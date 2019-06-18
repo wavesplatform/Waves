@@ -164,7 +164,7 @@ object Diff {
       scriptsComplexity = 0
     )
 
-  def apply(height: Int,
+  def apply(height: Height,
             tx: Transaction,
             portfolios: Map[Address, Portfolio] = Map.empty,
             assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
@@ -179,7 +179,7 @@ object Diff {
             scriptsComplexity: Long = 0,
             scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
     Diff(
-      transactions = Map((tx.id(), (Height @@ height, tx, (portfolios.keys ++ accountData.keys).toSet))),
+      transactions = Map((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,

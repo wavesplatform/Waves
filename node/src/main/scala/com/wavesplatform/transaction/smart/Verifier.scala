@@ -15,8 +15,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
@@ -31,7 +31,7 @@ object Verifier extends ScorexLogging {
 
   type ValidationResult[T] = Either[ValidationError, T]
 
-  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
+  def apply(blockchain: Blockchain, currentBlockHeight: Height)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
     val validatedTx: TracedResult[ValidationError, Transaction] = tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
@@ -67,7 +67,7 @@ object Verifier extends ScorexLogging {
 
   def verifyTx(blockchain: Blockchain,
                script: Script,
-               height: Int,
+               height: Height,
                transaction: Transaction,
                assetIdOpt: Option[ByteStr]): TracedResult[ValidationError, Transaction] = {
 
@@ -106,7 +106,7 @@ object Verifier extends ScorexLogging {
     }
   }
 
-  def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
+  def verifyOrder(blockchain: Blockchain, script: Script, height: Height, order: Order): ValidationResult[Order] =
     Try {
       logged(
         s"order ${order.idStr()}",
@@ -125,7 +125,7 @@ object Verifier extends ScorexLogging {
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
-                     height: Int): TracedResult[ValidationError, Transaction] = {
+                     height: Height): TracedResult[ValidationError, Transaction] = {
 
     val typeId    = et.builder.typeId
     val sellOrder = et.sellOrder

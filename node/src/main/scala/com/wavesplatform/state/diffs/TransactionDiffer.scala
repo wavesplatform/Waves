@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.state._
+import com.wavesplatform.state.{Height, _}
 import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -23,7 +23,7 @@ object TransactionDiffer extends ScorexLogging {
     override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${tx.toPrettyString})"
   }
 
-  def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int, verify: Boolean = true)(
+  def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Height, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction): TracedResult[ValidationError, Diff] = {
     val func =
@@ -32,7 +32,7 @@ object TransactionDiffer extends ScorexLogging {
     func(blockchain, tx)
   }
 
-  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(
+  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Height)(
       blockchain: Blockchain,
       tx: Transaction): TracedResult[ValidationError, Diff] = {
     for {
@@ -57,12 +57,13 @@ object TransactionDiffer extends ScorexLogging {
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
-  def unverified(currentBlockTimestamp: Long, currentBlockHeight: Int)(blockchain: Blockchain,
-                                                                       tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def unverified(currentBlockTimestamp: Long, currentBlockHeight: Height)(blockchain: Blockchain,
+                                                                          tx: Transaction): TracedResult[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx match {
-        case gtx: GenesisTransaction         => GenesisTransactionDiff(currentBlockHeight)(gtx)
-        case ptx: PaymentTransaction         => PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
+        case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
+        case ptx: PaymentTransaction =>
+          PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
         case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain, currentBlockHeight)(itx)
         case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockHeight, currentBlockTimestamp)(rtx)
         case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)

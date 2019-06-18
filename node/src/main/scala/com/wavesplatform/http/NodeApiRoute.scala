@@ -4,13 +4,13 @@ import java.time.Instant
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
+import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
-import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
-import com.wavesplatform.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
@@ -48,8 +48,8 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
     val lastUpdated = blockchain.lastBlock.get.timestamp
     complete(
       Json.obj(
-        "blockchainHeight" -> blockchain.height,
-        "stateHeight"      -> blockchain.height,
+        "blockchainHeight" -> blockchain.height.toInt,
+        "stateHeight" -> blockchain.height.toInt,
         "updatedTimestamp" -> lastUpdated,
         "updatedDate"      -> Instant.ofEpochMilli(lastUpdated).toString
       ))

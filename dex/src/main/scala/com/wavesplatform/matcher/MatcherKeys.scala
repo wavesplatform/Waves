@@ -33,7 +33,8 @@ object MatcherKeys {
   // openVolumeAsset = 8
 
   def orderTxIdsSeqNr(orderId: ByteStr): Key[Int]           = bytesSeqNr("matcher-order-tx-ids-seq-nr", 9, orderId.arr)
-  def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", hBytes(10, orderId.arr, seqNr), ByteStr(_), _.arr)
+
+  def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", numBytes(10, orderId.arr, seqNr), ByteStr(_), _.arr)
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
     Key.opt("matcher-exchange-transaction", bytes(11, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())

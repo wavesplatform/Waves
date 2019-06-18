@@ -3,17 +3,19 @@ package com.wavesplatform.consensus
 import cats.data.NonEmptyList
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.state.Height
+import com.wavesplatform.utils.HeightImplicitConv
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.util.Random
 
-class FairPoSCalculatorTest extends PropSpec with Matchers {
+class FairPoSCalculatorTest extends PropSpec with Matchers with HeightImplicitConv {
 
   import PoSCalculator._
 
   val pos: PoSCalculator = FairPoSCalculator
 
-  case class Block(height: Int, baseTarget: Long, miner: KeyPair, timestamp: Long, delay: Long)
+  case class Block(height: Height, baseTarget: Long, miner: KeyPair, timestamp: Long, delay: Long)
 
   def generationSignature: Array[Byte] = {
     val arr = new Array[Byte](32)

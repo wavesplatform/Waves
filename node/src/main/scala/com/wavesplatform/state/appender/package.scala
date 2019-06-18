@@ -96,7 +96,7 @@ package object appender extends ScorexLogging {
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSSelector, currentTs: Long, block: Block)(
-      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, Unit] = {
+    genBalance: (Height, BlockId) => Either[String, Long]): Either[ValidationError, Unit] = {
 
     val blockTime = block.timestamp
 
@@ -116,7 +116,7 @@ package object appender extends ScorexLogging {
     case x               => x
   }
 
-  private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
+  private def checkExceptions(height: Height, block: Block): Either[ValidationError, Unit] = {
     Either
       .cond(
         exceptions.contains((height, block.uniqueId)),
@@ -125,7 +125,7 @@ package object appender extends ScorexLogging {
       )
   }
 
-  private def validateBlockVersion(height: Int, block: Block, fs: FunctionalitySettings): Either[ValidationError, Unit] = {
+  private def validateBlockVersion(height: Height, block: Block, fs: FunctionalitySettings): Either[ValidationError, Unit] = {
     val version3Height = fs.blockVersion3AfterHeight
     Either.cond(
       height > version3Height

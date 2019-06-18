@@ -14,7 +14,7 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
@@ -251,7 +251,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
     def validate(transaction: Transaction,
                  lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
                  currentTime: Long = time.correctedTime(),
-                 height: Int = blockchain.height): Either[ValidationError, Diff] = {
+                 height: Height = blockchain.height): Either[ValidationError, Diff] = {
       for {
         _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
         diff <- TransactionDiffer(lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE

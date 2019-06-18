@@ -11,10 +11,11 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.utils.HeightImplicitConv
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
 
-class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithDomain {
+class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithDomain with HeightImplicitConv {
 
   private val ApprovalPeriod = 100
 

@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, Height, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets._
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
-  def issue(blockchain: Blockchain, height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
+  def issue(blockchain: Blockchain, height: Height)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
     Right(
@@ -28,7 +28,7 @@ object AssetTransactionsDiff {
       ))
   }
 
-  def setAssetScript(blockchain: Blockchain, height: Int, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
+  def setAssetScript(blockchain: Blockchain, height: Height, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
         Right(
@@ -51,7 +51,7 @@ object AssetTransactionsDiff {
       }
     }
 
-  def reissue(blockchain: Blockchain, height: Int, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
+  def reissue(blockchain: Blockchain, height: Height, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.asset).get
 
@@ -84,7 +84,7 @@ object AssetTransactionsDiff {
       }
     }
 
-  def burn(blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
+  def burn(blockchain: Blockchain, height: Height)(tx: BurnTransaction): Either[ValidationError, Diff] = {
     val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, height)
 
     validateAsset(tx, blockchain, tx.asset, !burnAnyTokensEnabled).map { _ =>
@@ -99,7 +99,7 @@ object AssetTransactionsDiff {
     }
   }
 
-  def sponsor(blockchain: Blockchain, height: Int, blockTime: Long)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] = {
+  def sponsor(blockchain: Blockchain, height: Height, blockTime: Long)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] = {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       Either.cond(
         !blockchain.hasAssetScript(tx.asset),

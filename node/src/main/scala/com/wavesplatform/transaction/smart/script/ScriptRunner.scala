@@ -18,7 +18,7 @@ import monix.eval.Coeval
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
 
-  def apply(height: Int,
+  def apply(height: Height,
             in: TxOrd,
             blockchain: Blockchain,
             script: Script,

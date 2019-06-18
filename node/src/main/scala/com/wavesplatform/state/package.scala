@@ -160,7 +160,7 @@ package object state {
         .addressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None)
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
 
-    def unsafeHeightOf(id: ByteStr): Int =
+    def unsafeHeightOf(id: ByteStr): Height =
       blockchain
         .heightOf(id)
         .getOrElse(throw new IllegalStateException(s"Can't find a block: $id"))
@@ -171,10 +171,10 @@ package object state {
       Map.empty
     )
 
-    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
+    def isMiningAllowed(height: Height, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
 
-    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
+    def isEffectiveBalanceValid(height: Height, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
 
     def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
@@ -213,7 +213,18 @@ package object state {
   }
 
   object Height extends TaggedType[Int] {
+    val Zero: Height = apply(0)
     val Genesis: Height = apply(1)
+
+    implicit class HeightExt(private val height: Height) extends AnyVal {
+      def next = Height(height + 1)
+
+      def prev = Height(height - 1)
+
+      def offset(i: Int) = Height(height + i)
+    }
+
+    implicit val HeightJsonFormat = implicitly[Format[Int]].asInstanceOf[Format[Height]]
   }
   type Height = Height.Type
 

@@ -139,7 +139,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                   s" ${if (blockchain.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
                 Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
               case lastBlockId =>
-                val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
+                val height = lastBlockId.fold(Height @@ 0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
                 BlockDiffer
                   .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -186,7 +186,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                     }
 
                     val constraint: MiningConstraint = {
-                      val height            = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
+                      val height = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(Height @@ 0)
                       val miningConstraints = MiningConstraints(blockchain, height)
                       miningConstraints.total
                     }
@@ -214,7 +214,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
         }).map {
           _ map {
             case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint), discarded) =>
-              val height = blockchain.height + 1
+              val height = Height(blockchain.height + 1)
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
