@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -109,6 +110,19 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
       r shouldBe an[Either[_, _]]
       time should be <= 1000L
     }
+  }
+
+  "incorrect base64" in {
+    def measureBase64Deser(base64: String): Unit = {
+      val (r, time) = measureTime(Script.fromBase64String(base64))
+
+      r should produce("arguments too big")
+      time should be <= 1000L
+    }
+
+    measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAA/wACCQAB9wAAAAEFAAAAAWIJAAH3AAAAAQUAAAABYi+LkdA=")
+    measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wD/AAEFAAAAAWIJAAH3AAAAAQUAAAABYtKFiCk=")
+    measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wAAAAEFAAAAAWIJAAH3AP8AAQUAAAABYpURGZc=")
   }
 
   def measureTime[A](f: => A): (A, Long) = {
