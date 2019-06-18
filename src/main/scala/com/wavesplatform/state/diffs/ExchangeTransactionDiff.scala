@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.settings.{FunctionalitySettings, TrackedAssetsSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
@@ -12,7 +13,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(blockchain: Blockchain, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, s: FunctionalitySettings, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress
@@ -87,7 +88,8 @@ object ExchangeTransactionDiff {
         orderFills = Map(
           tx.buyOrder.id()  -> VolumeAndFee(tx.amount, tx.buyMatcherFee),
           tx.sellOrder.id() -> VolumeAndFee(tx.amount, tx.sellMatcherFee)
-        )
+        ),
+        extraReserve = TrackedAssetsSettings.fromOrig(tx.sender, portfolios, s.trackedAssets)
       )
     }
   }

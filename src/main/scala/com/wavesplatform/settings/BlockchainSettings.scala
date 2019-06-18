@@ -1,7 +1,10 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.AssetId
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
@@ -23,7 +26,8 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  preActivatedFeatures: Map[Short, Int],
                                  doubleFeaturesPeriodsAfterHeight: Int,
                                  maxTransactionTimeBackOffset: FiniteDuration,
-                                 maxTransactionTimeForwardOffset: FiniteDuration) {
+                                 maxTransactionTimeForwardOffset: FiniteDuration,
+                                 trackedAssets: TrackedAssetsSettings) {
   val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
@@ -65,7 +69,8 @@ object FunctionalitySettings {
     preActivatedFeatures = Map.empty,
     doubleFeaturesPeriodsAfterHeight = 810000,
     maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes
+    maxTransactionTimeForwardOffset = 90.minutes,
+    trackedAssets = TrackedAssetsSettings.empty
   )
 
   val TESTNET = apply(
@@ -83,7 +88,8 @@ object FunctionalitySettings {
     preActivatedFeatures = Map.empty,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes
+    maxTransactionTimeForwardOffset = 90.minutes,
+    trackedAssets = TrackedAssetsSettings.empty
   )
 
   val configPath = "waves.blockchain.custom.functionality"
@@ -144,6 +150,8 @@ object BlockchainType extends Enumeration {
 }
 
 object BlockchainSettings {
+  import TrackedAssetsSettings.valueReader
+
   implicit val blockChainSettingsValueReader: ValueReader[BlockchainSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
@@ -151,12 +159,14 @@ object BlockchainSettings {
   def fromRootConfig(config: Config): BlockchainSettings = config.as[BlockchainSettings]("waves.blockchain")
 
   private[this] def fromConfig(config: Config): BlockchainSettings = {
+    def trackedAssets = config.as[TrackedAssetsSettings]("custom.functionality.tracked-assets")
+
     val blockchainType = config.as[BlockchainType.Value]("type")
     val (addressSchemeCharacter, functionalitySettings, genesisSettings) = blockchainType match {
       case BlockchainType.TESTNET =>
-        ('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET)
+        ('T', FunctionalitySettings.TESTNET.copy(trackedAssets = trackedAssets), GenesisSettings.TESTNET)
       case BlockchainType.MAINNET =>
-        ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
+        ('W', FunctionalitySettings.MAINNET.copy(trackedAssets = trackedAssets), GenesisSettings.MAINNET)
       case BlockchainType.CUSTOM =>
         val addressSchemeCharacter = config.as[String](s"custom.address-scheme-character").charAt(0)
         val functionalitySettings  = config.as[FunctionalitySettings](s"custom.functionality")
@@ -170,4 +180,28 @@ object BlockchainSettings {
       genesisSettings = genesisSettings
     )
   }
+}
+
+case class TrackedAssetsSettings(rawAllowedSources: Set[String], assets: Set[AssetId]) {
+  def allowed(source: Address): Boolean = rawAllowedSources.contains(source.stringRepr)
+}
+
+object TrackedAssetsSettings {
+  val empty = TrackedAssetsSettings(Set.empty, Set.empty)
+
+  implicit val valueReader: ValueReader[TrackedAssetsSettings] = { (rootConfig: Config, path: String) =>
+    import scala.collection.JavaConverters._
+    val config = rootConfig.getConfig(path)
+    TrackedAssetsSettings(
+      rawAllowedSources = config.getStringList("allowed-sources").asScala.toSet,
+      assets = config.getStringList("assets").asScala.map((x: String) => ByteStr.decodeBase58(x).get).toSet
+    )
+  }
+
+  def fromOrig(sender: Address, portfolios: Map[Address, Portfolio], settings: TrackedAssetsSettings): Map[Address, Portfolio] =
+    if (settings.allowed(sender)) Map.empty
+    else portfolios.map { case (address, portfolio) => address -> fromOrig(portfolio, settings) }
+
+  private def fromOrig(portfolio: Portfolio, settings: TrackedAssetsSettings): Portfolio =
+    Portfolio(0, LeaseBalance.empty, portfolio.assets.filter { case (assetId, v) => v > 0 && settings.assets.contains(assetId) })
 }

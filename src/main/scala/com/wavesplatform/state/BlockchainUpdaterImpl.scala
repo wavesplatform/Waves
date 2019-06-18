@@ -586,6 +586,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
       blockchain.balance(address, mayBeAssetId)
   }
 
+  override def extraReservedBalance(address: Address, assetId: AssetId): Long = ngState.foldLeft(blockchain.extraReservedBalance(address, assetId)) {
+    _ + _.bestLiquidDiff.extraReserve.getOrElse(address, Portfolio.empty).balanceOf(Some(assetId))
+  }
+
   override def leaseBalance(address: Address): LeaseBalance = ngState match {
     case Some(ng) =>
       cats.Monoid.combine(blockchain.leaseBalance(address), ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).lease)

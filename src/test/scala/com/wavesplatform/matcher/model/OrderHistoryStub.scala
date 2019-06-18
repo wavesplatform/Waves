@@ -24,6 +24,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
           new AddressActor(
             lo.order.sender,
             _ => 0L,
+            _ => 0L,
             5.seconds,
             time,
             new TestOrderDB(100),

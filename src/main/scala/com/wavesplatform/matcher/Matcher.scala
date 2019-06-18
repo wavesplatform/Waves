@@ -203,16 +203,19 @@ class Matcher(actorSystem: ActorSystem,
 
   private lazy val orderDb = OrderDB(matcherSettings, db)
 
-  private lazy val addressActors =
+  private lazy val addressActors = {
+    val trackedAssets = settings.blockchainSettings.functionalitySettings.trackedAssets.assets
     actorSystem.actorOf(
       Props(
         new AddressDirectory(
           spendableBalanceChanged,
           matcherSettings,
+          trackedAssets,
           (address, startSchedules) =>
             Props(new AddressActor(
               address,
               utx.spendableBalance(address, _),
+              assetId => if (trackedAssets.contains(assetId)) blockchain.extraReservedBalance(address, assetId) else 0L,
               5.seconds,
               time,
               orderDb,
@@ -223,6 +226,7 @@ class Matcher(actorSystem: ActorSystem,
         )),
       "addresses"
     )
+  }
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)

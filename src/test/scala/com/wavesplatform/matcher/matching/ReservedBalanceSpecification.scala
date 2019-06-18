@@ -85,9 +85,11 @@ class ReservedBalanceSpecification
       new AddressDirectory(
         ignoreSpendableBalanceChanged,
         matcherSettings,
+        Set.empty,
         (address, enableSchedules) =>
           Props(new AddressActor(
             address,
+            _ => 0L,
             _ => 0L,
             5.seconds,
             ntpTime,

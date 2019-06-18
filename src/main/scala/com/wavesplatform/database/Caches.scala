@@ -143,6 +143,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Option[AssetId])): Long
 
+  private val extraReservedBalancesCache: LoadingCache[(Address, AssetId), java.lang.Long] = cache(maxCacheSize * 16, loadExtraReservedBalance)
+  protected def discardExtraReservedBalance(key: (Address, AssetId)): Unit                 = extraReservedBalancesCache.invalidate(key)
+  override def extraReservedBalance(address: Address, assetId: AssetId): Long              = extraReservedBalancesCache.get(address -> assetId)
+  protected def loadExtraReservedBalance(req: (Address, AssetId)): Long
+
   private val assetDescriptionCache: LoadingCache[AssetId, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
   protected def loadAssetDescription(assetId: AssetId): Option[AssetDescription]
   protected def discardAssetDescription(assetId: AssetId): Unit             = assetDescriptionCache.invalidate(assetId)
@@ -205,7 +210,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
                          assetScripts: Map[AssetId, Option[Script]],
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
-                         sponsorship: Map[AssetId, Sponsorship]): Unit
+                         sponsorship: Map[AssetId, Sponsorship],
+                         trackedAssetBalances: Map[BigInt, Map[ByteStr, Long]]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
@@ -237,7 +243,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
     for ((address, portfolioDiff) <- diff.portfolios) {
       val aid = addressId(address)
       if (portfolioDiff.balance != 0) {
-        val wbalance = (portfolioDiff.balance + balance(address, None))
+        val wbalance = portfolioDiff.balance + balance(address, None)
         wavesBalances += aid           -> wbalance
         newBalances += (address, None) -> wbalance
       }
@@ -261,6 +267,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
       }
 
       newPortfolios += address
+    }
+
+    val extraReservedBalances    = Map.newBuilder[BigInt, Map[ByteStr, Long]]
+    val newExtraReservedBalances = Map.newBuilder[(Address, AssetId), java.lang.Long]
+
+    for ((address, portfolioDiff) <- diff.extraReserve if portfolioDiff.assets.nonEmpty) {
+      val aid = addressId(address)
+      val newAssetBalances = for ((assetId, balanceDiff) <- portfolioDiff.assets if balanceDiff != 0) yield {
+        val updatedBalance = extraReservedBalance(address, assetId) + balanceDiff
+        newExtraReservedBalances += (address, assetId) -> updatedBalance
+        assetId                                        -> updatedBalance
+      }
+      if (newAssetBalances.nonEmpty) {
+        extraReservedBalances += aid -> newAssetBalances
+      }
     }
 
     val newFills = for {
@@ -305,7 +326,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
       diff.assetScripts,
       diff.accountData.map { case (address, data) => addressId(address) -> data },
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
-      diff.sponsorship
+      diff.sponsorship,
+      extraReservedBalances.result()
     )
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
@@ -318,6 +340,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)
     forgetBlocks()
+
+    extraReservedBalancesCache.putAll(newExtraReservedBalances.result().asJava)
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]

@@ -153,4 +153,16 @@ object Keys {
       writeTransactionHN
     )
 
+  def extraReservedAssetList(addressId: BigInt): Key[Set[ByteStr]] =
+    Key("extra-reserved-asset-list", addr(300, addressId), readTxIds(_).toSet, assets => writeTxIds(assets.toSeq))
+
+  def extraReservedBalanceHistory(addressId: BigInt, assetId: ByteStr): Key[Seq[Int]] =
+    historyKey("extra-reserved-balance-history", 301, addressId.toByteArray ++ assetId.arr)
+
+  def extraReservedBalance(addressId: BigInt, assetId: ByteStr)(height: Int): Key[Long] =
+    Key("extra-reserved-balance",
+        hBytes(302, height, addressId.toByteArray ++ assetId.arr),
+        Option(_).fold(0L)(Longs.fromByteArray),
+        Longs.toByteArray)
+
 }

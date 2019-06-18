@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state._
 import com.wavesplatform.account.Address
+import com.wavesplatform.settings.{FunctionalitySettings, TrackedAssetsSettings}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
@@ -57,7 +57,7 @@ object TransferTransactionDiff {
         if (invalid)
           Left(GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
         else
-          Right(Diff(height, tx, portfolios))
+          Right(Diff(height, tx, portfolios, extraReserve = TrackedAssetsSettings.fromOrig(tx.sender, portfolios, s.trackedAssets)))
     }
   }
 }

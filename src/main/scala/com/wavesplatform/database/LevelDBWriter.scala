@@ -148,6 +148,13 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
+  protected def loadExtraReservedBalance(req: (Address, AssetId)): Long = readOnly { db =>
+    addressId(req._1).fold(0L) { addressId =>
+      val assetId = req._2
+      db.fromHistory(Keys.extraReservedBalanceHistory(addressId, assetId), Keys.extraReservedBalance(addressId, assetId)).getOrElse(0L)
+    }
+  }
+
   private def loadLeaseBalance(db: ReadOnlyDB, addressId: BigInt): LeaseBalance = {
     val lease = db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
     lease
@@ -220,7 +227,8 @@ class LevelDBWriter(writableDB: DB,
                                   assetScripts: Map[AssetId, Option[Script]],
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
-                                  sponsorship: Map[AssetId, Sponsorship]): Unit = readWrite { rw =>
+                                  sponsorship: Map[AssetId, Sponsorship],
+                                  extraReservedBalances: Map[BigInt, Map[ByteStr, Long]]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -303,6 +311,18 @@ class LevelDBWriter(writableDB: DB,
 
       rw.put(seqNrKey, nextSeqNr)
       rw.put(key, newAddressIds.toSeq)
+    }
+
+    for ((addressId, assets) <- extraReservedBalances) {
+      val prevAssets = rw.get(Keys.extraReservedAssetList(addressId))
+      rw.put(Keys.extraReservedAssetList(addressId), prevAssets ++ assets.keySet)
+      for ((assetId, balance) <- assets) {
+        rw.put(Keys.extraReservedBalance(addressId, assetId)(height), balance)
+        expiredKeys ++= updateHistory(rw,
+                                      Keys.extraReservedBalanceHistory(addressId, assetId),
+                                      threshold,
+                                      Keys.extraReservedBalance(addressId, assetId))
+      }
     }
 
     rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
@@ -422,6 +442,8 @@ class LevelDBWriter(writableDB: DB,
         val scriptsToDiscard       = Seq.newBuilder[Address]
         val assetScriptsToDiscard  = Seq.newBuilder[ByteStr]
 
+        val extraReservedToInvalidate = Seq.newBuilder[(Address, AssetId)]
+
         val h = Height(currentHeight)
 
         val discardedBlock = readWrite { rw =>
@@ -441,6 +463,12 @@ class LevelDBWriter(writableDB: DB,
               balancesToInvalidate += (address -> Some(assetId))
               rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
               rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
+            }
+
+            for (assetId <- rw.get(Keys.extraReservedAssetList(addressId))) {
+              extraReservedToInvalidate += address -> assetId
+              rw.delete(Keys.extraReservedBalance(addressId, assetId)(currentHeight))
+              rw.filterHistory(Keys.extraReservedBalanceHistory(addressId, assetId), currentHeight)
             }
 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
@@ -549,6 +577,7 @@ class LevelDBWriter(writableDB: DB,
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
+        extraReservedToInvalidate.result().foreach(discardExtraReservedBalance)
         discardedBlock
       }
 

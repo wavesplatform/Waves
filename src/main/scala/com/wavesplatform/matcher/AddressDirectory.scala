@@ -3,6 +3,7 @@ package com.wavesplatform.matcher
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.matcher.AddressActor.TrackAssets
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.utils.ScorexLogging
@@ -13,6 +14,7 @@ import scala.collection.mutable
 
 class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[AssetId])],
                        settings: MatcherSettings,
+                       trackedAssets: Set[AssetId],
                        addressActorProps: (Address, Boolean) => Props)
     extends Actor
     with ScorexLogging {
@@ -37,7 +39,9 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[Asse
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(addressActorProps(address, startSchedules), address.toString))
+    val r = watch(actorOf(addressActorProps(address, startSchedules), address.toString))
+    r ! TrackAssets(trackedAssets)
+    r
   }
 
   private def forward(address: Address, msg: Any): Unit = {

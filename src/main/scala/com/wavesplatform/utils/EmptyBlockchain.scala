@@ -84,6 +84,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = 0
 
+  override def extraReservedBalance(address: Address, assetId: AssetId): Long = 0
+
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
   override def assetDistribution(assetId: ByteStr): AssetDistribution = Monoid.empty[AssetDistribution]

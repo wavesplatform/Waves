@@ -28,6 +28,7 @@ import scala.util.{Failure, Success}
 class AddressActor(
     owner: Address,
     spendableBalance: Option[AssetId] => Long,
+    blockedBalance: AssetId => Long,
     cancelTimeout: FiniteDuration,
     time: Time,
     orderDB: OrderDB,
@@ -67,7 +68,9 @@ class AddressActor(
       openVolume += assetId -> updatedReserved
     }
 
-  private def tradableBalance(assetId: Option[AssetId]): Long = spendableBalance(assetId) - openVolume(assetId)
+  private def tradableBalance(assetId: Option[AssetId]): Long = spendableBalance(assetId) - reservedBalance(assetId)
+
+  private def reservedBalance(assetId: Option[AssetId]): Long = openVolume(assetId) + assetId.fold(0L)(blockedBalance)
 
   private val validator =
     OrderValidator.accountStateAware(owner,
@@ -188,7 +191,12 @@ class AddressActor(
     case GetTradableBalance(pair) =>
       sender() ! Set(pair.amountAsset, pair.priceAsset).map(id => id -> tradableBalance(id)).toMap
     case GetReservedBalance =>
-      sender() ! openVolume.filter(_._2 > 0).toMap
+      sender() ! openVolume.keys.map(assetId => assetId -> reservedBalance(assetId)).filter(_._2 > 0).toMap
+    case TrackAssets(xs) =>
+      val toTrack = xs -- openVolume.keySet.collect { case Some(id) => id }
+      toTrack.foreach { id =>
+        openVolume.put(Some(id), 0L)
+      }
   }
 
   private def handleExecutionEvents: Receive = {
@@ -320,6 +328,8 @@ object AddressActor {
   case class CancelOrder(orderId: ByteStr)                             extends Command
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
   case class BalanceUpdated(changedAssets: Set[Option[AssetId]])       extends Command
+
+  case class TrackAssets(assets: Set[AssetId])
 
   private case class CancelExpiredOrder(orderId: ByteStr)
 }

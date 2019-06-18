@@ -8,11 +8,13 @@ import cats.kernel.Monoid
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
+import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, GetReservedBalance, PlaceOrder, TrackAssets}
+import com.wavesplatform.matcher.api.OrderRejected
 import com.wavesplatform.matcher.db.EmptyOrderDB
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
@@ -172,20 +174,63 @@ class AddressActorSpecification
     "schedule expired order cancellation" in {
       pending
     }
+
+    "consider blocked assets in GetReservedBalance" in test { (ref, _, updatePortfolio, updateBlockedPortfolio) =>
+      val initPortfolio = sellToken1Portfolio
+      updatePortfolio(initPortfolio, false)
+
+      val blockPortfolio = initPortfolio.copy(assets = initPortfolio.assets.map {
+        case (id, amount) => id -> amount / 2
+      })
+      updateBlockedPortfolio(blockPortfolio)
+
+      val p = TestProbe()
+      p.send(ref, TrackAssets(sellToken1Portfolio.assets.keySet))
+      p.send(ref, GetReservedBalance)
+      val reservedAssets = p.expectMsgType[Map[Option[AssetId], Long]].collect {
+        case (Some(id), amount) => id -> amount
+      }
+
+      reservedAssets shouldBe blockPortfolio.assets
+    }
+
+    "consider blocked assets during placement" in test { (ref, _, updatePortfolio, updateBlockedPortfolio) =>
+      val initPortfolio = sellToken1Portfolio
+      updatePortfolio(initPortfolio, false)
+
+      val blockPortfolio = initPortfolio.copy(assets = initPortfolio.assets.map {
+        case (id, amount) => id -> amount / 2
+      })
+      updateBlockedPortfolio(blockPortfolio)
+
+      val p = TestProbe()
+      p.send(ref, PlaceOrder(sellTokenOrder1))
+      p.expectMsgType[OrderRejected]
+    }
   }
 
   /**
     * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
     */
-  private def test(f: (ActorRef, TestProbe, (Portfolio, Boolean) => Unit) => Unit): Unit = {
+  private def test(f: (ActorRef, TestProbe, (Portfolio, Boolean) => Unit) => Unit): Unit =
+    test { (ref, eventsProbe, updatePortfolio, _) =>
+      f(ref, eventsProbe, updatePortfolio)
+    }
+
+  /**
+    * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
+    */
+  private def test(f: (ActorRef, TestProbe, (Portfolio, Boolean) => Unit, Portfolio => Unit) => Unit): Unit = {
     val eventsProbe      = TestProbe()
-    val currentPortfolio = new AtomicReference[Portfolio]()
+    val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
+    val extraReserve     = new AtomicReference[Portfolio](Portfolio.empty)
     val address          = addr("test")
     val addressActor = system.actorOf(
       Props(
         new AddressActor(
           address,
           x => currentPortfolio.get().spendableBalanceOf(x),
+          x => extraReserve.get().balanceOf(Some(x)),
           1.day,
           ntpTime,
           EmptyOrderDB,
@@ -202,7 +247,8 @@ class AddressActorSpecification
       (updatedPortfolio, notify) => {
         val prevPortfolio = currentPortfolio.getAndSet(updatedPortfolio)
         if (notify) addressActor ! BalanceUpdated(prevPortfolio.changedAssetIds(updatedPortfolio))
-      }
+      },
+      updatedTrackedPortfolio => extraReserve.getAndSet(updatedTrackedPortfolio)
     )
     addressActor ! PoisonPill
   }

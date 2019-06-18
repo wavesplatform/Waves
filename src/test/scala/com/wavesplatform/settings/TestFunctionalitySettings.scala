@@ -24,7 +24,8 @@ object TestFunctionalitySettings {
     ),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes
+    maxTransactionTimeForwardOffset = 90.minutes,
+    trackedAssets = TrackedAssetsSettings.empty
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
