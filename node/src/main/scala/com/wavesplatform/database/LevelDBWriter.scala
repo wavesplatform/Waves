@@ -1065,7 +1065,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         val all = for {
           addressId <- db
             .iterateOverStream(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))
-            .map(e => AddressId.fromBytes(Keys.parseAddressBytesHeight(e.getKey)._3.drop(6)))
+            .map(e => AddressId.fromBytes(e.getKey.takeRight(AddressId.Bytes)))
         } yield addressId
 
         val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
