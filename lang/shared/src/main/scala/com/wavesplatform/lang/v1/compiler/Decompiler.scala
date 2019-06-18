@@ -37,15 +37,37 @@ object Decompiler {
         expr(pure(value), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
     }
 
+  private def extrTypes(Name: String, e: EXPR): Coeval[Option[List[String]]] = {
+    e match {
+      case FUNCTION_CALL(FunctionHeader.Native(1), List(REF(Name), CONST_STRING(typeName))) => pure(Some(List(typeName)))
+      case IF(FUNCTION_CALL(FunctionHeader.Native(1), List(REF(Name), CONST_STRING(typeName))), TRUE, t) =>
+        extrTypes(Name, t) map (_.map(tl => typeName :: tl))
+      case _ => pure(None)
+    }
+  }
+
+  object ANY_LET {
+    def unapply(e: EXPR): Option[(String, EXPR, EXPR)] = {
+      e match {
+        case LET_BLOCK(LET(name, v), body) => Some((name, v, body))
+        case BLOCK(LET(name, v), body) => Some((name, v, body))
+        case _ => None
+      }
+    }
+  }
+
   private def caseExpr(Name: String, e: EXPR, ctx: DecompilerContext): Coeval[(String, Option[EXPR])] = {
     e match {
       case IF(
-            FUNCTION_CALL(FunctionHeader.Native(1), List(REF(Name), CONST_STRING(typeName))),
-            BLOCK(
-              LET(name, REF(Name)),
-              cExpr),
-      tailExpr) => expr(pure(cExpr), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
-        ("case " ++ name ++ " :" ++ typeName ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
+            tc,
+            ANY_LET(name, REF(Name), cExpr),
+            tailExpr) => extrTypes(Name, tc) flatMap {
+        case None => expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+           ("case _ => " ++ NEWLINE ++ e, None)
+        }
+        case Some(tl) => expr(pure(cExpr), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+           ("case " ++ name ++ ": " ++ tl.mkString("|") ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
+        }
       }
       case _ => expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
         ("case _ => " ++ NEWLINE ++ e, None)
