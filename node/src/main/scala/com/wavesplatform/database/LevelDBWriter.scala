@@ -1,6 +1,7 @@
 package com.wavesplatform.database
 
 import java.nio.ByteBuffer
+import java.util
 
 import cats.Monoid
 import com.google.common.base.Charsets.UTF_8
@@ -332,23 +333,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    def deleteOldKeys(prefix: Short, bytes: Array[Byte])(key: Height => Key[_]): Unit = {
-      rw.iterateOverStream(KeyHelpers.bytes(prefix, bytes))
-        .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
-        .closeAfter { iterator =>
-          val heights = iterator.toStream
-          heights
-            .zip(heights.drop(1))
-            .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
-            .foreach { case (h, _) => rw.delete(key(h)) }
-        }
-    }
-
-    def deleteOldKeysForAddress(prefix: Short, addressId: AddressId, bytes: Array[Byte])(
-        key: AddressId => Height => Key[_]): Unit = {
-      deleteOldKeys(prefix, Bytes.concat(AddressId.toBytes(addressId), bytes))(key(addressId))
-    }
-
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
       rw.put(Keys.wavesBalance(addressId)(height), balance)
@@ -373,11 +357,34 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         .orElse(maybeHNFromState)
     }
 
+    def deleteOldKeys(prefix: Short, prefixes: Iterable[Array[Byte]])(getKey: (AddressId, Array[Byte], Height) => Key[_]): Unit = {
+      rw.iterateOverStream(prefixes.map(Bytes.concat(Shorts.toByteArray(prefix), _)))
+        .map { e =>
+          val (_, aid, bs, h) = Keys.parseAddressBytesHeight(e.getKey)
+          (aid, bs, h)
+        }
+        .closeAfter { iterator =>
+          val heights = iterator.toStream
+          heights
+            .zip(heights.drop(1))
+            .filter { case ((aid1, bs1, h1), (aid2, bs2, h2)) => aid1 == aid2 && util.Arrays.equals(bs1, bs2) }
+            .takeWhile { case ((aid1, bs1, h1), (aid2, bs2, h2)) => h1 < threshold && h2 <= threshold }
+            .foreach { case ((aid1, bs1, h1), _) => rw.delete(getKey(aid1, bs1, h1)) }
+        }
+    }
+
+    var prefixesForDelete = Seq.empty[Array[Byte]]
     for ((addressId, assets) <- assetBalances; (asset, balance) <- assets; (h, n) <- getHNForAsset(asset)) {
       rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
       rw.put(Keys.assetBalanceLastHeight(addressId, h, n), height)
-      deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
+      // deleteOldKeysForAddress(Keys.AssetBalancePrefix, addressId, Keys.heightWithNum(h, n))(Keys.assetBalance(_, h, n))
+      prefixesForDelete :+= Bytes.concat(AddressId.toBytes(addressId), Keys.heightWithNum(h, n))
       rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
+    }
+
+    deleteOldKeys(Keys.AssetBalancePrefix, prefixesForDelete) { (aid, bs, h) =>
+      val (h, n) = Keys.parseHeightNum(bs)
+      Keys.assetBalance(aid, h, n)(height)
     }
 
     rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
@@ -1086,7 +1093,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         AssetDistributionPage(result)
       }
     }
-
 
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
     Either
