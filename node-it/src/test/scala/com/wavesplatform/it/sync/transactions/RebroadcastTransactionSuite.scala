@@ -2,16 +2,14 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.Address
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.NodeConfigs._
-import com.wavesplatform.it.sync.transactions.LeaseStatusTestSuite.{minerConfig, notMinerConfig}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 
@@ -70,6 +68,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
     nodeA.signedBroadcast(tx)
     nodes.waitForHeightArise()
     nodeB.utxSize shouldBe 0
+    nodeB.ensureTxDoesntExist(txId)
 
   }
 }
