@@ -1,7 +1,6 @@
 package com.wavesplatform.database
 
 import java.nio.ByteBuffer
-import java.util
 
 import cats.Monoid
 import com.google.common.base.Charsets.UTF_8
@@ -358,19 +357,25 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     def deleteOldKeys(prefix: Short, prefixes: Iterable[Array[Byte]])(getKey: (AddressId, Array[Byte], Height) => Key[_]): Unit = {
-      rw.iterateOverStream(prefixes.map(Bytes.concat(Shorts.toByteArray(prefix), _)))
-        .map { e =>
-          val (_, aid, bs, h) = Keys.parseAddressBytesHeight(e.getKey)
-          (aid, bs, h)
-        }
-        .closeAfter { iterator =>
-          val heights = iterator.toStream
-          heights
-            .zip(heights.drop(1))
-            .filter { case ((aid1, bs1, h1), (aid2, bs2, h2)) => aid1 == aid2 && util.Arrays.equals(bs1, bs2) }
-            .takeWhile { case ((aid1, bs1, h1), (aid2, bs2, h2)) => h1 < threshold && h2 <= threshold }
-            .foreach { case ((aid1, bs1, h1), _) => rw.delete(getKey(aid1, bs1, h1)) }
-        }
+      val sortedPrefixes = prefixes.toList.map(ByteStr(_)).sorted
+      val iterator = rw.iterator
+
+      for (p <- sortedPrefixes) {
+        import scala.collection.JavaConverters._
+        val (_, aid, bs) = Keys.parseAddressBytes(p)
+
+        iterator.seek(p)
+        val heights = iterator.asScala
+          .takeWhile(_.getKey.startsWith(p.arr))
+          .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
+          .toStream
+        heights
+          .zip(heights.tail)
+          .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
+          .foreach { case (h, _) => rw.delete(getKey(aid, bs, h)) }
+      }
+
+      iterator.close()
     }
 
     var prefixesForDelete = Seq.empty[Array[Byte]]
