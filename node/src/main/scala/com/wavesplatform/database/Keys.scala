@@ -29,13 +29,6 @@ object Keys {
     (prefix, addressId, aux, height)
   }
 
-  def parseAddressBytes(bs: Array[Byte]): (Short, AddressId, Array[Byte]) = {
-    val prefix = Shorts.fromByteArray(bs.take(2))
-    val addressId = AddressId.fromBytes(bs.slice(2, 6))
-    val aux = bs.drop(6)
-    (prefix, addressId, aux)
-  }
-
   def heightWithNum(h: Int, num: Short) =
     ByteBuffer.allocate(6).putInt(h).putShort(num).array()
 

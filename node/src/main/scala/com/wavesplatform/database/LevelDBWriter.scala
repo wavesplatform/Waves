@@ -360,19 +360,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val sortedPrefixes = prefixes.toList.map(ByteStr(_)).sorted
       val iterator = rw.iterator
 
-      for (p <- sortedPrefixes) {
+      for (pBytes <- sortedPrefixes) {
         import scala.collection.JavaConverters._
-        val (_, aid, bs) = Keys.parseAddressBytes(p)
-
-        iterator.seek(p)
+        val (aid, bs) = pBytes.arr.splitAt(AddressId.Bytes)
+        iterator.seek(Bytes.concat(Shorts.toByteArray(prefix), pBytes))
         val heights = iterator.asScala
-          .takeWhile(_.getKey.startsWith(p.arr))
+          .takeWhile(_.getKey.startsWith(pBytes.arr))
           .map(e => Keys.parseAddressBytesHeight(e.getKey)._4)
           .toStream
         heights
           .zip(heights.drop(1))
           .takeWhile { case (h1, h2) => h1 < threshold && h2 <= threshold }
-          .foreach { case (h, _) => rw.delete(getKey(aid, bs, h)) }
+          .foreach { case (h, _) => rw.delete(getKey(AddressId.fromBytes(aid), bs, h)) }
       }
 
       iterator.close()
