@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, C
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.CryptoContext.{sha3256, sha3384, sha3512}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
@@ -134,7 +135,7 @@ object CryptoContext {
 
     def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                         => notImplemented("toBase16String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase16String(bytes: byte[])", xs)
     }
 
     def fromBase16StringF: BaseFunction =
@@ -156,11 +157,17 @@ object CryptoContext {
       )
 
     val v3Types = List(
+      none,
+      md5,
       sha1,
       sha224,
       sha256,
       sha384,
       sha512,
+      sha3224,
+      sha3256,
+      sha3384,
+      sha3512,
       digestAlgorithmType
     )
 
@@ -187,9 +194,9 @@ object CryptoContext {
       )
 
     version match {
-            case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
-            case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
-          }
+      case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
+      case V3      => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
+    }
   }
 
   def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext   = build(global, version).evaluationContext
