@@ -21,7 +21,7 @@ import com.wavesplatform.utils.CloseableIterator
 final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff], newBlock: Option[Block] = None, carry: Long = 0) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
-  private def diff = maybeDiff.getOrElse(Diff.empty)
+  def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
   override def portfolio(a: Address): Portfolio = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
 
