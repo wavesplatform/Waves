@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -417,9 +418,27 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
-        CaseObj(dataEntryType, Map("key" -> CONST_STRING("foo"), "value" -> CONST_LONG(1))),
-        CaseObj(dataEntryType, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
-        CaseObj(dataEntryType, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
+        CaseObj(
+          dataEntryType,
+          Map(
+            "key"   -> CONST_STRING("foo").explicitGet(),
+            "value" -> CONST_LONG(1)
+          )
+        ),
+        CaseObj(
+          dataEntryType,
+          Map(
+            "key"   -> CONST_STRING("bar").explicitGet(),
+            "value" -> CONST_STRING("2").explicitGet()
+          )
+        ),
+        CaseObj(
+          dataEntryType,
+          Map(
+            "key"   -> CONST_STRING("baz").explicitGet(),
+            "value" -> CONST_STRING("2").explicitGet()
+          )
+        )
       )))
   }
 
@@ -463,13 +482,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |func dub(s:String) = { s+s }
         |"qwe".dub()
       """.stripMargin
-    eval[EVALUATED](src) shouldBe Right(CONST_STRING("qweqwe"))
+    eval[EVALUATED](src) shouldBe CONST_STRING("qweqwe")
   }
 
   property("extract UTF8 string") {
     val src =
       """ base58'2EtvziXsJaBRS'.toUtf8String() """
-    eval[EVALUATED](src) shouldBe Right(CONST_STRING("abcdefghi"))
+    eval[EVALUATED](src) shouldBe CONST_STRING("abcdefghi")
   }
 
   property("toInt from ByteVector") {
@@ -495,10 +514,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    eval[EVALUATED](
-      src,
-      ctxt = CTX(Seq(), Map("arr" -> ((BYTESTR -> "max sized ByteVector") -> LazyVal(EitherT.pure(CONST_BYTESTR(array))))), Array())) shouldBe Right(
-      CONST_LONG(0x0101010101010101L))
+    eval[EVALUATED](src, ctxt = CTX(Seq(),
+      Map("arr" -> ((BYTESTR -> "max sized ByteVector") -> LazyVal(EitherT.fromEither(CONST_BYTESTR(array))))), Array())
+    ) shouldBe Right(CONST_LONG(0x0101010101010101L))
   }
 
   property("toInt by offset (partial)") {
@@ -583,8 +601,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val str = "a" * 32766 + "z"
     val src =
       """ str.indexOf("z", 32766) """
-    eval[EVALUATED](src, ctxt = CTX(Seq(), Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str))))), Array())) shouldBe Right(
-      CONST_LONG(32766L))
+    eval[EVALUATED](src, ctxt = CTX(Seq(),
+      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str).explicitGet())))), Array())
+    ) shouldBe Right(CONST_LONG(32766L))
   }
 
   property("indexOf (not present)") {
@@ -658,7 +677,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ str.lastIndexOf("z", 32766) """
     eval(src, ctxt = CTX(Seq(),
-      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str))))), Array())
+      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.fromEither(CONST_STRING(str))))), Array())
     ) shouldBe Right(CONST_LONG(32766L))
   }
 
@@ -714,25 +733,42 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("split") {
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("q:we"), CONST_STRING("q;we:x;q.we"))))
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
+      CONST_STRING("q:we").explicitGet(),
+      CONST_STRING("q;we:x;q.we").explicitGet()
+    )))
   }
 
   property("split separate correctly") {
     val src =
       """ "str1;str2;str3;str4".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING("str3"), CONST_STRING("str4"))))
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
+      CONST_STRING("str1").explicitGet(),
+      CONST_STRING("str2").explicitGet(),
+      CONST_STRING("str3").explicitGet(),
+      CONST_STRING("str4").explicitGet()
+    )))
   }
 
   property("split separator at the end") {
     val src =
       """ "str1;str2;".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING("str2"), CONST_STRING(""))))
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
+      CONST_STRING("str1").explicitGet(),
+      CONST_STRING("str2").explicitGet(),
+      CONST_STRING("").explicitGet()
+    )))
   }
 
   property("split double separator") {
     val src =
       """ "str1;;str2;str3".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("str1"), CONST_STRING(""), CONST_STRING("str2"), CONST_STRING("str3"))))
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
+      CONST_STRING("str1").explicitGet(),
+      CONST_STRING("").explicitGet(),
+      CONST_STRING("str2").explicitGet(),
+      CONST_STRING("str3").explicitGet()
+    )))
   }
 
   property("parseInt") {
