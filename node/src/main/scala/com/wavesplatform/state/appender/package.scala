@@ -8,6 +8,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
+import com.wavesplatform.metrics._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
@@ -16,6 +17,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
+import kamon.Kamon
 
 import scala.util.{Left, Right}
 
@@ -87,18 +89,20 @@ package object appender extends ScorexLogging {
 
   private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, verify: Boolean)(
       block: Block): Either[ValidationError, Option[Int]] =
-    blockchainUpdater.processBlock(block, verify).map { maybeDiscardedTxs =>
-      utxStorage.removeAll(block.transactionData)
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
+      metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
-        discarded.foreach(utxStorage.putIfNew(_, verify = false))
+        metrics.utxPutIfNew.measure(discarded.foreach(utxStorage.putIfNew(_, verify = false)))
         blockchainUpdater.height
       }
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSSelector, currentTs: Long, block: Block)(
-      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, Unit] = {
+      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, Unit] =
+    metrics.blockConsensusValidation
+      .measureSuccessful {
 
-    val blockTime = block.timestamp
+        val blockTime = block.timestamp
 
     for {
       height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
@@ -134,5 +138,12 @@ package object appender extends ScorexLogging {
       (),
       GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
     )
+  }
+
+  private[this] object metrics {
+    val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")
+    val appendBlock              = Kamon.timer("block-appender.blockchain-append-block")
+    val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all")
+    val utxPutIfNew              = Kamon.timer("block-appender.utx-put-if-new")
   }
 }

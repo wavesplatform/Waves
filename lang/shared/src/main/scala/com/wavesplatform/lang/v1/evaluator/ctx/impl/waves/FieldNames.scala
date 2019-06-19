@@ -6,7 +6,9 @@ object FieldNames {
   val TransferSet    = "TransferSet"
   val ScriptResult   = "ScriptResult"
   val Transfers      = "transfers"
+  val ScriptTransferSet    = "transferSet"
   val Data           = "data"
+  val ScriptWriteSet       = "writeSet"
   val DataEntry      = "DataEntry"
   val Recipient      = "recipient"
   val Amount         = "amount"
@@ -18,7 +20,7 @@ object FieldNames {
     s" or " +
     s"$TransferSet($Transfers: List[$ScriptTransfer($Recipient: Address, $Amount: Int, $Asset: ByteBector|Unit)]" +
     s" or " +
-    s"$ScriptResult($Data: $WriteSet, $Transfers: $TransferSet)"
+    s"$ScriptResult($ScriptWriteSet: $WriteSet, $ScriptTransferSet: $TransferSet)"
   lazy val Error = s"CallableFunction needs to return $ExpectedScriptResult or it super type"
 
 }

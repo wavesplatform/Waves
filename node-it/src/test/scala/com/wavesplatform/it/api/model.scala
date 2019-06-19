@@ -91,6 +91,18 @@ object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
 
+trait TxInfo {
+  def `type`: Int
+  def id: String
+  def fee: Long
+  def timestamp: Long
+  def sender: Option[String]
+  def height: Int
+  def minSponsoredAssetFee: Option[Long]
+  def recipient: Option[String]
+  def script: Option[String]
+}
+
 case class TransactionInfo(`type`: Int,
                            id: String,
                            fee: Long,
@@ -99,7 +111,7 @@ case class TransactionInfo(`type`: Int,
                            height: Int,
                            minSponsoredAssetFee: Option[Long],
                            recipient: Option[String],
-                           script: Option[String])
+                           script: Option[String]) extends TxInfo
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
@@ -134,7 +146,16 @@ object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
 }
 
-case class DebugStateChanges(stateChanges: StateChangesDetails)
+case class DebugStateChanges(`type`: Int,
+                             id: String,
+                             fee: Long,
+                             timestamp: Long,
+                             sender: Option[String],
+                             height: Int,
+                             minSponsoredAssetFee: Option[Long],
+                             recipient: Option[String],
+                             script: Option[String],
+                             stateChanges: Option[StateChangesDetails]) extends TxInfo
 object DebugStateChanges{
   implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
 }

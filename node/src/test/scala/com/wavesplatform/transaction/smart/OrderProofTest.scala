@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{V1, V2, V3}
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, Types}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.domain.{APair, Ord, OrdType, Recipient}
 import org.scalatest.{FreeSpec, Matchers}
 

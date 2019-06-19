@@ -123,6 +123,17 @@ object OrderValidator {
     }
   }
 
+  private[matcher] def checkOrderVersion(version: Byte, blockchain: Blockchain): Result[Unit] = version match {
+    case 1 => success
+    case 2 =>
+      if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)) success
+      else Left(MatcherError.OrderVersionUnsupported(version, BlockchainFeatures.SmartAccountTrading))
+    case 3 =>
+      if (blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)) success
+      else Left(MatcherError.OrderVersionUnsupported(version, BlockchainFeatures.OrderV3))
+    case _ => Left(MatcherError.UnknownOrderVersion(version))
+  }
+
   def blockchainAware(blockchain: Blockchain,
                       transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
                       matcherAddress: Address,
@@ -147,15 +158,6 @@ object OrderValidator {
       else verifyAssetScript(matcherFeeAsset)
     }
 
-    lazy val validateActivatedOrderFeatures =
-      lift(order)
-        .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.SmartAccountTrading)) {
-          _.version == 1 || blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)
-        }
-        .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.OrderV3)) {
-          _.version < 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)
-        }
-
     /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
@@ -169,7 +171,7 @@ object OrderValidator {
     }
 
     for {
-      _            <- validateActivatedOrderFeatures
+      _            <- checkOrderVersion(order.version, blockchain)
       _            <- validateOrderFeeByTransactionRequirements
       decimalsPair <- validateDecimals(blockchain, order)
       _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
@@ -266,7 +268,9 @@ object OrderValidator {
       _ <- lift(order)
         .ensure(MatcherError.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(MatcherError.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
-        .ensure(MatcherError.OrderV3IsNotAllowed)(_.version != 3 || matcherSettings.allowOrderV3)
+        .ensure(MatcherError.OrderVersionIsNotAllowed(order.version, matcherSettings.allowedOrderVersions)) { o =>
+          matcherSettings.allowedOrderVersions(o.version)
+        }
         .ensure(MatcherError.AssetPairIsNotAllowed(order.assetPair)) { o =>
           matcherSettings.allowedAssetPairs.isEmpty || matcherSettings.allowedAssetPairs(o.assetPair)
         }

@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -81,7 +82,13 @@ class Base58Perf {
       .map { i =>
         val b = new Array[Byte](64)
         Random.nextBytes(b)
-        LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTESTR(ByteStr(b)))))))
+        LET(
+          "v" + i,
+          FUNCTION_CALL(
+            PureContext.sizeString,
+            List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTESTR(ByteStr(b)).explicitGet())))
+          )
+        )
       }
       .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
@@ -95,7 +102,7 @@ class Base58Perf {
       .map { i =>
         val b = new Array[Byte](64)
         Random.nextBytes(b)
-        LET("v" + i, FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)))))))
+        LET("v" + i, FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)).explicitGet())))))
       }
       .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
@@ -122,7 +129,14 @@ class Signatures {
         LET(
           "v" + i,
           IF(
-            FUNCTION_CALL(Native(SIGVERIFY), List(CONST_BYTESTR(ByteStr(msg)), CONST_BYTESTR(ByteStr(sig)), CONST_BYTESTR(ByteStr(pk)))),
+            FUNCTION_CALL(
+              Native(SIGVERIFY),
+              List(
+                CONST_BYTESTR(ByteStr(msg)).explicitGet(),
+                CONST_BYTESTR(ByteStr(sig)).explicitGet(),
+                CONST_BYTESTR(ByteStr(pk)).explicitGet()
+              )
+            ),
             CONST_LONG(1),
             CONST_LONG(0)
           )
@@ -145,8 +159,18 @@ class Concat {
       case (e, _) => FUNCTION_CALL(func, List(e, operand))
     }
 
-  val strings: EXPR = expr(CONST_STRING("a" * (Short.MaxValue - Steps)), PureContext.sumString, CONST_STRING("a"), Steps)
+  val strings: EXPR = expr(
+    CONST_STRING("a" * (Short.MaxValue - Steps)).explicitGet(),
+    PureContext.sumString,
+    CONST_STRING("a").explicitGet(),
+    Steps
+  )
 
   val bytes: EXPR =
-    expr(CONST_BYTESTR(ByteStr.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteStr, CONST_BYTESTR(ByteStr.fromBytes(0)), Steps)
+    expr(
+      CONST_BYTESTR(ByteStr.fill(Short.MaxValue - Steps)(0)).explicitGet(),
+      PureContext.sumByteStr,
+      CONST_BYTESTR(ByteStr.fromBytes(0)).explicitGet(),
+      Steps
+    )
 }

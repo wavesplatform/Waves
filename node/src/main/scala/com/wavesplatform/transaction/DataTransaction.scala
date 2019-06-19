@@ -28,7 +28,7 @@ case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]],
         Array(builder.typeId, version),
         sender,
         Shorts.toByteArray(data.size.toShort),
-        data.flatMap(_.toBytes).toArray,
+        Bytes.concat(data.view.map(_.toBytes): _*),
         Longs.toByteArray(timestamp),
         Longs.toByteArray(fee)
       )
@@ -53,7 +53,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   override val typeId: Byte                 = 12
   override val supportedVersions: Set[Byte] = Set(1)
 
-  val MaxBytes      = 150 * 1024
+  val MaxBytes      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
   val MaxEntryCount = 100
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {

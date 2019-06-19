@@ -4,19 +4,20 @@ import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
@@ -65,6 +66,17 @@ object Verifier extends ScorexLogging {
     }
   }
 
+  private def logIfNecessary(
+                              result: Either[ValidationError, _],
+                              id:     String,
+                              eval:   (Log, Either[ExecutionError, EVALUATED])
+                            ): Unit =
+    result match {
+      case Left(_) if log.logger.isDebugEnabled => log.debug(buildLogs(id, eval))
+      case _       if log.logger.isTraceEnabled => log.trace(buildLogs(id, eval))
+      case _                                    => ()
+    }
+
   def verifyTx(blockchain: Blockchain,
                script: Script,
                transaction: Transaction,
@@ -75,15 +87,16 @@ object Verifier extends ScorexLogging {
 
     val result = Try {
       val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
-      logged(
-        s"transaction ${transaction.id()}",
-        ScriptRunner(Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, isAsset, containerAddress)
-      ) match {
+      val eval = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
+      val scriptResult = eval match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
         case (_,   Right(TRUE))     => Right(transaction)
         case (_,   Right(x))        => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
+      val logId = s"transaction ${transaction.id()}"
+      logIfNecessary(scriptResult, logId, eval)
+      scriptResult
     } match {
       case Failure(e) =>
         Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
@@ -107,15 +120,16 @@ object Verifier extends ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, order: Order): ValidationResult[Order] =
     Try {
-      logged(
-        s"order ${order.idStr()}",
-        ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
-      ) match {
+      val eval = ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
+      val scriptResult = eval match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAssetScript = false))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAssetScript = false))
         case (_, Right(TRUE))       => Right(order)
         case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
+      val logId = s"order ${order.idStr()}"
+      logIfNecessary(scriptResult, logId, eval)
+      scriptResult
     } match {
       case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", List.empty, isAssetScript = false))
       case Success(s) => s
@@ -196,14 +210,6 @@ object Verifier extends ScorexLogging {
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 
-  private def logged(
-                      id:     => String,
-                      result: (Log, Either[String, EVALUATED])
-                    ): (Log, Either[String, EVALUATED]) = {
-    if (log.logger.isDebugEnabled) log.debug(buildLogs(id, result))
-    result
-  }
-
   @VisibleForTesting
   private[smart] def buildLogs(
                                 id:     String,
@@ -213,12 +219,12 @@ object Verifier extends ScorexLogging {
     val builder = new StringBuilder(s"Script for $id evaluated to $execResult")
     execLog
       .foldLeft(builder) {
-        case (sb, (k, Right(v))) => sb.append(s"Evaluated `$k` to ")
+        case (sb, (k, Right(v))) => sb.append(s"\nEvaluated `$k` to ")
           v match {
             case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
             case a              => sb.append(a.toString)
           }
-        case (sb, (k, Left(err))) => sb.append(s"Failed to evaluate `$k`: $err")
+        case (sb, (k, Left(err))) => sb.append(s"\nFailed to evaluate `$k`: $err")
       }
       .toString
   }

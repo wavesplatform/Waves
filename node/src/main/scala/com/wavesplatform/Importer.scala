@@ -3,8 +3,8 @@ package com.wavesplatform
 import java.io._
 
 import com.google.common.primitives.Ints
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.Exporter.Formats
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -12,7 +12,6 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -31,23 +30,20 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ImportOptions()).foreach {
       case ImportOptions(configFile, blockchainFile, importHeight, format, verifyTransactions) =>
-        val config   = loadConfig(ConfigFactory.parseFile(configFile))
-        val settings = WavesSettings.fromRootConfig(config)
-        AddressScheme.current = new AddressScheme {
-          override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-        }
+        val settings = Application.loadApplicationConfig(Some(configFile))
 
         implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
-          override def putIfNew(tx: Transaction, b: Boolean)                               = ???
-          override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-          override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
-          override def pessimisticPortfolio(addr: Address): Portfolio          = ???
-          override def all                                                     = ???
-          override def size                                                    = ???
-          override def transactionById(transactionId: ByteStr)                 = ???
-          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
-          override def close(): Unit                                           = {}
+          override def putIfNew(tx: Transaction, b: Boolean)                 = ???
+          override def removeAll(txs: Traversable[Transaction]): Unit        = {}
+          override def spendableBalance(addr: Address, assetId: Asset): Long = ???
+          override def pessimisticPortfolio(addr: Address): Portfolio        = ???
+          override def all                                                   = ???
+          override def size                                                  = ???
+          override def transactionById(transactionId: ByteStr)               = ???
+          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
+                                       maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
+          override def close(): Unit                                                                                = {}
         }
 
         val time = new NTP(settings.ntpServer)
@@ -68,7 +64,7 @@ object Importer extends ScorexLogging {
             var blocksToSkip  = blockchainUpdater.height - 1
             val blocksToApply = importHeight - blockchainUpdater.height + 1
 
-            println(s"Skipping $blocksToSkip blocks(s)")
+            println(s"Skipping $blocksToSkip block(s)")
 
             while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
@@ -81,8 +77,8 @@ object Importer extends ScorexLogging {
                     blocksToSkip -= 1
                   } else {
                     val Right(block) =
-                      if (format == "BINARY_OLD") Block.parseBytes(buffer).toEither
-                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
+                      if (format == Formats.Binary) Block.parseBytes(buffer).toEither
+                      else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
@@ -107,7 +103,9 @@ object Importer extends ScorexLogging {
             inputStream.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
-          case Failure(_) => log.error(s"Failed to open file '$blockchainFile")
+
+          case Failure(error) =>
+            log.error(s"Failed to open file '$blockchainFile", error)
         }
 
         time.close()
@@ -117,7 +115,7 @@ object Importer extends ScorexLogging {
   private[this] final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
                                                blockchainFile: File = new File("blockchain"),
                                                importHeight: Int = Int.MaxValue,
-                                               format: String = "BINARY_OLD",
+                                               format: String = Formats.Binary,
                                                verify: Boolean = true)
 
   private[this] lazy val commandParser = {
@@ -133,6 +131,7 @@ object Importer extends ScorexLogging {
         .text("Config file name")
         .action((f, c) => c.copy(configFile = f)),
       opt[File]('i', "input-file")
+        .required()
         .text("Blockchain data file name")
         .action((f, c) => c.copy(blockchainFile = f)),
       opt[Int]('h', "height")
@@ -142,14 +141,15 @@ object Importer extends ScorexLogging {
       opt[String]('f', "format")
         .text("Blockchain data file format")
         .action((f, c) => c.copy(format = f))
-        .valueName("<BINARY|BINARY_OLD>")
+        .valueName(s"<${Formats.importerList.mkString("|")}> (default is ${Formats.default})")
         .validate {
-          case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
-          case f                                                        => failure(s"Unsupported format: $f")
+          case f if Formats.isSupportedInImporter(f) => success
+          case f                                     => failure(s"Unsupported format: $f")
         },
-      opt[Boolean]('n', "no-verify")
+      opt[Unit]('n', "no-verify")
         .text("Disable signatures verification")
-        .action((n, c) => c.copy(verify = !n))
+        .action((n, c) => c.copy(verify = false)),
+      help("help").hidden()
     )
   }
 }

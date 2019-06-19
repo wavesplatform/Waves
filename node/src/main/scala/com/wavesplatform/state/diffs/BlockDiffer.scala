@@ -56,7 +56,7 @@ object BlockDiffer extends ScorexLogging {
     val blockchainWithLastBlock = CompositeBlockchain.withLastBlock(blockchain, block)
 
     for {
-      _ <- TracedResult(block.signaturesValid())
+      _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
       r <- apply(
         blockchainWithLastBlock,
         constraint,
