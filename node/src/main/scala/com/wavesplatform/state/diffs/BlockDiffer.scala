@@ -162,22 +162,24 @@ object BlockDiffer extends ScorexLogging {
                 else
                   (newDiff, 0L)
 
-              Right((composite(blockchain, resultDiff), Result(Diff.empty, resultCarryFee, totalWavesFee, updatedConstraint)))
+              Right((composite(blockchain, resultDiff), Result(currDiff.combine(resultDiff), resultCarryFee, totalWavesFee, updatedConstraint)))
             }
           }
       }
       .map {
         case (blockchain, result) =>
           final case class Patch(predicate: CompositeBlockchain => Boolean, patch: CompositeBlockchain => Diff)
-          def applyAll(patches: Patch*) = patches.foldLeft(blockchain) {
-            case (blockchain, p) =>
-              if (p.predicate(blockchain))
-                composite(blockchain, p.patch(blockchain))
-              else
-                blockchain
+          def applyAll(patches: Patch*) = patches.foldLeft((blockchain, Diff.empty)) {
+            case ((blockchain, cd), p) =>
+              if (p.predicate(blockchain)) {
+                val pd = p.patch(blockchain)
+                (composite(blockchain, pd), cd.combine(pd))
+              } else {
+                (blockchain, cd)
+              }
           }
 
-          val patchedBlockchain = applyAll(
+          val (_, patchDiff) = applyAll(
             Patch(
               _ => currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight,
               CancelAllLeases(_)
@@ -192,7 +194,7 @@ object BlockDiffer extends ScorexLogging {
             )
           )
 
-          result.copy(diff = patchedBlockchain.diff)
+          result.copy(diff = result.diff.combine(patchDiff))
       }
   }
 }
