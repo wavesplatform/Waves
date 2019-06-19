@@ -283,13 +283,13 @@ object PBTransactions {
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction.create(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
-      case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
         import com.wavesplatform.common.utils._
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
-          address <- Address.fromBytes(dappAddress.toByteArray)
+          dApp <- PBRecipients.toAddressOrAlias(dappAddress)
 
           desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1
 
@@ -303,7 +303,7 @@ object PBTransactions {
 
           tx <- vt.smart.InvokeScriptTransaction.create(
             sender,
-            address,
+            dApp,
             fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
             feeAmount,
@@ -527,14 +527,14 @@ object PBTransactions {
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
-      case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
           chainId,
           sender,
-          Address.fromBytes(dappAddress.toByteArray).explicitGet(),
+          PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
           feeAmount,
@@ -553,7 +553,11 @@ object PBTransactions {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)
-        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, proofsArray = Seq(signature), data = Data.Genesis(data))
+        PBTransactions.create(sender = PublicKey(Array.emptyByteArray),
+                              timestamp = timestamp,
+                              version = 1,
+                              proofsArray = Seq(signature),
+                              data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
         val data = PaymentTransactionData(ByteString.copyFrom(recipient.bytes), amount)
@@ -664,9 +668,11 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.serialization.Deser
 
-        val data = InvokeScriptTransactionData(dappAddress.toByteString,
-                                               ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
-                                               payment.map(p => (p.assetId, p.amount): Amount))
+        val data = InvokeScriptTransactionData(
+          Some(PBRecipients.create(dappAddress)),
+          ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+          payment.map(p => (p.assetId, p.amount): Amount)
+        )
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
 
       case _ =>

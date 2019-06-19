@@ -17,6 +17,7 @@ import net.ceedubs.ficus.Ficus._
 
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
+    implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.LogExceptionsToStandardErr
     val sharedConfig = Docker.genesisOverride
       .withFallback(Docker.configTemplate)
       .withFallback(defaultApplication())
@@ -26,8 +27,7 @@ object BaseTargetChecker {
     val settings          = WavesSettings.fromRootConfig(sharedConfig)
     val db                = openDB("/tmp/tmp-db")
     val ntpTime           = new NTP("ntp.pool.org")
-    val portfolioChanges  = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-    val blockchainUpdater = StorageFactory(settings, db, ntpTime, portfolioChanges)
+    val blockchainUpdater = StorageFactory(settings, db, ntpTime, Observer.empty, Observer.empty)
     val poSSelector       = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
 
     try {

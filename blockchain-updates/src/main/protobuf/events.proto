@@ -1,5 +1,6 @@
 syntax = "proto3";
-package com.wavesplatform.events.protobuf;
+package waves;
+option java_package = "com.wavesplatform.events.protobuf";
 
 import "block.proto";
 import "transaction.proto";
