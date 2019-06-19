@@ -61,11 +61,16 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
       asset = IssuedAsset(issueTransaction.id())
 
       assetScript = s"""
-                       |{-# STDLIB_VERSION 3 #-}
-                       |{-# CONTENT_TYPE EXPRESSION #-}
-                       |{-# SCRIPT_TYPE ASSET #-}
+                       | {-# STDLIB_VERSION 3 #-}
+                       | {-# CONTENT_TYPE EXPRESSION #-}
+                       | {-# SCRIPT_TYPE ASSET #-}
                        |
-                       |this.bytes == base58'${asset.id.base58}'
+                       | this.id         == base58'${asset.id.base58}' &&
+                       | this.quantity   == 100                        &&
+                       | this.decimals   == 0                          &&
+                       | this.reissuable == false                      &&
+                       | this.scripted   == true                       &&
+                       | this.sponsored  == false
                        |
         """.stripMargin
 
