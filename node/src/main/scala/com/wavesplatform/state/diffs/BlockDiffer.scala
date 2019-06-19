@@ -156,21 +156,20 @@ object BlockDiffer extends ScorexLogging {
               val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
               val totalWavesFee                = currTotalFee + curBlockFees.balance + nextBlockFee
 
-              Right(
-                if (hasNg) {
-                  val diff = newDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
-                  val blockchain = composite(updatedBlockchain, diff)
-                  (blockchain, Result(blockchain.maybeDiff.getOrElse(Diff.empty), carryFee + nextBlockFee, totalWavesFee, updatedConstraint))
-                } else {
-                  val blockchain = composite(updatedBlockchain, newDiff)
-                  (blockchain, Result(blockchain.maybeDiff.getOrElse(Diff.empty), 0L, totalWavesFee, updatedConstraint))
-                }
-              )
+
+              val (resultDiff, resultCarryFee) = if (hasNg)
+                (newDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees))), carryFee + nextBlockFee)
+              else
+                (newDiff, 0L)
+
+              Right((composite(updatedBlockchain, resultDiff), Result(Diff.empty, resultCarryFee, totalWavesFee, updatedConstraint)))
             }
           }
       }
       .map {
-        case (_, Result(diff, carry, totalFee, constraint)) =>
+        case (bc, Result(_, carry, totalFee, constraint)) =>
+          val diff = bc.maybeDiff.getOrElse(sys.error("Should not happen"))
+
           val diffWithCancelledLeases =
             if (currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight)
               Monoid.combine(diff, CancelAllLeases(composite(blockchain, diff)))
