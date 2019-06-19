@@ -487,7 +487,16 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                                    types: Set[TransactionParser],
                                    fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     readLock {
-      addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, fromId)
+      val fromNg = ngState
+        .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { ng =>
+          ng.bestLiquidDiff
+            .reverseIterator(_.transactions)
+            .map {
+              case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
+            }
+        }
+
+      addressTransactionsCompose(blockchain, fromNg)(address, types, fromId)
     }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {

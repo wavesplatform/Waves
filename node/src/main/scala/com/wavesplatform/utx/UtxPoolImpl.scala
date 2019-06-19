@@ -159,7 +159,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
       .foreach(afterRemove)
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
+    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
       .map { diff => pessimisticPortfolios.add(tx.id(), diff); true }
 
     if (!verify || isNew.resultE.isRight) {
@@ -187,7 +187,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
                                maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()) _
     val (reversedValidTxs, _, finalConstraint, _, _, totalIterations) = PoolMetrics.packTimeStats.measure {
       val startTime                   = System.nanoTime()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (System.nanoTime() - startTime) >= maxPackTime.toNanos
@@ -246,16 +246,6 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, spendableBalanceChanged: O
 
     def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()): Boolean = {
       (currentTime - transaction.timestamp) > ExpirationTime
-    }
-
-    def validate(transaction: Transaction,
-                 lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
-                 currentTime: Long = time.correctedTime(),
-                 height: Int = blockchain.height): Either[ValidationError, Diff] = {
-      for {
-        _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
-        diff <- TransactionDiffer(lastBlockTimestamp, currentTime, height)(blockchain, transaction).resultE
-      } yield diff
     }
 
     def isScripted(transaction: Transaction): Boolean = {

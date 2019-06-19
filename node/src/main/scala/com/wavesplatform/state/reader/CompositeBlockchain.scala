@@ -94,7 +94,9 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
       .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
+  override def height: Int = {
+    inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
+  }
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
     nftListFromDiff(inner, maybeDiff)(address, from)
@@ -102,8 +104,19 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
-    addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+
+    val fromDiff = maybeDiff
+      .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { diff =>
+        diff
+          .reverseIterator(_.transactions)
+          .map {
+            case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
+          }
+      }
+
+    addressTransactionsCompose(inner, fromDiff)(address, types, fromId)
+  }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -226,7 +239,10 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = inner.scoreOf(blockId)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(height)
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    if (height == inner.height + 1) lastBlock.map(b => (b, b.bytes().length))
+    else inner.blockHeaderAndSize(height)
+  }
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 

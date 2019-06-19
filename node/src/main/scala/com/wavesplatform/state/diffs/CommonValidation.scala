@@ -99,7 +99,6 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
     case _ =>
@@ -107,11 +106,11 @@ object CommonValidation {
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
+  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
 
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
-        blockchain.isFeatureActivated(b, height),
+        blockchain.isFeatureActivated(b, blockchain.height - 1),
         tx,
         TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )
@@ -217,7 +216,7 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  private def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = {
+  private def feeInUnits(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Long] = {
     FeeConstants
       .get(tx.builder.typeId)
       .map { baseFee =>
@@ -225,12 +224,10 @@ object CommonValidation {
           case tx: MassTransferTransaction =>
             baseFee + (tx.transfers.size + 1) / 2
           case tx: DataTransaction =>
-            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
+            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, blockchain.height)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
           case itx: IssueTransaction =>
-            lazy val nftActivated = blockchain.activatedFeatures
-              .get(BlockchainFeatures.ReduceNFTFee.id)
-              .exists(_ <= height)
+            lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, blockchain.height)
 
             val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
 
@@ -241,16 +238,16 @@ object CommonValidation {
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def getMinFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
     type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
     def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+      if (blockchain.height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
         // This could be true for private blockchains
-        feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
+        feeInUnits(blockchain, tx).map(x => (None, x * FeeUnit))
       } else
         for {
-          feeInUnits <- feeInUnits(blockchain, height, tx)
+          feeInUnits <- feeInUnits(blockchain, tx)
           r <- txAsset match {
             case Waves => Right((None, feeInUnits * FeeUnit))
             case assetId @ IssuedAsset(_) =>
@@ -311,10 +308,10 @@ object CommonValidation {
       }
   }
 
-  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+  def checkFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
+    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
-        minAFee <- getMinFee(blockchain, height, tx)
+        minAFee <- getMinFee(blockchain, tx)
         minWaves   = minAFee._3
         minFee     = minAFee._2
         feeAssetId = minAFee._1

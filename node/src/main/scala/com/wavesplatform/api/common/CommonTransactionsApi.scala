@@ -32,7 +32,7 @@ private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, w
   }
 
   def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] = {
-    CommonValidation.getMinFee(blockchain, blockchain.height, tx)
+    CommonValidation.getMinFee(blockchain, tx)
   }
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, VanillaTransaction] = {

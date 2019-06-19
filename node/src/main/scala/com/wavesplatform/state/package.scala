@@ -58,18 +58,12 @@ package object state {
       }
     }
   }
-
+  
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(address: Address,
-                                                                  types: Set[TransactionParser],
-                                                                  fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
-
-    def transactionsFromDiff(d: Diff): Iterator[(Height, Transaction, Set[Address])] =
-      d.transactions
-        .values
-        .toSeq
-        .map { case (t,a) => (Height @@ b.height, t, a) }
-        .reverseIterator
+  def addressTransactionsCompose(b: Blockchain, fromDiffIter: CloseableIterator[(Height, Transaction, Set[Address])])(
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
     def withPagination(txs: Iterator[(Height, Transaction, Set[Address])]): Iterator[(Height, Transaction, Set[Address])] =
       fromId match {
@@ -81,17 +75,11 @@ package object state {
       txs
         .collect { case (h, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (h, tx) }
 
-    def transactions: Diff => Iterator[(Height, Transaction)] =
-      withFilterAndLimit _ compose withPagination compose transactionsFromDiff
-
-    d.fold(b.addressTransactions(address, types, fromId)) { diff =>
-      fromId match {
-        case Some(id) if !diff.transactions.contains(id) => b.addressTransactions(address, types, fromId)
-        case _ =>
-          val diffTxs = transactions(diff).map(kv => (Height(kv._1), kv._2))
-          CloseableIterator.seq(diffTxs, b.addressTransactions(address, types, None))
-      }
-    }
+    CloseableIterator
+      .seq(
+        withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
+        b.addressTransactions(address, types, fromId)
+      )
   }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {

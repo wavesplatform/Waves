@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.DataTransaction
 
 object DataTransactionDiff {
 
-  def apply(blockchain: Blockchain, height: Int)(tx: DataTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: DataTransaction): Either[ValidationError, Diff] = {
     val sender = tx.sender.toAddress
     Right(
       Diff(
