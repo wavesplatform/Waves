@@ -1,13 +1,11 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
-import cats.data.NonEmptyList
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.flat
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._

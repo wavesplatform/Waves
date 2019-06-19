@@ -28,7 +28,7 @@ case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]],
         Array(builder.typeId, version),
         sender,
         Shorts.toByteArray(data.size.toShort),
-        data.flatMap(_.toBytes).toArray,
+        Bytes.concat(data.view.map(_.toBytes): _*),
         Longs.toByteArray(timestamp),
         Longs.toByteArray(fee)
       )
