@@ -270,11 +270,11 @@ object CompositeBlockchain {
 
   def withLastBlock(inner: Blockchain, block: Block): CompositeBlockchain = wrap(inner, None, Some(block))
 
-  def wrap(inner: Blockchain, diff: Option[Diff], block: Option[Block]): CompositeBlockchain = inner match {
+  def wrap(bc: Blockchain, diff: Option[Diff], block: Option[Block]): CompositeBlockchain = bc match {
     case CompositeBlockchain(inner, leftDiff, leftBlock, leftCarry) =>
       CompositeBlockchain(inner, Monoid.combine(leftDiff, diff), block.orElse(leftBlock), leftCarry)
 
     case _ =>
-      CompositeBlockchain(inner, diff, block)
+      CompositeBlockchain(bc, diff, block)
   }
 }
