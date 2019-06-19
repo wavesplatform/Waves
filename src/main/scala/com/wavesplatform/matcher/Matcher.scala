@@ -176,8 +176,14 @@ class Matcher(actorSystem: ActorSystem,
                   eventWithMeta.event.assetPair
                 }(collection.breakOut)
 
-                val timeout = new Timeout(240.days) // All actor are local and have unbounded queues, so it's okay
-                self.ask(MatcherActor.PingAll(assetPairs))(timeout).map(_ => ())
+                // All actor are local and have unbounded queues, so it's okay
+                val timeout = new Timeout(10.seconds)
+                self
+                  .ask(MatcherActor.PingAll(assetPairs))(timeout)
+                  .recover {
+                    case NonFatal(e) => log.error("PingAll is timed out!", e)
+                  }
+                  .map(_ => ())
               }
             }
           )

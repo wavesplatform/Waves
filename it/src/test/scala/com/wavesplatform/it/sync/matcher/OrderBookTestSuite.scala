@@ -96,6 +96,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     "it should not affect other pairs and their orders" in {
       matcherNode.orderStatus(buyOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
       matcherNode.orderStatus(sellOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
+      matcherNode.placeOrder(aliceAcc, wctWavesPair, BUY, amount, price, matcherFee)
 
       val orderBook = matcherNode.orderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)
