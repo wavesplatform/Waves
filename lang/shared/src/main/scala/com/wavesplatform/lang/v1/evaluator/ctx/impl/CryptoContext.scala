@@ -16,17 +16,17 @@ import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object CryptoContext {
 
-  private val none    = CASETYPEREF("NOALG", List.empty)
-  private val md5     = CASETYPEREF("MD5", List.empty)
-  private val sha1    = CASETYPEREF("SHA1", List.empty)
-  private val sha224  = CASETYPEREF("SHA224", List.empty)
-  private val sha256  = CASETYPEREF("SHA256", List.empty)
-  private val sha384  = CASETYPEREF("SHA384", List.empty)
-  private val sha512  = CASETYPEREF("SHA512", List.empty)
-  private val sha3224 = CASETYPEREF("SHA3224", List.empty)
-  private val sha3256 = CASETYPEREF("SHA3256", List.empty)
-  private val sha3384 = CASETYPEREF("SHA3384", List.empty)
-  private val sha3512 = CASETYPEREF("SHA3512", List.empty)
+  private val none    = CASETYPEREF("NoAlg", List.empty)
+  private val md5     = CASETYPEREF("Md5", List.empty)
+  private val sha1    = CASETYPEREF("Sha1", List.empty)
+  private val sha224  = CASETYPEREF("Sha224", List.empty)
+  private val sha256  = CASETYPEREF("Sha256", List.empty)
+  private val sha384  = CASETYPEREF("Sha384", List.empty)
+  private val sha512  = CASETYPEREF("Sha512", List.empty)
+  private val sha3224 = CASETYPEREF("Sha3224", List.empty)
+  private val sha3256 = CASETYPEREF("Sha3256", List.empty)
+  private val sha3384 = CASETYPEREF("Sha3384", List.empty)
+  private val sha3512 = CASETYPEREF("Sha3512", List.empty)
 
   private val digestAlgorithmType =
     UNION(none, md5, sha1, sha224, sha256, sha384, sha512, sha3224, sha3256, sha3384, sha3512)
