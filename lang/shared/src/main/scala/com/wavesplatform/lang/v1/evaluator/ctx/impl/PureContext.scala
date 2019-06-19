@@ -4,7 +4,9 @@ import java.nio.charset.StandardCharsets
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -43,17 +45,13 @@ object PureContext {
   lazy val sumString: BaseFunction =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, "Limited strings concatenation", "prefix", "suffix", 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
-        lazy val al = a.length
-        lazy val bl = b.length
-        Either.cond(al + bl <= MaxStringResult, CONST_STRING(a + b), "String is too large")
+        CONST_STRING(a + b).filterOrElse(_.s.length <= MaxStringResult, "String is too large")
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction =
     createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited bytes vectors concatenation", "prefix", "suffix", 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        lazy val al = a.arr.length
-        lazy val bl = b.arr.length
-        Either.cond(al + bl <= MaxBytesResult, CONST_BYTESTR(a ++ b), "ByteStr is too large")
+        CONST_BYTESTR(a ++ b).filterOrElse(_.bs.length <= MaxBytesResult, "ByteStr is too large")
       case _ => ???
     }
   lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer greater or equal comparison", "term", "term")(_ >= _)
@@ -82,7 +80,7 @@ object PureContext {
   }
 
   lazy val throwNoMessage: BaseFunction = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1), NOTHING, "Fail script") {
-    FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage)))
+    FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage).explicitGet()))
   }
 
   lazy val extract: BaseFunction =
@@ -93,7 +91,7 @@ object PureContext {
                  ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
       IF(
         FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
-        FUNCTION_CALL(throwWithMessage, List(CONST_STRING("extract() called on unit value"))),
+        FUNCTION_CALL(throwWithMessage, List(CONST_STRING("extract() called on unit value").explicitGet())),
         REF("@a")
       )
     }
@@ -106,7 +104,7 @@ object PureContext {
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
       IF(
         FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
-        FUNCTION_CALL(throwWithMessage, List(CONST_STRING("value() called on unit value"))),
+        FUNCTION_CALL(throwWithMessage, List(CONST_STRING("value() called on unit value").explicitGet())),
         REF("@a")
       )
     }
@@ -179,19 +177,19 @@ object PureContext {
 
   lazy val toBytesBoolean: BaseFunction =
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTESTR, "Bytes array representation", ("b", BOOLEAN, "value")) {
-      case TRUE :: Nil  => Right(CONST_BYTESTR(ByteStr.fromBytes(1)))
-      case FALSE :: Nil => Right(CONST_BYTESTR(ByteStr.fromBytes(0)))
+      case TRUE :: Nil  => CONST_BYTESTR(ByteStr.fromBytes(1))
+      case FALSE :: Nil => CONST_BYTESTR(ByteStr.fromBytes(0))
       case _            => ???
     }
 
   lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTESTR, "Bytes array representation", ("n", LONG, "value")) {
-    case CONST_LONG(n) :: Nil => Right(CONST_BYTESTR(ByteStr.fromLong(n)))
+    case CONST_LONG(n) :: Nil => CONST_BYTESTR(ByteStr.fromLong(n))
     case _                    => ???
   }
 
   lazy val toBytesString: BaseFunction =
     NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTESTR, "Bytes array representation", ("s", STRING, "value")) {
-      case CONST_STRING(s) :: Nil => Right(CONST_BYTESTR(ByteStr(s.getBytes(StandardCharsets.UTF_8))))
+      case CONST_STRING(s) :: Nil => CONST_BYTESTR(ByteStr(s.getBytes(StandardCharsets.UTF_8)))
       case _                      => ???
     }
 
@@ -202,25 +200,25 @@ object PureContext {
 
   lazy val toStringBoolean: BaseFunction =
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
-      case TRUE :: Nil  => Right(CONST_STRING("true"))
-      case FALSE :: Nil => Right(CONST_STRING("false"))
+      case TRUE :: Nil  => CONST_STRING("true")
+      case FALSE :: Nil => CONST_STRING("false")
       case _            => ???
     }
 
   lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
-    case CONST_LONG(n) :: Nil => Right(CONST_STRING(n.toString))
+    case CONST_LONG(n) :: Nil => CONST_STRING(n.toString)
     case _                    => ???
   }
 
   lazy val takeBytes: BaseFunction =
     NativeFunction("take", 1, TAKE_BYTES, BYTESTR, "Take firsts bytes subvector", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTESTR(xs.take(number)))
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number))
       case xs                                             => notImplemented("take(xs: byte[], number: Long)", xs)
     }
 
   lazy val dropBytes: BaseFunction =
     NativeFunction("drop", 1, DROP_BYTES, BYTESTR, "Skip firsts bytes", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
-      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTESTR(xs.drop(number)))
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number))
       case xs                                             => notImplemented("drop(xs: byte[], number: Long)", xs)
     }
 
@@ -262,7 +260,7 @@ object PureContext {
 
   lazy val takeString: BaseFunction =
     NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size in characters")) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.take(trimLongToInt(number))))
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.take(trimLongToInt(number)))
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
@@ -282,7 +280,7 @@ object PureContext {
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remove string prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
-      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.drop(trimLongToInt(number))))
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(trimLongToInt(number)))
       case xs                                            => notImplemented("drop(xs: String, number: Long)", xs)
     }
 
@@ -324,10 +322,16 @@ object PureContext {
 
   lazy val toUtf8String: BaseFunction =
     NativeFunction("toUtf8String", 20, UTF8STRING, STRING, "Convert UTF8 bytes to string", ("u", BYTESTR, "utf8")) {
-      case CONST_BYTESTR(u) :: Nil => Try(CONST_STRING(UTF8Decoder.decode(ByteBuffer.wrap(u.arr)).toString)).toEither.left.map {
-        case _:MalformedInputException => "Input contents invalid UTF8 sequence"
-        case e => e.toString
-      }
+      case CONST_BYTESTR(u) :: Nil =>
+        Try(ByteBuffer.wrap(u.arr))
+          .map(UTF8Decoder.decode)
+          .toEither
+          .map(_.toString)
+          .flatMap(CONST_STRING(_))
+          .leftMap {
+            case _: MalformedInputException => "Input contents invalid UTF8 sequence"
+            case e => e.toString
+          }
       case xs                      => notImplemented("toUtf8String(u: byte[])", xs)
     }
 
@@ -428,16 +432,19 @@ object PureContext {
 
   lazy val splitStr: BaseFunction =
     NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
-      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil => Right(ARR(split(str, sep).map(CONST_STRING)))
-      case xs                                            => notImplemented("split(STRING, STRING)", xs)
+      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
+        split(str, sep)
+          .traverse(CONST_STRING(_))
+          .map(s => ARR(s.toIndexedSeq))
+      case xs => notImplemented("split(STRING, STRING)", xs)
     }
 
   private def split(str: String, sep: String) =
-    if (str == "") seqWithEmptyStr
-    else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1)))
-    else splitRec(str, sep).reverse.toIndexedSeq
+    if (str == "") listWithEmptyStr
+    else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1))) toList
+    else splitRec(str, sep).reverse
 
-  private val seqWithEmptyStr = IndexedSeq("")
+  private val listWithEmptyStr = List("")
 
   @tailrec private def splitRec(
                 str: String,
@@ -472,7 +479,7 @@ object PureContext {
       val parseO = FUNCTION_CALL(Native(PARSEINT), List(REF("str")))
       FUNCTION_CALL(
         User("valueOrErrorMessage"),
-        List(parseO, CONST_STRING("Error while parsing string to integer"))
+        List(parseO, CONST_STRING("Error while parsing string to integer").explicitGet())
       )
     }
 

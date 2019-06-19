@@ -67,13 +67,19 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   def dataContract(senderBinding: String, argName: String, funcName: String, bigData: Boolean) = {
     val datas =
-      if (bigData) List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument"), CONST_STRING("abcde" * 1024))), REF("nil"))
+      if (bigData) List(
+        FUNCTION_CALL(
+          User("DataEntry"),
+          List(CONST_STRING("argument").explicitGet(), CONST_STRING("abcde" * 1024).explicitGet())
+        ),
+        REF("nil")
+      )
       else
         List(
-          FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument"), REF(argName))),
+          FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument").explicitGet(), REF(argName))),
           FUNCTION_CALL(
             Native(1100),
-            List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))), REF("nil")))
+            List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))), REF("nil")))
         )
 
     DApp(
@@ -111,9 +117,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes))),
+            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet())),
             CONST_LONG(recipientAmount),
-            a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id))
+            a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
       ))
 
@@ -151,9 +157,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes))),
+            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet())),
             CONST_LONG(recipientAmount),
-            a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id))
+            a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
       ))
 
@@ -307,7 +313,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       script      = ContractScript(V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
-      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.fill(invocationParamsCount)(CONST_STRING("Not-a-Number")))
+      fc = Terms.FUNCTION_CALL(
+        FunctionHeader.User(funcBinding),
+        List.fill(invocationParamsCount)(CONST_STRING("Not-a-Number").explicitGet())
+      )
       ci = InvokeScriptTransaction
         .selfSigned(
           invoker,
@@ -364,7 +373,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
-        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)))))
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
       ci = InvokeScriptTransaction
@@ -408,7 +417,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
-        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)))))
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
       ci = InvokeScriptTransaction
@@ -451,7 +460,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
-        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)))))
+        Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
       ciWithAlias = InvokeScriptTransaction
@@ -888,7 +897,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       arg         <- genBoundedString(1, 32)
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
-      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
+      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
       ci = InvokeScriptTransaction.selfSigned(invoker, master, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
     } yield ci) { _ should produce("NonPositiveAmount") }
   }

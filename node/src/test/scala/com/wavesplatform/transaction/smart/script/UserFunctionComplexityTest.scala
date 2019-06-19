@@ -61,16 +61,16 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     )
     est(exprIsDefined).explicitGet() shouldBe 43
 
-    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
+    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprDropRightBytes).explicitGet() shouldBe 21
 
-    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
+    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprTakeRightBytes).explicitGet() shouldBe 21
 
-    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str"), CONST_LONG(1)))
+    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprDropRightString).explicitGet() shouldBe 21
 
-    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str"), CONST_LONG(1)))
+    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))
@@ -79,13 +79,13 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 12
 
-    val exprAddressFromPublicKey = FUNCTION_CALL(User("addressFromPublicKey"), List(CONST_BYTESTR(ByteStr.fromLong(2))))
+    val exprAddressFromPublicKey = FUNCTION_CALL(User("addressFromPublicKey"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet()))
     est(exprAddressFromPublicKey).explicitGet() shouldBe 83
 
-    val exprAddressFromString = FUNCTION_CALL(User("addressFromString"), List(CONST_STRING("address")))
+    val exprAddressFromString = FUNCTION_CALL(User("addressFromString"), List(CONST_STRING("address").explicitGet()))
     est(exprAddressFromString).explicitGet() shouldBe 125
 
-    val exprWavesBalance = FUNCTION_CALL(User("wavesBalance"), List(CONST_STRING("alias")))
+    val exprWavesBalance = FUNCTION_CALL(User("wavesBalance"), List(CONST_STRING("alias").explicitGet()))
     est(exprWavesBalance).explicitGet() shouldBe 110
   }
 
@@ -126,16 +126,16 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     )
     est(exprIsDefined).explicitGet() shouldBe 43
 
-    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
+    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprDropRightBytes).explicitGet() shouldBe 21
 
-    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
+    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprTakeRightBytes).explicitGet() shouldBe 21
 
-    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str"), CONST_LONG(1)))
+    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprDropRightString).explicitGet() shouldBe 21
 
-    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str"), CONST_LONG(1)))
+    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))
@@ -144,13 +144,13 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 12
 
-    val exprAddressFromPublicKey = FUNCTION_CALL(User("addressFromPublicKey"), List(CONST_BYTESTR(ByteStr.fromLong(2))))
+    val exprAddressFromPublicKey = FUNCTION_CALL(User("addressFromPublicKey"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet()))
     est(exprAddressFromPublicKey).explicitGet() shouldBe 83
 
-    val exprAddressFromString = FUNCTION_CALL(User("addressFromString"), List(CONST_STRING("address")))
+    val exprAddressFromString = FUNCTION_CALL(User("addressFromString"), List(CONST_STRING("address").explicitGet()))
     est(exprAddressFromString).explicitGet() shouldBe 125
 
-    val exprWavesBalance = FUNCTION_CALL(User("wavesBalance"), List(CONST_STRING("alias")))
+    val exprWavesBalance = FUNCTION_CALL(User("wavesBalance"), List(CONST_STRING("alias").explicitGet()))
     est(exprWavesBalance).explicitGet() shouldBe 110
   }
 
@@ -191,16 +191,16 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     )
     est(exprIsDefined).explicitGet() shouldBe 9
 
-    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
+    val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprDropRightBytes).explicitGet() shouldBe 21
 
-    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
+    val exprTakeRightBytes = FUNCTION_CALL(PureContext.takeRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet(), CONST_LONG(1)))
     est(exprTakeRightBytes).explicitGet() shouldBe 21
 
-    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str"), CONST_LONG(1)))
+    val exprDropRightString = FUNCTION_CALL(PureContext.dropRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprDropRightString).explicitGet() shouldBe 21
 
-    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str"), CONST_LONG(1)))
+    val exprTakeRightString = FUNCTION_CALL(PureContext.takeRightString, List(CONST_STRING("str").explicitGet(), CONST_LONG(1)))
     est(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))
@@ -210,18 +210,18 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     est(exprUNot).explicitGet() shouldBe 2
 
     val exprDataByIndex = LET_BLOCK(
-      LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1"), REF("nil")))),
+      LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1").explicitGet(), REF("nil")))),
       FUNCTION_CALL(User("getString"), List(REF("arr"), CONST_LONG(0)))
     )
     est(exprDataByIndex).explicitGet() shouldBe 43
 
-    val exprAddressFromPublicKey = FUNCTION_CALL(User("addressFromPublicKey"), List(CONST_BYTESTR(ByteStr.fromLong(2))))
+    val exprAddressFromPublicKey = FUNCTION_CALL(User("addressFromPublicKey"), List(CONST_BYTESTR(ByteStr.fromLong(2)).explicitGet()))
     est(exprAddressFromPublicKey).explicitGet() shouldBe 83
 
-    val exprAddressFromString = FUNCTION_CALL(User("addressFromString"), List(CONST_STRING("address")))
+    val exprAddressFromString = FUNCTION_CALL(User("addressFromString"), List(CONST_STRING("address").explicitGet()))
     est(exprAddressFromString).explicitGet() shouldBe 125
 
-    val exprWavesBalance = FUNCTION_CALL(User("wavesBalance"), List(CONST_STRING("alias")))
+    val exprWavesBalance = FUNCTION_CALL(User("wavesBalance"), List(CONST_STRING("alias").explicitGet()))
     est(exprWavesBalance).explicitGet() shouldBe 110
   }
 }
