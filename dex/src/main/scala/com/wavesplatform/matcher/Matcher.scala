@@ -33,6 +33,7 @@ import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 class Matcher(context: Context) extends Extension with ScorexLogging {
@@ -197,8 +198,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
                   eventWithMeta.event.assetPair
                 }(collection.breakOut)
 
-                val timeout = new Timeout(240.days) // All actor are local and have unbounded queues, so it's okay
-                self.ask(MatcherActor.PingAll(assetPairs))(timeout).map(_ => ())
+                // All actor are local and have unbounded queues, so it's okay
+                val timeout = new Timeout(10.seconds)
+                self
+                  .ask(MatcherActor.PingAll(assetPairs))(timeout)
+                  .recover {
+                    case NonFatal(e) => log.error("PingAll is timed out!", e)
+                  }
+                  .map(_ => ())
               }
             }
           )

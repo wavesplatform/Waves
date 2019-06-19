@@ -166,8 +166,8 @@ class MatcherActor(settings: MatcherSettings,
 
     case Terminated(ref) =>
       val name = ref.path.name
-      val xs   = name.split("-")
-      val pair = if (xs.size == 2) AssetPair.createAssetPair(xs.head, xs(1)).toOption else None
+      val xs   = name.split('-')
+      val pair = if (xs.length == 2) AssetPair.createAssetPair(xs.head, xs(1)).toOption else None
 
       pair.foreach { p =>
         orderBooks.getAndUpdate { obs =>
