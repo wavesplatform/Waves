@@ -62,14 +62,14 @@ object Decompiler {
             tc,
             ANY_LET(name, REF(Name), cExpr),
             tailExpr) => extrTypes(Name, tc) flatMap {
-        case None => expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+        case None => expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
            ("case _ => " ++ NEWLINE ++ e, None)
         }
-        case Some(tl) => expr(pure(cExpr), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+        case Some(tl) => expr(pure(cExpr), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
            ("case " ++ name ++ ": " ++ tl.mkString("|") ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
         }
       }
-      case _ => expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { e =>
+      case _ => expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
         ("case _ => " ++ NEWLINE ++ e, None)
       }
     }
@@ -89,7 +89,7 @@ object Decompiler {
   val MatchRef = """(\$match\d*)""".r
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
-    val i = if (braces == BracesWhenNeccessary) 0 else ctx.ident
+    val i = if (firstLinePolicy == DontIndentFirstLine /*braces == BracesWhenNeccessary*/) 0 else ctx.ident
     e flatMap {
       case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b => 
         expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>

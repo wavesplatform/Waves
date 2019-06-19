@@ -455,7 +455,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let startPrice = 100000
         |let interval = (24 * 60)
         |let exp = ((100 * 60) * 1000)
-        |match     tx {
+        |match tx {
         |    case e: ExchangeTransaction => 
         |        let days = ((height - startHeight) / interval)
         |        if (if (if ((e.price >= (startPrice * (1 + (days * days)))))
@@ -489,7 +489,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
  
     val rev = Decompiler(expr, decompilerContext)
 
-    rev shouldEq """match     tv {
+    rev shouldEq """match tv {
     |    case x: PointB|PointA => 
     |        1
     |    case x: PointC => 
