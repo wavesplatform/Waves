@@ -219,5 +219,5 @@ class TradersTestSuite extends MatcherSuiteBase {
 }
 
 object TradersTestSuite {
-  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.matcher { allow-order-v3 = yes }")
+  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.matcher { allowed-order-versions = [1, 2, 3] }")
 }

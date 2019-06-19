@@ -179,11 +179,12 @@ object JsAPI {
                   err => {
                     js.Dynamic.literal("error" -> err)
                   }, {
-                    case (bytes, ast, complexity) =>
+                    case (bytes, ast, complexity, complexityByFunc) =>
                       js.Dynamic.literal(
-                        "result"     -> Global.toBuffer(bytes),
-                        "ast"        -> toJs(ast),
-                        "complexity" -> complexity
+                        "result"           -> Global.toBuffer(bytes),
+                        "ast"              -> toJs(ast),
+                        "complexity"       -> complexity,
+                        "complexityByFunc" -> complexityByFunc
                       )
                   }
                 )

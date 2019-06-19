@@ -70,7 +70,6 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
       val received =
         sender
           .transactionsByAddress(recipient.address, limit)
-          .flatten
           .map(_.id)
 
       expected shouldEqual received
@@ -98,7 +97,6 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
       val received =
         sender
           .transactionsByAddress(recipient.address, limit, afterParam)
-          .flatten
           .map(_.id)
 
       expected shouldEqual received
@@ -125,8 +123,8 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
 
   def loadAll(node: Node, address: String, limit: Int, maybeAfter: Option[String], acc: List[TransactionInfo]): List[TransactionInfo] = {
     val txs = maybeAfter match {
-      case None         => node.transactionsByAddress(address, limit).flatten.toList
-      case Some(lastId) => node.transactionsByAddress(address, limit, lastId).flatten.toList
+      case None         => node.transactionsByAddress(address, limit).toList
+      case Some(lastId) => node.transactionsByAddress(address, limit, lastId).toList
     }
 
     txs.lastOption match {

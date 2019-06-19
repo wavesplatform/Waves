@@ -198,8 +198,12 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
 
-    def debugStateChange(transactionId:String): DebugStateChanges ={
-      sync(async(n).debugStateChange(transactionId))
+    def debugStateChanges(transactionId:String): DebugStateChanges ={
+      sync(async(n).debugStateChanges(transactionId))
+    }
+
+    def debugStateChangesByAddress(address:String, limit: Int): Seq[DebugStateChanges] ={
+      sync(async(n).debugStateChangesByAddress(address, limit))
     }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
@@ -208,10 +212,10 @@ object SyncHttpApi extends Assertions {
     def transactionInfo(txId: String): TransactionInfo =
       sync(async(n).transactionInfo(txId))
 
-    def transactionsByAddress(address: String, limit: Int): Seq[Seq[TransactionInfo]] =
+    def transactionsByAddress(address: String, limit: Int): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit))
 
-    def transactionsByAddress(address: String, limit: Int, after: String): Seq[Seq[TransactionInfo]] =
+    def transactionsByAddress(address: String, limit: Int, after: String): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit, after))
 
     def scriptCompile(code: String): CompiledScript =
