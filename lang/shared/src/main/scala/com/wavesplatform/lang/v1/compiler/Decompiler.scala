@@ -69,6 +69,9 @@ object Decompiler {
            ("case " ++ name ++ ": " ++ tl.mkString("|") ++ " => " ++ NEWLINE ++ e, Some(tailExpr))
         }
       }
+      case ANY_LET(name, REF(Name), e) => expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
+        ("case " ++ name ++ " => " ++ NEWLINE ++ e, None)
+      }
       case _ => expr(pure(e), ctx.incrementIdent(), NoBraces, IdentFirstLine) map { e =>
         ("case _ => " ++ NEWLINE ++ e, None)
       }

@@ -506,4 +506,23 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     |        throw()
     |}""".stripMargin
   }
+
+  property("match with case without type") {
+    val script = """
+      match tv {
+        case x : PointA|PointB => 1
+        case x => 2
+    }"""
+
+    val Right((expr, ty)) = compile(script)
+ 
+    val rev = Decompiler(expr, decompilerContext)
+
+    rev shouldEq """match tv {
+    |    case x: PointB|PointA => 
+    |        1
+    |    case x => 
+    |        2
+    |}""".stripMargin
+  }
 }
