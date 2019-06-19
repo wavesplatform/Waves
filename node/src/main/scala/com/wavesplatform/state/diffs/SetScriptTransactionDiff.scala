@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import scala.util.Right
 
 object SetScriptTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
     val scriptOpt = tx.script
     Right(
       Diff(

@@ -2,7 +2,7 @@ package com.wavesplatform.protobuf.block
 import cats.instances.all._
 import cats.syntax.traverse._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.SignerData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -65,6 +65,15 @@ object PBBlocks {
     block.update(
       _.header.chainId := 0,
       _.transactions.foreach(_.transaction.chainId := 0)
+    )
+  }
+
+  def addChainId(block: PBBlock): PBBlock = {
+    val chainId = AddressScheme.current.chainId
+
+    block.update(
+      _.header.chainId := chainId,
+      _.transactions.foreach(_.transaction.chainId := chainId)
     )
   }
 

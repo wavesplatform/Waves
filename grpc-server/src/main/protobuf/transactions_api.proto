@@ -1,17 +1,19 @@
 syntax = "proto3";
-package com.wavesplatform.api.grpc;
+package waves.grpc;
+option java_package = "com.wavesplatform.api.grpc";
+option csharp_namespace = "Waves.Grpc";
+
 import "recipient.proto";
 import "transaction.proto";
-import "google/protobuf/empty.proto";
 
 service TransactionsApi {
     rpc GetTransactions (TransactionsRequest) returns (stream TransactionResponse);
-    rpc GetStateChanges (TransactionsRequest) returns (stream InvokeScriptResult);
+    rpc GetStateChanges (TransactionsRequest) returns (stream waves.InvokeScriptResult);
     rpc GetStatuses (TransactionsByIdRequest) returns (stream TransactionStatus);
     rpc GetUnconfirmed (TransactionsRequest) returns (stream TransactionResponse);
 
-    rpc Sign (SignRequest) returns (SignedTransaction);
-    rpc Broadcast (SignedTransaction) returns (SignedTransaction);
+    rpc Sign (SignRequest) returns (waves.SignedTransaction);
+    rpc Broadcast (waves.SignedTransaction) returns (waves.SignedTransaction);
 }
 
 message TransactionStatus {
@@ -29,12 +31,12 @@ message TransactionStatus {
 message TransactionResponse {
     bytes id = 1;
     int64 height = 2;
-    SignedTransaction transaction = 3;
+    waves.SignedTransaction transaction = 3;
 }
 
 message TransactionsRequest {
     bytes sender = 1;
-    Recipient recipient = 2;
+    waves.Recipient recipient = 2;
     repeated bytes transaction_ids = 3;
 }
 
@@ -48,6 +50,6 @@ message CalculateFeeResponse {
 }
 
 message SignRequest {
-    Transaction transaction = 1;
+    waves.Transaction transaction = 1;
     bytes signer_public_key = 2;
 }

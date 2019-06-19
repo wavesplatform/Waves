@@ -240,13 +240,22 @@ object MatcherError {
         e"Trading is not allowed for the pair: ${'amountAssetId -> orderAssetPair.amountAsset} - ${'priceAssetId -> orderAssetPair.priceAsset}"
       )
 
-  case object OrderV3IsNotAllowed
+  case class OrderVersionIsNotAllowed(version: Byte, allowedVersions: Set[Byte])
       extends MatcherError(
         order,
         commonEntity,
         denied,
-        e"The orders of version 3 are not allowed by matcher"
+        e"The orders of version ${'version -> version} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toSeq.sorted
+          .mkString(", ")}"
       )
+
+  case class UnknownOrderVersion(version: Byte)
+    extends MatcherError(
+      order,
+      commonEntity,
+      denied,
+      e"Unknown order version: ${'version -> version}. Allowed order versions can be obtained via /matcher/settings GET method"
+    )
 
   import OrderRestrictionsSettings.formatValue
 

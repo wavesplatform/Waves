@@ -56,7 +56,7 @@ object BlockDiffer extends ScorexLogging {
     val blockchainWithLastBlock = CompositeBlockchain.withLastBlock(blockchain, block)
 
     for {
-      _ <- TracedResult(block.signaturesValid())
+      _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
       r <- apply(
         blockchainWithLastBlock,
         constraint,
@@ -119,7 +119,7 @@ object BlockDiffer extends ScorexLogging {
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
     val hasNg          = currentBlockFeeDistr.isEmpty
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)

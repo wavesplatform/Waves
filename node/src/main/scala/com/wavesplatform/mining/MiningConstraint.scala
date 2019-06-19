@@ -5,21 +5,21 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
 
 trait MiningConstraint {
-  def isEmpty: Boolean
+  def isFull: Boolean
   def isOverfilled: Boolean
   def put(blockchain: Blockchain, x: Transaction, diff: Diff): MiningConstraint
 }
 
 object MiningConstraint {
   case object Unlimited extends MiningConstraint {
-    override def isEmpty: Boolean                                              = false
+    override def isFull: Boolean                                              = false
     override def isOverfilled: Boolean                                         = false
     override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MiningConstraint = this
   }
 }
 
 case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn, description: String = "") extends MiningConstraint {
-  override def isEmpty: Boolean = {
+  override def isFull: Boolean = {
     rest < estimator.minEstimate
   }
   override def isOverfilled: Boolean = {
@@ -36,7 +36,7 @@ case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn
 }
 
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
-  override def isEmpty: Boolean      = constraints.exists(_.isEmpty)
+  override def isFull: Boolean      = constraints.exists(_.isFull)
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
   override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, diff)))

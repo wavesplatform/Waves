@@ -86,7 +86,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       caller.address,
       contract.address,
       func = Some("foo"),
-      args = List(CONST_BYTESTR(arg)),
+      args = List(CONST_BYTESTR(arg).explicitGet()),
       payment = Seq(),
       fee = 1.waves,
       waitForTx = true

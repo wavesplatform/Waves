@@ -179,7 +179,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.reference)) match {
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                 case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
-                  if (referencedForgedBlock.signaturesValid().isRight) {
+                  if (!verify || referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
                       metrics.microBlockForkStats.increment()
                       metrics.microBlockForkHeightStats.record(discarded.size)
@@ -487,7 +487,16 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                                    types: Set[TransactionParser],
                                    fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     readLock {
-      addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, fromId)
+      val fromNg = ngState
+        .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { ng =>
+          ng.bestLiquidDiff
+            .reverseIterator(_.transactions)
+            .map {
+              case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
+            }
+        }
+
+      addressTransactionsCompose(blockchain, fromNg)(address, types, fromId)
     }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {

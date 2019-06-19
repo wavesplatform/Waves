@@ -4,7 +4,7 @@ import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{BaseGlobal, Serde}
+import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, Serde}
 
 object ScriptReader {
 
@@ -41,8 +41,14 @@ object ScriptReader {
           } yield s
         case DApp =>
           for {
-            bytes <- ContractSerDe.deserialize(scriptBytes)
-            s     <- ContractScript(stdLibVersion, bytes)
+            dapp <- ContractSerDe.deserialize(scriptBytes)
+            _ <- Either
+              .cond(
+                dapp.meta.size <= ContractLimits.MaxContractMetaSizeInBytes,
+                (),
+                s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}"
+              )
+            s <- ContractScript(stdLibVersion, dapp)
           } yield s
       }
     } yield s).left

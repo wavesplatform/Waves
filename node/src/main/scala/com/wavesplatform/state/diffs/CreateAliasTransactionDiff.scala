@@ -10,8 +10,8 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import scala.util.Right
 
 object CreateAliasTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: CreateAliasTransaction): Either[ValidationError, Diff] =
-    if (blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, height) && !blockchain.canCreateAlias(tx.alias))
+  def apply(blockchain: Blockchain)(tx: CreateAliasTransaction): Either[ValidationError, Diff] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height) && !blockchain.canCreateAlias(tx.alias))
       Left(GenericError("Alias already claimed"))
     else
       Right(
