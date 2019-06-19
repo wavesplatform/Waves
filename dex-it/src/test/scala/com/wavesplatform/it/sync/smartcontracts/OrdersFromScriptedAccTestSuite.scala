@@ -40,7 +40,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     )
     .explicitGet()
 
-  private val aliceAsset     = aliceAssetTx.id().base58
+  private val aliceAsset = aliceAssetTx.id().toString
   private val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
   override protected def beforeAll(): Unit = {
@@ -81,6 +81,78 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       val bobOrder =
         node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
+    }
+
+    "scripted dApp account can trade" in {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3       #-}
+          | {-# CONTENT_TYPE   DAPP    #-}
+          | {-# SCRIPT_TYPE    ACCOUNT #-}
+          |
+          | @Callable(i)
+          | func call() = WriteSet([])
+          |
+        """.stripMargin
+      setContract(Some(script), bob)
+
+      val bobOrder = node.placeOrder(
+        sender     = bob,
+        pair       = aliceWavesPair,
+        orderType  = OrderType.BUY,
+        amount     = 500,
+        price      = 2.waves * Order.PriceConstant,
+        fee        = smartTradeFee,
+        version    = 2,
+        timeToLive = 10.minutes
+      )
+      bobOrder.status shouldBe "OrderAccepted"
+    }
+
+    val orderFilterScript =
+      """
+        |
+        | {-# STDLIB_VERSION 3       #-}
+        | {-# CONTENT_TYPE   DAPP    #-}
+        | {-# SCRIPT_TYPE    ACCOUNT #-}
+        |
+        | @Verifier(tx)
+        | func verify() =
+        |    match tx {
+        |        case o: Order => o.amount > 1000
+        |        case _        => true
+        |    }
+        |
+      """.stripMargin
+
+    "scripted dApp account accept correct order" in {
+      setContract(Some(orderFilterScript), bob)
+      val bobOrder = node.placeOrder(
+        sender     = bob,
+        pair       = aliceWavesPair,
+        orderType  = OrderType.BUY,
+        amount     = 2000,
+        price      = 2.waves * Order.PriceConstant,
+        fee        = smartTradeFee,
+        version    = 2,
+        timeToLive = 10.minutes
+      )
+      bobOrder.status shouldBe "OrderAccepted"
+    }
+
+    "scripted dApp account reject incorrect order" in {
+      setContract(Some(orderFilterScript), bob)
+      node.expectRejectedOrderPlacement(
+        sender     = bob,
+        pair       = aliceWavesPair,
+        orderType  = OrderType.BUY,
+        amount     = 500,
+        price      = 2.waves * Order.PriceConstant,
+        fee        = smartTradeFee,
+        version    = 2,
+        timeToLive = 10.minutes
+      ) shouldBe true
     }
 
     "can trade from non-scripted account" in {

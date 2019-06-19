@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{Actor, Props}
 import com.wavesplatform.matcher.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.matcher.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.matcher.settings.MatcherSettings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.matcher.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
 
@@ -42,7 +42,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
 
       broadcast(ready)
       log.debug(
-        s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${expired.size} failed to send: ${expired.map(_.id().base58).mkString(", ")}")
+        s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
 
       scheduleSend()
       context.become(watching(next ++ ready, Vector.empty))

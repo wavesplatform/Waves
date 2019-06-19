@@ -395,7 +395,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     val js = Json.parse("""{
          "version": 2,
          "type":7,
-         "id":"4f4ntXNge7QNLP2DhMPJJzgngygEboLQQdBmzLYGeRoT",
+         "id":"3G1U1UX2mtWXVdZTZNjEYvPeNn6cyYmmjHYUePrg4zM5",
          "sender":"3N22UCTvst8N1i1XDvGHzyqdgmZgwDKbp44",
          "senderPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",
          "fee":1,
@@ -404,7 +404,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
          "proofs":["5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa"],
          "order1":{
             "version": 3,
-            "id":"BRAgLHDZFEMP5zRXrAis4EcwuYj11ksD1vq3ZsmiUVSp",
+            "id":"8KZby2jXfFCaFtEKejqBbutQvyimgeQykwPKGi3ufNiA",
             "sender":"3MthkhReCHXeaPZcWXcT3fa6ey1XWptLtwj",
             "senderPublicKey":"BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ",
             "matcherPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",

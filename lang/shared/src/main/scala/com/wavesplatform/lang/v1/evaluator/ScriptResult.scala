@@ -69,11 +69,11 @@ object ScriptResult {
 
   private def processContractSet(c: CaseObj) = c match {
     case CaseObj(_, fields) =>
-      val writes = fields(FieldNames.Data) match {
+      val writes = fields(FieldNames.ScriptWriteSet) match {
         case c @ CaseObj(tpe, _) if tpe.name == FieldNames.WriteSet => processWriteSet(c)
         case other                                                  => err(other, FieldNames.Data)
       }
-      val payments = fields(FieldNames.Transfers) match {
+      val payments = fields(FieldNames.ScriptTransferSet) match {
         case c @ CaseObj(tpe, _) if tpe.name == FieldNames.TransferSet => processTransferSet(c)
         case other                                                     => err(other, FieldNames.Transfers)
       }

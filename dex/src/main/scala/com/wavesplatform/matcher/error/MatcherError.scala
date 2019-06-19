@@ -240,13 +240,22 @@ object MatcherError {
         e"Trading is not allowed for the pair: ${'amountAssetId -> orderAssetPair.amountAsset} - ${'priceAssetId -> orderAssetPair.priceAsset}"
       )
 
-  case object OrderV3IsNotAllowed
+  case class OrderVersionIsNotAllowed(version: Byte, allowedVersions: Set[Byte])
       extends MatcherError(
         order,
         commonEntity,
         denied,
-        e"The orders of version 3 are not allowed by matcher"
+        e"The orders of version ${'version -> version} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toSeq.sorted
+          .mkString(", ")}"
       )
+
+  case class UnknownOrderVersion(version: Byte)
+    extends MatcherError(
+      order,
+      commonEntity,
+      denied,
+      e"Unknown order version: ${'version -> version}. Allowed order versions can be obtained via /matcher/settings GET method"
+    )
 
   import OrderRestrictionsSettings.formatValue
 
@@ -257,7 +266,7 @@ object MatcherError {
         denied,
         e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> formatValue(Denormalization
           .denormalizeAmountAndFee(ord.amount, amountAssetDecimals))}) does not meet matcher requirements: max amount = ${'maxAmount -> formatValue(
-          amtSettings.maxAmount)}, min amount = ${'minAmount                                                                         -> formatValue(amtSettings.minAmount)}, step size = ${'stepSize -> formatValue(amtSettings.stepSize)}"
+          amtSettings.maxAmount)}, min amount = ${'minAmount                                                                         -> formatValue(amtSettings.minAmount)}, step amount = ${'stepAmount -> formatValue(amtSettings.stepAmount)}"
       )
 
   case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings, amountAssetDecimals: Int, priceAssetDecimals: Int)
@@ -267,8 +276,7 @@ object MatcherError {
         denied,
         e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> formatValue(Denormalization
           .denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max price = ${'maxPrice -> formatValue(
-          prcSettings.maxPrice)}, min price = ${'minPrice                                                                                      -> formatValue(prcSettings.minPrice)}, tick size = ${'tickSize -> formatValue(
-          prcSettings.tickSize)}, merge small prices = ${'mergeSmallPrices                                                                     -> prcSettings.mergeSmallPrices}"
+          prcSettings.maxPrice)}, min price = ${'minPrice                                                                                      -> formatValue(prcSettings.minPrice)}, step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"
       )
 
   case class OrderRestrictionsNotFound(assetPair: AssetPair)

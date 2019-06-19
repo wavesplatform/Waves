@@ -15,7 +15,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(blockchain: Blockchain, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
 
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
@@ -59,7 +59,7 @@ object ExchangeTransactionDiff {
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
-          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
+          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height))
           .count(identity)
 
         assetScripted +
@@ -111,7 +111,6 @@ object ExchangeTransactionDiff {
       val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
       Diff(
-        height,
         tx,
         portfolios = portfolios,
         orderFills = Map(

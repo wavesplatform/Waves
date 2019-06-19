@@ -1,5 +1,7 @@
 syntax = "proto3";
-package com.wavesplatform.api.grpc;
+package waves.grpc;
+option java_package = "com.wavesplatform.api.grpc";
+option csharp_namespace = "Waves.Grpc";
 
 import "transactions_api.proto";
 import "transaction.proto";
@@ -22,7 +24,7 @@ message DataRequest {
 
 message BalancesRequest {
     bytes address = 1;
-    repeated AssetId assets = 4;
+    repeated waves.AssetId assets = 4;
 }
 
 message BalanceResponse {
@@ -38,13 +40,13 @@ message BalanceResponse {
     bytes address = 1; // TODO: ???
     oneof balance {
         WavesBalances waves = 2;
-        AssetAmount asset = 3;
+        waves.AssetAmount asset = 3;
     }
 }
 
 message DataEntryResponse {
     bytes address = 1;
-    DataTransactionData.DataEntry entry = 2;
+    waves.DataTransactionData.DataEntry entry = 2;
 }
 
 message ScriptData {

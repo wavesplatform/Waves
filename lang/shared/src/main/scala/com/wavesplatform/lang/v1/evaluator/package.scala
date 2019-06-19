@@ -19,7 +19,7 @@ package object evaluator {
     TaskM(_ => ter)
   }
 
-  type LetExecResult  = Either[ExecutionError, Any]
+  type LetExecResult  = Either[ExecutionError, compiler.Terms.EVALUATED]
   type LogItem        = (String, LetExecResult)
   type Log            = List[LogItem]
   type LogCallback    = LetExecResult => Unit

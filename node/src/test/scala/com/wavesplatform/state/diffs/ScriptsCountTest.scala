@@ -203,7 +203,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         case (_, state) =>
           txs.foldLeft(Diff.empty) { (diff, tx) =>
             val newState = CompositeBlockchain.composite(state, diff)
-            val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp, state.height)(newState, tx).resultE.explicitGet()
+            val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
             val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
             if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
             Monoid.combine(diff, newDiff)

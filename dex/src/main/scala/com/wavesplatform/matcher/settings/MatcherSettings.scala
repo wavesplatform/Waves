@@ -2,24 +2,24 @@ package com.wavesplatform.matcher.settings
 
 import java.io.File
 
+import cats.data.NonEmptyList
 import com.typesafe.config.Config
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.model.OrderValidator
-import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.matcher.settings.DeviationsSettings._
-import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
+import com.wavesplatform.matcher.settings.EventsQueueSettings.eventsQueueSettingsReader
 import com.wavesplatform.matcher.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.matcher.settings.OrderHistorySettings._
-import com.wavesplatform.matcher.settings.OrderRestrictionsSettings._
+import com.wavesplatform.matcher.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.matcher.settings.PostgresConnection._
 import com.wavesplatform.settings.utils.ConfigOps._
+import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import com.wavesplatform.matcher.settings.RawMatchingRules.rawMatchingRulesNelReader
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
@@ -49,30 +49,21 @@ case class MatcherSettings(account: String,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+                           matchingRules: Map[AssetPair, NonEmptyList[RawMatchingRules]],
                            allowedAssetPairs: Set[AssetPair],
-                           allowOrderV3: Boolean,
+                           allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings])
 
 object MatcherSettings {
 
-  implicit val addressReader: ValueReader[Address] = (cfg, path) => Address.fromString(cfg.getString(path)).explicitGet()
-  implicit val chosenCase: NameMapper              = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-
-  case class EventsQueueSettings(tpe: String, local: LocalMatcherQueue.Settings, kafka: KafkaMatcherQueue.Settings)
-
-  private[this] implicit val eventsQueueSettingsReader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
-    EventsQueueSettings(
-      tpe = cfg.getString(s"$path.type"),
-      local = cfg.as[LocalMatcherQueue.Settings](s"$path.local"),
-      kafka = cfg.as[KafkaMatcherQueue.Settings](s"$path.kafka")
-    )
-  }
-
-  implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
+  implicit val chosenCase: NameMapper                              = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val matcherSettingsReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
+
+    import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
 
     val account     = config.as[String]("account")
     val bindAddress = config.as[String]("bind-address")
@@ -107,10 +98,11 @@ object MatcherSettings {
 
     val orderFee          = config.as[OrderFeeSettings]("order-fee")
     val deviation         = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
+    val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules     = config.getValidatedMap[AssetPair, NonEmptyList[RawMatchingRules]]("matching-rules")(validateAssetPairKey)
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
-    val allowOrderV3            = config.as[Boolean]("allow-order-v3")
+    val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
     val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
     val postgresConnection = config.as[PostgresConnection]("postgres")
@@ -141,13 +133,12 @@ object MatcherSettings {
       orderFee,
       deviation,
       orderRestrictions,
+      matchingRules,
       allowedAssetPairs,
-      allowOrderV3,
+      allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
       orderHistory
     )
   }
-
-  case class ExchangeTransactionBroadcastSettings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
 }

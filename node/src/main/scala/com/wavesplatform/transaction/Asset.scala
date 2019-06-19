@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.protobuf.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
@@ -24,7 +25,7 @@ object Asset {
     case _ => JsError("Expected base58-encoded assetId")
   }
   implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
-    JsString(asset.id.base58)
+    JsString(asset.id.toString)
   }
 
   implicit val assetIdReads: Reads[Asset] = Reads {
@@ -34,7 +35,7 @@ object Asset {
   }
   implicit val assetIdWrites: Writes[Asset] = Writes {
     case Waves           => JsNull
-    case IssuedAsset(id) => JsString(id.base58)
+    case IssuedAsset(id) => JsString(id.toString)
   }
 
   implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
@@ -57,15 +58,20 @@ object Asset {
     else IssuedAsset(byteStr.toByteArray)
   }
 
+  def fromProtoId(assetId: AssetId): Asset = assetId.asset match {
+    case AssetId.Asset.IssuedAsset(bs) => fromProtoId(bs)
+    case _ => Waves
+  }
+
   implicit class AssetIdOps(private val ai: Asset) extends AnyVal {
     def byteRepr: Array[Byte] = ai match {
       case Waves           => Array(0: Byte)
       case IssuedAsset(id) => (1: Byte) +: id.arr
     }
 
-    def protoId: ByteString = ai match {
-      case IssuedAsset(id) => ByteString.copyFrom(id)
-      case Waves           => ByteString.EMPTY
+    def protoId: AssetId = ai match {
+      case IssuedAsset(id) => AssetId().withIssuedAsset(ByteString.copyFrom(id))
+      case Waves => AssetId().withWaves(com.google.protobuf.empty.Empty())
     }
 
     def compatId: Option[ByteStr] = ai match {
@@ -75,7 +81,7 @@ object Asset {
 
     def maybeBase58Repr: Option[String] = ai match {
       case Waves           => None
-      case IssuedAsset(id) => Some(id.base58)
+      case IssuedAsset(id) => Some(id.toString)
     }
 
     def fold[A](onWaves: => A)(onAsset: IssuedAsset => A): A = ai match {

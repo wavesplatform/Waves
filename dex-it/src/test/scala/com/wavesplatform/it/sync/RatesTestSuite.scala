@@ -19,7 +19,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     val orderFeeSettingsStr =
       s"""
          |waves.matcher {
-         |  allow-order-v3 = yes
+         |  allowed-order-versions = [1, 2, 3]
          |  order-fee {
          |    mode = dynamic
          |    dynamic {
@@ -46,10 +46,10 @@ class RatesTestSuite extends MatcherSuiteBase {
   val wctRate        = 0.2
   val wctRateUpdated = 0.5
 
-  val wctStr   = WctId.base58
+  val wctStr = WctId.toString
   val wctAsset = IssuedAsset(WctId)
 
-  val btcStr   = BtcId.base58
+  val btcStr = BtcId.toString
   val btcAsset = IssuedAsset(BtcId)
 
   val (amount, price) = (1000L, PriceConstant)

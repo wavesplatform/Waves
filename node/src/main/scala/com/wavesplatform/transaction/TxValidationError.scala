@@ -68,8 +68,8 @@ object TxValidationError {
     else {
       log
         .map {
-          case (name, Right(v: CaseObj)) => s"$name = ${v.prettyString(1)}"
-          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
+          case (name, Right(v)) => s"$name = ${v.prettyString(1)}"
+//          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
           case (name, l@Left(_))         => s"$name = $l"
         }
         .map("\t" + _)

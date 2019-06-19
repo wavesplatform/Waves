@@ -5,12 +5,12 @@ import play.api.libs.json._
 
 trait ProvenTransaction extends Transaction with Proven {
 
-  protected def proofField: Seq[(String, JsValue)] = Seq("proofs" -> JsArray(this.proofs.proofs.map(p => JsString(p.base58))))
+  protected def proofField: Seq[(String, JsValue)] = Seq("proofs" -> JsArray(this.proofs.proofs.map(p => JsString(p.toString))))
 
   protected def jsonBase(): JsObject =
     Json.obj(
       "type"            -> builder.typeId,
-      "id"              -> id().base58,
+      "id" -> id().toString,
       "sender"          -> sender.address,
       "senderPublicKey" -> Base58.encode(sender),
       "fee"             -> assetFee._2,

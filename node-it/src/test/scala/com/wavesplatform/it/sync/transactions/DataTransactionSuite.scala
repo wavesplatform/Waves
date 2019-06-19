@@ -59,7 +59,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     for ((tx, diag) <- invalidTxs) {
       assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
-      nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
+      nodes.foreach(_.ensureTxDoesntExist(tx.id().toString))
     }
 
     nodes.waitForHeightArise()

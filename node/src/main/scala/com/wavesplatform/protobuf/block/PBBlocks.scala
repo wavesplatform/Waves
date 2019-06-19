@@ -68,8 +68,9 @@ object PBBlocks {
     )
   }
 
-  def setChainId(block: PBBlock): PBBlock = {
+  def addChainId(block: PBBlock): PBBlock = {
     val chainId = AddressScheme.current.chainId
+
     block.update(
       _.header.chainId := chainId,
       _.transactions.foreach(_.transaction.chainId := chainId)
