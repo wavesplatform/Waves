@@ -70,7 +70,7 @@ class AddressActor(
 
   private def tradableBalance(assetId: Option[AssetId]): Long = spendableBalance(assetId) - reservedBalance(assetId)
 
-  private def reservedBalance(assetId: Option[AssetId]): Long = openVolume(assetId) + assetId.fold(0L)(blockedBalance)
+  private def reservedBalance(assetId: Option[AssetId]): Long = math.max(openVolume(assetId) + assetId.fold(0L)(blockedBalance), 0)
 
   private val validator =
     OrderValidator.accountStateAware(owner,

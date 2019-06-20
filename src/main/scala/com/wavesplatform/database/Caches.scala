@@ -211,7 +211,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[AssetId, Sponsorship],
-                         trackedAssetBalances: Map[BigInt, Map[ByteStr, Long]]): Unit
+                         extraReservedBalances: Map[BigInt, Map[ByteStr, Long]]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1

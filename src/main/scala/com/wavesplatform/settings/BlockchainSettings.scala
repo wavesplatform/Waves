@@ -203,5 +203,5 @@ object TrackedAssetsSettings {
     else portfolios.map { case (address, portfolio) => address -> fromOrig(portfolio, settings) }
 
   private def fromOrig(portfolio: Portfolio, settings: TrackedAssetsSettings): Portfolio =
-    Portfolio(0, LeaseBalance.empty, portfolio.assets.filter { case (assetId, v) => v > 0 && settings.assets.contains(assetId) })
+    Portfolio(0, LeaseBalance.empty, portfolio.assets.filter { case (assetId, _) => settings.assets.contains(assetId) })
 }

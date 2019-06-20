@@ -10,8 +10,8 @@ import com.wavesplatform.it.sync.matcher.BlockedAssetsTestSuite._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV2, Order, OrderV2}
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV2, Order, OrderV2}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV2}
 import org.scalatest._
 
@@ -27,12 +27,13 @@ class BlockedAssetsTestSuite
 
   private def matcher = dockerNodes().head
   private def alice   = dockerNodes()(1)
+  private def miner   = dockerNodes()(2)
 
   val (amount, price) = (1000L, Order.PriceConstant)
 
   private val asset = {
-    val txId   = matcher.signedBroadcast(IssueUsdTx.json()).id
-    val height = matcher.waitForTransaction(txId).height
+    val txId   = miner.signedBroadcast(IssueUsdTx.json()).id
+    val height = miner.waitForTransaction(txId).height
     nodes.waitForHeight(height + 1)
     IssueUsdTx
   }
@@ -44,7 +45,7 @@ class BlockedAssetsTestSuite
       .selfSigned(
         assetId = Some(asset.id()),
         sender = matcher.privateKey,
-        recipient = alice.publicKey.toAddress,
+        recipient = miner.publicKey.toAddress,
         amount = toTransfer,
         timestamp = System.currentTimeMillis(),
         feeAssetId = None,
@@ -53,108 +54,439 @@ class BlockedAssetsTestSuite
       )
       .explicitGet()
 
-  "TransferTransaction" in {
-    val transferTx = TransferTransactionV2
-      .selfSigned(
-        assetId = Some(asset.id()),
-        sender = alice.privateKey,
-        recipient = matcher.publicKey.toAddress,
-        amount = toTransfer,
-        timestamp = System.currentTimeMillis(),
-        feeAssetId = None,
-        feeAmount = 300000L,
-        attachment = Array.emptyByteArray
-      )
-      .explicitGet()
-    matcher.signedBroadcast(transferTx.json(), waitForTx = true)
-    nodes.waitForHeight(matcher.transactionInfo(transferTx.id().base58).height + 1)
-
-    val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
-    tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
-
-    val reservedBalance = matcher.reservedBalance(matcher.privateKey)
-    reservedBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer
-
-    matcher.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
-
-//    matcher.signedBroadcast(reverseTransferTx.json(), waitForTx = true)
-  }
-
-  "MassTransferTransaction" in {
-    val transferTx = MassTransferTransaction
-      .selfSigned(
-        assetId = Some(asset.id()),
-        sender = alice.privateKey,
-        transfers = List(MassTransferTransaction.ParsedTransfer(matcher.publicKey.toAddress, toTransfer)),
-        timestamp = System.currentTimeMillis(),
-        feeAmount = 300000L,
-        attachment = Array.emptyByteArray
-      )
-      .explicitGet()
-    matcher.signedBroadcast(transferTx.json(), waitForTx = true)
-    nodes.waitForHeight(matcher.transactionInfo(transferTx.id().base58).height + 1)
-
-    val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
-    tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
-
-    val reservedBalance = matcher.reservedBalance(matcher.privateKey)
-    reservedBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer * 2
-
-    matcher.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
-
-//    matcher.signedBroadcast(reverseTransferTx.json(), waitForTx = true)
-  }
-
-  "ExchangeTransaction from different matcher" in {
-    val now   = System.currentTimeMillis()
-    val price = Order.PriceConstant
-    val exchangeTx = ExchangeTransactionV2
-      .create(
-        matcher = alice.privateKey,
-        buyOrder = OrderV2.buy(
+  "Do not track from allowed sender" - {
+    "TransferTransaction" in {
+      val transferTx = TransferTransactionV2
+        .selfSigned(
+          assetId = Some(asset.id()),
           sender = alice.privateKey,
-          matcher = alice.publicKey,
-          pair = wavesUsdPair,
+          recipient = miner.publicKey.toAddress,
+          amount = toTransfer,
+          timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
+          feeAmount = 300000L,
+          attachment = Array.emptyByteArray
+        )
+        .explicitGet()
+      miner.signedBroadcast(transferTx.json(), waitForTx = true)
+      nodes.waitForTransaction(transferTx.id().base58)
+
+      withClue("after transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("alice") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(alice.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(alice.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity - toTransfer
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer
+          }
+        }
+      }
+    }
+
+    "MassTransferTransaction" in {
+      val transferTx = MassTransferTransaction
+        .selfSigned(
+          assetId = Some(asset.id()),
+          sender = alice.privateKey,
+          transfers = List(MassTransferTransaction.ParsedTransfer(miner.publicKey.toAddress, toTransfer)),
+          timestamp = System.currentTimeMillis(),
+          feeAmount = 300000L,
+          attachment = Array.emptyByteArray
+        )
+        .explicitGet()
+      miner.signedBroadcast(transferTx.json(), waitForTx = true)
+      nodes.waitForTransaction(transferTx.id().base58)
+
+      withClue("after transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("alice") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(alice.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(alice.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity - toTransfer * 2
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer * 2
+          }
+        }
+      }
+    }
+
+    "ExchangeTransaction" in {
+      val now   = System.currentTimeMillis()
+      val price = Order.PriceConstant
+      val exchangeTx = ExchangeTransactionV2
+        .create(
+          matcher = alice.privateKey,
+          buyOrder = OrderV2.buy(
+            sender = alice.privateKey,
+            matcher = alice.publicKey,
+            pair = wavesUsdPair,
+            amount = asset.quantity - toTransfer * 2,
+            price = price,
+            timestamp = now,
+            expiration = now + 10.days.toMillis,
+            matcherFee = 3000000
+          ),
+          sellOrder = OrderV2.sell(
+            sender = miner.privateKey,
+            matcher = alice.publicKey,
+            pair = wavesUsdPair,
+            amount = asset.quantity - toTransfer * 2,
+            price = price,
+            timestamp = now,
+            expiration = now + 10.days.toMillis,
+            matcherFee = 3000000
+          ),
+          amount = asset.quantity - toTransfer * 2,
+          price = price,
+          buyMatcherFee = 3000000,
+          sellMatcherFee = 3000000,
+          fee = 3000000,
+          timestamp = System.currentTimeMillis()
+        )
+        .explicitGet()
+      miner.signedBroadcast(exchangeTx.json(), waitForTx = true)
+      nodes.waitForTransaction(exchangeTx.id().base58)
+
+      withClue("after transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("alice") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(alice.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(alice.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity
+          }
+        }
+      }
+    }
+  }
+
+  "Track" - {
+    "TransferTransaction" in {
+      val transferTx = TransferTransactionV2
+        .selfSigned(
+          assetId = Some(asset.id()),
+          sender = miner.privateKey,
+          recipient = matcher.publicKey.toAddress,
+          amount = toTransfer,
+          timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
+          feeAmount = 300000L,
+          attachment = Array.emptyByteArray
+        )
+        .explicitGet()
+      miner.signedBroadcast(transferTx.json(), waitForTx = true)
+      nodes.waitForTransaction(transferTx.id().base58)
+
+      withClue("after transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity - toTransfer
+          }
+        }
+      }
+
+      matcher.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
+
+      val reverseTransferTxId = miner.signedBroadcast(reverseTransferTx.json(), waitForTx = true).id
+      nodes.waitForTransaction(reverseTransferTxId)
+
+      withClue("after reverse transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity
+          }
+        }
+      }
+    }
+
+    "MassTransferTransaction" in {
+      val transferTx = MassTransferTransaction
+        .selfSigned(
+          assetId = Some(asset.id()),
+          sender = miner.privateKey,
+          transfers = List(MassTransferTransaction.ParsedTransfer(matcher.publicKey.toAddress, toTransfer)),
+          timestamp = System.currentTimeMillis(),
+          feeAmount = 300000L,
+          attachment = Array.emptyByteArray
+        )
+        .explicitGet()
+      miner.signedBroadcast(transferTx.json(), waitForTx = true)
+      nodes.waitForTransaction(transferTx.id().base58)
+
+      withClue("after transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity - toTransfer
+          }
+        }
+      }
+
+      matcher.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
+
+      val reverseTransferTxId = matcher.signedBroadcast(reverseTransferTx.json(), waitForTx = true).id
+      nodes.waitForTransaction(reverseTransferTxId)
+
+      withClue("after reverse transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity
+          }
+        }
+      }
+    }
+
+    "ExchangeTransaction from different matcher" in {
+      val now   = System.currentTimeMillis()
+      val price = Order.PriceConstant
+      val exchangeTx = ExchangeTransactionV2
+        .create(
+          matcher = miner.privateKey,
+          buyOrder = OrderV2.buy(
+            sender = miner.privateKey,
+            matcher = miner.publicKey,
+            pair = wavesUsdPair,
+            amount = toTransfer,
+            price = price,
+            timestamp = now,
+            expiration = now + 10.days.toMillis,
+            matcherFee = 3000000
+          ),
+          sellOrder = OrderV2.sell(
+            sender = matcher.privateKey,
+            matcher = miner.publicKey,
+            pair = wavesUsdPair,
+            amount = toTransfer,
+            price = price,
+            timestamp = now,
+            expiration = now + 10.days.toMillis,
+            matcherFee = 3000000
+          ),
           amount = toTransfer,
           price = price,
-          timestamp = now,
-          expiration = now + 10.days.toMillis,
-          matcherFee = 3000000
-        ),
-        sellOrder = OrderV2.sell(
-          sender = matcher.privateKey,
-          matcher = alice.publicKey,
-          pair = wavesUsdPair,
-          amount = toTransfer,
-          price = price,
-          timestamp = now,
-          expiration = now + 10.days.toMillis,
-          matcherFee = 3000000
-        ),
-        amount = toTransfer,
-        price = price,
-        buyMatcherFee = 3000000,
-        sellMatcherFee = 3000000,
-        fee = 3000000,
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
-    matcher.signedBroadcast(exchangeTx.json(), waitForTx = true)
-    nodes.waitForHeight(matcher.transactionInfo(exchangeTx.id().base58).height + 1)
+          buyMatcherFee = 3000000,
+          sellMatcherFee = 3000000,
+          fee = 3000000,
+          timestamp = System.currentTimeMillis()
+        )
+        .explicitGet()
+      miner.signedBroadcast(exchangeTx.json(), waitForTx = true)
+      nodes.waitForTransaction(exchangeTx.id().base58)
 
-    val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
-    tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+      withClue("after exchange") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer
+          }
 
-    val reservedBalance = matcher.reservedBalance(matcher.privateKey)
-    reservedBalance.getOrElse(asset.id().base58, 0) shouldBe toTransfer * 3
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
 
-    matcher.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity - toTransfer
+          }
+        }
+      }
+
+      matcher.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
+
+      val reverseTransferTxId = matcher.signedBroadcast(reverseTransferTx.json(), waitForTx = true).id
+      nodes.waitForTransaction(reverseTransferTxId)
+
+      withClue("after reverse transfer") {
+        withClue("matcher") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(matcher.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(matcher.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+        }
+
+        withClue("miner") {
+          withClue("reserved") {
+            val reservedBalance = matcher.reservedBalance(miner.privateKey)
+            reservedBalance.getOrElse(asset.id().base58, 0) shouldBe 0
+          }
+
+          withClue("tradable") {
+            val tradableBalance = matcher.tradableBalance(miner.privateKey, wavesUsdPair)
+            tradableBalance.getOrElse(asset.id().base58, 0) shouldBe asset.quantity
+          }
+        }
+      }
+    }
   }
 }
 
 object BlockedAssetsTestSuite {
   private def ConfigOverrides = ConfigFactory.parseString(s"""waves.blockchain.custom.functionality.tracked-assets {
-                                                             |  allowed-sources = [${Configs.head.getString("waves.matcher.account")}]
+                                                             |  allowed-sources = ["${Configs(1).getString("address")}"]
                                                              |  assets = ["${IssueUsdTx.id().base58}"]
                                                              |}""".stripMargin)
 }
