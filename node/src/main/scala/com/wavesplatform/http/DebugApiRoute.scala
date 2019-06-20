@@ -383,12 +383,14 @@ case class DebugApiRoute(ws: WavesSettings,
           .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
         complete(resultE)
 
-      case Some((h, tx)) =>
-        // Doesnt include masstransfer, leases, etc additional information
-        complete(tx.json() ++ Json.obj("height" -> h))
+      case Some((_, tx)) =>
+        complete(
+          StatusCodes.NotImplemented -> Json.obj("status" -> "error",
+                                                 "details" -> s"State changes are not recorded for transactions of type ${tx.builder.typeId}"))
 
       case None =>
-        complete(StatusCodes.NotFound)
+        complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+
     }
   }
 
