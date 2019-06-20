@@ -699,10 +699,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(src) shouldBe Right(unit)
   }
 
+  property("lastIndexOf from string with Int.MaxValue offset") {
+    val src =
+      s""" "abc".lastIndexOf("c", ${Int.MaxValue}) """
+    eval(src) shouldBe Right(CONST_LONG(2))
+  }
+
   property("lastIndexOf from string with Long.MaxValue offset") {
     val src =
       s""" "abc".lastIndexOf("c", ${Long.MaxValue}) """
-    eval(src) shouldBe Right(unit)
+    eval(src) shouldBe Right(CONST_LONG(2))
   }
 
   property("lastIndexOf from string with negative offset") {

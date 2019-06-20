@@ -97,7 +97,7 @@ object CryptoContext {
 
     def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "Base58 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                   => notImplemented("toBase58String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase58String(bytes: ByteVector)", xs)
     }
 
     def fromBase58StringF: BaseFunction =
@@ -108,7 +108,7 @@ object CryptoContext {
 
     def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "Base64 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                   => notImplemented("toBase64String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase64String(bytes: ByteVector)", xs)
     }
 
     def fromBase64StringF: BaseFunction =
@@ -135,7 +135,7 @@ object CryptoContext {
 
     def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                   => notImplemented("toBase16String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF: BaseFunction =
