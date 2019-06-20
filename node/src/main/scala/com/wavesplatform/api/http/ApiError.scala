@@ -60,7 +60,9 @@ object ApiError {
     }
 
   implicit val lvWrites: Writes[LazyVal] = Writes { lv =>
-    Coeval.fromEval(lv.value).attempt
+    Coeval
+      .fromEval(lv.value)
+      .attempt
       .map({
         case Left(thr) =>
           Json.obj(
@@ -312,5 +314,4 @@ object ApiError {
   implicit class ApiErrorException(val error: ApiError) extends IllegalArgumentException(error.message) {
     def toException = this
   }
-
 }
