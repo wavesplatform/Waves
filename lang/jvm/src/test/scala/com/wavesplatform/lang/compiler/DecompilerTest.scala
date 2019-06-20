@@ -10,8 +10,10 @@ import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Matchers, PropSpec}
@@ -24,7 +26,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   val CTX: CTX =
-    Monoid.combineAll(Seq(PureContext.build(Global, V3), CryptoContext.build(Global, V3)))
+    Monoid.combineAll(Seq(testContext, CryptoContext.build(Global, V3)))
 
   val decompilerContext = CTX.decompilerContext
 
@@ -455,15 +457,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )
       )
     )
+
     Decompiler(expr, decompilerContext) shouldEq
       """let startHeight = 1375557
         |let startPrice = 100000
         |let interval = (24 * 60)
         |let exp = ((100 * 60) * 1000)
-        |let $match0 = tx
-        |if (_isInstanceOf($match0, "ExchangeTransaction"))
-        |    then {
-        |        let e = $match0
+        |match tx {
+        |    case e: ExchangeTransaction => 
         |        let days = ((height - startHeight) / interval)
         |        if (if (if ((e.price >= (startPrice * (1 + (days * days)))))
         |            then !(isDefined(e.sellOrder.assetPair.priceAsset))
@@ -472,13 +473,75 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |            else false)
         |            then (exp >= (e.buyOrder.expiration - e.buyOrder.timestamp))
         |            else false
-        |        }
-        |    else if (_isInstanceOf($match0, "BurnTransaction"))
-        |        then {
-        |            let tx = $match0
-        |            true
-        |            }
-        |        else false""".stripMargin
+        |    case tx: BurnTransaction => 
+        |        true
+        |    case _ => 
+        |        false
+        |}""".stripMargin
   }
 
+  def compile(code: String): Either[String, (EXPR, TYPE)] = {
+    val untyped = Parser.parseExpr(code).get.value
+    val typed = ExpressionCompiler(compilerContext, untyped)
+    typed
+  }
+
+  property("match") {
+    val script = """
+      match tv {
+        case x : PointA|PointB => 1
+        case x : PointC => 2
+    }"""
+
+    val Right((expr, ty)) = compile(script)
+ 
+    val rev = Decompiler(expr, decompilerContext)
+
+    rev shouldEq """match tv {
+    |    case x: PointB|PointA => 
+    |        1
+    |    case x: PointC => 
+    |        2
+    |    case _ => 
+    |        throw()
+    |}""".stripMargin
+  }
+
+  property("match with case without type") {
+    val script = """
+      match tv {
+        case x : PointA|PointB => 1
+        case x => 2
+    }"""
+
+    val Right((expr, ty)) = compile(script)
+ 
+    val rev = Decompiler(expr, decompilerContext)
+
+    rev shouldEq """match tv {
+    |    case x: PointB|PointA => 
+    |        1
+    |    case x => 
+    |        2
+    |}""".stripMargin
+  }
+
+  property("match with case without var") {
+    val script = """
+      match tv {
+        case _ : PointA|PointB => 1
+        case x => 2
+    }"""
+
+    val Right((expr, ty)) = compile(script)
+ 
+    val rev = Decompiler(expr, decompilerContext)
+
+    rev shouldEq """match tv {
+    |    case _: PointB|PointA => 
+    |        1
+    |    case x => 
+    |        2
+    |}""".stripMargin
+  }
 }

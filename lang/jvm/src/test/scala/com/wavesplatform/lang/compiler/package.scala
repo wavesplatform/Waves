@@ -33,13 +33,14 @@ package object compiler {
                    ("p2", TYPEPARAM('T'), "p2")) { case l => Right(l.head) }
 
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
-  val compilerContext: CompilerContext = Monoid
+  val testContext = Monoid
     .combine(
       PureContext.build(Global, V3),
       CTX(
-        Seq(pointType, Common.pointTypeA, Common.pointTypeB),
+        Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
         Map(
           ("p", ((Common.AorB, "Test variable"), null)),
+          ("tv", ((Common.AorBorC, "Yet test variable"), null)),
           ("l", ((LIST(LONG), "Test list"), LazyVal(EitherT.pure(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))))),
           ("lpa", ((LIST(Common.pointTypeA), "Yet test list"), LazyVal(EitherT.pure(arr)))),
           ("lpabc", ((LIST(Common.AorBorC), "Yet another test list"), LazyVal(EitherT.pure(arr))))
@@ -47,6 +48,7 @@ package object compiler {
         Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
       )
     )
-    .compilerContext
+
+  val compilerContext = testContext.compilerContext
 
 }
