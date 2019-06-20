@@ -38,13 +38,15 @@ object FunctionIds {
 
   val CREATE_LIST: Short = 1100
 
-  val UTF8STRING: Short = 1200
-  val BININT: Short     = 1201
-  val BININT_OFF: Short = 1202
-  val INDEXOF: Short    = 1203
-  val INDEXOFN: Short   = 1204
-  val SPLIT: Short      = 1205
-  val PARSEINT: Short   = 1206
+  val UTF8STRING: Short   = 1200
+  val BININT: Short       = 1201
+  val BININT_OFF: Short   = 1202
+  val INDEXOF: Short      = 1203
+  val INDEXOFN: Short     = 1204
+  val SPLIT: Short        = 1205
+  val PARSEINT: Short     = 1206
+  val LASTINDEXOF: Short  = 1207
+  val LASTINDEXOFN: Short = 1208
 
   // Crypto
   val SIGVERIFY: Short = 500

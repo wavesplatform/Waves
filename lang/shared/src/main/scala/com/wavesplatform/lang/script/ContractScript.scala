@@ -3,9 +3,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits.{MaxContractSizeInBytes, MaxComplexityByVersion}
+import com.wavesplatform.lang.v1.ContractLimits.{MaxComplexityByVersion, MaxContractSizeInBytes}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader, ScriptEstimator}
 import monix.eval.Coeval
 
 object ContractScript {
@@ -45,16 +45,16 @@ object ContractScript {
         .map {
           case (annotationArgName, funcExpr) =>
             ScriptEstimator(varNames(version, DAppType),
-              functionCosts(version),
-              constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr))
+                            functionCosts(version),
+                            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
         }
     funcsWithComplexity.toVector.sequence
   }
 
-  def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (String, Long)] = {
-    estimateComplexityByFunction(version, contract).map(namesAndComp => (("", 0L) +: namesAndComp).maxBy(_._2))
-  }
+  def estimateComplexity(version: StdLibVersion, contract: DApp): Either[String, (Long, Vector[(String, Long)])] =
+    estimateComplexityByFunction(version, contract)
+      .map(namesAndComp => ((("", 0L) +: namesAndComp).map(_._2).max, namesAndComp))
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =

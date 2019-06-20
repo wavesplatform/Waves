@@ -76,7 +76,7 @@ package object predef {
        |
        | let eqUnion = match tx {
        |   case _: DataTransaction => true
-       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.bytes.base58}')
+       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.bytes.toString}')
        |   case _ => false
        | }
        |
@@ -130,8 +130,8 @@ package object predef {
        | let txById = match tx {
        |     case _: DataTransaction => true
        |     case _: TransferTransaction =>
-       |       let g = extract(transactionById(base58'${tx.id().base58}'))
-       |       g.id == base58'${tx.id().base58}'
+       |       let g = extract(transactionById(base58'${tx.id().toString}'))
+       |       g.id == base58'${tx.id().toString}'
        |     case _ => false
        | }
        | let entries = match tx {
@@ -153,7 +153,7 @@ package object predef {
        |     dataByKey && dataByIndex
        |
        |   case _: TransferTransaction =>
-       |     let add = Address(base58'${t.recipient.bytes.base58}')
+       |     let add = Address(base58'${t.recipient.bytes.toString}')
        |     let long = extract(getInteger(add,"${tx.data(0).key}")) == ${tx.data(0).value}
        |     let bool1 = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
        |     let bin = extract(getBinary(add,"${tx.data(2).key}")) ==  base58'${tx.data(2).value}'
@@ -167,8 +167,8 @@ package object predef {
        |
        | let aFromPK = addressFromPublicKey(tx.senderPublicKey) == tx.sender
        | let aFromStrOrRecip = match tx {
-       |   case _: DataTransaction => addressFromString("${tx.sender.address}") == Address(base58'${tx.sender.bytes.base58}')
-       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient.bytes.base58}')
+       |   case _: DataTransaction => addressFromString("${tx.sender.address}") == Address(base58'${tx.sender.bytes.toString}')
+       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient.bytes.toString}')
        |   case _ => false
        | }
        |

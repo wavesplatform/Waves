@@ -43,7 +43,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   test("cannot exchange non-issued assets") {
     for ((o1ver, o2ver, tver) <- versions) {
 
-      val assetId = exchAsset.id().base58
+      val assetId = exchAsset.id().toString
 
       val buyer               = acc0
       val seller              = acc1
@@ -105,8 +105,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   }
 
   test("negative - check orders v2 and v3 with exchange tx v1") {
-    if (sender.findTransactionInfo(exchAsset.id().base58).isEmpty) sender.postJson("/transactions/broadcast", exchAsset.json())
-    pair = AssetPair.createAssetPair("WAVES", exchAsset.id().base58).get
+    if (sender.findTransactionInfo(exchAsset.id().toString).isEmpty) sender.postJson("/transactions/broadcast", exchAsset.json())
+    pair = AssetPair.createAssetPair("WAVES", exchAsset.id().toString).get
 
     for ((o1ver, o2ver) <- Seq(
            (2: Byte, 1: Byte),
@@ -143,7 +143,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     sender.postJson("/transactions/broadcast", IssueTx.json())
 
-    nodes.waitForHeightAriseAndTxPresent(assetId.base58)
+    nodes.waitForHeightAriseAndTxPresent(assetId.toString)
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
@@ -160,15 +160,15 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       var assetBalanceBefore: Long = 0l
 
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        assetBalanceBefore = sender.assetBalance(secondAddress, assetId.base58).balance
-        sender.transfer(buyer.address, seller.address, 100000, minFee, Some(assetId.base58), waitForTx = true)
+        assetBalanceBefore = sender.assetBalance(secondAddress, assetId.toString).balance
+        sender.transfer(buyer.address, seller.address, 100000, minFee, Some(assetId.toString), waitForTx = true)
       }
 
       val buyPrice   = 500000
       val sellPrice  = 500000
       val buyAmount  = 40000000
       val sellAmount = 40000000
-      val assetPair  = AssetPair.createAssetPair("WAVES", assetId.base58).get
+      val assetPair = AssetPair.createAssetPair("WAVES", assetId.toString).get
       val buy        = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, o1ver, matcherFeeOrder1)
       val sell       = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, o2ver, matcherFeeOrder2)
       val amount     = 40000000
@@ -191,10 +191,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       sender.postJson("/transactions/broadcast", tx.json())
 
-      nodes.waitForHeightAriseAndTxPresent(tx.id().base58)
+      nodes.waitForHeightAriseAndTxPresent(tx.id().toString)
 
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        sender.assetBalance(secondAddress, assetId.base58).balance shouldBe assetBalanceBefore
+        sender.assetBalance(secondAddress, assetId.toString).balance shouldBe assetBalanceBefore
       }
     }
   }

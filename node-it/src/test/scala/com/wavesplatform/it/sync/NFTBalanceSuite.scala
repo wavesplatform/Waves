@@ -78,7 +78,7 @@ class NFTBalanceSuite
 
   "after activation" - {
     "returns only non-nft portfolio on /balance/{address}" in {
-      val expectedIds = simple map (_.assetId().base58)
+      val expectedIds = simple map (_.assetId().toString)
 
       val assertion =
         getPortfolio(node, issuer.address) map { ids =>
@@ -89,7 +89,7 @@ class NFTBalanceSuite
     }
 
     "returns issue transactions on /nft/{address}/limit/{limit}" in {
-      val expectedIds = nft.map(_.assetId().base58)
+      val expectedIds = nft.map(_.assetId().toString)
 
       val assertion =
         getNFTPage(node, issuer.address, 1000, None) map { ids =>
@@ -102,7 +102,7 @@ class NFTBalanceSuite
 
   "pagination" - {
     "works" in {
-      val expectedIds = nft.map(_.assetId().base58).toSet
+      val expectedIds = nft.map(_.assetId().toString).toSet
 
       val assertion = for {
         pagedIds    <- getNFTPaged(node, issuer.address, 10).map(_.toSet)

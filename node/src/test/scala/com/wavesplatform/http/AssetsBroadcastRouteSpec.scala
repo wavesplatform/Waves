@@ -273,7 +273,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.base58
+      signature.toString
     )
   }
 
@@ -288,7 +288,7 @@ class AssetsBroadcastRouteSpec
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.proofs.map(_.base58)
+      proofs.proofs.map(_.toString)
     )
   }
 

@@ -67,7 +67,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
         diff.transactions
           .get(asset.id)
           .collectFirst {
-            case (_, it: IssueTransaction, _) =>
+            case (it: IssueTransaction, _) =>
               AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
@@ -77,25 +77,26 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (h, lt: LeaseTransaction, _) =>
-          LeaseDetails(lt.sender, lt.recipient, h, lt.amount, diff.leaseState(lt.id()))
+        case (lt: LeaseTransaction, _) =>
+          LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
     diff.transactions
       .get(id)
-      .map(_._1)
+      .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
-
+  override def height: Int = {
+    inner.height + maybeDiff.toSeq.length + newBlock.toSeq.length
+  }
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
     nftListFromDiff(inner, maybeDiff)(address, from)
@@ -103,8 +104,19 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
-    addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
+                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+
+    val fromDiff = maybeDiff
+      .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { diff =>
+        diff
+          .reverseIterator(_.transactions)
+          .map {
+            case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
+          }
+      }
+
+    addressTransactionsCompose(inner, fromDiff)(address, types, fromId)
+  }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -115,7 +127,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
   override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keysIterator
-      .map(id => diff.transactions(id)._2)
+      .map(id => diff.transactions(id)._1)
       .collect { case lt: LeaseTransaction => lt }
 
     val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
@@ -227,7 +239,10 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = inner.scoreOf(blockId)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(height)
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    if (height == inner.height + 1) lastBlock.map(b => (b, b.bytes().length))
+    else inner.blockHeaderAndSize(height)
+  }
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 

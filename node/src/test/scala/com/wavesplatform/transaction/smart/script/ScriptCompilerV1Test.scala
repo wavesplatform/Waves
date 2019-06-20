@@ -180,36 +180,63 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler.compile(script) shouldBe 'left
   }
 
-  property("max dapp complexity") {
-    def scriptWithHighComplexity(assigns: Int): String =
+  property("complexity border") {
+    def buildDirectives(
+                         version:     StdLibVersion,
+                         contentType: ContentType,
+                         scriptType:  ScriptType
+                       ): String =
+    s"""
+       | {-# STDLIB_VERSION ${version.value}     #-}
+       | {-# CONTENT_TYPE   ${contentType.value} #-}
+       | {-# SCRIPT_TYPE    ${scriptType.value}  #-}
+     """.stripMargin
+
+    def buildScript(
+                     assigns:      Int,
+                     conjunctions: Int,
+                     withVerifier: Boolean
+                   ): String =
       s"""
-         | {-# STDLIB_VERSION 3       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         | @Verifier(tx)
-         | func verify() = {
-         |   let a0 = [base58'']
-         |   ${1 to assigns map (i => s"let a$i = [a${i - 1}[0] + a0[1]]") mkString " "}
-         |   let c0 = 1
-         |   let c1 = c0 + c0
-         |   let c2 = c0 + c0
-         |   let c3 = c0 + c0
-         |   let c4 = c0 + c0
-         |   a$assigns == a$assigns && true && true && true
+         | func script() = {
+         |   let a0 = base58''
+         |   ${1 to assigns map (i => s"let a$i = a${i - 1} + a0") mkString " "}
+         |   a$assigns == base58'' ${"&& true " * conjunctions}
          | }
          |
+         | ${if (withVerifier) "@Verifier(tx) func verify() = " else ""}
+         | script()
       """.stripMargin
 
-    val count = 136
+    def checkComplexityBorder(
+                               version:     StdLibVersion,
+                               contentType: ContentType,
+                               scriptType:  ScriptType,
+                               complexity:  Int
+                             ): Unit = {
 
-    inside(ScriptCompiler.compile(scriptWithHighComplexity(count))) {
-      case Right((_, complexity)) => complexity shouldBe 4000
+      val directives = buildDirectives(version, contentType, scriptType)
+      val (assigns, conjunctions) = (version, contentType, scriptType) match {
+        case (V3, DApp, Account) => (209, 2)
+        case (V3, Expression, _) => (209, 7)
+        case ( _, Expression, _) => (103, 14)
+        case _ => ???
+      }
+      val withVerifier = contentType == DApp
+      val validScript          = directives + buildScript(assigns, conjunctions,     withVerifier)
+      val exceedingLimitScript = directives + buildScript(assigns, conjunctions + 1, withVerifier)
+
+      inside(ScriptCompiler.compile(validScript)) { case Right((_, c)) => c shouldBe complexity }
+      ScriptCompiler.compile(exceedingLimitScript) should produce(s"${complexity + 2} > $complexity")
     }
 
-    inside(ScriptCompiler.compile(scriptWithHighComplexity(count + 1))) {
-      case Left(msg) => msg shouldBe "Contract function (verify) is too complex: 4029 > 4000"
-    }
+    checkComplexityBorder(V3, DApp,       Account, 4000)
+    checkComplexityBorder(V3, Expression, Asset,   4000)
+    checkComplexityBorder(V3, Expression, Account, 4000)
+    checkComplexityBorder(V2, Expression, Asset,   2000)
+    checkComplexityBorder(V2, Expression, Account, 2000)
+    checkComplexityBorder(V1, Expression, Asset,   2000)
+    checkComplexityBorder(V1, Expression, Account, 2000)
   }
 
   property("transactionByID complexity") {

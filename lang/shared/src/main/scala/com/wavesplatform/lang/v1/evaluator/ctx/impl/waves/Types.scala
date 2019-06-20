@@ -12,7 +12,8 @@ object Types {
   val assetType = CASETYPEREF(
     "Asset",
     List(
-      "totalAmount"     -> LONG,
+      "id"              -> BYTESTR,
+      "quantity"        -> LONG,
       "decimals"        -> LONG,
       "issuer"          -> addressType,
       "issuerPublicKey" -> BYTESTR,

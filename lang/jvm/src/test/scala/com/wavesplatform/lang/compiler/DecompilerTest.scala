@@ -3,6 +3,7 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -212,6 +213,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract with verifier decompilation") {
     val contract = DApp(
+      ByteStr.empty,
       List(FUNC("foo", List(), FALSE), FUNC("bar", List(), IF(FUNCTION_CALL(User("foo"), List()), TRUE, FALSE))),
       List(
         CallableFunction(
@@ -228,8 +230,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                   List(FUNCTION_CALL(
                     Native(1100),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b"), CONST_LONG(1))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))), REF("nil")))
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b").explicitGet(), CONST_LONG(1))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil")))
                     )
                   ))
                 ),
@@ -238,8 +240,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                   List(FUNCTION_CALL(
                     Native(1100),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))), REF("nil")))
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil")))
                     )
                   ))
                 )
@@ -274,6 +276,39 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract decompilation") {
     val contract = DApp(
+      ByteStr.empty,
+      List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
+      List(
+        CallableFunction(
+          CallableAnnotation("i"),
+          Terms.FUNC(
+            "testfunc",
+            List("amount"),
+            BLOCK(
+              LET("pmt", CONST_LONG(1)),
+              TRUE
+            )
+          )
+        )),
+      None
+    )
+    Decompiler(contract, decompilerContext) shouldEq
+      """func foo (bar,buz) = true
+        |
+        |
+        |@Callable(i)
+        |func testfunc (amount) = {
+        |    let pmt = 1
+        |    true
+        |    }
+        |
+        |""".stripMargin
+
+  }
+
+  property("Invoke contract decompilation with meta") {
+    val contract = DApp(
+      ByteStr.fromByteArray(Array(1, 2, 3, 4)),
       List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(
@@ -306,7 +341,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("bytestring") {
     val test = Base58.encode("abc".getBytes("UTF-8"))
     // ([REVIEW]: may be i`am make a mistake here)
-    val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes()))), REF("param"))
+    val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes())).explicitGet()), REF("param"))
     Decompiler(expr, decompilerContext) shouldEq
       """let param = base58'3K3F4C'
         |param""".stripMargin
@@ -323,7 +358,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("simple if") {
-    val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX"))
+    val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX").explicitGet())
     Decompiler(expr, decompilerContext) shouldEq
       """if (true)
         |    then 1
@@ -331,7 +366,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("if with complicated else branch") {
-    val expr = IF(TRUE, CONST_LONG(1), IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")))
+    val expr = IF(TRUE, CONST_LONG(1), IF(TRUE, CONST_LONG(1), CONST_STRING("XXX").explicitGet()))
     Decompiler(expr, decompilerContext) shouldEq
       """if (true)
         |    then 1
@@ -341,7 +376,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("if with complicated then branch") {
-    val expr = IF(TRUE, IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")), CONST_LONG(1))
+    val expr = IF(TRUE, IF(TRUE, CONST_LONG(1), CONST_STRING("XXX").explicitGet()), CONST_LONG(1))
     Decompiler(expr, decompilerContext) shouldEq
       """if (true)
         |    then if (true)
@@ -362,7 +397,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             BLOCK(
               LET("$match0", REF("tx")),
               IF(
-                FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("ExchangeTransaction"))),
+                FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("ExchangeTransaction").explicitGet())),
                 BLOCK(
                   LET("e", REF("$match0")),
                   BLOCK(
@@ -406,7 +441,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                     )
                   )
                 ),
-                IF(FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("BurnTransaction"))), BLOCK(LET("tx", REF("$match0")), TRUE), FALSE)
+                IF(
+                  FUNCTION_CALL(
+                    Native(1),
+                    List(REF("$match0"), CONST_STRING("BurnTransaction").explicitGet())
+                  ),
+                  BLOCK(LET("tx", REF("$match0")), TRUE),
+                  FALSE
+                )
               )
             )
           )

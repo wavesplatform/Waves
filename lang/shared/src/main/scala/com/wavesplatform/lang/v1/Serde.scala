@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.utils.Serialize._
@@ -74,8 +75,8 @@ object Serde {
   def desAux(bb: ByteBuffer, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
     bb.get() match {
       case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
-      case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)))
-      case E_STRING => Coeval.now(CONST_STRING(bb.getString))
+      case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)).explicitGet())
+      case E_STRING => Coeval.now(CONST_STRING(bb.getString).explicitGet())
       case E_IF     => (desAux(bb), desAux(bb), desAux(bb)).mapN(IF)
       case E_BLOCK =>
         for {

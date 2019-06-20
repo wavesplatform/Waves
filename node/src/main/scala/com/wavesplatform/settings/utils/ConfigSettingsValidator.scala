@@ -3,6 +3,7 @@ package com.wavesplatform.settings.utils
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigException}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
@@ -10,11 +11,18 @@ import scala.collection.JavaConverters._
 import scala.util.Try
 
 object ConfigSettingsValidator {
+
   type ErrorsListOr[A] = ValidatedNel[String, A]
+
   def apply(config: Config): ConfigSettingsValidator = new ConfigSettingsValidator(config)
 
-  implicit class ErrorListOrOpts[A](validatedValue: ErrorsListOr[A]) {
+  implicit class ErrorListOrOps[A](validatedValue: ErrorsListOr[A]) {
     def getValueOrThrowErrors: A = validatedValue valueOr (errorsAcc => throw new Exception(errorsAcc.mkString_(", ")))
+  }
+
+  object AdhocValidation {
+    def validateAssetPairKey(key: String): Validated[String, AssetPair] =
+      Validated.fromTry(AssetPair.fromString(key)) leftMap (_ => s"Can't parse asset pair '$key'")
   }
 }
 
@@ -23,7 +31,9 @@ class ConfigSettingsValidator(config: Config) {
   import ConfigSettingsValidator.ErrorsListOr
 
   private def createError[T](settingName: String, errorMsg: String, showError: Boolean = true, showValue: Boolean = true): NonEmptyList[String] = {
+
     lazy val value = config.getValue(settingName).unwrapped
+
     lazy val msg = (showValue, showError) match {
       case (true, true)  => s"$value ($errorMsg)"
       case (true, false) => s"$value"
@@ -31,7 +41,7 @@ class ConfigSettingsValidator(config: Config) {
       case _             => ""
     }
 
-    NonEmptyList(s"Invalid setting $settingName value: $msg", Nil)
+    NonEmptyList.one(s"Invalid setting $settingName value: $msg")
   }
 
   def validate[T: ValueReader](settingName: String, showError: Boolean = false): ErrorsListOr[T] = {
@@ -57,6 +67,23 @@ class ConfigSettingsValidator(config: Config) {
           val elemPath = s"$settingName.$index"
           Validated fromTry Try(cfg.atPath(elemPath).as[T](elemPath)) leftMap (ex => List(ex.getMessage))
       }
+      .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
+  }
+
+  def validateMap[K, V: ValueReader](settingName: String)(keyValidator: String => Validated[String, K]): ErrorsListOr[Map[K, V]] = {
+    config
+      .getConfig(settingName)
+      .root()
+      .entrySet()
+      .asScala
+      .toList
+      .traverse { entry =>
+        val elemPath = s"$settingName.${entry.getKey}"
+        val k        = keyValidator(entry.getKey).leftMap(List(_))
+        val v        = Validated fromTry Try(entry.getValue.atPath(elemPath).as[V](elemPath)) leftMap (ex => List(ex.getMessage))
+        k.product(v)
+      }
+      .map(_.toMap)
       .leftMap(errorsInList => createError(settingName, errorsInList.mkString(", "), showValue = false))
   }
 

@@ -13,6 +13,7 @@ import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartAc
 import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdated}
 import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.matcher.settings.MatchingRules
 import com.wavesplatform.matcher.{MatcherTestData, SnapshotUtils}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
@@ -377,7 +378,8 @@ class MatcherActorSpecification
           matcherSettings,
           doNothingOnRecovery,
           ob,
-          (assetPair, matcher) => OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
+          (assetPair, matcher) =>
+            OrderBookActor.props(matcher, addressActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, MatchingRules.DefaultNel),
           blockchain.assetDescription
         )
       ))

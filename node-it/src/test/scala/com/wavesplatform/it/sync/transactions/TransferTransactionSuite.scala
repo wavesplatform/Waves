@@ -66,7 +66,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
     for ((tx, diag) <- invalidTxs) {
       assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
-      nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
+      nodes.foreach(_.ensureTxDoesntExist(tx.id().toString))
     }
 
     nodes.waitForHeightArise()

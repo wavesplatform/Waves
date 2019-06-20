@@ -345,13 +345,11 @@ case class DebugApiRoute(ws: WavesSettings,
   def validate: Route = (path("validate") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-
-        val h  = blockchain.height
         val t0 = System.nanoTime
         val tracedDiff = for {
           tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-          _  <- Verifier(blockchain, h)(tx)
-          ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
+          _  <- Verifier(blockchain)(tx)
+          ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
         val response = Json.obj(
@@ -369,18 +367,18 @@ case class DebugApiRoute(ws: WavesSettings,
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
-  @Path("/stateChanges/info/{transactionId}")
+  @Path("/stateChanges/info/{id}")
   @ApiOperation(value = "Transaction state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "transactionId", value = "Transaction id", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
     ))
-  def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment) & handleExceptions(jsonExceptionHandler)) { transactionId =>
-    blockchain.transactionInfo(transactionId) match {
-      case Some((_, tx: InvokeScriptTransaction)) =>
+  def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment) & handleExceptions(jsonExceptionHandler)) { id =>
+    blockchain.transactionInfo(id) match {
+      case Some((h, tx: InvokeScriptTransaction)) =>
         val resultE = blockchain
           .invokeScriptResult(TransactionId(tx.id()))
-          .map(isr => Json.obj("transaction" -> tx, "stateChanges" -> isr))
+          .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
         complete(resultE)
 
       case None =>
@@ -392,11 +390,18 @@ case class DebugApiRoute(ws: WavesSettings,
   }
 
   @Path("/stateChanges/address/{address}/limit/{limit}")
-  @ApiOperation(value = "Transactions by address state changes", notes = "Returns state changes made by the transaction", httpMethod = "GET")
+  @ApiOperation(value = "List of transactions by address with state changes",
+                notes = "Get list of transactions with state changes where specified address has been involved",
+                httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Limit", required = true, dataType = "integer", paramType = "path")
+      new ApiImplicitParam(name = "limit",
+                           value = "Number of transactions to be returned",
+                           required = true,
+                           dataType = "integer",
+                           paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
     ))
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?) & handleExceptions(jsonExceptionHandler)) {
@@ -448,7 +453,7 @@ object DebugApiRoute {
         }
       case _ => JsError("The map is expected")
     },
-    m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
+    m => Json.toJson(m.map { case (assetId, count) => assetId.toString -> count })
   )
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
 
