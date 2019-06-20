@@ -2,6 +2,7 @@ package com.wavesplatform.api.http.alias
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Alias
+import com.wavesplatform.api.http.ApiError.AliasDoesNotExist
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings

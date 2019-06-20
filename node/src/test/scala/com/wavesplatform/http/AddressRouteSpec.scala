@@ -2,7 +2,8 @@ package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
+import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._

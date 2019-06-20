@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutionException
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server._
-import com.wavesplatform.api.http.ApiError.ApiErrorException
+import com.wavesplatform.api.http.ApiError.{ApiErrorException, ApiKeyNotValid, WrongJson}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}

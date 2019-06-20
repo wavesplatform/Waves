@@ -3,6 +3,7 @@ package com.wavesplatform.api
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{PathMatcher, PathMatcher1}
 import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._

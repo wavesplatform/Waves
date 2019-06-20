@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.wavesplatform.api.http.TransactionNotAllowedByAccountScript
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._

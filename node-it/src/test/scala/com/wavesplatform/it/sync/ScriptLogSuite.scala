@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.api.http.TransactionNotAllowedByAccountScript
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.it.api.SyncHttpApi._

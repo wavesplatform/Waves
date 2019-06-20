@@ -3,6 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
