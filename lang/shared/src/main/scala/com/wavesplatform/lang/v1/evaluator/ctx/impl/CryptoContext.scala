@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.Eval
 import cats.syntax.either._
+import cats.data.EitherT
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
