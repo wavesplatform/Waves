@@ -489,4 +489,44 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         }
     }
   }
+
+  property("address toString") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let checkAddressToStrRight = this.toString() == "${masterAcc.address}"
+                 | let checkAddressToStr = this.bytes.toBase58String() == this.toString()
+                 |
+                 | checkAddressToStrRight && checkAddressToStr
+                 |
+              """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(
+              masterAcc,
+              Some(script),
+              1000000L,
+              transferTx.timestamp + 5
+            )
+            .explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
 }
