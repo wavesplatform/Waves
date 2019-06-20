@@ -3,10 +3,8 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.{Transaction, _}
-import monix.eval.Coeval
 import play.api.libs.json._
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -23,6 +21,7 @@ trait ApiError {
   lazy val json = Json.obj("error" -> id, "message" -> message)
 }
 
+//noinspection TypeAnnotation
 object ApiError {
   implicit def fromValidationError(e: ValidationError): ApiError =
     e match {
@@ -58,29 +57,6 @@ object ApiError {
         }
       case error => CustomValidationError(error.toString)
     }
-
-  implicit val lvWrites: Writes[LazyVal] = Writes { lv =>
-    Coeval
-      .fromEval(lv.value)
-      .attempt
-      .map({
-        case Left(thr) =>
-          Json.obj(
-            "status" -> "Failed",
-            "error"  -> thr.getMessage
-          )
-        case Right(Left(err)) =>
-          Json.obj(
-            "status" -> "Failed",
-            "error"  -> err
-          )
-        case Right(Right(lv)) =>
-          Json.obj(
-            "status" -> "Success",
-            "value"  -> lv.toString
-          )
-      })()
-  }
 
   case object Unknown extends ApiError {
     override val id = 0
