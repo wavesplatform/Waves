@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidAddress, InvalidName, StateCheckFailed, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58

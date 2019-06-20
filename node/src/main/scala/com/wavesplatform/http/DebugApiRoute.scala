@@ -385,7 +385,7 @@ case class DebugApiRoute(ws: WavesSettings,
         complete(ApiError.UnsupportedTransactionType)
 
       case None =>
-        complete(ApiError.TransactionDoesNotExist)
+        complete(ApiError.TransactionNotExists)
 
     }
   }

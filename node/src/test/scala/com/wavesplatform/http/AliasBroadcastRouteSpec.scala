@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.RequestGen
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidAddress, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
