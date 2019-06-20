@@ -84,10 +84,10 @@ object WavesContext {
             .find(entry => Right(entry.fields("key")) == CONST_STRING(key))
             .map(_.fields("value"))
           entryValue match {
-            case Some(n: CONST_LONG)    if dataType == DataType.Long      => Right(n)
+            case Some(n: CONST_LONG) if dataType == DataType.Long         => Right(n)
             case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean   => Right(b)
             case Some(b: CONST_BYTESTR) if dataType == DataType.ByteArray => Right(b)
-            case Some(s: CONST_STRING)  if dataType == DataType.String    => Right(s)
+            case Some(s: CONST_STRING) if dataType == DataType.String     => Right(s)
             case _                                                        => Right(unit)
           }
         case _ => ???
@@ -291,6 +291,19 @@ object WavesContext {
         case _ => ???
       }
 
+    val stringFromAddressF: BaseFunction =
+      NativeFunction(
+        "toString",
+        10,
+        ADDRESSTOSTRING,
+        STRING,
+        "Convert address bytes to string",
+        ("Address", addressType, "address")
+      ) {
+        case CaseObj(`addressType`, fields) :: Nil => CONST_STRING(fields("bytes").asInstanceOf[CONST_BYTESTR].bs.toString)
+        case _                                     => ???
+      }
+
     val inputEntityCoeval: Eval[Either[String, CaseObj]] = {
       Eval.later(
         env.inputEntity
@@ -488,21 +501,22 @@ object WavesContext {
       functions ++ (
         version match {
           case V1 | V2 => List(txByIdF)
-          case V3      => List(
-            getIntegerFromStateF,
-            getBooleanFromStateF,
-            getBinaryFromStateF,
-            getStringFromStateF,
-            getIntegerFromArrayF,
-            getBooleanFromArrayF,
-            getBinaryFromArrayF,
-            getStringFromArrayF,
-            getIntegerByIndexF,
-            getBooleanByIndexF,
-            getBinaryByIndexF,
-            getStringByIndexF,
-            addressFromStringF
-          ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF)
+          case V3 =>
+            List(
+              getIntegerFromStateF,
+              getBooleanFromStateF,
+              getBinaryFromStateF,
+              getStringFromStateF,
+              getIntegerFromArrayF,
+              getBooleanFromArrayF,
+              getBinaryFromArrayF,
+              getStringFromArrayF,
+              getIntegerByIndexF,
+              getBooleanByIndexF,
+              getBinaryByIndexF,
+              getStringByIndexF,
+              addressFromStringF
+            ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF, stringFromAddressF)
         }
       )
     )
