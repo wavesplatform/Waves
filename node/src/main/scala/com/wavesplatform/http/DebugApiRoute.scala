@@ -384,6 +384,7 @@ case class DebugApiRoute(ws: WavesSettings,
         complete(resultE)
 
       case Some((h, tx)) =>
+        // Doesnt include masstransfer, leases, etc additional information
         complete(tx.json() ++ Json.obj("height" -> h))
 
       case None =>
