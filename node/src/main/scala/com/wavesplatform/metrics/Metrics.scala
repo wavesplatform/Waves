@@ -3,9 +3,8 @@ package com.wavesplatform.metrics
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import monix.eval.Task
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -25,7 +24,7 @@ object Metrics extends ScorexLogging {
 
   case class Settings(enable: Boolean, nodeId: Int, influxDb: InfluxDbSettings)
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread("metrics")
+  private implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
 
   private var settings: Settings   = _
   private var time: Time           = _

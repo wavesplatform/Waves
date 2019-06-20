@@ -32,7 +32,7 @@ object Importer extends ScorexLogging {
       case ImportOptions(configFile, blockchainFile, importHeight, format, verifyTransactions) =>
         val settings = Application.loadApplicationConfig(Some(configFile))
 
-        implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
+        implicit val scheduler: Scheduler = Schedulers.singleThread("appender")
         val utxPoolStub: UtxPool = new UtxPool {
           override def putIfNew(tx: Transaction, b: Boolean)                 = ???
           override def removeAll(txs: Traversable[Transaction]): Unit        = {}

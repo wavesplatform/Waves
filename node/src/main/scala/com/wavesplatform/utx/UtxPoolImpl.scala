@@ -21,11 +21,10 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
 
@@ -142,7 +141,7 @@ class UtxPoolImpl(time: Time,
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
     tracedIsNew.resultE match {
       case Left(err)    => log.debug(s"UTX putIfNew(${tx.id()}) failed with $err")
-      case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Right(isNew)  => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
     }
     tracedIsNew
   }
@@ -254,7 +253,7 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[UtxPoolImpl] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  private[UtxPoolImpl] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   val cleanupTask: Task[Unit] = Task
     .eval[Unit](packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf))
