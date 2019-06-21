@@ -77,6 +77,6 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
   private[this] def getBlockById(signature: ByteStr): Either[ApiError, VanillaBlock] = {
     blockchain
       .blockById(signature)
-      .toRight(BlockDoesNotExist)
+      .toRight(BlockNotExists)
   }
 }

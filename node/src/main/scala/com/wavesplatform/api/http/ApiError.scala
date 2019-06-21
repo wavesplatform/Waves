@@ -41,7 +41,7 @@ object ApiError {
       case TxValidationError.AlreadyInTheState(tx, txHeight) =>
         CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
       case TxValidationError.AccountBalanceError(errs)  => CustomValidationError(errs.values.mkString(", "))
-      case TxValidationError.AliasDoesNotExist(tx)      => AliasDoesNotExist(tx)
+      case TxValidationError.AliasDoesNotExist(tx) => AliasNotExists(tx)
       case TxValidationError.OrderValidationError(_, m) => CustomValidationError(m)
       case TxValidationError.UnsupportedTransactionType => UnsupportedTransactionType
       case TxValidationError.Mistiming(err)             => Mistiming(err)
@@ -64,7 +64,7 @@ object ApiError {
     override val message = "Error is unknown"
   }
 
-  case class WrongJson(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
+  final case class WrongJson(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
     override val id = 1
     override val code = StatusCodes.BadRequest
     override lazy val message = "failed to parse json message"
@@ -162,7 +162,7 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
+  final case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
     override val id: Int = 112
     override val message: String = s"State check failed. Reason: $err"
     override val code: StatusCode = StatusCodes.BadRequest
@@ -187,29 +187,30 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class CustomValidationError(errorMessage: String) extends ApiError {
+  final case class CustomValidationError(errorMessage: String) extends ApiError {
     override val id: Int = 199
     override val message: String = errorMessage
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case object BlockDoesNotExist extends ApiError {
+  case object BlockNotExists extends ApiError {
     override val id: Int = 301
     override val code = StatusCodes.NotFound
     override val message: String = "block does not exist"
   }
 
-  case class AliasDoesNotExist(aoa: AddressOrAlias) extends ApiError {
+  final case class AliasNotExists(aoa: AddressOrAlias) extends ApiError {
     override val id: Int = 302
     override val code = StatusCodes.NotFound
-    private lazy val msgReason = aoa match {
+
+    private[this] lazy val msgReason = aoa match {
       case a: Address => s"for address '${a.stringRepr}'"
       case a: Alias => s"'${a.stringRepr}'"
     }
-    override val message: String = s"alias $msgReason doesn't exist"
+    override lazy val message: String = s"alias $msgReason doesn't exist"
   }
 
-  case class Mistiming(errorMessage: String) extends ApiError {
+  final case class Mistiming(errorMessage: String) extends ApiError {
     override val id: Int = Mistiming.Id
     override val message: String = errorMessage
     override val code: StatusCode = StatusCodes.BadRequest
@@ -225,20 +226,20 @@ object ApiError {
     override val message: String = "no data for this key"
   }
 
-  case class ScriptCompilerError(errorMessage: String) extends ApiError {
+  final case class ScriptCompilerError(errorMessage: String) extends ApiError {
     override val id: Int = 305
     override val code: StatusCode = StatusCodes.BadRequest
     override val message: String = errorMessage
   }
 
-  case class ScriptExecutionError(tx: Transaction, error: String, isTokenScript: Boolean) extends ApiError {
+  final case class ScriptExecutionError(tx: Transaction, error: String, isTokenScript: Boolean) extends ApiError {
     override val id: Int = 306
     override val code: StatusCode = StatusCodes.BadRequest
     override val message: String = s"Error while executing ${if (isTokenScript) "token" else "account"}-script: $error"
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 
-  case class TransactionNotAllowedByAccountScript(tx: Transaction) extends ApiError {
+  final case class TransactionNotAllowedByAccountScript(tx: Transaction) extends ApiError {
     override val id: Int = TransactionNotAllowedByAccountScript.ErrorCode
     override val code: StatusCode = StatusCodes.BadRequest
     override val message: String = s"Transaction is not allowed by account-script"
@@ -249,7 +250,7 @@ object ApiError {
     val ErrorCode = 307
   }
 
-  case class TransactionNotAllowedByAssetScript(tx: Transaction) extends ApiError {
+  final case class TransactionNotAllowedByAssetScript(tx: Transaction) extends ApiError {
     override val id: Int = TransactionNotAllowedByAssetScript.ErrorCode
     override val code: StatusCode = StatusCodes.BadRequest
     override val message: String = s"Transaction is not allowed by token-script"
@@ -260,7 +261,7 @@ object ApiError {
     val ErrorCode = 308
   }
 
-  case class SignatureError(error: String) extends ApiError {
+  final case class SignatureError(error: String) extends ApiError {
     override val id: Int = 309
     override val code: StatusCode = StatusCodes.InternalServerError
     override val message: String = s"Signature error: $error"
@@ -309,31 +310,31 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class NegativeAmount(msg: String) extends ApiError {
+  final case class NegativeAmount(msg: String) extends ApiError {
     override val id: Int = 111
     override val message: String = s"negative amount: $msg"
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class InsufficientFee(override val message: String = "insufficient fee") extends ApiError {
+  final case class InsufficientFee(override val message: String = "insufficient fee") extends ApiError {
     override val id: Int = 112
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class WrongTransactionJson(err: JsError) extends ApiError {
+  final case class WrongTransactionJson(err: JsError) extends ApiError {
     override val id: Int = 113
     override val message: String =
       err.errors.map(e => s"Validation failed for field '${e._1}', errors:${e._2}. ").mkString("\n")
     override val code: StatusCode = StatusCodes.UnprocessableEntity
   }
 
-  case class NegativeMinFee(msg: String) extends ApiError {
+  final case class NegativeMinFee(msg: String) extends ApiError {
     override val id: Int = 114
     override val message: String = s"negative fee per: $msg"
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class NonPositiveAmount(msg: String) extends ApiError {
+  final case class NonPositiveAmount(msg: String) extends ApiError {
     override val id: Int = 115
     override val message: String = s"non-positive amount: $msg"
     override val code: StatusCode = StatusCodes.BadRequest

@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.BlockGen
-import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
+import com.wavesplatform.api.http.ApiError.BlockNotExists
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.http.ApiMarshallers._
@@ -41,7 +41,7 @@ class ConsensusRouteSpec
     }
 
     "for non-existent block" in routeTest { (h, route) =>
-      Get(routePath(s"/generationsignature/brggwg4wg4g")) ~> route should produce(BlockDoesNotExist)
+      Get(routePath(s"/generationsignature/brggwg4wg4g")) ~> route should produce(BlockNotExists)
     }
   }
 
@@ -54,7 +54,7 @@ class ConsensusRouteSpec
     }
 
     "for non-existent block" in routeTest { (h, route) =>
-      Get(routePath(s"/basetarget/brggwg4wg4g")) ~> route should produce(BlockDoesNotExist)
+      Get(routePath(s"/basetarget/brggwg4wg4g")) ~> route should produce(BlockNotExists)
     }
   }
 }
