@@ -79,7 +79,7 @@ object CryptoContext {
     val rsaVerifyF: BaseFunction =
       NativeFunction(
         "rsaVerify",
-        100,
+        300,
         RSAVERIFY,
         BOOLEAN,
         "check RSA signature",
