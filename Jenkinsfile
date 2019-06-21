@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'buildagent'
+        label 'wavesnode'
     }
     environment {
         // Define sbt path
