@@ -242,7 +242,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val updatedLeaseBalances = DiffToStateApplier.leases(this, diff)
     val leaseBalances        = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
 
-    val newPortfolios = newBalances.keys.map(_._1).toSet
+    val newPortfolios = diff.portfolios.keys.toSet
 
     val newFills = for {
       (orderId, fillInfo) <- diff.orderFills
