@@ -170,7 +170,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeight(height + 20)
 
     miner.accountBalances(swapBC1)
-    assertBadRequestAndMessage(miner.transactionInfo(versionedTransferId), "Transaction is not in blockchain", 404)
+    assertBadRequestAndMessage(miner.transactionInfo(versionedTransferId), "transactions does not exist", 404)
 
     val selfSignedToAlice = TransferTransactionV2
       .selfSigned(
