@@ -1,7 +1,8 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.matcher.db
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
+import com.wavesplatform.matcher.MatcherKeys
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import org.iq80.leveldb.DB
 

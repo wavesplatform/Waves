@@ -7,16 +7,14 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 class MatcherRecoveryTestSuite extends MatcherSuiteBase {
-  private def configOverrides = ConfigFactory.parseString("""waves.matcher {
-      |  price-assets = ["WAVES"]
+  protected def configOverrides: Config = ConfigFactory.parseString("""waves.matcher {
       |  snapshots-interval = 51
       |}""".stripMargin)
 
@@ -25,18 +23,9 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
 
-  private val (issue1, issue2, assetPair1) = issueAssetPair(alice, 8, 8)
-  private val assetPair2                   = AssetPair(assetPair1.amountAsset, Waves)
-  private val assetPair3                   = AssetPair(assetPair1.priceAsset, Waves)
-  private val assetPairs                   = Seq(assetPair1, assetPair2, assetPair3)
-
-  {
-    val xs = Seq(issue1, issue2).map(_.json()).map(node.broadcastRequest(_))
-    xs.foreach(x => node.waitForTransaction(x.id))
-  }
-
-  private val orders    = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
-  private val lastOrder = orderGen(matcher, alice, assetPairs).sample.get
+  private val assetPairs = Seq(ethUsdPair, wavesUsdPair, ethWavesPair)
+  private val orders     = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
+  private val lastOrder  = orderGen(matcher, alice, assetPairs).sample.get
 
   "Place, fill and cancel a lot of orders" in {
     val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
@@ -45,7 +34,9 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
     executeCommands(List(MatcherCommand.Place(node, lastOrder)))
   }
 
-  "Wait until all requests are processed - 1" in node.waitForStableOffset(10, 100, 200.millis)
+  "Wait until all requests are processed - 1" in {
+    node.waitForStableOffset(10, 100, 200.millis)
+  }
 
   private var stateBefore: MatcherState = _
 
@@ -60,6 +51,7 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
           snapshotOffset should be > 0L
         }
     }
+    node.waitForHeight(node.height + 1)
   }
 
   "Restart the matcher" in docker.restartContainer(node)
@@ -76,5 +68,14 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
     stateBefore shouldBe stateAfter
   }
 
-  private def state = node.matcherState(assetPairs, orders, Seq(alice))
+  private def state = cleanState(node.matcherState(assetPairs, orders, Seq(alice)))
+
+  protected def cleanState(state: MatcherState): MatcherState = state
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+
+    val xs = Seq(IssueEthTx, IssueUsdTx).map(_.json()).map(node.broadcastRequest(_))
+    xs.foreach(x => node.waitForTransaction(x.id))
+  }
 }

@@ -59,10 +59,21 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       node.waitOrderStatus(wctUsdPair, sellOrder, "Cancelled")
     }
 
-    "orderbook was really deleted" in {
-      val orderBook = node.orderBook(wctUsdPair)
-      orderBook.bids shouldBe empty
-      orderBook.asks shouldBe empty
+    "orderbook was deleted" in {
+      withClue("orderBook") {
+        val orderBook = node.orderBook(wctUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+
+      withClue("tradingMarkets") {
+        val tradingPairs = node.tradingMarkets().markets.map(x => s"${x.amountAsset}-${x.priceAsset}")
+        tradingPairs shouldNot contain(wctUsdPair.key)
+      }
+
+      withClue("getAllSnapshotOffsets") {
+        node.getAllSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
+      }
     }
 
     "reserved balances should be released for the pair" in {
@@ -76,6 +87,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     "it should not affect other pairs and their orders" in {
       node.orderStatus(buyOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
       node.orderStatus(sellOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
+      node.placeOrder(alice, wctWavesPair, BUY, amount, price, matcherFee)
 
       val orderBook = node.orderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)

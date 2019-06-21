@@ -299,7 +299,11 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
       val transferCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
 
       val transfersList: List[(Validation[ParsedTransfer], Int)] =
-        List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offst) => readTransfer(buf, offst) }
+        if (transferCount < 0 || transferCount > buf.size - offset - 2) {
+          throw new Exception(s"Brocken array size ($transferCount entries while ${buf.size - offset - 2} bytes avaliable)")
+        } else {
+          List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offst) => readTransfer(buf, offst) }
+        }
 
       val resultOffset = transfersList.lastOption.map(_._2).getOrElse(offset + 2)
       val resultList   = transfersList.map { case (ei, _) => ei }.sequence.explicitGet()
@@ -372,7 +376,9 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
 
       val entryCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
 
-      if (entryCount > 0) {
+      if (entryCount < 0 || entryCount > buf.size - offset - 2) {
+        throw new Exception(s"Brocken array size ($entryCount entries while ${buf.size - offset - 2} bytes avaliable)")
+      } else if (entryCount > 0) {
         val parsed = List.iterate(DataEntry.parse(buf, offset + 2), entryCount) { case (_, p) => DataEntry.parse(buf, p) }
         parsed.map(_._1) -> parsed.last._2
       } else
@@ -503,7 +509,9 @@ class SeqBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U])
     Try {
       val entryCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
 
-      if (entryCount > 0) {
+      if (entryCount < 0 || entryCount > buf.size - offset - 2) {
+        throw new Exception(s"Brocken array size ($entryCount entries while ${buf.size - offset - 2} bytes avaliable)")
+      } else if (entryCount > 0) {
         val parsed = List.iterate(nestedByteEntity.deserialize(buf, offset + 2).get, entryCount) {
           case (_, p) => nestedByteEntity.deserialize(buf, p).get
         }

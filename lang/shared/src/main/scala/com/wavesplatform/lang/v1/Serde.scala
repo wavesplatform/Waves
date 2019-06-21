@@ -61,7 +61,7 @@ object Serde {
           name <- Coeval.now(bb.getString)
           args <- ({
             val argsCnt = bb.getInt
-            if (argsCnt <= (bb.limit() - bb.position())/2) {
+            if (argsCnt <= (bb.limit() - bb.position())/2 && argsCnt >= 0) {
               Coeval.now(for (_ <- 1 to argsCnt) yield bb.getString)
             } else {
               Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments names too big."))
@@ -103,7 +103,7 @@ object Serde {
           .now((bb.getFunctionHeader, bb.getInt))
           .flatMap {
             case (header, argc) =>
-              if (argc <= (bb.limit() - bb.position())) {
+              if (argc <= (bb.limit() - bb.position()) && argc >= 0) {
                 val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb))(collection.breakOut)
                 args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
               } else {

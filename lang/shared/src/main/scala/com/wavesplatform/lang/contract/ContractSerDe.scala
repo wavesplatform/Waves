@@ -108,9 +108,15 @@ object ContractSerDe {
     } yield VerifierFunction(a, f)
   }
 
-  private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] =
-    (1 to bb.getInt).toList
-      .traverse[({ type L[B] = Either[String, B] })#L, A](_ => df(bb))
+  private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] = {
+    val len = bb.getInt
+    if (len <= (bb.limit() - bb.position()) && len >= 0) {
+      (1 to len).toList
+        .traverse[({ type L[B] = Either[String, B] })#L, A](_ => df(bb))
+    } else {
+      Left(s"At position ${bb.position()} array of arguments too big.")
+    }
+  }
 
   private[lang] def deserializeOption[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, Option[A]] = {
     tryEi(bb.getInt > 0)
@@ -123,9 +129,13 @@ object ContractSerDe {
   private[lang] def deserializeFromArray[A](bb: ByteBuffer, df: Array[Byte] => Either[String, A]): Either[String, A] = {
     tryEi {
       val len = bb.getInt()
-      val arr = new Array[Byte](len)
-      bb.get(arr, bb.arrayOffset(), len)
-      arr
+      if (len <= (bb.limit() - bb.position()) && len >= 0) {
+        val arr = new Array[Byte](len)
+        bb.get(arr, bb.arrayOffset(), len)
+        arr
+      } else {
+        throw new Exception(s"At position ${bb.position()} array of arguments too big.")
+      }
     } flatMap df
   }
 

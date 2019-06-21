@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.db.OrderDB
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
@@ -244,7 +245,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "request order book for blacklisted pair" in {
         val f = node.matcherGetStatusCode(s"/matcher/orderbook/$ForbiddenAssetId/WAVES", 404)
-        f.message shouldBe s"Invalid Asset ID: $ForbiddenAssetId"
+        f.message shouldBe s"The asset $ForbiddenAssetId not found"
       }
 
       "should consider UTX pool when checking the balance" in {
@@ -366,6 +367,27 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val o1                = node.placeOrder(alice, pair, BUY, amount, minNonZeroInvalid, matcherFee)
         o1.status shouldBe "OrderAccepted"
       }
+    }
+  }
+
+  "Order statuses for old orders" in {
+    val (amountAssetTx, priceAssetTx, pair) = issueAssetPair(alice, 2, 8)
+
+    def placeOrder(i: Int, tpe: OrderType) = node.placeOrder(alice, pair, tpe, 100L + i, Order.PriceConstant, matcherFee)
+
+    val txIds = List(amountAssetTx, priceAssetTx).map(_.json()).map(node.broadcastRequest(_)).map(_.id)
+    txIds.foreach(node.waitForTransaction(_))
+
+    val ids = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+      List(
+        placeOrder(i, OrderType.BUY).message.id,
+        placeOrder(i, OrderType.SELL).message.id
+      )
+    }
+
+    ids.foreach { id =>
+      val status = node.orderStatus(id, pair, waitForStatus = false).status
+      withClue(id)(status should not be "NotFound")
     }
   }
 
