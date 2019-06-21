@@ -104,7 +104,11 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       caller.address,
       contract.address,
       func = Some("sendAsset"),
-      args = List(CONST_STRING(recipient.address), CONST_LONG(10), CONST_STRING(simpleAsset)),
+      args = List(
+        CONST_STRING(recipient.address).explicitGet(),
+        CONST_LONG(10),
+        CONST_STRING(simpleAsset).explicitGet()
+      ),
       fee = 5,
       feeAssetId = Some(assetSponsoredByDApp),
       waitForTx = true
@@ -139,7 +143,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       caller.address,
       contract.address,
       func = Some("writeAndSendWaves"),
-      args = List(CONST_LONG(7), CONST_STRING(caller.address), CONST_LONG(10)),
+      args = List(CONST_LONG(7), CONST_STRING(caller.address).explicitGet(), CONST_LONG(10)),
       fee = 25,
       feeAssetId = Some(assetSponsoredByRecipient),
       waitForTx = true

@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
-import cats.data.NonEmptyList
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.flat
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -31,10 +30,23 @@ object ExpressionCompiler {
   }
 
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+
+    def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) = {
+      CONST_BYTESTR(b)
+        .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
+        .map((_, BYTESTR))
+    }
+
+    def adjustStr(expr: Expressions.CONST_STRING, str: String) = {
+      CONST_STRING(str)
+        .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
+        .map((_, STRING))
+    }
+
     expr match {
       case x: Expressions.CONST_LONG                => (CONST_LONG(x.value): EXPR, LONG: FINAL).pure[CompileM]
-      case x: Expressions.CONST_BYTESTR             => handlePart(x.value).map(v => (CONST_BYTESTR(v), BYTESTR: FINAL))
-      case x: Expressions.CONST_STRING              => handlePart(x.value).map(v => (CONST_STRING(v), STRING: FINAL))
+      case x: Expressions.CONST_BYTESTR             => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
+      case x: Expressions.CONST_STRING              => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
       case _: Expressions.TRUE                      => (TRUE: EXPR, BOOLEAN: FINAL).pure[CompileM]
       case _: Expressions.FALSE                     => (FALSE: EXPR, BOOLEAN: FINAL).pure[CompileM]
       case Expressions.GETTER(p, ref, field)        => compileGetter(p, field, ref)

@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -20,7 +21,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   }
 
   property("ScriptV1.apply should deny too complex scripts") {
-    val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1))
+    val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet()
     val expr = (1 to 21)
       .map { _ =>
         FUNCTION_CALL(
@@ -51,7 +52,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   }
 
   property("19 sigVerify should fit in maxSizeInBytes") {
-    val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1))
+    val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet()
     val expr = (1 to 19)
       .map { _ =>
         FUNCTION_CALL(

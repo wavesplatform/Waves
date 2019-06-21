@@ -104,23 +104,21 @@ package object appender extends ScorexLogging {
 
         val blockTime = block.timestamp
 
-        for {
-          height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-          parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
-          grandParent = blockchain.parentHeader(parent, 2)
-          effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
-          _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
-          _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
-          _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          _                <- pos.validateGeneratorSignature(height, block)
-          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
-        } yield ()
-      }
-      .left
-      .map {
-        case GenericError(x) => GenericError(s"Block $block is invalid: $x")
-        case x               => x
-      }
+    for {
+      height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
+      parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+      grandParent = blockchain.parentHeader(parent, 2)
+      effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
+      _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
+      _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
+      _                <- pos.validateBaseTarget(height, block, parent, grandParent)
+      _                <- pos.validateGeneratorSignature(height, block)
+      _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
+    } yield ()
+  }.left.map {
+    case GenericError(x) => GenericError(s"Block $block is invalid: $x")
+    case x               => x
+  }
 
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either

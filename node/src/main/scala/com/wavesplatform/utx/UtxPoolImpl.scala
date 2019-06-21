@@ -25,9 +25,9 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{Cancelable, Scheduler}
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration => ScalaDuration}
@@ -255,30 +255,15 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  //noinspection ScalaStyle
-  object cleanup {
-    private[UtxPoolImpl] implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  private[UtxPoolImpl] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
-    val runCleanupTask: Task[Unit] = Task
-      .eval(doCleanup())
-      .executeOn(scheduler)
-
-    def runCleanupOn(observable: Observable[_]): Cancelable = {
-      observable
-        .whileBusyDropEventsAndSignal(dropped => log.warn(s"UTX pool cleanup is too slow, $dropped cleanups skipped"))
-        .mapTask(_ => runCleanupTask)
-        .doOnComplete(() => log.debug("UTX pool cleanup stopped"))
-        .doOnError(err => log.error("UTX pool cleanup error", err))
-        .subscribe()
-    }
-
-    private[UtxPoolImpl] def doCleanup(): Unit = {
-      UtxPoolImpl.this.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
-    }
-  }
+  val cleanupTask: Task[Unit] = Task
+    .eval[Unit](packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf))
+    .onErrorRecover { case t => log.error("Error cleaning up UTX pool", t) }
+    .executeOn(scheduler)
 
   override def close(): Unit = {
-    cleanup.scheduler.shutdown()
+    scheduler.shutdown()
   }
 
   private[this] object PoolMetrics {
