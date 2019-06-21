@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
+import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
@@ -38,12 +38,6 @@ object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-  case class NotFoundErrorMessage(status: String, details: String)
-
-  object NotFoundErrorMessage {
-    implicit val format: Format[NotFoundErrorMessage] = Json.format
-  }
-
   def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
     case Failure(e)                                                  => Assertions.fail(e)
@@ -59,17 +53,10 @@ object SyncHttpApi extends Assertions {
   }
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
-    case Failure(e @ UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
-  }
-
-  def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
-    case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting not found error")
   }
 
   val RequestAwaitTime: FiniteDuration = 50.seconds
