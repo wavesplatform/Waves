@@ -22,8 +22,10 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   var assetSponsoredByRecipient: String = ""
   var initCallerTxs: Long = 0
   var initDAppTxs: Long = 0
+  var initRecipientTxs: Long = 0
   var initCallerStateChanges: Long = 0
   var initDAppStateChanges: Long = 0
+  var initRecipientStateChanges: Long = 0
 
   test("prepare") {
     simpleAsset = sender.issue(contract.address, "simple", "", 9000, 0).id
@@ -63,14 +65,17 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     initCallerTxs = sender.transactionsByAddress(caller.address, 100).length
     initDAppTxs = sender.transactionsByAddress(contract.address, 100).length
+    initRecipientTxs = sender.transactionsByAddress(recipient.address, 100).length
     initCallerStateChanges = sender.debugStateChangesByAddress(caller.address, 100).length
     initDAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100).length
+    initRecipientStateChanges = sender.debugStateChangesByAddress(recipient.address, 100).length
     initCallerTxs shouldBe initCallerStateChanges
     initDAppTxs shouldBe initDAppStateChanges
+    initRecipientTxs shouldBe initRecipientStateChanges
   }
 
   test("write") {
-    val writeTx = sender.invokeScript(
+    val invokeTx = sender.invokeScript(
       caller.address,
       contract.address,
       func = Some("write"),
@@ -79,10 +84,10 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo = sender.transactionInfo(writeTx.id)
+    val txInfo = sender.transactionInfo(invokeTx.id)
     val callerTxs = sender.transactionsByAddress(caller.address, 100)
     val dAppTxs = sender.transactionsByAddress(contract.address, 100)
-    val txStateChanges = sender.debugStateChanges(writeTx.id)
+    val txStateChanges = sender.debugStateChanges(invokeTx.id)
     val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
     val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
 
@@ -100,7 +105,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   }
 
   test("sponsored by dApp") {
-    val writeTx = sender.invokeScript(
+    val invokeTx = sender.invokeScript(
       caller.address,
       contract.address,
       func = Some("sendAsset"),
@@ -114,32 +119,39 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo = sender.transactionInfo(writeTx.id)
+    val txInfo = sender.transactionInfo(invokeTx.id)
     val callerTxs = sender.transactionsByAddress(caller.address, 100)
     val dAppTxs = sender.transactionsByAddress(contract.address, 100)
-    val txStateChanges = sender.debugStateChanges(writeTx.id)
+    val recipientTxs = sender.transactionsByAddress(recipient.address, 100)
+    val txStateChanges = sender.debugStateChanges(invokeTx.id)
     val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
     val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
+    val recipientStateChanges = sender.debugStateChangesByAddress(recipient.address, 100)
 
     callerTxs.length shouldBe initCallerTxs + 2
     callerTxs.length shouldBe callerStateChanges.length
     dAppTxs.length shouldBe initDAppTxs + 2
     dAppTxs.length shouldBe dAppStateChanges.length
+    recipientTxs.length shouldBe initRecipientTxs + 1
+    recipientTxs.length shouldBe recipientStateChanges.length
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
     txInfoShouldBeEqual(callerTxs.head, txStateChanges)
     txInfoShouldBeEqual(dAppTxs.head, txStateChanges)
+    txInfoShouldBeEqual(recipientTxs.head, txStateChanges)
     txInfoShouldBeEqual(txInfo, callerStateChanges.head)
     txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
+    txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
     val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient.address, Some(simpleAsset), 10)))
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
+    recipientStateChanges.head.stateChanges.get shouldBe expected
   }
 
   test("sponsored by recipient") {
-    val writeTx = sender.invokeScript(
+    val invokeTx = sender.invokeScript(
       caller.address,
       contract.address,
       func = Some("writeAndSendWaves"),
@@ -149,23 +161,29 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo = sender.transactionInfo(writeTx.id)
+    val txInfo = sender.transactionInfo(invokeTx.id)
     val callerTxs = sender.transactionsByAddress(caller.address, 100)
     val dAppTxs = sender.transactionsByAddress(contract.address, 100)
-    val txStateChanges = sender.debugStateChanges(writeTx.id)
+    val recipientTxs = sender.transactionsByAddress(recipient.address, 100)
+    val txStateChanges = sender.debugStateChanges(invokeTx.id)
     val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
     val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
+    val recipientStateChanges = sender.debugStateChangesByAddress(recipient.address, 100)
 
     callerTxs.length shouldBe initCallerTxs + 3
     callerTxs.length shouldBe callerStateChanges.length
     dAppTxs.length shouldBe initDAppTxs + 3
     dAppTxs.length shouldBe dAppStateChanges.length
+    recipientTxs.length shouldBe initRecipientTxs + 2
+    recipientTxs.length shouldBe recipientStateChanges.length
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
     txInfoShouldBeEqual(callerTxs.head, txStateChanges)
     txInfoShouldBeEqual(dAppTxs.head, txStateChanges)
+    txInfoShouldBeEqual(recipientTxs.head, txStateChanges)
     txInfoShouldBeEqual(txInfo, callerStateChanges.head)
     txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
+    txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
     val expected = StateChangesDetails(
       Seq(DataResponse("integer", 7, "result")),
