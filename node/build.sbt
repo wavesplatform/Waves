@@ -131,10 +131,8 @@ inConfig(Linux)(
     packageDescription := "Waves node"
   ))
 
-val packageSource = Def.settingKey[File]("Additional files for DEB")
 inConfig(Debian)(
   Seq(
-    packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
     serviceAutostart := false,
@@ -173,9 +171,5 @@ val nameFix = Seq(
   normalizedName := s"${name.value}${network.value.packageSuffix}"
 )
 
-inConfig(Universal)(nameFix)
-inConfig(Linux)(nameFix)
-inConfig(Debian)(nameFix)
-
-inTask(packageBin)(nameFix)
-inTask(assembly)(nameFix)
+nameFix
+inScope(Global)(nameFix)
