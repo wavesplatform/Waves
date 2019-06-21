@@ -9,6 +9,7 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{KeyPair, PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
+import com.wavesplatform.matcher.db.EmptyOrderDB
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
@@ -193,7 +194,8 @@ class AddressActorSpecification
           event => {
             eventsProbe.ref ! event
             Future.successful(Some(QueueEventWithMeta(0, 0, event)))
-          }
+          },
+          false
         )))
     f(
       addressActor,

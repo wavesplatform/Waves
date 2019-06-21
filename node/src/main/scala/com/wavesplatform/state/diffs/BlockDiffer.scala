@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.Monoid
 import cats.implicits._
 import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -17,6 +16,7 @@ import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.ScorexLogging
 
+//noinspection VariablePatternShadow
 object BlockDiffer extends ScorexLogging {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: Seq[Diff])
   final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint, detailedDiff: DetailedDiff)
@@ -57,7 +57,7 @@ object BlockDiffer extends ScorexLogging {
     val blockchainWithLastBlock = CompositeBlockchain.withLastBlock(blockchain, block)
 
     for {
-      _ <- TracedResult(block.signaturesValid())
+      _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
       r <- apply(
         blockchainWithLastBlock,
         constraint,
@@ -120,7 +120,7 @@ object BlockDiffer extends ScorexLogging {
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
     val hasNg          = currentBlockFeeDistr.isEmpty
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
@@ -146,54 +146,71 @@ object BlockDiffer extends ScorexLogging {
     }
 
     txs
-      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Seq.empty[Diff])).asRight[ValidationError])) {
+      .foldLeft(
+        TracedResult((composite(blockchain, initDiff), Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Seq.empty[Diff])))
+          .asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
-        case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _), tx) =>
-          val updatedBlockchain = composite(blockchain, currDiff)
-          txDiffer(updatedBlockchain, tx).flatMap { newDiff =>
-            val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx, newDiff)
+        case (TracedResult(Right((blockchain, Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs)))), _),
+              tx) =>
+          txDiffer(blockchain, tx).flatMap { newDiff =>
+            val updatedConstraint = updateConstraint(currConstraint, blockchain, tx, newDiff)
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {
-              val updatedDiff = currDiff.combine(newDiff)
-
-              val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
+              val (curBlockFees, nextBlockFee) = clearSponsorship(blockchain, tx.feeDiff())
               val totalWavesFee                = currTotalFee + curBlockFees.balance + nextBlockFee
-              Right(
+
+              val (resultDiff, resultCarryFee, minerDiff) =
                 if (hasNg) {
                   val minerDiff = Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees))
-                  Result(updatedDiff.combine(minerDiff),
-                         carryFee + nextBlockFee,
-                         totalWavesFee,
-                         updatedConstraint,
-                         DetailedDiff(parentDiff.combine(minerDiff), txDiffs :+ newDiff))
-                } else Result(updatedDiff, 0L, totalWavesFee, updatedConstraint, DetailedDiff(parentDiff, txDiffs :+ newDiff))
-              )
+                  (newDiff.combine(minerDiff), carryFee + nextBlockFee, minerDiff)
+                } else (newDiff, 0L, Diff.empty)
+
+              Right(
+                (composite(blockchain, resultDiff),
+                 Result(currDiff.combine(resultDiff),
+                        resultCarryFee,
+                        totalWavesFee,
+                        updatedConstraint,
+                        DetailedDiff(parentDiff.combine(minerDiff), txDiffs :+ newDiff))))
             }
           }
       }
       .map {
-        case Result(diff, carry, totalFee, constraint, DetailedDiff(parentDiff, txDiffs)) =>
-          def withPatches(d: Diff): Diff = {
-            val diffWithCancelledLeases =
-              if (currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight)
-                Monoid.combine(d, CancelAllLeases(composite(blockchain, d)))
-              else d
+        case (blockchain, result) =>
+          final case class Patch(predicate: CompositeBlockchain => Boolean, patch: CompositeBlockchain => Diff)
+          def applyAll(patches: Patch*): Diff =
+            patches
+              .foldLeft((blockchain, Diff.empty)) {
+                case ((blockchain, cd), p) =>
+                  if (p.predicate(blockchain)) {
+                    val pd = p.patch(blockchain)
+                    (composite(blockchain, pd), cd.combine(pd))
+                  } else {
+                    (blockchain, cd)
+                  }
+              }
+              ._2
 
-            val diffWithLeasePatches =
-              if (currentBlockHeight == blockchain.settings.functionalitySettings.blockVersion3AfterHeight)
-                Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases)))
-              else diffWithCancelledLeases
+          val patchDiff = applyAll(
+            Patch(
+              _ => currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight,
+              CancelAllLeases(_)
+            ),
+            Patch(
+              _ => currentBlockHeight == blockchain.settings.functionalitySettings.blockVersion3AfterHeight,
+              CancelLeaseOverflow(_)
+            ),
+            Patch(
+              _.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight),
+              CancelInvalidLeaseIn(_)
+            )
+          )
 
-            val diffWithCancelledLeaseIns =
-              if (blockchain.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-                Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
-              else diffWithLeasePatches
-
-            diffWithCancelledLeaseIns
-          }
-
-          Result(withPatches(diff), carry, totalFee, constraint, DetailedDiff(withPatches(parentDiff), txDiffs))
+          result.copy(diff = result.diff.combine(patchDiff),
+                      detailedDiff = result.detailedDiff.copy(
+                        parentDiff = result.detailedDiff.parentDiff.combine(patchDiff)
+                      ))
       }
   }
 }

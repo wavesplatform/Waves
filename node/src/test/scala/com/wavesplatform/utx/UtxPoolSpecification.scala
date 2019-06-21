@@ -128,6 +128,12 @@ class UtxPoolSpecification
     (sender, senderBalance, bcu)
   }
 
+  private val stateWithTransfer = for {
+    (sender, balance, bcu) <- stateGen
+    time = new TestTime
+    transfer <- transfer(sender, balance, time)
+  } yield (time, bcu, transfer)
+
   private val twoOutOfManyValidPayments = (for {
     (sender, senderBalance, bcu) <- stateGen
     recipient                    <- accountGen
@@ -366,7 +372,7 @@ class UtxPoolSpecification
         val (packed, restUpdated) = utx.packUnconfirmed(rest, 5.seconds)
 
         packed.lengthCompare(maxNumber) should be <= 0
-        if (maxNumber <= utx.all.size) restUpdated.isEmpty shouldBe true
+        if (maxNumber <= utx.all.size) restUpdated shouldBe 'full
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) {
@@ -581,6 +587,25 @@ class UtxPoolSpecification
         "v2" in {
           val (utx2, tx2) = enoughFeeTxWithScriptedAccount(2).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
           utx2.putIfNew(tx2).resultE should produce("denied from UTX pool")
+        }
+      }
+
+      "when pack time limit is exceeded" - {
+        "always packs the first transaction" in forAll(stateWithTransfer) {
+          case (time, bcu, transfer) =>
+            var timeSourceIsRunning = false
+            def nanoTimeSource(): Long =
+              if (timeSourceIsRunning) 100000L
+              else {
+                timeSourceIsRunning = true
+                0L
+              }
+            val settings = UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource())
+
+          utxPool.putIfNew(transfer).resultE.explicitGet()
+          val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
+          tx should contain (transfer)
         }
       }
     }

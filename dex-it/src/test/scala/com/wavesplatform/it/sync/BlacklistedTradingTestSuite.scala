@@ -17,20 +17,20 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    val xs = Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(node.signedIssue)
-    xs.foreach(tx => node.waitForTransaction(tx.id))
-    node.waitForHeight(node.height + 1)
+    val xs = Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_))
+    val height = xs.map(tx => node.waitForTransaction(tx.id).height).max
+    node.waitForHeight(height + 1)
   }
 
   "When blacklists are empty" in {
     val (dec2, dec8) = (1000L, 1000000000L)
 
     Then("Place some orders")
-    val usdOrder = node.placeOrder(alice, wavesUsdPair, BUY, dec8, dec2, matcherFee).message.id
-    val wctOrder = node.placeOrder(alice, wctWavesPair, BUY, dec2, dec8, matcherFee).message.id
-    val ethOrder = node.placeOrder(alice, ethWavesPair, SELL, dec8, dec8, matcherFee).message.id
-    val btcOrder = node.placeOrder(bob, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
-    node.waitOrderStatus(wctWavesPair, btcOrder, "Accepted")
+    val usdOrder  = node.placeOrder(alice, wavesUsdPair, BUY, dec8, dec2, matcherFee).message.id
+    val wctOrder  = node.placeOrder(alice, wctWavesPair, BUY, dec2, dec8, matcherFee).message.id
+    val ethOrder  = node.placeOrder(alice, ethWavesPair, SELL, dec8, dec8, matcherFee).message.id
+    val btcOrder1 = node.placeOrder(bob, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
+    node.waitOrderStatus(wctWavesPair, btcOrder1, "Accepted")
 
     Then("We blacklist some assets and addresses and restart the node")
     docker.restartNode(
@@ -43,21 +43,21 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     )
 
     Then("orders for blacklisted assets are not available and new orders can't be placed")
-    node.orderStatusExpectInvalidAssetId(wctOrder, wctWavesPair, WctId.toString) //
-    node.orderStatusExpectInvalidAssetId(ethOrder, ethWavesPair, EthId.toString)
+    node.orderStatusExpectInvalidAssetId(wctOrder, wctWavesPair, WctId.toString, _.message.contains("is blacklisted"))
+    node.orderStatusExpectInvalidAssetId(ethOrder, ethWavesPair, EthId.toString, _.message.contains("is blacklisted"))
     node.expectRejectedOrderPlacement(alice, wctWavesPair, BUY, dec2, dec8)
     node.expectRejectedOrderPlacement(alice, ethWavesPair, SELL, dec8, dec8)
     node.expectRejectedOrderPlacement(bob, wavesBtcPair, SELL, dec8, dec8)
 
     And("orders of blacklisted address are still available")
-    node.orderStatus(btcOrder, wavesBtcPair).status shouldBe "Accepted"
+    node.orderStatus(btcOrder1, wavesBtcPair).status shouldBe "Accepted"
 
     And("orders for other assets are still available")
     node.orderStatus(usdOrder, wavesUsdPair).status shouldBe "Accepted"
 
     And("OrderBook for blacklisted assets is not available")
-    node.orderBookExpectInvalidAssetId(wctWavesPair, WctId.toString)
-    node.orderBookExpectInvalidAssetId(ethWavesPair, EthId.toString)
+    node.orderBookExpectInvalidAssetId(wctWavesPair, WctId.toString, _.message.contains("is blacklisted"))
+    node.orderBookExpectInvalidAssetId(ethWavesPair, EthId.toString, _.message.contains("is blacklisted"))
     node.orderBook(wavesBtcPair).asks.size shouldBe 1
 
     And("OrderHistory returns info about all orders")
@@ -76,6 +76,10 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     And("orders for other assets are still available")
     node.orderStatus(usdOrder, wavesUsdPair).status shouldBe "Accepted"
 
+    And("order can be placed on allowed pair with blacklisted asset")
+    val btcOrder2 = node.placeOrder(alice, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
+    node.waitOrderStatus(wavesBtcPair, btcOrder2, "Accepted")
+
     And("now if all blacklists are cleared")
     docker.restartNode(node, configWithBlacklisted())
 
@@ -90,8 +94,8 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     And("new orders can be placed")
     val newWctOrder = node.placeOrder(alice, wctWavesPair, BUY, dec2, dec8, matcherFee).message.id
     val newEthOrder = node.placeOrder(alice, ethWavesPair, SELL, dec8, dec8, matcherFee).message.id
-    val newBtcOrder = node.placeOrder(bob, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
-    node.waitOrderStatus(wctWavesPair, newBtcOrder, "Accepted")
+    val btcOrder3   = node.placeOrder(bob, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
+    node.waitOrderStatus(wctWavesPair, btcOrder3, "Accepted")
     node.orderStatus(newWctOrder, wctWavesPair).status shouldBe "Accepted"
     node.orderStatus(newEthOrder, ethWavesPair).status shouldBe "Accepted"
   }
@@ -100,13 +104,18 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
 object BlacklistedTradingTestSuite {
 
-  def configWithBlacklisted(assets: Array[String] = Array(), names: Array[String] = Array(), addresses: Array[String] = Array()): Config = {
+  def configWithBlacklisted(assets: Array[String] = Array.empty,
+                            names: Array[String] = Array.empty,
+                            addresses: Array[String] = Array.empty,
+                            allowedAssetPairs: Array[String] = Array.empty): Config = {
     def toStr(array: Array[String]): String = if (array.length == 0) "" else array.mkString("\"", "\", \"", "\"")
     parseString(s"""
                 |waves.matcher {
                 |  blacklisted-assets = [${toStr(assets)}]
                 |  blacklisted-names = [${toStr(names)}]
                 |  blacklisted-addresses = [${toStr(addresses)}]
+                |  allowed-asset-pairs = [${toStr(allowedAssetPairs)}]
+                |  white-list-only = no
                 |}
     """.stripMargin)
   }

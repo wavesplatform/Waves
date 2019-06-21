@@ -400,7 +400,8 @@ package object database {
       }
     }
 
-    def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
+    def get[A](key: Key[A]): A    = key.parse(db.get(key.keyBytes))
+    def has(key: Key[_]): Boolean = db.get(key.keyBytes) != null
 
     def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)

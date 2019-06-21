@@ -66,6 +66,48 @@ class TradersTestSuite extends MatcherSuiteBase {
 
     node.assertAssetBalance(bob.address, bobNewAsset, bobAssetQuantity)
 
+    "AssetPair BOB/WAVES vs BOB/NULL" in {
+      val trickyBobWavesPairWB58 = AssetPair(
+        amountAsset = bobAssetId,
+        priceAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
+      )
+
+      trickyBobWavesPairWB58.key shouldBe bobWavesPair.key
+
+      val trickyBobWavesPairWS = AssetPair(
+        priceAsset = IssuedAsset(ByteStr("WAVES".getBytes())),
+        amountAsset = bobAssetId
+      )
+
+      val trickyBobOrderWB58 = node.prepareOrder(bob, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      node.expectIncorrectOrderPlacement(trickyBobOrderWB58, 400, "OrderRejected")
+
+      val trickyBobOrderWS = node.prepareOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      node.expectIncorrectOrderPlacement(trickyBobOrderWS, 400, "OrderRejected")
+
+      val correctBobOrder   = node.prepareOrder(bob, bobWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      val correctBobOrderId = node.placeOrder(correctBobOrder).message.id
+      node.waitOrderStatus(bobWavesPair, correctBobOrderId, "Accepted")
+
+      val markets = node.tradingMarkets().markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
+
+      withClue("hasTrickyBobWavesPairWB58Market") {
+        markets.contains(trickyBobWavesPairWB58.key) shouldBe true
+      }
+
+      withClue("hasTrickyBobWavesPairWSMarket") {
+        markets.contains(trickyBobWavesPairWS.key) shouldBe false
+      }
+
+      withClue("bobWavesPair") {
+        markets.contains(bobWavesPair.key) shouldBe true
+      }
+
+      node.orderBook(bobWavesPair).bids shouldNot be(empty)
+      node.cancelOrder(bob, bobWavesPair, correctBobOrderId)
+      node.waitOrderStatus(bobWavesPair, correctBobOrderId, "Cancelled")
+    }
+
     "owner moves assets/waves to another account and order become an invalid" - {
       // Could not work sometimes because of NODE-546
       "order with assets" - {
@@ -219,5 +261,5 @@ class TradersTestSuite extends MatcherSuiteBase {
 }
 
 object TradersTestSuite {
-  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.matcher { allow-order-v3 = yes }")
+  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.matcher { allowed-order-versions = [1, 2, 3] }")
 }

@@ -60,7 +60,7 @@ object Asset {
 
   def fromProtoId(assetId: AssetId): Asset = assetId.asset match {
     case AssetId.Asset.IssuedAsset(bs) => fromProtoId(bs)
-    case _                             => Waves
+    case _ => Waves
   }
 
   implicit class AssetIdOps(private val ai: Asset) extends AnyVal {
@@ -71,7 +71,7 @@ object Asset {
 
     def protoId: AssetId = ai match {
       case IssuedAsset(id) => AssetId().withIssuedAsset(ByteString.copyFrom(id))
-      case Waves           => AssetId().withWaves(com.google.protobuf.empty.Empty())
+      case Waves => AssetId().withWaves(com.google.protobuf.empty.Empty())
     }
 
     def compatId: Option[ByteStr] = ai match {

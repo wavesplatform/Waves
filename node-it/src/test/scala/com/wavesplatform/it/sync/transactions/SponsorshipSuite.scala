@@ -110,14 +110,14 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         miner.assertAssetBalance(bob.address, sponsorAssetId, 10 * Token)
 
         val aliceTx = alice.transactionsByAddress(alice.address, 100)
-        aliceTx.head.size shouldBe 3
-        aliceTx.head.count(tx => tx.sender.contains(alice.address) || tx.recipient.contains(alice.address)) shouldBe 3
-        aliceTx.head.map(_.id) should contain allElementsOf Seq(transferTxCustomFeeAlice, transferTxToAlice)
+        aliceTx.size shouldBe 3
+        aliceTx.count(tx => tx.sender.contains(alice.address) || tx.recipient.contains(alice.address)) shouldBe 3
+        aliceTx.map(_.id) should contain allElementsOf Seq(transferTxCustomFeeAlice, transferTxToAlice)
 
         val bobTx = alice.transactionsByAddress(bob.address, 100)
-        bobTx.head.size shouldBe 2
-        bobTx.head.count(tx => tx.sender.contains(bob.address) || tx.recipient.contains(bob.address)) shouldBe 2
-        bobTx.head.map(_.id) should contain(transferTxCustomFeeAlice)
+        bobTx.size shouldBe 2
+        bobTx.count(tx => tx.sender.contains(bob.address) || tx.recipient.contains(bob.address)) shouldBe 2
+        bobTx.map(_.id) should contain(transferTxCustomFeeAlice)
       }
 
       "check transactions by address" in {
@@ -127,7 +127,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         val sponsorTx = sponsor.transactionsByAddress(sponsor.address, 100)
 //        sponsorTx.head.size shouldBe 4
 //        sponsorTx.head.count(tx => tx.sender.contains(sponsor.address) || tx.recipient.contains(sponsor.address)) shouldBe 4
-        sponsorTx.head.map(_.id) should contain allElementsOf Seq(sponsorId, transferTxToAlice, sponsorAssetId)
+        sponsorTx.map(_.id) should contain allElementsOf Seq(sponsorId, transferTxToAlice, sponsorAssetId)
       }
 
       "sponsor should receive sponsored asset as fee, waves should be written off" in {
@@ -256,9 +256,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       "transfer tx sponsored fee is less then new minimal" in {
         assertBadRequestAndResponse(
           sponsor
-            .transfer(sponsor.address, alice.address, 10 * Token, fee = SmallFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
+            .transfer(sponsor.address, alice.address, 11 * Token, fee = SmallFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
             .id,
-          "does not exceed minimal value"
+          s"Fee for TransferTransaction \\($SmallFee in ${Some(sponsorAssetId).get}\\) does not exceed minimal value of 100000 WAVES or $LargeFee ${Some(sponsorAssetId).get}"
         )
       }
 
@@ -305,7 +305,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       assetInfo.minSponsoredAssetFee shouldBe Some(Token)
       assetInfo.quantity shouldBe sponsorAssetTotal / 2
 
-      val sponsorAssetId2Reissue = sponsor.reissue(sponsor.address, sponsorAssetId2, sponsorAssetTotal, true, issueFee).id
+      val sponsorAssetId2Reissue = sponsor.reissue(sponsor.address, sponsorAssetId2, sponsorAssetTotal, reissuable = true, issueFee).id
       nodes.waitForHeightAriseAndTxPresent(sponsorAssetId2Reissue)
 
       val assetInfoAfterReissue = sponsor.assetsDetails(sponsorAssetId2)

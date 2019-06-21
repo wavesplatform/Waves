@@ -2,6 +2,7 @@ package com.wavesplatform.matcher
 
 import java.util.concurrent.ConcurrentHashMap
 
+import com.wavesplatform.matcher.db.RateDB
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -9,6 +10,7 @@ import org.iq80.leveldb.DB
 import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
+import scala.collection.concurrent.TrieMap
 
 trait RateCache {
 
@@ -55,5 +57,28 @@ object RateCache {
       rateDB.deleteRate(issuedAsset)
       Option(rateMap.remove(issuedAsset))
     }
+  }
+
+  def inMem: RateCache = new RateCache {
+
+    private val rates: TrieMap[Asset, Double] = TrieMap(Waves -> 1d)
+
+    def upsertRate(asset: Asset, value: Double): Option[Double] = {
+      asset.fold { Option(1d) } { issuedAsset =>
+        val previousValue = rates.get(issuedAsset)
+        rates += (asset -> value)
+        previousValue
+      }
+    }
+
+    def getRate(asset: Asset): Option[Double] = rates.get(asset)
+    def getAllRates: Map[Asset, Double]       = rates.toMap
+
+    def deleteRate(asset: Asset): Option[Double] =
+      asset.fold { Option(1d) } { issuedAsset =>
+        val previousValue = rates.get(issuedAsset)
+        rates -= issuedAsset
+        previousValue
+      }
   }
 }

@@ -10,6 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils.CloseableIterator
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -214,5 +215,15 @@ object Diff {
         scriptResults = older.scriptResults.combine(newer.scriptResults),
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
       )
+  }
+
+  implicit class DiffOps(val diff: Diff) {
+    def iterator[A](f: Diff => Iterable[A]): CloseableIterator[A] = {
+      CloseableIterator.fromIterator(f(diff).iterator)
+    }
+
+    def reverseIterator[A](f: Diff => Iterable[A]): CloseableIterator[A] = {
+      CloseableIterator.fromIterator(f(diff).toSeq.reverseIterator)
+    }
   }
 }

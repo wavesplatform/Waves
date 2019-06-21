@@ -101,12 +101,18 @@ object AsyncMatcherHttpApi extends Assertions {
         .as[MatcherStatusResponse]
     }
 
-    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] = {
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] =
+      orderStatusExpectInvalidAssetId(orderId, assetPair, assetId, _.message == s"Invalid Asset ID: $assetId")
+
+    def orderStatusExpectInvalidAssetId(orderId: String,
+                                        assetPair: AssetPair,
+                                        assetId: String,
+                                        pred: MessageMatcherResponse => Boolean): Future[Boolean] = {
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId") transform {
         case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
           Try(parse(responseBody).as[MessageMatcherResponse]) match {
-            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
-            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+            case Success(mr) if pred(mr) => Success(true)
+            case Failure(f)              => Failure(new RuntimeException(s"Failed to parse response: $f"))
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
@@ -114,11 +120,14 @@ object AsyncMatcherHttpApi extends Assertions {
     }
 
     def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
+      orderBookExpectInvalidAssetId(assetPair, assetId, _.message == s"Invalid Asset ID: $assetId")
+
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String, pred: MessageMatcherResponse => Boolean): Future[Boolean] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
         case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
           Try(parse(responseBody).as[MessageMatcherResponse]) match {
-            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
-            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+            case Success(mr) if pred(mr) => Success(true)
+            case Failure(f)              => Failure(new RuntimeException(s"Failed to parse response: $f"))
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
@@ -301,10 +310,9 @@ object AsyncMatcherHttpApi extends Assertions {
       for {
         offset           <- matcherNode.getCurrentOffset
         snapshots        <- matcherNode.getAllSnapshotOffsets
-        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).map(r => x -> r))
+        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).zip(matcherNode.marketStatus(x)).map(r => x -> r))
         orderStatuses    <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
         reservedBalances <- Future.traverse(accounts)(x => matcherNode.reservedBalance(x).map(r => x -> r))
-
         accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
         orderHistory <- Future.traverse(accountsOrderHistory) {
           case (account, pair) => matcherNode.orderHistoryByPair(account, pair).map(r => (account, pair, r))
@@ -332,7 +340,7 @@ object AsyncMatcherHttpApi extends Assertions {
       }
 
     private def clean(x: MatcherState): MatcherState = x.copy(
-      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(timestamp = 0L) }
+      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
     )
 
     def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int): Future[RatesResponse] = {

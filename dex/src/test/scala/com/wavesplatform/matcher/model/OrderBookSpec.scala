@@ -1,18 +1,23 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.NTPTime
+import java.nio.ByteBuffer
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.OrderBook.Level
+import com.wavesplatform.matcher.model.OrderBook.{Level, TickSize}
+import com.wavesplatform.matcher.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.{NTPTime, NoShrink}
+import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.{SortedSet, mutable}
 
-class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTPTime {
+class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with MatcherTestData with NTPTime with NoShrink {
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
   "place buy orders with different prices" in {
@@ -25,17 +30,14 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord2, ntpNow)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders.toSeq shouldEqual Seq(LimitOrder(ord2), LimitOrder(ord1), LimitOrder(ord3))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(LimitOrder(ord2), LimitOrder(ord1), LimitOrder(ord3))
   }
 
   "place several buy orders at the same price" in {}
 
   "place buy and sell orders with prices different from each other less than tick size in one level" in {
-
-    def toNormalized(value: Long): Long = value * Order.PriceConstant
-
-    val ob                 = OrderBook.empty
-    val normalizedTickSize = Some(toNormalized(100L))
+    val ob       = OrderBook.empty
+    val tickSize = TickSize.Enabled(toNormalized(100L))
 
     val buyOrd1 = buy(pair, 1583290045643L, 34100)
     val buyOrd2 = buy(pair, 170484969L, 34120)
@@ -51,19 +53,19 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val sellOrd5 = sell(pair, 54521418494L, 44357)
     val sellOrd6 = sell(pair, 54521418493L, 44389)
 
-    ob.add(buyOrd1, ntpNow, normalizedTickSize)
-    ob.add(buyOrd2, ntpNow, normalizedTickSize)
-    ob.add(buyOrd3, ntpNow, normalizedTickSize)
-    ob.add(buyOrd4, ntpNow, normalizedTickSize)
-    ob.add(buyOrd5, ntpNow, normalizedTickSize)
-    ob.add(buyOrd6, ntpNow, normalizedTickSize)
+    ob.add(buyOrd1, ntpNow, tickSize)
+    ob.add(buyOrd2, ntpNow, tickSize)
+    ob.add(buyOrd3, ntpNow, tickSize)
+    ob.add(buyOrd4, ntpNow, tickSize)
+    ob.add(buyOrd5, ntpNow, tickSize)
+    ob.add(buyOrd6, ntpNow, tickSize)
 
-    ob.add(sellOrd1, ntpNow, normalizedTickSize)
-    ob.add(sellOrd2, ntpNow, normalizedTickSize)
-    ob.add(sellOrd3, ntpNow, normalizedTickSize)
-    ob.add(sellOrd4, ntpNow, normalizedTickSize)
-    ob.add(sellOrd5, ntpNow, normalizedTickSize)
-    ob.add(sellOrd6, ntpNow, normalizedTickSize)
+    ob.add(sellOrd1, ntpNow, tickSize)
+    ob.add(sellOrd2, ntpNow, tickSize)
+    ob.add(sellOrd3, ntpNow, tickSize)
+    ob.add(sellOrd4, ntpNow, tickSize)
+    ob.add(sellOrd5, ntpNow, tickSize)
+    ob.add(sellOrd6, ntpNow, tickSize)
 
     ob.getBids.keySet shouldBe SortedSet[Long](34300, 34200, 34100).map(toNormalized)
     ob.getAsks.keySet shouldBe SortedSet[Long](44100, 44200, 44300, 44400).map(toNormalized)
@@ -94,7 +96,50 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     Seq(ord3, ord1, ord2).map(LimitOrder(_))
   }
 
-  "place several sell orders at the same price" in {}
+  "place several sell orders at the same price" - {
+    "with same level" - {
+      "TickSize.Enabled" in {
+        val tickSize = TickSize.Enabled(toNormalized(100L))
+        val ob       = OrderBook.empty
+
+        val sellOrder = sell(pair, 54521418493L, 44389)
+        ob.add(sellOrder, ntpNow, tickSize)
+        ob.add(sellOrder, ntpNow, tickSize)
+
+        ob.getAsks.size shouldBe 1
+
+        val sellLimitOrder = LimitOrder(sellOrder)
+        ob.getAsks.head._2.toList shouldBe List(sellLimitOrder, sellLimitOrder)
+      }
+
+      "TickSize.Disabled" in {
+        val ob = OrderBook.empty
+
+        val sellOrder = sell(pair, 54521418493L, 44389)
+        ob.add(sellOrder, ntpNow, TickSize.Disabled)
+        ob.add(sellOrder, ntpNow, TickSize.Disabled)
+
+        ob.getAsks.size shouldBe 1
+
+        val sellLimitOrder = LimitOrder(sellOrder)
+        ob.getAsks.head._2.toList shouldBe List(sellLimitOrder, sellLimitOrder)
+      }
+    }
+
+    "with different levels" in {
+      val ob = OrderBook.empty
+
+      val sellOrder = sell(pair, 54521418493L, 44389)
+      ob.add(sellOrder, ntpNow, TickSize.Enabled(toNormalized(100L)))
+      ob.add(sellOrder, ntpNow, TickSize.Disabled)
+
+      ob.getAsks.size shouldBe 2
+
+      val sellLimitOrder = LimitOrder(sellOrder)
+      ob.getAsks.head._2.head shouldBe sellLimitOrder
+      ob.getAsks.last._2.head shouldBe sellLimitOrder
+    }
+  }
 
   "sell market" in {
     val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
@@ -104,12 +149,12 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord1, ntpNow)
     ob.add(ord2, ntpNow)
 
-    ob.allOrders shouldEqual Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+    ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
 
     val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders shouldEqual Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+    ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
 
   "execute orders at different price levels" in {
@@ -126,7 +171,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
 
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
-    ob.allOrders shouldEqual Seq(
+    ob.allOrders.map(_._2) shouldEqual Seq(
       SellLimitOrder(
         restAmount,
         ord3.matcherFee - LimitOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
@@ -145,7 +190,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord2, ntpNow)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders shouldEqual Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+    ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
 
   "partially execute order with zero fee remaining part" in {
@@ -165,7 +210,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
     val restFee = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
-    ob.allOrders.toSeq shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
   "partially execute order with price > 1 and zero fee remaining part " in {
@@ -182,7 +227,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
     val restFee    = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
-    ob.allOrders.toSeq shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
   "buy small amount of pricey asset" in {
@@ -197,7 +242,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
     val restFee     = s.matcherFee - LimitOrder.partialFee(s.matcherFee, s.amount, restSAmount)
-    ob.allOrders shouldEqual Seq(SellLimitOrder(restAmount, restFee, s))
+    ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, s))
   }
 
   "cleanup expired buy orders" in {
@@ -211,4 +256,69 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
   "aggregate levels for snapshot, preserving order" in {
     pending
   }
+
+  "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    SideSnapshot.serialize(dest, x)
+    val bb = ByteBuffer.wrap(dest.result())
+    SideSnapshot.loFromBytes(bb) shouldBe x
+  }
+
+  "SideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    SideSnapshot.serialize(dest, x)
+    val bb = ByteBuffer.wrap(dest.result())
+    SideSnapshot.fromBytes(bb) shouldBe x
+  }
+
+  "LastTrade serialization" in forAll(lastTradeGen) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    LastTrade.serialize(dest, x)
+    val bb = ByteBuffer.wrap(dest.result())
+    LastTrade.fromBytes(bb) shouldBe x
+  }
+
+  "Snapshot serialization" in forAll(snapshotGen) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    Snapshot.serialize(dest, x)
+    val bb       = ByteBuffer.wrap(dest.result())
+    val restored = Snapshot.fromBytes(bb)
+    restored.asks shouldBe x.asks
+    restored.bids shouldBe x.bids
+    restored.lastTrade shouldBe x.lastTrade
+  }
+
+  private val sellLevelGen: Gen[Vector[SellLimitOrder]] =
+    Gen.containerOf[Vector, SellLimitOrder](sellLimitOrderGenerator)
+
+  private val asksGen: Gen[SideSnapshot] = for {
+    n      <- Gen.choose(0, 10)
+    levels <- Gen.containerOfN[Vector, Vector[SellLimitOrder]](n, sellLevelGen)
+    prices <- Gen.containerOfN[Vector, Long](n, Gen.choose(1, 1000L))
+  } yield prices.zip(levels).toMap
+
+  private val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
+    Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)
+
+  private val bidsGen: Gen[SideSnapshot] = for {
+    n      <- Gen.choose(0, 10)
+    levels <- Gen.containerOfN[Vector, Vector[BuyLimitOrder]](n, buyLevelGen)
+    prices <- Gen.containerOfN[Vector, Long](n, Gen.choose(1, 1000L))
+  } yield prices.zip(levels).toMap
+
+  private val lastTradeGen: Gen[LastTrade] = for {
+    price     <- Gen.choose(1, Long.MaxValue)
+    amount    <- Gen.choose(1, Long.MaxValue)
+    orderType <- orderTypeGenerator
+  } yield LastTrade(price, amount, orderType)
+
+  private val snapshotGen: Gen[Snapshot] = for {
+    asks      <- asksGen
+    bids      <- bidsGen
+    lastTrade <- Gen.option(lastTradeGen)
+  } yield Snapshot(bids, asks, lastTrade)
+
+  private val sideSnapshotSerGen: Gen[SideSnapshot] = Gen.oneOf(asksGen, bidsGen)
+
+  private def toNormalized(value: Long): Long = value * Order.PriceConstant
 }

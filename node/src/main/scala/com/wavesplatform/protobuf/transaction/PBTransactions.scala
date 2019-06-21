@@ -668,11 +668,9 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.serialization.Deser
 
-        val data = InvokeScriptTransactionData(
-          Some(PBRecipients.create(dappAddress)),
-          ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
-          payment.map(p => (p.assetId, p.amount): Amount)
-        )
+        val data = InvokeScriptTransactionData(Some(PBRecipients.create(dappAddress)),
+                                               ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+                                               payment.map(p => (p.assetId, p.amount): Amount))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
 
       case _ =>

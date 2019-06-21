@@ -176,7 +176,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
              |""".stripMargin,
           Coproduct(tx)
         )
-        outOfBounds shouldBe Left(s"java.lang.IndexOutOfBoundsException: $badIndex")
+        outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
     }
   }
 
@@ -293,6 +293,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           append(Seq(transferTx, issueTx)).explicitGet()
 
+          val assetId = issueTx.assetId.value
           val script = ScriptCompiler
             .compile(
               s"""
@@ -300,19 +301,26 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | {-# CONTENT_TYPE EXPRESSION #-}
               | {-# SCRIPT_TYPE ACCOUNT #-}
               |
-              | let aInfoOpt = assetInfo(base58'${issueTx.assetId.value}')
+              | let aInfoOpt = assetInfo(base58'$assetId')
               |
-              | let aInfo = extract(aInfoOpt)
-              | let totalAmount = aInfo.totalAmount == $quantity
-              | let decimals = aInfo.decimals == $decimals
-              | let issuer = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress.bytes}'
+              | let aInfo           = extract(aInfoOpt)
+              | let id              = aInfo.id == base58'$assetId'
+              | let quantity        = aInfo.quantity == $quantity
+              | let decimals        = aInfo.decimals == $decimals
+              | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress.bytes}'
               | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
-              | let scripted = aInfo.scripted == ${assetScript.nonEmpty}
-              | let reissuable = aInfo.reissuable == $reissuable
-              | let sponsored = aInfo.sponsored == $sponsored
+              | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
+              | let reissuable      = aInfo.reissuable == $reissuable
+              | let sponsored       = aInfo.sponsored == $sponsored
               |
-              | isDefined(aInfoOpt) && totalAmount && decimals && issuer && issuerPublicKey && scripted && reissuable && sponsored
-              |
+              | id              &&
+              | quantity        &&
+              | decimals        &&
+              | issuer          &&
+              | issuerPublicKey &&
+              | scripted        &&
+              | reissuable      &&
+              | sponsored
               |
             """.stripMargin
             )
@@ -426,6 +434,12 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |   transferTransactionById(base64'${transferTx.id.value.base64Raw}')
                  | )
                  |
+                 | let checkTransferOpt = match transferTransactionById(base64'') {
+                 |  case _: Unit => true
+                 |  case _: TransferTransaction => false
+                 |  case _ => false
+                 | }
+                 |
                  | let checkAddress = match transfer.recipient {
                  |   case addr: Address => addr.bytes == base64'${transferTx.recipient.bytes.base64Raw}'
                  |   case _             => false
@@ -448,12 +462,83 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |   transferTransactionById(base64'${dataTransaction.id.value.base64Raw}')
                  | )
                  |
+                 | checkTransferOpt    &&
                  | checkAmount         &&
                  | checkAddress        &&
                  | checkAttachment     &&
                  | checkAssetId        &&
                  | checkFeeAssetId     &&
                  | checkAnotherTxType
+                 |
+              """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(
+              masterAcc,
+              Some(script),
+              1000000L,
+              transferTx.timestamp + 5
+            )
+            .explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("account this") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | this.bytes == base58'${masterAcc.address}'
+                 |
+              """.stripMargin
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("address toString") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let checkAddressToStrRight = this.toString() == "${masterAcc.address}"
+                 | let checkAddressToStr = this.bytes.toBase58String() == this.toString()
+                 |
+                 | checkAddressToStrRight && checkAddressToStr
                  |
               """.stripMargin
             )

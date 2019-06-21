@@ -10,41 +10,60 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 
 class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(implicit ec: ExecutionContext)
     extends MatcherQueue
     with ScorexLogging {
 
-  private var lastUnreadOffset: QueueEventWithMeta.Offset = 0
-  private val timer                                       = new Timer("local-dex-queue", true)
+  @volatile private var lastUnreadOffset: QueueEventWithMeta.Offset = -1L
+
+  private val timer = new Timer("local-dex-queue", true)
   private val producer: Producer = {
     val r = if (settings.enableStoring) new LocalProducer(store, time) else IgnoreProducer
     log.info(s"Choosing ${r.getClass.getName} producer")
     r
   }
 
-  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
+  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
     if (settings.cleanBeforeConsume) store.dropUntil(fromOffset)
-    lastUnreadOffset = fromOffset
 
-    timer.schedule(
-      new TimerTask {
-        override def run(): Unit = {
-          val requests = store.getFrom(lastUnreadOffset, settings.maxElementsPerPoll)
-          lastUnreadOffset = requests.lastOption.fold(lastUnreadOffset) { x =>
-            val r = x.offset + 1
-            log.trace(s"Read $r events")
-            r
-          }
-          requests.foreach(process)
+    def runOnce(from: QueueEventWithMeta.Offset): Future[QueueEventWithMeta.Offset] = {
+      val requests = store.getFrom(from, settings.maxElementsPerPoll)
+      if (requests.isEmpty) Future.successful(from)
+      else {
+        val newOffset = requests.last.offset + 1
+        log.trace(s"Read ${newOffset - from} events")
+        process(requests).map(_ => newOffset)
+      }
+    }
+
+    val pollingInterval = settings.pollingInterval.toNanos
+    def loop(from: QueueEventWithMeta.Offset): Unit = {
+      val start = System.nanoTime()
+      runOnce(from)
+        .recover {
+          case NonFatal(e) =>
+            // Actually this should not happen. The Future[_] type is not powerful to express error-less computations
+            log.error("Can't process messages, trying again", e)
+            from
         }
-      },
-      0,
-      settings.pollingInterval.toMillis
-    )
+        .map { nextStartOffset =>
+          lastUnreadOffset = nextStartOffset
+          val diff  = System.nanoTime() - start
+          val delay = math.max(pollingInterval - diff, 0L) / 1000000 // to millis
+          timer.schedule(new TimerTask {
+            override def run(): Unit = loop(lastUnreadOffset)
+          }, delay)
+        }
+    }
+
+    loop(fromOffset)
   }
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
+
+  override def lastProcessedOffset: QueueEventWithMeta.Offset = lastUnreadOffset - 1
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future.successful(store.newestOffset.getOrElse(-1L))
 

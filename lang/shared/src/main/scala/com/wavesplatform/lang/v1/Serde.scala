@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.utils.Serialize._
@@ -60,7 +61,7 @@ object Serde {
           name <- Coeval.now(bb.getString)
           args <- ({
             val argsCnt = bb.getInt
-            if (argsCnt <= (bb.limit() - bb.position())/2) {
+            if (argsCnt <= (bb.limit() - bb.position())/2 && argsCnt >= 0) {
               Coeval.now(for (_ <- 1 to argsCnt) yield bb.getString)
             } else {
               Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments names too big."))
@@ -74,8 +75,8 @@ object Serde {
   def desAux(bb: ByteBuffer, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
     bb.get() match {
       case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
-      case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)))
-      case E_STRING => Coeval.now(CONST_STRING(bb.getString))
+      case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)).explicitGet())
+      case E_STRING => Coeval.now(CONST_STRING(bb.getString).explicitGet())
       case E_IF     => (desAux(bb), desAux(bb), desAux(bb)).mapN(IF)
       case E_BLOCK =>
         for {
@@ -102,7 +103,7 @@ object Serde {
           .now((bb.getFunctionHeader, bb.getInt))
           .flatMap {
             case (header, argc) =>
-              if (argc <= (bb.limit() - bb.position())) {
+              if (argc <= (bb.limit() - bb.position()) && argc >= 0) {
                 val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb))(collection.breakOut)
                 args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
               } else {

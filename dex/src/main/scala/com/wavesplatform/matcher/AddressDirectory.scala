@@ -15,14 +15,15 @@ import scala.collection.mutable
 
 class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
                        settings: MatcherSettings,
-                       addressActorProps: Address => Props,
+                       addressActorProps: (Address, Boolean) => Props,
                        historyRouter: Option[ActorRef])
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
   import context._
 
-  private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
+  private var startSchedules: Boolean = false
+  private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
   spendableBalanceChanged
     .filter(x => children.contains(x._1))
@@ -40,7 +41,7 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(addressActorProps(address), address.toString))
+    watch(actorOf(addressActorProps(address, startSchedules), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = {
@@ -71,6 +72,12 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
       forward(lo.order.sender, e)
       historyRouter foreach { _ ! SaveEvent(e) }
 
+    case StartSchedules =>
+      if (!startSchedules) {
+        startSchedules = true
+        context.children.foreach(_ ! StartSchedules)
+      }
+
     case Terminated(child) =>
       val addressString = child.path.name
       val address       = Address.fromString(addressString).explicitGet()
@@ -81,4 +88,5 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
 
 object AddressDirectory {
   case class Envelope(address: Address, cmd: AddressActor.Command)
+  case object StartSchedules
 }

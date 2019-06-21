@@ -4,11 +4,12 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.utils.Serialize._
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.Serde.desAux
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -21,14 +22,17 @@ object ContractSerDe {
   def serialize(c: DApp): Array[Byte] = {
     val out = new ByteArrayOutputStream()
 
+    // version byte
     out.writeInt(0)
+
+    out.writeInt(c.meta.size)
+    out.write(c.meta)
+
     out.writeInt(c.decs.size)
     c.decs.foreach(dec => serializeDeclaration(out, dec))
+
     out.writeInt(c.callableFuncs.size)
     c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
-
-    //TODO remove - default func
-    out.writeInt(0)
 
     c.verifierFuncOpt match {
       case None =>
@@ -45,18 +49,27 @@ object ContractSerDe {
     val bb = ByteBuffer.wrap(arr)
     for {
       _               <- tryEi(bb.getInt())
+      meta            <- deserializeMeta(bb)
       decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
       callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
-      defaultFuncOpt  <- Either.cond(bb.getInt == 0, (), "") //TODO remove - default func
       verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
-    } yield DApp(decs, callableFuncs, verifierFuncOpt)
+    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
-  private def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
+  private[lang] def deserializeMeta(bb: ByteBuffer): Either[String, ByteStr] = {
+    tryEi {
+      val len = bb.getInt()
+      val arr = new Array[Byte](len)
+      bb.get(arr, bb.arrayOffset(), len)
+      arr
+    }
+  }
+
+  private[lang]  def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
     Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value
   }
 
-  private def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
+  private[lang]  def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
     val decType = bb.get()
     Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value.leftMap(_.getMessage)
   }
@@ -95,9 +108,15 @@ object ContractSerDe {
     } yield VerifierFunction(a, f)
   }
 
-  private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] =
-    (1 to bb.getInt).toList
-      .traverse[({ type L[B] = Either[String, B] })#L, A](_ => df(bb))
+  private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] = {
+    val len = bb.getInt
+    if (len <= (bb.limit() - bb.position()) && len >= 0) {
+      (1 to len).toList
+        .traverse[({ type L[B] = Either[String, B] })#L, A](_ => df(bb))
+    } else {
+      Left(s"At position ${bb.position()} array of arguments too big.")
+    }
+  }
 
   private[lang] def deserializeOption[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, Option[A]] = {
     tryEi(bb.getInt > 0)
@@ -110,9 +129,13 @@ object ContractSerDe {
   private[lang] def deserializeFromArray[A](bb: ByteBuffer, df: Array[Byte] => Either[String, A]): Either[String, A] = {
     tryEi {
       val len = bb.getInt()
-      val arr = new Array[Byte](len)
-      bb.get(arr, bb.arrayOffset(), len)
-      arr
+      if (len <= (bb.limit() - bb.position()) && len >= 0) {
+        val arr = new Array[Byte](len)
+        bb.get(arr, bb.arrayOffset(), len)
+        arr
+      } else {
+        throw new Exception(s"At position ${bb.position()} array of arguments too big.")
+      }
     } flatMap df
   }
 

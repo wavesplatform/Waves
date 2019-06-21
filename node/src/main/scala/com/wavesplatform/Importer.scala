@@ -4,7 +4,7 @@ import java.io._
 
 import akka.actor.ActorSystem
 import com.google.common.primitives.Ints
-import com.typesafe.config.ConfigFactory
+import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -26,11 +26,11 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
-
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success, Try}
 import scopt.OParser
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
@@ -50,11 +50,13 @@ object Importer extends ScorexLogging {
   final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
                                  blockchainFile: File = new File("blockchain"),
                                  importHeight: Int = Int.MaxValue,
-                                 format: String = "BINARY_OLD",
+                                 format: String = Formats.Binary,
                                  verify: Boolean = true)
 
   def parseOptions(args: Array[String]): Try[ImportOptions] = {
     lazy val commandParser = {
+      import scopt.OParser
+
       val builder = OParser.builder[ImportOptions]
       import builder._
 
@@ -65,6 +67,7 @@ object Importer extends ScorexLogging {
           .text("Config file name")
           .action((f, c) => c.copy(configFile = f)),
         opt[File]('i', "input-file")
+          .required()
           .text("Blockchain data file name")
           .action((f, c) => c.copy(blockchainFile = f)),
         opt[Int]('h', "height")
@@ -74,14 +77,15 @@ object Importer extends ScorexLogging {
         opt[String]('f', "format")
           .text("Blockchain data file format")
           .action((f, c) => c.copy(format = f))
-          .valueName("<BINARY|BINARY_OLD>")
+          .valueName(s"<${Formats.importerList.mkString("|")}> (default is ${Formats.default})")
           .validate {
-            case f if Set("BINARY", "BINARY_OLD").contains(f.toUpperCase) => success
-            case f                                                        => failure(s"Unsupported format: $f")
+            case f if Formats.isSupportedInImporter(f) => success
+            case f                                     => failure(s"Unsupported format: $f")
           },
-        opt[Boolean]('n', "no-verify")
+        opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
-          .action((n, c) => c.copy(verify = !n))
+          .action((n, c) => c.copy(verify = false)),
+        help("help").hidden()
       )
     }
 
@@ -91,10 +95,7 @@ object Importer extends ScorexLogging {
     }
   }
 
-  def loadSettings(file: File): WavesSettings =
-    ((file: File) => ConfigFactory.parseFile(file)) andThen
-      settings.loadConfig andThen
-      WavesSettings.fromRootConfig apply file
+  def loadSettings(file: File): WavesSettings = Application.loadApplicationConfig(Some(file))
 
   def initFileStream(file: File): Try[FileInputStream] =
     Try(new FileInputStream(file))
@@ -182,7 +183,7 @@ object Importer extends ScorexLogging {
     var blocksToSkip  = blockchainUpdater.height - 1
     val blocksToApply = importOptions.importHeight - blockchainUpdater.height + 1
 
-    println(s"Skipping $blocksToSkip blocks(s)")
+    println(s"Skipping $blocksToSkip block(s)")
 
     while (!quit && counter < blocksToApply) {
       val s1 = bis.read(lenBytes)
@@ -195,8 +196,8 @@ object Importer extends ScorexLogging {
             blocksToSkip -= 1
           } else {
             val Right(block) =
-              if (importOptions.format == "BINARY_OLD") Block.parseBytes(buffer).toEither
-              else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
+              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer).toEither
+              else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
             if (blockchainUpdater.lastBlockId.contains(block.reference)) {
               Await.result(appendBlock(block).runAsync(scheduler), Duration.Inf) match {
@@ -233,7 +234,7 @@ object Importer extends ScorexLogging {
       fis <- initFileStream(importOptions.blockchainFile)
       bis = new BufferedInputStream(fis)
 
-      scheduler                        = Scheduler.singleThread("appender")
+      scheduler                        = Schedulers.singleThread("appender")
       time                             = initTime(wavesSettings.ntpServer)
       utxPool                          = initUtxPool()
       blockchainUpdated                = initBlockchainUpdated(wavesSettings)

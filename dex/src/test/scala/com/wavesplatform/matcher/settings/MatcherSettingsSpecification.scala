@@ -1,12 +1,12 @@
 package com.wavesplatform.matcher.settings
 
+import cats.data.NonEmptyList
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.matcher.settings.MatcherSettings.{EventsQueueSettings, ExchangeTransactionBroadcastSettings}
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{FixedSettings, DynamicSettings, PercentSettings}
+import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -56,10 +56,19 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   val correctOrderRestrictionsStr: String =
     s"""
-       |order-restrictions = []
+       |order-restrictions = {}
      """.stripMargin
 
-  def configWithSettings(orderFeeStr: String)(deviationsStr: String)(allowedAssetPairsStr: String)(orderRestrictionsStr: String): Config = {
+  val correctMatchingRulesStr: String =
+    s"""
+       |matching-rules = {}
+     """.stripMargin
+
+  def configWithSettings(orderFeeStr: String = correctOrderFeeStr,
+                         deviationsStr: String = correctDeviationsStr,
+                         allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
+                         orderRestrictionsStr: String = correctOrderRestrictionsStr,
+                         matchingRulesStr: String = correctMatchingRulesStr): Config = {
     val configStr =
       s"""waves {
       |  directory = /waves
@@ -70,9 +79,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    exchange-tx-base-fee = 300000
       |    actor-response-timeout = 11s
       |    snapshots-interval = 999
+      |    limit-events-during-recovery = 48879
       |    make-snapshots-at-start = yes
       |    snapshots-loading-timeout = 423s
       |    start-events-processing-timeout = 543s
+      |    order-books-recovering-timeout = 111s
       |    rest-order-limit = 100
       |    price-assets = [
       |      WAVES
@@ -84,6 +95,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    blacklisted-addresses = [
       |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
       |    ]
+      |    white-list-only = yes
+      |    allowed-order-versions = [11, 22]
       |    order-book-snapshot-http-cache {
       |      cache-timeout = 11m
       |      depth-ranges = [1, 5, 333]
@@ -118,7 +131,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    $deviationsStr
       |    $allowedAssetPairsStr
       |    $orderRestrictionsStr
-      |    allow-order-v3 = no
+      |    $matchingRulesStr
       |    exchange-transaction-broadcast {
       |      broadcast-until-confirmed = yes
       |      interval = 1 day
@@ -132,7 +145,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "MatcherSettings" should "read values" in {
 
-    val config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
+    val config = configWithSettings()
 
     val settings = config.as[MatcherSettings]("waves.matcher")
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
@@ -143,7 +156,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
-    settings.makeSnapshotsAtStart should be(true)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
     settings.maxOrdersPerRequest should be(100)
@@ -179,7 +191,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
-    settings.allowOrderV3 shouldBe false
+    settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
     settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
       broadcastUntilConfirmed = true,
@@ -220,10 +232,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
      """.stripMargin
 
-    val configStr: String => Config = configWithSettings(correctOrderFeeStr)(_)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
-    val settingsInvalidEnable       = getSettingByConfig(configStr(invalidEnable))
-    val settingsInvalidProfit       = getSettingByConfig(configStr(invalidProfit))
-    val settingsInvalidLossAndFee   = getSettingByConfig(configStr(invalidLossAndFee))
+    def configStr(x: String): Config = configWithSettings(deviationsStr = x)
+    val settingsInvalidEnable        = getSettingByConfig(configStr(invalidEnable))
+    val settingsInvalidProfit        = getSettingByConfig(configStr(invalidProfit))
+    val settingsInvalidLossAndFee    = getSettingByConfig(configStr(invalidLossAndFee))
 
     settingsInvalidEnable shouldBe Left("Invalid setting max-price-deviations.enable value: foobar")
 
@@ -310,7 +322,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val configStr: String => Config     = configWithSettings(_)(correctDeviationsStr)(correctAllowedAssetPairsStr)(correctOrderRestrictionsStr)
+    def configStr(x: String): Config    = configWithSettings(orderFeeStr = x)
     val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode))
     val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
     val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
@@ -335,7 +347,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "Allowed asset pairs in MatcherSettings" should "be validated" in {
 
-    val configStr: String => Config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(_)(correctOrderRestrictionsStr)
+    def configStr(x: String): Config = configWithSettings(allowedAssetPairsStr = x)
 
     val incorrectAssetsCount =
       """allowed-asset-pairs = [
@@ -369,11 +381,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin
 
     getSettingByConfig(configStr(incorrectAssetsCount)) should produce(
-      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3), ETH (incorrect assets count, expected 2 but got 1)"
+      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3: WAVES, BTC, ETH), ETH (incorrect assets count, expected 2 but got 1: ETH)"
     )
 
     getSettingByConfig(configStr(incorrectAssets)) should produce(
-      "Invalid setting allowed-asset-pairs value: WAVES-;;; (requirement failed: Wrong char ';' in Base58 string ';;;')"
+      "Invalid setting allowed-asset-pairs value: requirement failed: Wrong char ';' in Base58 string ';;;')"
     )
 
     getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2
@@ -388,117 +400,155 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "Order restrictions" should "be validated" in {
 
-    val configStr: String => Config = configWithSettings(correctOrderFeeStr)(correctDeviationsStr)(correctAllowedAssetPairsStr)(_)
-
-    val defaults =
-      """order-restrictions = [
-        | {
-        |   pair = "WAVES-BTC"
-        | },
-        | {
-        |   pair = "ETH-WAVES"
-        | }
-        |]
-      """.stripMargin
+    def configStr(x: String): Config = configWithSettings(orderRestrictionsStr = x)
 
     val nonEmptyCorrect =
-      """order-restrictions = [
-        | {
-        |   pair = "WAVES-BTC",
-        |   step-size = 0.001,
-        |   min-amount = 0.001,
-        |   max-amount = 1000000
+      """order-restrictions = {
+        | "WAVES-BTC": {
+        |   step-amount = 0.001
+        |   min-amount  = 0.001
+        |   max-amount  = 1000000
         | },
-        | {
-        |   pair = "ETH-USD",
-        |   step-size = 0.01,
-        |   min-amount = 0.05,
-        |   max-amount = 20000,
-        |   merge-small-prices = yes
+        | "ETH-USD": {
+        |   step-amount = 0.01
+        |   min-amount  = 0.05
+        |   max-amount  = 20000
         | }
-        |]
+        |}
       """.stripMargin
 
-    val incorrectPairAndStepSize =
-      """order-restrictions = [
-        | {
-        |   pair = "WAVES-BTC",
-        |   step-size = -0.013,
-        |   min-amount = 0.001,
-        |   max-amount = 1000000
+    val incorrectPairAndStepAmount =
+      """order-restrictions = {
+        | "WAVES-BTC": {
+        |   step-amount = -0.013
+        |   min-amount  = 0.001
+        |   max-amount  = 1000000
         | },
-        | {
-        |   pair = "ETH-;;;",
-        |   step-size = 0.01,
-        |   min-amount = 0.05,
-        |   max-amount = 20000
+        | "ETH-;;;": {
+        |   step-amount = 0.01
+        |   min-amount  = 0.05
+        |   max-amount  = 20000
         | }
-        |]
+        |}
       """.stripMargin
 
     val incorrectMinAndMax =
-      """order-restrictions = [
-        | {
-        |   pair = "WAVES-BTC",
-        |   step-size = 0.013,
-        |   min-amount = 0.001,
-        |   max-amount = 1000000,
-        |   min-price = 100
-        |   max-price = 10
+      """order-restrictions = {
+        | "WAVES-BTC": {
+        |   step-amount = 0.013
+        |   min-amount  = 0.001
+        |   max-amount  = 1000000
+        |   min-price   = 100
+        |   max-price   = 10
         | },
-        | {
-        |   pair = "ETH-WAVES",
-        |   tick-size = 0.14,
-        |   max-price = 17
+        | "ETH-WAVES": {
+        |   step-price = 0.14
+        |   max-price  = 17
         | }
-        |]
+        |}
       """.stripMargin
 
-    val defaultOrderRestrictionsSettings =
-      OrderRestrictionsSettings(
-        stepSize = OrderRestrictionsSettings.stepSizeDefault,
-        minAmount = OrderRestrictionsSettings.minAmountDefault,
-        maxAmount = OrderRestrictionsSettings.maxAmountDefault,
-        tickSize = OrderRestrictionsSettings.tickSizeDefault,
-        minPrice = OrderRestrictionsSettings.minPriceDefault,
-        maxPrice = OrderRestrictionsSettings.maxPriceDefault,
-        mergeSmallPrices = false
+    withClue("default") {
+      getSettingByConfig(configStr("")).explicitGet().orderRestrictions shouldBe Map.empty
+    }
+
+    withClue("nonempty correct") {
+      getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().orderRestrictions shouldBe
+        Map(
+          AssetPair.createAssetPair("WAVES", "BTC").get ->
+            OrderRestrictionsSettings(
+              stepAmount = 0.001,
+              minAmount = 0.001,
+              maxAmount = 1000000,
+              stepPrice = OrderRestrictionsSettings.stepPriceDefault,
+              minPrice = OrderRestrictionsSettings.minPriceDefault,
+              maxPrice = OrderRestrictionsSettings.maxPriceDefault
+            ),
+          AssetPair.createAssetPair("ETH", "USD").get ->
+            OrderRestrictionsSettings(
+              stepAmount = 0.01,
+              minAmount = 0.05,
+              maxAmount = 20000,
+              stepPrice = OrderRestrictionsSettings.stepPriceDefault,
+              minPrice = OrderRestrictionsSettings.minPriceDefault,
+              maxPrice = OrderRestrictionsSettings.maxPriceDefault
+            )
+        )
+    }
+
+    withClue("incorrect pair and step amount") {
+      getSettingByConfig(configStr(incorrectPairAndStepAmount)) should produce(
+        "Invalid setting order-restrictions value: Can't parse asset pair 'ETH-;;;', " +
+          "Invalid setting order-restrictions.WAVES-BTC.step-amount value: -0.013 (required 0 < value)"
       )
+    }
 
-    getSettingByConfig(configStr(defaults)).explicitGet().orderRestrictions shouldBe Map(
-      AssetPair.createAssetPair("WAVES", "BTC").get -> defaultOrderRestrictionsSettings,
-      AssetPair.createAssetPair("ETH", "WAVES").get -> defaultOrderRestrictionsSettings
-    )
+    withClue("incorrect min and max") {
+      getSettingByConfig(configStr(incorrectMinAndMax)) should produce(
+        "Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price")
+    }
+  }
 
-    getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().orderRestrictions shouldBe
-      Map(
-        AssetPair.createAssetPair("WAVES", "BTC").get ->
-          OrderRestrictionsSettings(
-            stepSize = 0.001,
-            minAmount = 0.001,
-            maxAmount = 1000000,
-            tickSize = OrderRestrictionsSettings.tickSizeDefault,
-            minPrice = OrderRestrictionsSettings.minPriceDefault,
-            maxPrice = OrderRestrictionsSettings.maxPriceDefault,
-            mergeSmallPrices = false
-          ),
-        AssetPair.createAssetPair("ETH", "USD").get ->
-          OrderRestrictionsSettings(
-            stepSize = 0.01,
-            minAmount = 0.05,
-            maxAmount = 20000,
-            tickSize = OrderRestrictionsSettings.tickSizeDefault,
-            minPrice = OrderRestrictionsSettings.minPriceDefault,
-            maxPrice = OrderRestrictionsSettings.maxPriceDefault,
-            mergeSmallPrices = true
+  "Matching rules" should "be validated" in {
+    def configStr(x: String): Config = configWithSettings(matchingRulesStr = x)
+
+    val nonEmptyCorrect =
+      """matching-rules = {
+        |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
+        |    {
+        |      start-offset = 100
+        |      merge-prices = yes
+        |      tick-size    = 0.002
+        |    },
+        |    {
+        |      start-offset = 500
+        |      merge-prices = no
+        |    }
+        |  ]
+        |}
+      """.stripMargin
+
+    def incorrectRulesOrder(firstRuleOffset: Long, secondRuleOffset: Long): String =
+      s"""matching-rules = {
+        |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
+        |    {
+        |      start-offset = $firstRuleOffset
+        |      merge-prices = yes
+        |      tick-size    = 0.002
+        |    },
+        |    {
+        |      start-offset = $secondRuleOffset
+        |      merge-prices = no
+        |    }
+        |  ]
+        |}
+      """.stripMargin
+
+    withClue("default") {
+      getSettingByConfig(configStr("")).explicitGet().matchingRules shouldBe Map.empty
+    }
+
+    withClue("nonempty correct") {
+      getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
+        AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
+          NonEmptyList[RawMatchingRules](
+            RawMatchingRules(0, false),
+            List(
+              RawMatchingRules(100L, mergePrices = true, 0.002),
+              RawMatchingRules(500L, mergePrices = false)
+            )
           )
       )
+    }
 
-    getSettingByConfig(configStr(incorrectPairAndStepSize)) should produce(
-      "Invalid setting order-restrictions.0.step-size value: -0.013 (required 0 < value), " +
-        "Invalid setting order-restrictions.1.pair value: ETH-;;;"
-    )
+    withClue("incorrect rules order: 100, 100") {
+      getSettingByConfig(configStr(incorrectRulesOrder(100, 100))) should produce(
+        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 100")
+    }
 
-    getSettingByConfig(configStr(incorrectMinAndMax)) should produce("Required order-restrictions.0.min-price < order-restrictions.0.max-price")
+    withClue("incorrect rules order: 100, 88") {
+      getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
+        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88")
+    }
   }
 }

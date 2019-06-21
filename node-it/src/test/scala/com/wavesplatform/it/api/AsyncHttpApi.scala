@@ -193,11 +193,11 @@ object AsyncHttpApi extends Assertions {
 
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
-    def transactionsByAddress(address: String, limit: Int): Future[Seq[Seq[TransactionInfo]]] =
-      get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]]
+    def transactionsByAddress(address: String, limit: Int): Future[Seq[TransactionInfo]] =
+      get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]].map(_.flatten)
 
-    def transactionsByAddress(address: String, limit: Int, after: String): Future[Seq[Seq[TransactionInfo]]] = {
-      get(s"/transactions/address/$address/limit/$limit?after=$after").as[Seq[Seq[TransactionInfo]]]
+    def transactionsByAddress(address: String, limit: Int, after: String): Future[Seq[TransactionInfo]] = {
+      get(s"/transactions/address/$address/limit/$limit?after=$after").as[Seq[Seq[TransactionInfo]]].map(_.flatten)
     }
 
     def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None): Future[AssetDistributionPage] = {
@@ -349,8 +349,11 @@ object AsyncHttpApi extends Assertions {
                  "version"  -> version))
     }
 
-    def debugStateChange(invokeScriptTransactionId: String): Future[DebugStateChanges] =
+    def debugStateChanges(invokeScriptTransactionId: String): Future[DebugStateChanges] =
       get(s"/debug/stateChanges/info/$invokeScriptTransactionId").as[DebugStateChanges]
+
+    def debugStateChangesByAddress(address: String, limit: Int = 10000): Future[Seq[DebugStateChanges]] =
+      get(s"/debug/stateChanges/address/$address/limit/$limit").as[Seq[DebugStateChanges]]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]

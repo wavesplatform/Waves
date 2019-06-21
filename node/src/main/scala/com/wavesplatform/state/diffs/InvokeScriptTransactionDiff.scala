@@ -40,7 +40,7 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
@@ -53,7 +53,7 @@ object InvokeScriptTransactionDiff {
             val environment = new WavesEnvironment(
               AddressScheme.current.chainId,
               Coeval(tx.asInstanceOf[In]),
-              Coeval(height),
+              Coeval(blockchain.height),
               blockchain,
               Coeval(tx.dAppAddressOrAlias.bytes)
             )
@@ -126,7 +126,7 @@ object InvokeScriptTransactionDiff {
           })
           dAppAddress <- TracedResult(dAppAddressEi)
           wavesFee = feeInfo._1
-          dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, dAppAddress, dataEntries, feeInfo._2))
+          dataAndPaymentDiff <- TracedResult(payableAndDataPart(blockchain.height, tx, dAppAddress, dataEntries, feeInfo._2))
           _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _                  <- TracedResult(validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
           _ <- TracedResult(
@@ -297,7 +297,6 @@ object InvokeScriptTransactionDiff {
       script: Script): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
-        blockchain.height,
         Coproduct[TxOrd](
           ScriptTransfer(
             asset,

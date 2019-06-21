@@ -255,7 +255,7 @@ class Worker(workerSettings: Settings,
     runStepsFrom(1)
   }
 
-  override protected def log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(toString))
+  override protected lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(toString))
 }
 
 object Worker {

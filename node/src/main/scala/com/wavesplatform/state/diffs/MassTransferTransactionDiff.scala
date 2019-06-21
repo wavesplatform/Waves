@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.transfer._
 
 object MassTransferTransactionDiff {
 
-  def apply(blockchain: Blockchain, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- blockchain.resolveAlias(xfer.address)

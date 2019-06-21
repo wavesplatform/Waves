@@ -7,8 +7,9 @@ import akka.pattern.pipe
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.Matcher.StoreEvent
-import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.api.NotImplemented
+import com.wavesplatform.matcher.db.OrderDB
+import com.wavesplatform.matcher.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
@@ -33,21 +34,21 @@ class AddressActor(
     orderDB: OrderDB,
     hasOrder: Order.Id => Boolean,
     storeEvent: StoreEvent,
+    var enableSchedules: Boolean
 ) extends Actor
     with ScorexLogging {
 
   import AddressActor._
   import context.dispatcher
 
-  protected override def log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
+  protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
 
   private val pendingCancellation = MutableMap.empty[ByteStr, Promise[Resp]]
   private val pendingPlacement    = MutableMap.empty[ByteStr, Promise[Resp]]
 
-  private val activeOrders  = MutableMap.empty[Order.Id, LimitOrder]
-  private val openVolume    = MutableMap.empty[Asset, Long].withDefaultValue(0L)
-  private val expiration    = MutableMap.empty[ByteStr, Cancellable]
-  private var latestOrderTs = 0L
+  private val activeOrders = MutableMap.empty[Order.Id, LimitOrder]
+  private val openVolume   = MutableMap.empty[Asset, Long].withDefaultValue(0L)
+  private val expiration   = MutableMap.empty[ByteStr, Cancellable]
 
   private def reserve(limitOrder: LimitOrder): Unit = {
     activeOrders += limitOrder.order.id() -> limitOrder
@@ -66,10 +67,6 @@ class AddressActor(
       log.trace(s"id=${limitOrder.order.id()}: $prevReserved - $b = $updatedReserved of ${assetIdStr(assetId)}")
       openVolume += assetId -> updatedReserved
     }
-
-  private def updateTimestamp(newTimestamp: Long): Unit = if (newTimestamp > latestOrderTs) {
-    latestOrderTs = newTimestamp
-  }
 
   private def tradableBalance(assetId: Asset): Long = spendableBalance(assetId) - openVolume(assetId)
 
@@ -97,7 +94,6 @@ class AddressActor(
           validator(o) match {
             case Left(error) => Future.successful(api.OrderRejected(error))
             case Right(_) =>
-              updateTimestamp(o.timestamp)
               reserve(LimitOrder(o))
               storePlaced(o)
           }
@@ -140,6 +136,12 @@ class AddressActor(
           scheduleExpiration(lo.order)
         }
       }
+
+    case AddressDirectory.StartSchedules =>
+      if (!enableSchedules) {
+        enableSchedules = true
+        activeOrders.values.foreach(x => scheduleExpiration(x.order))
+      }
   }
 
   private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], error: Resp): Future[Resp] = {
@@ -151,10 +153,11 @@ class AddressActor(
         Future.successful(error)
       case Success(r) =>
         r match {
-          case None    => promisedResponse.tryComplete(Success(NotImplemented(MatcherError.FeatureDisabled)))
-          case Some(x) => log.info(s"Stored $x")
+          case None => Future.successful(NotImplemented(MatcherError.FeatureDisabled))
+          case Some(x) =>
+            log.info(s"Stored $x")
+            promisedResponse.future
         }
-        promisedResponse.future
     }
   }
 
@@ -194,7 +197,6 @@ class AddressActor(
   private def handleExecutionEvents: Receive = {
     case OrderAdded(submitted, _) if submitted.order.sender.toAddress == owner =>
       log.trace(s"OrderAdded(${submitted.order.id()})")
-      updateTimestamp(submitted.order.timestamp)
       release(submitted.order.id())
       handleOrderAdded(submitted)
 
@@ -216,7 +218,7 @@ class AddressActor(
       }
   }
 
-  private def scheduleExpiration(order: Order): Unit = {
+  private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
     log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
     expiration +=
@@ -231,7 +233,6 @@ class AddressActor(
   }
 
   private def handleOrderExecuted(remaining: LimitOrder): Unit = if (remaining.order.sender.toAddress == owner) {
-    updateTimestamp(remaining.order.timestamp)
     release(remaining.order.id())
     if (remaining.isValid) {
       handleOrderAdded(remaining)

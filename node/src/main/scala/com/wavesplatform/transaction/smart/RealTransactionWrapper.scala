@@ -15,16 +15,16 @@ import com.wavesplatform.transaction.transfer._
 
 object RealTransactionWrapper {
 
-  private def header(tx: Transaction): Header = {
+  private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
     val v = tx match {
       case vt: VersionedTransaction => vt.version
       case _                        => 1
     }
-    Header(ByteStr(tx.id().arr), tx.assetFee._2, tx.timestamp, v)
+    Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.assetFee._2, tx.timestamp, v)
   }
-  private def proven(tx: ProvenTransaction): Proven =
+  private def proven(tx: ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
     Proven(
-      header(tx),
+      header(tx, txIdOpt),
       Recipient.Address(ByteStr(tx.sender.bytes.arr)),
       ByteStr(tx.bodyBytes()),
       ByteStr(tx.sender),
@@ -58,7 +58,7 @@ object RealTransactionWrapper {
     case a: Alias   => Recipient.Alias(a.name)
   }
 
-  def apply(tx: Transaction): Tx = {
+  def apply(tx: Transaction, txIdOpt: Option[ByteStr] = None): Tx = {
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient)
       case t: TransferTransaction => mapTransferTx(t)

@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.{BuyLimitOrder, OrderValidator, SellLimitOrder}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.settings.OrderFeeSettings._
 import com.wavesplatform.matcher.settings.{AssetType, MatcherSettings}
@@ -36,33 +36,10 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   private val seqNr = new AtomicLong(-1)
 
-  def rateCache: RateCache = new RateCache {
+  def rateCache: RateCache = RateCache.inMem
 
-    import scala.collection.mutable
-
-    private val rates: mutable.Map[Asset, Double] = mutable.Map(Waves -> 1d)
-
-    def upsertRate(asset: Asset, value: Double): Option[Double] = {
-      asset.fold { Option(1d) } { issuedAsset =>
-        val previousValue = rates.get(issuedAsset)
-        rates += (asset -> value)
-        previousValue
-      }
-    }
-
-    def getRate(asset: Asset): Option[Double] = rates.get(asset)
-    def getAllRates: Map[Asset, Double]       = rates.toMap
-
-    def deleteRate(asset: Asset): Option[Double] =
-      asset.fold { Option(1d) } { issuedAsset =>
-        val previousValue = rates.get(issuedAsset)
-        rates -= issuedAsset
-        previousValue
-      }
-  }
-
-  def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)
-  def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
+  def wrap(x: Order): QueueEventWithMeta                   = wrap(seqNr.incrementAndGet(), x)
+  def wrap(n: Long, x: Order): QueueEventWithMeta          = wrap(n, QueueEvent.Placed(x))
   def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
 
   def assetIdGen(prefix: Byte): Gen[IssuedAsset] =
@@ -90,7 +67,6 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val config = loadConfig(ConfigFactory.parseString("""waves {
       |  directory: "/tmp/waves-test"
       |  matcher {
-      |    enable: yes
       |    account: ""
       |    bind-address: "127.0.0.1"
       |    port: 6886
@@ -101,7 +77,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |    price-assets: ["BASE1", "BASE2", "BASE"]
       |    blacklisted-assets: ["BLACKLST"]
       |    blacklisted-names: ["[Ff]orbidden"]
-      |    allow-order-v3 = yes
+      |    allowed-order-versions = [1, 2, 3]
       |  }
       |}""".stripMargin))
 
@@ -225,6 +201,8 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
   } yield SellLimitOrder(amount, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+
+  val limitOrderGenerator: Gen[LimitOrder] = Gen.oneOf(sellLimitOrderGenerator, buyLimitOrderGenerator)
 
   val orderV3Generator: Gen[Order] =
     for {

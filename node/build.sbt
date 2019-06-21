@@ -11,7 +11,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 17, 3)
+  val FallbackVersion = (0, 17, 4)
 
   val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -131,10 +131,8 @@ inConfig(Linux)(
     packageDescription := "Waves node"
   ))
 
-val packageSource = Def.settingKey[File]("Additional files for DEB")
 inConfig(Debian)(
   Seq(
-    packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
     serviceAutostart := false,
@@ -173,9 +171,5 @@ val nameFix = Seq(
   normalizedName := s"${name.value}${network.value.packageSuffix}"
 )
 
-inConfig(Universal)(nameFix)
-inConfig(Linux)(nameFix)
-inConfig(Debian)(nameFix)
-
-inTask(packageBin)(nameFix)
-inTask(assembly)(nameFix)
+nameFix
+inScope(Global)(nameFix)
