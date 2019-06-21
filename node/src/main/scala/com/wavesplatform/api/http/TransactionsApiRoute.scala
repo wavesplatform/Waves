@@ -76,7 +76,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
           case Success(id) =>
             commonApi.transactionById(id) match {
               case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None => complete(ApiError.TransactionNotExists)
+              case None => complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }
@@ -116,7 +116,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>
-                complete(ApiError.TransactionNotExists)
+                complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }

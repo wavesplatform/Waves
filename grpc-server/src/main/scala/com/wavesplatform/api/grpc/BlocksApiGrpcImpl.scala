@@ -5,7 +5,7 @@ import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
-import com.wavesplatform.api.http.ApiError.BlockNotExists
+import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
 import io.grpc.stub.StreamObserver
@@ -55,13 +55,13 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       case Request.Height(height) =>
         commonApi
           .blockAtHeight(if (height > 0) height else blockchain.height + height)
-          .toRight(BlockNotExists)
+          .toRight(BlockDoesNotExist)
           .map(block => BlockWithHeight(Some(block.toPB), height))
 
       case Request.Reference(reference) =>
         commonApi
           .childBlock(reference)
-          .toRight(BlockNotExists)
+          .toRight(BlockDoesNotExist)
           .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
 
       case Request.Empty =>

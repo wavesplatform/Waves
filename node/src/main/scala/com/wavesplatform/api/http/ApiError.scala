@@ -41,7 +41,7 @@ object ApiError {
       case TxValidationError.AlreadyInTheState(tx, txHeight) =>
         CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
       case TxValidationError.AccountBalanceError(errs)  => CustomValidationError(errs.values.mkString(", "))
-      case TxValidationError.AliasDoesNotExist(tx) => AliasNotExists(tx)
+      case TxValidationError.AliasDoesNotExist(tx) => AliasDoesNotExist(tx)
       case TxValidationError.OrderValidationError(_, m) => CustomValidationError(m)
       case TxValidationError.UnsupportedTransactionType => UnsupportedTransactionType
       case TxValidationError.Mistiming(err)             => Mistiming(err)
@@ -193,13 +193,13 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case object BlockNotExists extends ApiError {
+  case object BlockDoesNotExist extends ApiError {
     override val id: Int = 301
     override val code = StatusCodes.NotFound
     override val message: String = "block does not exist"
   }
 
-  final case class AliasNotExists(aoa: AddressOrAlias) extends ApiError {
+  final case class AliasDoesNotExist(aoa: AddressOrAlias) extends ApiError {
     override val id: Int = 302
     override val code = StatusCodes.NotFound
 
@@ -220,7 +220,7 @@ object ApiError {
     val Id = 303
   }
 
-  case object DataKeyNotExists extends ApiError {
+  case object DataKeyDoesNotExist extends ApiError {
     override val id: Int = 304
     override val code = StatusCodes.NotFound
     override val message: String = "no data for this key"
@@ -273,7 +273,7 @@ object ApiError {
     override val code: StatusCode = StatusCodes.NotFound
   }
 
-  case object WalletAddressNotExists extends ApiError {
+  case object WalletAddressDoesNotExist extends ApiError {
     override val id: Int = 202
     override val message: String = "private key for the public key does not exist in wallet"
     override val code: StatusCode = StatusCodes.NotFound
@@ -298,7 +298,7 @@ object ApiError {
   }
 
   //TRANSACTIONS
-  case object TransactionNotExists extends ApiError {
+  case object TransactionDoesNotExist extends ApiError {
     override val id: Int = 311
     override val message: String = "transactions does not exist"
     override val code: StatusCode = StatusCodes.NotFound

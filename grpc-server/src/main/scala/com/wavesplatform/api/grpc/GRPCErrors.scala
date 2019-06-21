@@ -16,7 +16,7 @@ object GRPCErrors {
 
   private[this] def errorToStatusException(api: ApiError): StatusException = {
     val code = api match {
-      case WalletNotExist | WalletAddressNotExists | TransactionNotExists => Status.NOT_FOUND
+      case WalletNotExist | WalletAddressDoesNotExist | TransactionDoesNotExist => Status.NOT_FOUND
       case WalletAlreadyExists                                            => Status.ALREADY_EXISTS
       case WalletLocked                                                   => Status.PERMISSION_DENIED
       case _                                                              => Status.INVALID_ARGUMENT

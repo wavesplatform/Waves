@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.ApiError.{BlockNotExists, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
@@ -106,7 +106,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
           .toOption
           .toRight(InvalidSignature)
 
-        height <- commonApi.blockHeight(signature).toRight(BlockNotExists)
+        height <- commonApi.blockHeight(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> height)
 
       complete(result)

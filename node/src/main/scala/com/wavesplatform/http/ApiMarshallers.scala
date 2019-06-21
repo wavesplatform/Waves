@@ -27,12 +27,6 @@ trait ApiMarshallers {
   implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
     ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
 
-  implicit lazy val ApiErrorToEntityMarshaller: ToEntityMarshaller[ApiError] =
-    PredefinedToEntityMarshallers.stringMarshaller(MediaTypes.`application/json`).compose(ae => Json.stringify(ae.json))
-
-  implicit lazy val ValidationErrorToEntityMarshaller: ToEntityMarshaller[ValidationError] =
-    ApiErrorToEntityMarshaller.compose(ve => ApiError.fromValidationError(ve))
-
   implicit lazy val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
 
   implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
