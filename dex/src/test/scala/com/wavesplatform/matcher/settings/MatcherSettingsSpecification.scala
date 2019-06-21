@@ -70,9 +70,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    exchange-tx-base-fee = 300000
       |    actor-response-timeout = 11s
       |    snapshots-interval = 999
+      |    limit-events-during-recovery = 48879
       |    make-snapshots-at-start = yes
       |    snapshots-loading-timeout = 423s
       |    start-events-processing-timeout = 543s
+      |    order-books-recovering-timeout = 111s
       |    rest-order-limit = 100
       |    price-assets = [
       |      WAVES
@@ -84,6 +86,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    blacklisted-addresses = [
       |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
       |    ]
+      |    white-list-only = yes
+      |    allowed-order-versions = [11, 22]
       |    order-book-snapshot-http-cache {
       |      cache-timeout = 11m
       |      depth-ranges = [1, 5, 333]
@@ -118,7 +122,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    $deviationsStr
       |    $allowedAssetPairsStr
       |    $orderRestrictionsStr
-      |    allow-order-v3 = no
       |    exchange-transaction-broadcast {
       |      broadcast-until-confirmed = yes
       |      interval = 1 day
@@ -143,7 +146,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
-    settings.makeSnapshotsAtStart should be(true)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
     settings.maxOrdersPerRequest should be(100)
@@ -179,7 +181,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
-    settings.allowedOrderVersions shouldBe Set(1, 2)
+    settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
     settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
       broadcastUntilConfirmed = true,

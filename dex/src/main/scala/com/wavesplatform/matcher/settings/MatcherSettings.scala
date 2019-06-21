@@ -34,9 +34,10 @@ case class MatcherSettings(account: String,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: Int,
+                           limitEventsDuringRecovery: Option[Int],
                            snapshotsLoadingTimeout: FiniteDuration,
                            startEventsProcessingTimeout: FiniteDuration,
-                           makeSnapshotsAtStart: Boolean,
+                           orderBooksRecoveringTimeout: FiniteDuration,
                            priceAssets: Seq[String],
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
@@ -49,6 +50,7 @@ case class MatcherSettings(account: String,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+                           whiteListOnly: Boolean,
                            allowedAssetPairs: Set[AssetPair],
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
@@ -90,7 +92,7 @@ object MatcherSettings {
     val snapshotsInterval            = config.as[Int]("snapshots-interval")
     val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
     val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
-    val makeSnapshotsAtStart         = config.as[Boolean]("make-snapshots-at-start")
+    val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
     val maxOrdersPerRequest          = config.as[Int]("rest-order-limit")
     val baseAssets                   = config.as[List[String]]("price-assets")
 
@@ -105,11 +107,15 @@ object MatcherSettings {
     val eventsQueue         = config.as[EventsQueueSettings](s"events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
+    val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
+    require(limitEventsDuringRecovery.forall(_ >= snapshotsInterval), "limit-events-during-recovery should be >= snapshotsInterval")
+
     val orderFee          = config.as[OrderFeeSettings]("order-fee")
     val deviation         = config.as[DeviationsSettings]("max-price-deviations")
     val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
+    val whiteListOnly           = config.as[Boolean]("white-list-only")
     val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
     val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
@@ -127,9 +133,10 @@ object MatcherSettings {
       journalDirectory,
       snapshotsDirectory,
       snapshotsInterval,
+      limitEventsDuringRecovery,
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
-      makeSnapshotsAtStart,
+      orderBooksRecoveringTimeout,
       baseAssets,
       blacklistedAssets.toSet,
       blacklistedNames,
@@ -141,6 +148,7 @@ object MatcherSettings {
       orderFee,
       deviation,
       orderRestrictions,
+      whiteListOnly,
       allowedAssetPairs,
       allowedOrderVersions,
       broadcastUntilConfirmed,

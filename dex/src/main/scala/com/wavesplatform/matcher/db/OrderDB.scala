@@ -1,8 +1,9 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.matcher.db
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
+import com.wavesplatform.matcher.MatcherKeys
 import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.matcher.model.{OrderInfo, OrderStatus}
 import com.wavesplatform.matcher.settings.MatcherSettings
@@ -21,7 +22,7 @@ trait OrderDB {
 }
 
 object OrderDB {
-  private val OldestOrderIndexOffset = 100
+  val OldestOrderIndexOffset = 100
 
   def apply(settings: MatcherSettings, db: DB): OrderDB = new OrderDB with ScorexLogging {
     override def containsInfo(id: ByteStr): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
@@ -39,9 +40,8 @@ object OrderDB {
 
     override def saveOrderInfo(id: ByteStr, sender: Address, oi: FinalOrderInfo): Unit = {
       val orderInfoKey = MatcherKeys.orderInfo(id)
-      if (db.get(orderInfoKey).isDefined) {
-        log.warn(s"Finalized order info already exists for $id")
-      } else {
+      if (db.has(orderInfoKey)) log.warn(s"Finalized order info already exists for $id")
+      else {
         db.readWrite { rw =>
           val newCommonSeqNr = rw.inc(MatcherKeys.finalizedCommonSeqNr(sender))
           rw.put(MatcherKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))

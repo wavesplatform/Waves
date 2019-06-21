@@ -28,7 +28,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
   "matcher ticker validation" - {
     "get tickers for unavailable asset should produce error" in {
-      SyncMatcherHttpApi.assertNotFoundAndMessage(node.marketStatus(wctWavesPair), s"Invalid Asset ID: ${IssueEightDigitAssetTx.id()}")
+      SyncMatcherHttpApi.assertNotFoundAndMessage(node.marketStatus(wctWavesPair), s"The asset ${IssueEightDigitAssetTx.id()} not found")
     }
 
     "status of empty orderbook" in {

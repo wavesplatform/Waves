@@ -4,7 +4,8 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.matcher.{AddressActor, TestOrderDB}
+import com.wavesplatform.matcher.AddressActor
+import com.wavesplatform.matcher.db.TestOrderDB
 import com.wavesplatform.utils.Time
 
 import scala.collection.mutable
@@ -28,6 +29,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             new TestOrderDB(100),
             _ => false,
             e => Future.successful(Some(QueueEventWithMeta(0, 0, e))),
+            true
           )))
     )
 
