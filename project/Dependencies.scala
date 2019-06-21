@@ -128,7 +128,7 @@ object Dependencies {
       "commons-net"          % "commons-net" % "3.6",
       "com.iheart"           %% "ficus" % "1.4.2",
       logback                % Runtime,
-      janino                 , //% Runtime,
+      janino                 % Runtime,
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
       kamonModule("system-metrics", "1.0.0"),
