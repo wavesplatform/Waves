@@ -4,6 +4,7 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockNotExists
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
