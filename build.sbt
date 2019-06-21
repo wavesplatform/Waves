@@ -168,6 +168,7 @@ packageAll := Def
       (node /  assembly).value
       (node / Debian / packageBin).value
       (dex / Universal / packageZipTarball).value
+      (dex / Debian / packageBin).value
     (`grpc-server` /Universal / packageZipTarball).value
     }
   )
