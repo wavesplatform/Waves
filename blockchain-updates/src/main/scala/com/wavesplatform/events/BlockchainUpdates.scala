@@ -2,7 +2,6 @@ package com.wavesplatform.events
 
 import java.time.{Duration => JDuration}
 import java.util
-import java.util.Properties
 
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
@@ -13,13 +12,11 @@ import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.reactive.Observer
 import org.apache.kafka.clients.producer.{KafkaProducer, RecordMetadata}
-import com.wavesplatform.events.kafka.{createProducer, createProducerRecord}
+import com.wavesplatform.events.kafka.{createProducer, createProducerRecord, createProperties}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.serialization.Deserializer
 import com.wavesplatform.events.protobuf.PBBlockchainUpdated
-import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.config.SaslConfigs
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -34,23 +31,11 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
   private def getLastHeight(timeout: Duration = 10.seconds): Int = {
     import scala.collection.JavaConverters._
 
-    val props = new Properties()
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.bootstrapServers)
+    val props = createProperties(settings)
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "admin")
-    props.put(ConsumerConfig.CLIENT_ID_CONFIG, settings.clientId)
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
-    props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "60000")
-    props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, "120000")
+    props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "10000")
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1")
-
-    if (settings.ssl.enabled) {
-      props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL")
-      props.put(SaslConfigs.SASL_MECHANISM, "PLAIN")
-      props.put(
-        SaslConfigs.SASL_JAAS_CONFIG,
-        s"org.apache.kafka.common.security.plain.PlainLoginModule required username = '${settings.ssl.username}' password = '${settings.ssl.password}';"
-      )
-    }
 
     val consumer = new KafkaConsumer[Unit, Int](
       props,
@@ -99,7 +84,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     if (kafkaHeight == 0 && blockchainHeight > 1)
       throw new IllegalStateException("No events in Kafka, but blockchain is neither empty nor on genesis block.")
 
-    if (kafkaHeight > blockchainHeight + 1)
+    if (kafkaHeight > blockchainHeight + 1 || (kafkaHeight != 0 && blockchainHeight == 0))
       throw new IllegalStateException(s"""Node is behind kafka. Kafka is at $kafkaHeight, while node is at $blockchainHeight.
                                          |This should never happen. Manual correction of even full system restart might be necessary.""".stripMargin)
 
