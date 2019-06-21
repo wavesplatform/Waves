@@ -1,13 +1,15 @@
 package com.wavesplatform.matcher.fixtures
 
-import akka.persistence.PersistentActor
-
+import akka.actor.Actor
 import com.wavesplatform.matcher.fixtures.RestartableActor.{RestartActor, RestartActorException}
 
-trait RestartableActor extends PersistentActor {
-
-  abstract override def receiveCommand: PartialFunction[Any, Unit] = super.receiveCommand orElse {
-    case RestartActor => throw RestartActorException
+trait RestartableActor extends Actor {
+  override def unhandled(message: Any): Unit = {
+    message match {
+      case RestartActor => throw RestartActorException
+      case _            =>
+    }
+    super.unhandled(message)
   }
 }
 

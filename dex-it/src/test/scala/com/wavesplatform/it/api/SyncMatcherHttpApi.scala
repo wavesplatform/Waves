@@ -57,8 +57,14 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Boolean =
       Await.result(async(m).orderBookExpectInvalidAssetId(assetPair, assetId), OrderRequestAwaitTime)
 
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String, pred: MessageMatcherResponse => Boolean): Boolean =
+      Await.result(async(m).orderBookExpectInvalidAssetId(assetPair, assetId, pred), OrderRequestAwaitTime)
+
     def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Boolean =
       Await.result(async(m).orderStatusExpectInvalidAssetId(orderId, assetPair, assetId), OrderRequestAwaitTime)
+
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String, pred: MessageMatcherResponse => Boolean): Boolean =
+      Await.result(async(m).orderStatusExpectInvalidAssetId(orderId, assetPair, assetId, pred), OrderRequestAwaitTime)
 
     def marketStatus(assetPair: AssetPair): MarketStatusResponse =
       sync(async(m).marketStatus(assetPair), RequestAwaitTime)

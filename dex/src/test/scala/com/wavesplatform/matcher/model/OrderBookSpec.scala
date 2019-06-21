@@ -1,18 +1,23 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.NTPTime
+import java.nio.ByteBuffer
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.OrderBook.{Level, TickSize}
+import com.wavesplatform.matcher.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.{NTPTime, NoShrink}
+import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.{SortedSet, mutable}
 
-class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTPTime {
+class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with MatcherTestData with NTPTime with NoShrink {
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
   "place buy orders with different prices" in {
@@ -251,6 +256,69 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
   "aggregate levels for snapshot, preserving order" in {
     pending
   }
+
+  "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    SideSnapshot.serialize(dest, x)
+    val bb = ByteBuffer.wrap(dest.result())
+    SideSnapshot.loFromBytes(bb) shouldBe x
+  }
+
+  "SideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    SideSnapshot.serialize(dest, x)
+    val bb = ByteBuffer.wrap(dest.result())
+    SideSnapshot.fromBytes(bb) shouldBe x
+  }
+
+  "LastTrade serialization" in forAll(lastTradeGen) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    LastTrade.serialize(dest, x)
+    val bb = ByteBuffer.wrap(dest.result())
+    LastTrade.fromBytes(bb) shouldBe x
+  }
+
+  "Snapshot serialization" in forAll(snapshotGen) { x =>
+    val dest = new mutable.ArrayBuilder.ofByte
+    Snapshot.serialize(dest, x)
+    val bb       = ByteBuffer.wrap(dest.result())
+    val restored = Snapshot.fromBytes(bb)
+    restored.asks shouldBe x.asks
+    restored.bids shouldBe x.bids
+    restored.lastTrade shouldBe x.lastTrade
+  }
+
+  private val sellLevelGen: Gen[Vector[SellLimitOrder]] =
+    Gen.containerOf[Vector, SellLimitOrder](sellLimitOrderGenerator)
+
+  private val asksGen: Gen[SideSnapshot] = for {
+    n      <- Gen.choose(0, 10)
+    levels <- Gen.containerOfN[Vector, Vector[SellLimitOrder]](n, sellLevelGen)
+    prices <- Gen.containerOfN[Vector, Long](n, Gen.choose(1, 1000L))
+  } yield prices.zip(levels).toMap
+
+  private val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
+    Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)
+
+  private val bidsGen: Gen[SideSnapshot] = for {
+    n      <- Gen.choose(0, 10)
+    levels <- Gen.containerOfN[Vector, Vector[BuyLimitOrder]](n, buyLevelGen)
+    prices <- Gen.containerOfN[Vector, Long](n, Gen.choose(1, 1000L))
+  } yield prices.zip(levels).toMap
+
+  private val lastTradeGen: Gen[LastTrade] = for {
+    price     <- Gen.choose(1, Long.MaxValue)
+    amount    <- Gen.choose(1, Long.MaxValue)
+    orderType <- orderTypeGenerator
+  } yield LastTrade(price, amount, orderType)
+
+  private val snapshotGen: Gen[Snapshot] = for {
+    asks      <- asksGen
+    bids      <- bidsGen
+    lastTrade <- Gen.option(lastTradeGen)
+  } yield Snapshot(bids, asks, lastTrade)
+
+  private val sideSnapshotSerGen: Gen[SideSnapshot] = Gen.oneOf(asksGen, bidsGen)
 
   private def toNormalized(value: Long): Long = value * Order.PriceConstant
 }

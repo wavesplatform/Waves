@@ -38,38 +38,44 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
       IssuedAsset(b("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS")),
     )
 
-  private val priceAssets = ConfigFactory.parseString(s"""waves.matcher {
-                                                         |  blacklisted-assets = [${Asset3.id.toString}]
-                                                         |  blacklisted-names = ["name$$"]
-                                                         |  price-assets = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
-                                                         |}""".stripMargin)
-  private val settings    = loadConfig(priceAssets).as[MatcherSettings]("waves.matcher")
-  private val blockchain  = stub[Blockchain]
+  private val blacklistedAssets = Set(Asset3)
+  private val priceAssets       = ConfigFactory.parseString(s"""waves.matcher {
+       |  blacklisted-assets  = [${blacklistedAssets.map(_.id.toString).mkString(",")}]
+       |  blacklisted-names   = ["name$$"]
+       |  price-assets        = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
+       |  white-list-only     = no
+       |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
+       |}""".stripMargin)
 
-  private val builder = new AssetPairBuilder(settings, blockchain)
+  private val settings   = loadConfig(priceAssets).as[MatcherSettings]("waves.matcher")
+  private val blockchain = stub[Blockchain]
+
+  private val builder = new AssetPairBuilder(settings, blockchain, blacklistedAssets)
 
   private val pairs = Table(
     ("amount", "price", "result"),
     (WAVES, WUSD.id.toString, Right(())),
-    (WUSD.id.toString, WAVES, Left("Pair should be reverse")),
-    (WBTC.id.toString, WEUR.id.toString, Left("Pair should be reverse")),
+    (WUSD.id.toString, WAVES, Left("AssetPairReversed")),
+    (WBTC.id.toString, WEUR.id.toString, Left("AssetPairReversed")),
     (WEUR.id.toString, WBTC.id.toString, Right(())),
     (Asset1.id.toString, WAVES, Right(())),
-    (WAVES, Asset1.id.toString, Left("Pair should be reverse")),
+    (WAVES, Asset1.id.toString, Left("AssetPairReversed")),
     (Asset2.id.toString, Asset1.id.toString, Right(())),
-    (Asset1.id.toString, Asset2.id.toString, Left("Pair should be reverse")),
+    (Asset1.id.toString, Asset2.id.toString, Left("AssetPairReversed")),
     (Asset1.id.toString, WBTC.id.toString, Right(())),
-    (WEUR.id.toString, Asset1.id.toString, Left("Pair should be reverse")),
+    (WEUR.id.toString, Asset1.id.toString, Left("AssetPairReversed")),
+    (WAVES, Asset3.id.toString, Right(())),
   )
 
   "AssetPairBuilder" - {
-    "correctly orders pairs when assets IDs are valid" in {
+    "correctly ordered and assets IDs are valid" in {
       for (id <- predefinedPriceAssets) {
         (blockchain.assetDescription _).when(id).returns(mkAssetDescription())
       }
 
       (blockchain.assetDescription _).when(Asset1).returns(mkAssetDescription())
       (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription())
+      (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription())
 
       forAll(pairs) {
         case (amountAsset, priceAsset, isValid) =>
@@ -84,25 +90,30 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
       "blacklist" - {
         "contains asset id" in {
           (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription())
-          builder.validateAssetPair(AssetPair(Asset3, Waves)) should produce("Invalid Asset ID")
+          builder.validateAssetPair(AssetPair(Asset3, Waves)) should produce("AmountAssetBlacklisted")
         }
         "matchers asset name" in {
           (blockchain.assetDescription _).when(Asset1).returns(mkAssetDescription())
           (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription("forbidden Asset name"))
           (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription("name of an asset"))
 
-          builder.validateAssetPair(AssetPair(Asset3, Asset1)) should produce("Invalid Asset ID")
-          builder.validateAssetPair(AssetPair(Asset2, Asset1)) should produce("Invalid Asset ID")
+          builder.validateAssetPair(AssetPair(Asset3, Asset1)) should produce("AmountAssetBlacklisted")
+          builder.validateAssetPair(AssetPair(Asset2, Asset1)) should produce("AmountAssetBlacklisted")
         }
       }
       "asset was not issued" in {
         (blockchain.assetDescription _).when(Asset1).returns(None)
         (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription())
 
-        builder.validateAssetPair(AssetPair(Asset2, Asset1)) should produce("Invalid Asset ID")
+        builder.validateAssetPair(AssetPair(Asset2, Asset1)) should produce("AssetNotFound")
       }
       "amount and price assets are the same" in {
-        builder.validateAssetPair(AssetPair(WUSD, WUSD)) should produce("Amount and price assets must be different")
+        builder.validateAssetPair(AssetPair(WUSD, WUSD)) should produce("AssetPairSameAsset")
+      }
+      "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
+        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), blockchain, blacklistedAssets)
+        val assetPair = AssetPair(Waves, WUSD)
+        builder.validateAssetPair(assetPair) should produce("AssetPairIsNotAllowed")
       }
     }
   }
@@ -116,7 +127,7 @@ object AssetPairBuilderSpec {
                        assetName.getBytes(Charsets.UTF_8),
                        Array.emptyByteArray,
                        8,
-                       false,
+                       reissuable = false,
                        BigInt(1),
                        None,
                        0))

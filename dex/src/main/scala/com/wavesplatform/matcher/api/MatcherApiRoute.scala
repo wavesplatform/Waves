@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import akka.actor.ActorRef
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
@@ -89,32 +90,37 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
+    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(MatcherError.OrderBookBroken(p)))
     case None    => forceCheckOrderBook(p)
   }
 
   private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
     case Success(_) => pass
-    case _          => complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
+    case _          => complete(OrderBookUnavailable(MatcherError.OrderBookBroken(p)))
   }
 
-  private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
+  private def withAssetPair(p: AssetPair,
+                            redirectToInverse: Boolean = false,
+                            suffix: String = "",
+                            formatError: MatcherError => ToResponseMarshallable = defaultFormatError): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
         assetPairBuilder
           .validateAssetPair(p.reverse)
           .fold(
-            _ => complete(StatusCodes.NotFound -> Json.obj("message" -> e)),
+            _ => complete(formatError(e)),
             _ => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
           )
-      case Left(e) => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
+      case Left(e) => complete(formatError(e))
     }
+
+  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = StatusCodes.NotFound -> e.json
 
   private def withAsset(a: Asset): Directive1[Asset] = {
     assetPairBuilder.validateAssetId(a) match {
       case Right(_) => provide(a)
-      case Left(e)  => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
+      case Left(e)  => complete(StatusCodes.NotFound -> e.json)
     }
   }
 
@@ -128,8 +134,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
-        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey), "Incorrect signature")
-        pass
+        Base58.tryDecodeWithLimit(sig).map(crypto.verify(_, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey)) match {
+          case Success(true) => pass
+          case _             => complete(InvalidSignature)
+        }
     }
 
   @inline
@@ -199,7 +207,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
     )
   )
-  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete  & withAuth) { a =>
+  def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
     withAsset(a) { asset =>
       complete(
         if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
@@ -242,7 +250,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
-    withAssetPair(p, redirectToInverse = true) { pair =>
+    withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
       getMarketStatus(pair).fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { ms =>
         complete(StatusCodes.OK -> ms)
       }
@@ -284,11 +292,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def place: Route = path("orderbook") {
     (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
-      unavailableOrderBookBarrier(order.assetPair) {
-        complete(placeTimer.measureFuture(orderValidator(order) match {
-          case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
-          case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
-        }))
+      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
+        unavailableOrderBookBarrier(pair) {
+          complete(placeTimer.measureFuture(orderValidator(order) match {
+            case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
+            case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
+          }))
+        }
       }
     }
   }
@@ -349,8 +359,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
-    unavailableOrderBookBarrier(p) {
-      withAssetPair(p) { pair =>
+    withAssetPair(p, formatError = e => OrderCancelRejected(e)) { pair =>
+      unavailableOrderBookBarrier(pair) {
         handleCancelRequest(Some(pair))
       }
     }
@@ -570,13 +580,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
-      complete(
-        DBUtils
-          .order(db, orderId)
-          .fold[Future[OrderStatus]](Future.successful(OrderStatus.NotFound)) { order =>
-            askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
-          }
-          .map(_.json))
+      complete {
+        val r = DBUtils.order(db, orderId) match {
+          case Some(order) => askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
+          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status))
+        }
+        r.map(_.json)
+      }
     }
   }
 
@@ -591,14 +601,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
-  def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
-    withAssetPair(p) { pair =>
-      unavailableOrderBookBarrier(pair) {
+  def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { pair =>
+    orderBook(pair) match {
+      case Some(Right(_)) =>
         complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
           case None => NotImplemented(MatcherError.FeatureDisabled)
           case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
         })
-      }
+      case _ => complete(OrderBookUnavailable(MatcherError.OrderBookBroken(pair)))
     }
   }
 

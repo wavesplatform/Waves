@@ -1,14 +1,18 @@
 package com.wavesplatform.matcher
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Key
-import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
+import com.wavesplatform.matcher.model.{OrderBook, OrderInfo}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
+
+import scala.collection.mutable
 
 object MatcherKeys {
   import com.wavesplatform.database.KeyHelpers._
@@ -73,11 +77,8 @@ object MatcherKeys {
     )
 
   val ratePrefix: Short = 22
-
   def rate(asset: IssuedAsset): Key[Double] = {
-
     import java.lang.Double._
-
     Key(
       keyName = "matcher-rate",
       key = bytes(ratePrefix, asset.id.arr),
@@ -85,4 +86,25 @@ object MatcherKeys {
       encoder = double => Longs.toByteArray(doubleToLongBits(double))
     )
   }
+
+  val AssetPairsPrefix: Short = 23
+  def assetPair(pair: AssetPair): Key[Unit] =
+    Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => (), _ => Array.emptyByteArray)
+
+  val OrderBookSnapshotOffsetPrefix: Short = 24
+  def orderBookSnapshotOffset(pair: AssetPair): Key[Option[Long]] =
+    Key.opt("matcher-ob-snapshot-offset", bytes(OrderBookSnapshotOffsetPrefix, pair.bytes), Longs.fromByteArray, Longs.toByteArray)
+
+  val OrderBookSnapshotPrefix: Short = 25
+  def orderBookSnapshot(pair: AssetPair): Key[Option[OrderBook.Snapshot]] =
+    Key.opt(
+      "matcher-ob-snapshot",
+      bytes(OrderBookSnapshotPrefix, pair.bytes),
+      xs => OrderBook.Snapshot.fromBytes(ByteBuffer.wrap(xs)),
+      x => {
+        val r = new mutable.ArrayBuilder.ofByte
+        OrderBook.Snapshot.serialize(r, x)
+        r.result()
+      }
+    )
 }

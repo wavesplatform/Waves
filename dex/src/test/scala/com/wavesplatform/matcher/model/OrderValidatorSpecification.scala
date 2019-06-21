@@ -372,21 +372,6 @@ class OrderValidatorSpecification
         orderValidator(validOrder) shouldBe 'right
       }
 
-      "assetPair is not in whitelist" in {
-        val preconditions = for {
-          (order, _, orderFeeSettings) <- orderWithFeeSettingsGenerator
-          amountAsset                  <- arbitraryAssetIdGen
-          priceAsset                   <- arbitraryAssetIdGen
-        } yield (order, orderFeeSettings, AssetPair(amountAsset, priceAsset))
-
-        forAll(preconditions) {
-          case (order, orderFeeSettings, assetPair) =>
-            validateByMatcherSettings(orderFeeSettings, allowedAssetPairs = Set(assetPair))(order) should produce("AssetPairIsNotAllowed")
-            validateByMatcherSettings(orderFeeSettings, allowedAssetPairs = Set(order.assetPair))(order) shouldBe 'right
-            validateByMatcherSettings(orderFeeSettings, allowedAssetPairs = Set.empty[AssetPair])(order) shouldBe 'right // empty allowedAssetPairs set means that all pairs are allowed
-        }
-      }
-
       "it's version is not allowed by matcher" in forAll(orderWithFeeSettingsGenerator) {
         case (order, _, orderFeeSettings) =>
           if (order.version > 1) {

@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.matcher.db
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr

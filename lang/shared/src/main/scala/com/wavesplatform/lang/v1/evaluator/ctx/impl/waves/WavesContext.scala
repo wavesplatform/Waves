@@ -84,10 +84,10 @@ object WavesContext {
             .find(entry => Right(entry.fields("key")) == CONST_STRING(key))
             .map(_.fields("value"))
           entryValue match {
-            case Some(n: CONST_LONG)    if dataType == DataType.Long      => Right(n)
+            case Some(n: CONST_LONG) if dataType == DataType.Long         => Right(n)
             case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean   => Right(b)
             case Some(b: CONST_BYTESTR) if dataType == DataType.ByteArray => Right(b)
-            case Some(s: CONST_STRING)  if dataType == DataType.String    => Right(s)
+            case Some(s: CONST_STRING) if dataType == DataType.String     => Right(s)
             case _                                                        => Right(unit)
           }
         case _ => ???
@@ -291,6 +291,19 @@ object WavesContext {
         case _ => ???
       }
 
+    val stringFromAddressF: BaseFunction =
+      NativeFunction(
+        "toString",
+        10,
+        ADDRESSTOSTRING,
+        STRING,
+        "Convert address bytes to string",
+        ("Address", addressType, "address")
+      ) {
+        case CaseObj(`addressType`, fields) :: Nil => CONST_STRING(fields("bytes").asInstanceOf[CONST_BYTESTR].bs.toString)
+        case _                                     => ???
+      }
+
     val inputEntityCoeval: Eval[Either[String, CaseObj]] = {
       Eval.later(
         env.inputEntity
@@ -306,9 +319,10 @@ object WavesContext {
           ))
     }
 
-    val heightCoeval:    Eval[Either[String, CONST_LONG]] = Eval.later(Right(CONST_LONG(env.height)))
-    val thisCoeval:      Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.senderObject(env.tthis)))
-    val lastBlockCoeval: Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
+    val heightCoeval:      Eval[Either[String, CONST_LONG]] = Eval.later(Right(CONST_LONG(env.height)))
+    val accountThisCoeval: Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.senderObject(env.tthis)))
+    val assetThisCoeval:   Eval[Either[String, CaseObj]]    = Eval.later(Right(buildAssetInfo(env.assetInfoById(env.tthis.bytes).get)))
+    val lastBlockCoeval:   Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
 
     val anyTransactionType =
       UNION(
@@ -430,7 +444,13 @@ object WavesContext {
     )
 
     val txVar   = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
-    val thisVar = ("this", ((addressType, "Script address"), LazyVal(EitherT(thisCoeval))))
+
+    lazy val accountThisVar = ("this", ((addressType, "Script address"), LazyVal(EitherT(accountThisCoeval))))
+    lazy val assetThisVar   = ("this", ((assetType,   "Asset info"),     LazyVal(EitherT(assetThisCoeval))))
+    lazy val thisVar = ds.scriptType match {
+      case Account => accountThisVar
+      case Asset   => assetThisVar
+    }
 
     val vars = Map(
       1 -> Map(txVar),
@@ -481,21 +501,22 @@ object WavesContext {
       functions ++ (
         version match {
           case V1 | V2 => List(txByIdF)
-          case V3      => List(
-            getIntegerFromStateF,
-            getBooleanFromStateF,
-            getBinaryFromStateF,
-            getStringFromStateF,
-            getIntegerFromArrayF,
-            getBooleanFromArrayF,
-            getBinaryFromArrayF,
-            getStringFromArrayF,
-            getIntegerByIndexF,
-            getBooleanByIndexF,
-            getBinaryByIndexF,
-            getStringByIndexF,
-            addressFromStringF
-          ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF)
+          case V3 =>
+            List(
+              getIntegerFromStateF,
+              getBooleanFromStateF,
+              getBinaryFromStateF,
+              getStringFromStateF,
+              getIntegerFromArrayF,
+              getBooleanFromArrayF,
+              getBinaryFromArrayF,
+              getStringFromArrayF,
+              getIntegerByIndexF,
+              getBooleanByIndexF,
+              getBinaryByIndexF,
+              getStringByIndexF,
+              addressFromStringF
+            ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF, stringFromAddressF)
         }
       )
     )

@@ -10,22 +10,23 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, C
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.CryptoContext.{sha3256, sha3384, sha3512}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object CryptoContext {
 
-  private val none    = CASETYPEREF("NOALG", List.empty)
-  private val md5     = CASETYPEREF("MD5", List.empty)
-  private val sha1    = CASETYPEREF("SHA1", List.empty)
-  private val sha224  = CASETYPEREF("SHA224", List.empty)
-  private val sha256  = CASETYPEREF("SHA256", List.empty)
-  private val sha384  = CASETYPEREF("SHA384", List.empty)
-  private val sha512  = CASETYPEREF("SHA512", List.empty)
-  private val sha3224 = CASETYPEREF("SHA3224", List.empty)
-  private val sha3256 = CASETYPEREF("SHA3256", List.empty)
-  private val sha3384 = CASETYPEREF("SHA3384", List.empty)
-  private val sha3512 = CASETYPEREF("SHA3512", List.empty)
+  private val none    = CASETYPEREF("NoAlg", List.empty)
+  private val md5     = CASETYPEREF("Md5", List.empty)
+  private val sha1    = CASETYPEREF("Sha1", List.empty)
+  private val sha224  = CASETYPEREF("Sha224", List.empty)
+  private val sha256  = CASETYPEREF("Sha256", List.empty)
+  private val sha384  = CASETYPEREF("Sha384", List.empty)
+  private val sha512  = CASETYPEREF("Sha512", List.empty)
+  private val sha3224 = CASETYPEREF("Sha3224", List.empty)
+  private val sha3256 = CASETYPEREF("Sha3256", List.empty)
+  private val sha3384 = CASETYPEREF("Sha3384", List.empty)
+  private val sha3512 = CASETYPEREF("Sha3512", List.empty)
 
   private val digestAlgorithmType =
     UNION(none, md5, sha1, sha224, sha256, sha384, sha512, sha3224, sha3256, sha3384, sha3512)
@@ -96,7 +97,7 @@ object CryptoContext {
 
     def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "Base58 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                   => notImplemented("toBase58String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase58String(bytes: ByteVector)", xs)
     }
 
     def fromBase58StringF: BaseFunction =
@@ -107,7 +108,7 @@ object CryptoContext {
 
     def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "Base64 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                   => notImplemented("toBase64String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase64String(bytes: ByteVector)", xs)
     }
 
     def fromBase64StringF: BaseFunction =
@@ -134,7 +135,7 @@ object CryptoContext {
 
     def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
-      case xs                                         => notImplemented("toBase16String(bytes: byte[])", xs)
+      case xs                                   => notImplemented("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF: BaseFunction =
@@ -156,11 +157,17 @@ object CryptoContext {
       )
 
     val v3Types = List(
+      none,
+      md5,
       sha1,
       sha224,
       sha256,
       sha384,
       sha512,
+      sha3224,
+      sha3256,
+      sha3384,
+      sha3512,
       digestAlgorithmType
     )
 
@@ -187,9 +194,9 @@ object CryptoContext {
       )
 
     version match {
-            case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
-            case V3 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
-          }
+      case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
+      case V3      => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
+    }
   }
 
   def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext   = build(global, version).evaluationContext

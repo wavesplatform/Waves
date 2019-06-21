@@ -4,8 +4,11 @@ import java.io.File
 import java.util.{HashMap => JHashMap}
 
 import akka.actor.ActorSystem
+import akka.persistence.query.PersistenceQuery
+import akka.persistence.query.journal.leveldb.scaladsl.LeveldbReadJournal
 import akka.persistence.serialization.Snapshot
 import akka.serialization.SerializationExtension
+import akka.stream.ActorMaterializer
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
@@ -14,6 +17,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
+import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB}
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.matcher.settings.MatcherSettings
@@ -102,7 +106,7 @@ object MatcherTool extends ScorexLogging {
 
           val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
           val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
-          println(s"Snapshots history for $pair: $history")
+          log.info(s"Snapshots history for $pair: $history")
 
           history.headOption.foreach { lastSnapshotNr =>
             val lastSnapshotKey     = MatcherSnapshotStore.kSnapshot(persistenceId, lastSnapshotNr)
@@ -114,24 +118,56 @@ object MatcherTool extends ScorexLogging {
                 lo <- v
               } yield s"${lo.order.id()} -> $lo").mkString("\n")
 
-            println(s"Last snapshot: $lastSnapshot")
-            println(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders.map(_._2))}")
+            log.info(s"Last snapshot: $lastSnapshot")
+            log.info(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders.map(_._2))}")
+          }
+        } finally {
+          Await.ready(system.terminate(), Duration.Inf)
+        }
+      case "ob-compact" =>
+        val groupSize = args(2).toInt
+
+        log.info("Removing stale snapshots from order books")
+        log.info("Warning: matcher's snapshot in new format is required")
+        val system = ActorSystem("matcher-tool", actualConfig)
+        try {
+          val apdb  = AssetPairsDB(db)
+          val pairs = apdb.all().toVector
+          log.info(s"Found ${pairs.size} asset pairs")
+
+          val snapshotDB = openDB(settings.snapshotsDataDir)
+          pairs.grouped(groupSize).foreach { pairs =>
+            snapshotDB.readWrite { rw =>
+              pairs.foreach { pair =>
+                val persistenceId = OrderBookActor.name(pair)
+                val history       = rw.get(MatcherSnapshotStore.kSMHistory(persistenceId))
+                if (history.lengthCompare(1) > 0) {
+                  log.info(s"Snapshots history for $pair has ${history.size} records")
+                  val (toKeep, toDelete) = history.map(seqNr => seqNr -> rw.get(MatcherSnapshotStore.kSM(persistenceId, seqNr))).splitAt(1)
+                  rw.put(MatcherSnapshotStore.kSMHistory(persistenceId), toKeep.map(_._1).sorted.reverse)
+                  for ((seqNr, _) <- toDelete) {
+                    rw.delete(MatcherSnapshotStore.kSM(persistenceId, seqNr))
+                    rw.delete(MatcherSnapshotStore.kSnapshot(persistenceId, seqNr))
+                  }
+                }
+              }
+            }
           }
         } finally {
           Await.ready(system.terminate(), Duration.Inf)
         }
       case "oi" =>
         val id = ByteStr.decodeBase58(args(2)).get
-        println(s"Loading order '$id'")
+        log.info(s"Loading order '$id'")
 
         val orderKey = MatcherKeys.order(id)
         orderKey.parse(db.get(orderKey.keyBytes)).foreach { o =>
-          println(s"Order (id=${o.id()}): $o")
+          log.info(s"Order (id=${o.id()}): $o")
         }
 
         val orderInfoKey = MatcherKeys.orderInfo(id)
         orderInfoKey.parse(db.get(orderInfoKey.keyBytes)).foreach { oi =>
-          println(s"Order info: $oi")
+          log.info(s"Order info: $oi")
         }
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
@@ -139,11 +175,16 @@ object MatcherTool extends ScorexLogging {
       case "compact" =>
         log.info("Compacting database")
         db.compactRange(null, null)
-      case "mar" =>
+      case "dex-compact" =>
+        log.info("Compacting DEX database")
+        val snapshotDB = openDB(settings.snapshotsDataDir)
+        snapshotDB.compactRange(null, null)
+      case "ma" =>
         val system = ActorSystem("matcher-tool", actualConfig)
         try {
           val snapshotDB    = openDB(settings.snapshotsDataDir)
           val persistenceId = MatcherActor.name
+          val se            = SerializationExtension(system)
 
           val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
           val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
@@ -160,33 +201,134 @@ object MatcherTool extends ScorexLogging {
 
               (seqNr, sm, snapshotRaw)
             }
-            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: $sm" }.mkString("\n")}")
+            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: SM(seqNr=${sm.seqNr}, ts=${sm.ts})" }.mkString("\n")}")
 
-            log.info(s"Deleting old data")
-            xs.foreach {
-              case (seqNr, _, _) =>
-                val smKey       = MatcherSnapshotStore.kSM(persistenceId, seqNr)
-                val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, seqNr)
-
-                snapshotDB.delete(smKey.keyBytes)
-                snapshotDB.delete(snapshotKey.keyBytes)
-            }
-
-            val (firstSeqNr, firstSm, firstSnapshotRaw) = xs.head
-            val updatedSm                               = firstSm.copy(seqNr = 1L)
-            log.info(s"Writing the record with seqNr=$firstSeqNr at seqNr=1, sm was $firstSm, will be $updatedSm")
-
-            val smKey       = MatcherSnapshotStore.kSM(persistenceId, 1)
-            val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, 1)
-
-            snapshotDB.put(smKey.keyBytes, smKey.encode(updatedSm))
-            snapshotDB.put(snapshotKey.keyBytes, firstSnapshotRaw)
-            snapshotDB.put(historyKey.keyBytes, historyKey.encode(Seq(1)))
+            val (_, _, lastSnapshotRaw) = xs.last
+            val snapshot                = se.deserialize(lastSnapshotRaw, classOf[Snapshot]).get.data.asInstanceOf[MatcherActor.Snapshot]
+            log.info(s"The last snapshot:\n${snapshot.tradedPairsSet.map(_.key).toVector.sorted.mkString("\n")}")
           }
         } finally {
           Await.ready(system.terminate(), Duration.Inf)
         }
-      case _ =>
+      case "maj" =>
+        val from   = args(2).toLong
+        val to     = if (args.length < 4) Long.MaxValue else args(3).toLong
+        val system = ActorSystem("matcher-tool", actualConfig)
+        val mat    = ActorMaterializer()(system)
+        try {
+          val readJournal = PersistenceQuery(system).readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
+          val query       = readJournal.currentEventsByPersistenceId(MatcherActor.name, from, to)
+          val process = query.runForeach { rawEvt =>
+            val evt = rawEvt.event.asInstanceOf[MatcherActor.OrderBookCreated]
+            log.info(s"[offset=${rawEvt.offset}, seqNr=${rawEvt.sequenceNr}] $evt")
+          }(mat)
+
+          Await.ready(process, Duration.Inf)
+        } finally {
+          mat.shutdown()
+          Await.ready(system.terminate(), Duration.Inf)
+        }
+      case "ma-migrate" =>
+        val system = ActorSystem("matcher-tool", actualConfig)
+        val mat    = ActorMaterializer()(system)
+        try {
+          val allPairs      = Set.newBuilder[AssetPair]
+          val snapshotDB    = openDB(settings.snapshotsDataDir)
+          val persistenceId = MatcherActor.name
+          val se            = SerializationExtension(system)
+
+          val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
+          val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
+          if (history.isEmpty) log.warn("Snapshots history is empty")
+          else {
+            val xs = history.map { seqNr =>
+              val smKey = MatcherSnapshotStore.kSM(persistenceId, seqNr)
+              val smRaw = snapshotDB.get(smKey.keyBytes)
+              val sm    = smKey.parse(smRaw)
+
+              val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, seqNr)
+              val snapshotRaw = snapshotDB.get(snapshotKey.keyBytes)
+
+              (seqNr, sm, snapshotRaw)
+            }
+            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: SM(seqNr=${sm.seqNr}, ts=${sm.ts})" }.mkString("\n")}")
+
+            val (_, _, lastSnapshotRaw) = xs.last
+            val snapshot                = se.deserialize(lastSnapshotRaw, classOf[Snapshot]).get.data.asInstanceOf[MatcherActor.Snapshot]
+            log.info(s"The last snapshot:\n${snapshot.tradedPairsSet.map(_.key).toVector.sorted.mkString("\n")}")
+            allPairs ++= snapshot.tradedPairsSet
+          }
+
+          val readJournal = PersistenceQuery(system).readJournalFor[LeveldbReadJournal](LeveldbReadJournal.Identifier)
+          val query       = readJournal.currentEventsByPersistenceId(MatcherActor.name, 0)
+          val process = query.runForeach { rawEvt =>
+            val evt = rawEvt.event.asInstanceOf[MatcherActor.OrderBookCreated]
+            log.info(s"[offset=${rawEvt.offset}, seqNr=${rawEvt.sequenceNr}] $evt")
+            allPairs += evt.assetPair
+          }(mat)
+
+          Await.ready(process, Duration.Inf)
+          log.info(s"Asset pairs collected")
+
+          val apdb = AssetPairsDB(db)
+          allPairs.result().foreach(apdb.add)
+          log.info(s"Asset pairs migrated")
+        } finally {
+          mat.shutdown()
+          Await.ready(system.terminate(), Duration.Inf)
+        }
+      case "ma-inspect" =>
+        val apdb            = AssetPairsDB(db)
+        val knownAssetPairs = apdb.all()
+        if (knownAssetPairs.isEmpty) log.info("There are no known asset pairs")
+        else log.info(s"Known asset pairs: ${knownAssetPairs.mkString("\n")}")
+      case "ob-migrate" =>
+        val defaultOffset    = Option(args(2)).map(_.toLong)
+        val brokenOrderBooks = List.newBuilder[AssetPair]
+        val apdb             = AssetPairsDB(db)
+        val knownAssetPairs  = apdb.all()
+        if (knownAssetPairs.isEmpty) log.info("There are no known asset pairs")
+        else {
+          val obsdb  = OrderBookSnapshotDB(db)
+          val system = ActorSystem("matcher-tool", actualConfig)
+          val se     = SerializationExtension(system)
+          try {
+            val snapshotDB = openDB(settings.snapshotsDataDir)
+            val total      = knownAssetPairs.size
+            var i          = 0
+            knownAssetPairs.foreach { pair =>
+              val persistenceId = OrderBookActor.name(pair)
+
+              val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
+              val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
+
+              history.headOption.foreach { lastSnapshotNr =>
+                val lastSnapshotKey     = MatcherSnapshotStore.kSnapshot(persistenceId, lastSnapshotNr)
+                val lastSnapshotRawData = lastSnapshotKey.parse(snapshotDB.get(lastSnapshotKey))
+                val lastSnapshot        = se.deserialize(lastSnapshotRawData, classOf[Snapshot]).get.data.asInstanceOf[OrderBookActor.Snapshot]
+
+                lastSnapshot.eventNr match {
+                  case Some(offset) => obsdb.update(pair, offset, Some(lastSnapshot.orderBook))
+                  case None =>
+                    defaultOffset.foreach(obsdb.update(pair, _, Some(lastSnapshot.orderBook)))
+                    brokenOrderBooks += pair
+                }
+              }
+
+              i += 1
+              if (total % i == 10) log.info(s"$i%...")
+            }
+          } finally {
+            log.error(s"Can't migrate order books: ${brokenOrderBooks.result().mkString(", ")}")
+            defaultOffset match {
+              case None         => log.error("It's unsafe to switch the version of DEX!")
+              case Some(offset) => log.info(s"The default offset for these order books is $offset")
+            }
+            Await.ready(system.terminate(), Duration.Inf)
+          }
+        }
+      case x =>
+        log.warn(s"Can't run $x")
     }
 
     log.info(s"Completed in ${(System.currentTimeMillis() - start) / 1000}s")
