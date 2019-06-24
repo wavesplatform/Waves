@@ -2,14 +2,10 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{Node, NodeConfigs}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
@@ -25,19 +21,19 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       .overrideBase(_.quorum(0))
       .withDefault(1)
       .withSpecial(_.raw(s"""
-           |waves.blockchain.custom.functionality.pre-activated-features = {
-           |          2 = 0
-           |          3 = 0
-           |          4 = 0
-           |          5 = 0
-           |          6 = 0
-           |          7 = 0
-           |          9 = 0
-           |          10 = 0
-           |          11 = 0
-           |          12 = 0
-           |          13 = 0
-           |}
+                            |waves.blockchain.custom.functionality.pre-activated-features = {
+                            |          2 = 0
+                            |          3 = 0
+                            |          4 = 0
+                            |          5 = 0
+                            |          6 = 0
+                            |          7 = 0
+                            |          9 = 0
+                            |          10 = 0
+                            |          11 = 0
+                            |          12 = 0
+                            |          13 = 0
+                            |}
          """.stripMargin))
       .buildNonConflicting()
 
@@ -62,104 +58,113 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
 
-    val ttx = TransferTransactionV1
-      .selfSigned(
-        Waves,
-        secondNode.privateKey,
-        secondNodeIssuer,
-        10.waves,
-        System.currentTimeMillis(),
-        Waves,
-        0.001.waves,
-        Array.emptyByteArray
-      )
-      .explicitGet()
+    val nftIssueTxId = secondNode
+      .issue(secondNode.address,
+        assetName,
+        assetDescription,
+        quantity = 1,
+        decimals = 0,
+        reissuable = false,
+        fee = 0.001.waves,
+        script = None,
+        waitForTx = true)
+      .id
 
-    secondNode.signedBroadcast(ttx.json(), waitForTx = true)
-
-    val itx = IssueTransactionV2
-      .selfSigned(
-        'I',
-        secondNodeIssuer,
-        assetName.getBytes("UTF-8"),
-        assetDescription.getBytes("UTF-8"),
-        1,
-        0,
-        false,
-        None,
-        0.001.waves,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
-
-    secondNode.signedBroadcast(itx.json(), waitForTx = true)
-
-    secondNode.assertAssetBalance(secondNodeIssuer.address, itx.assetId().base58, 1L)
+    secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 1L)
   }
 
   test("Can't issue reissuable NFT") {
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
 
-    val itx = IssueTransactionV2
-      .selfSigned(
-        'I',
-        secondNodeIssuer,
-        assetName.getBytes("UTF-8"),
-        assetDescription.getBytes("UTF-8"),
-        1,
-        0,
-        true,
-        None,
-        0.001.waves,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
-
-    assertBadRequestAndResponse(secondNode.signedBroadcast(itx.json(), waitForTx = true), "does not exceed minimal value")
+    assertBadRequestAndResponse(
+      secondNode.issue(secondNode.address,
+        assetName,
+        assetDescription,
+        quantity = 1,
+        decimals = 0,
+        reissuable = true,
+        fee = 0.001.waves,
+        script = None,
+        waitForTx = true),
+      "does not exceed minimal value"
+    )
   }
 
   test("Can't issue NFT with quantity > 1") {
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
 
-    val itx = IssueTransactionV2
-      .selfSigned(
-        'I',
-        secondNodeIssuer,
-        assetName.getBytes("UTF-8"),
-        assetDescription.getBytes("UTF-8"),
-        2,
-        0,
-        true,
-        None,
-        0.001.waves,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
-
-    assertBadRequestAndResponse(secondNode.signedBroadcast(itx.json(), waitForTx = true), "does not exceed minimal value")
+    assertBadRequestAndResponse(
+      secondNode.issue(secondNode.address,
+        assetName,
+        assetDescription,
+        quantity = 2,
+        decimals = 0,
+        reissuable = false,
+        fee = 0.001.waves,
+        script = None,
+        waitForTx = true),
+      "does not exceed minimal value"
+    )
   }
 
   test("Can't issue token with reduced fee if decimals > 0") {
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
 
-    val itx = IssueTransactionV2
-      .selfSigned(
-        'I',
-        secondNodeIssuer,
-        assetName.getBytes("UTF-8"),
-        assetDescription.getBytes("UTF-8"),
-        1,
-        1,
-        true,
-        None,
-        0.001.waves,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
+    assertBadRequestAndResponse(
+      secondNode.issue(secondNode.address,
+        assetName,
+        assetDescription,
+        quantity = 1,
+        decimals = 1,
+        reissuable = false,
+        fee = 0.001.waves,
+        script = None,
+        waitForTx = true),
+      "does not exceed minimal value"
+    )
+  }
+  test("nft assets balance should be returned by separate api endpoint") {
+    secondNode
+      .issue(secondNode.address, "Common", "Common asset", quantity = 1, decimals = 1, reissuable = false, fee = 1.waves, script = None)
+      .id
+    val issetsId = issueManyAssets(20)
+    secondNode.waitForTransaction(issetsId.last)
+    nodes.waitForHeightArise()
+    val assetsBalance    = secondNode.assetsBalance(secondNode.address).balances.map(a => a.assetId)
+    val nftAssetsBalance = secondNode.nftAssetsBalance(secondNode.address, 10).map(id => id.assetId)
 
-    assertBadRequestAndResponse(secondNode.signedBroadcast(itx.json(), waitForTx = true), "does not exceed minimal value")
+    assetsBalance shouldNot contain atLeastOneElementOf nftAssetsBalance
+    nftAssetsBalance shouldNot contain atLeastOneElementOf assetsBalance
+    nftAssetsBalance.length shouldBe 10
+
+    val remaingNftAssets = secondNode.nftAssetsBalance(secondNode.address, 15, after = nftAssetsBalance.last).map(id => id.assetId)
+    remaingNftAssets.length shouldBe 10
+    remaingNftAssets shouldNot contain atLeastOneElementOf nftAssetsBalance
+
+    val allNFTAssets = secondNode.nftAssetsBalance(secondNode.address, 100).map(id => id.assetId)
+    allNFTAssets.length shouldBe 20
+    allNFTAssets shouldBe nftAssetsBalance ++ remaingNftAssets
+
+  }
+
+  private def issueManyAssets(n: Int): Seq[String] = {
+    val assetName        = "NFTAsset"
+    val assetDescription = "my asset description"
+
+    (1 to n).map(
+      i =>
+        secondNode
+          .issue(secondNode.address,
+            assetName + i,
+            assetDescription + i,
+            quantity = 1,
+            decimals = 0,
+            reissuable = false,
+            fee = 0.001.waves,
+            script = None)
+          .id)
   }
 }
