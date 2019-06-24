@@ -538,6 +538,21 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
+  property("invoking script transaction can be found for recipient") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (paymentContractGen(a, am) _)
+      r <- preconditionsAndSetContract(contractGen)
+    } yield (a, am, r._1, r._2, r._3)) {
+      case (acc, amount, genesis, setScript, ci) =>
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          case (blockDiff, newState) =>
+            newState.addressTransactions(acc.toAddress, Set.empty, None).toList.head._2 shouldBe ci
+        }
+    }
+  }
+
   property("invoking default func payment contract results in accounts state") {
     forAll(for {
       a  <- accountGen

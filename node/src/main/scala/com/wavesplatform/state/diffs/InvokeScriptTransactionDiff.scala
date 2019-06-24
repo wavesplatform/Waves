@@ -196,9 +196,14 @@ object InvokeScriptTransactionDiff {
           val isr = InvokeScriptResult(data = dataEntries, transfers = paymentReceiversMap.toVector.flatMap {
             case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
           })
-          dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1, scriptsComplexity = scriptsComplexity) |+| Diff.stateOps(portfolios = transfers,
-                                                                                                                            scriptResults =
-                                                                                                                              Map(tx.id() -> isr))
+          val dataAndPaymentDiffTx = dataAndPaymentDiff.transactions(tx.id())
+          val dataAndPaymentDiffTxWithTransfers = dataAndPaymentDiffTx.copy(_3 = dataAndPaymentDiffTx._3 ++ transfers.keys)
+          val transferSetDiff = Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
+          dataAndPaymentDiff.copy(
+            transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
+            scriptsRun = scriptsInvoked + 1,
+            scriptsComplexity = scriptsComplexity
+          ) |+| transferSetDiff
         }
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
