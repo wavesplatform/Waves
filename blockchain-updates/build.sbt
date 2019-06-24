@@ -2,7 +2,7 @@ import WavesDockerKeys._
 
 name := "blockchain-updates"
 
-libraryDependencies += "org.apache.kafka" %% "kafka" % "2.1.0"
+libraryDependencies += Dependencies.kafka
 
 inConfig(Compile)(
   Seq(
