@@ -36,7 +36,7 @@ class AliasBroadcastRouteSpec
 
     "when state validation fails" in {
       forAll(createAliasGen.retryUntil(_.version == 1)) { t: Transaction =>
-        posting("create", t.json()) should produce(StateCheckFailed(t, "foo"))
+        posting("create", t.json()) should produce(StateCheckFailed(CustomValidationError("foo"), t))
       }
     }
   }

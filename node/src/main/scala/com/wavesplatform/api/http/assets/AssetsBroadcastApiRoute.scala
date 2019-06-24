@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.{UnsupportedTransactionType => _, _}
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
