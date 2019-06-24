@@ -13,12 +13,17 @@ final case class StateUpdate(balances: Seq[(Address, Asset, Long)], leases: Seq[
 }
 
 sealed trait BlockchainUpdated
-final case class BlockAppended(block: Block, height: Int, blockStateUpdate: StateUpdate, transactionStateUpdates: Seq[StateUpdate])
+final case class BlockAppended(block: Block,
+                               height: Int,
+                               blockStateUpdate: StateUpdate,
+                               transactionStateUpdates: Seq[StateUpdate],
+                               transactionIds: Seq[ByteStr])
     extends BlockchainUpdated
 final case class MicroBlockAppended(microBlock: MicroBlock,
                                     height: Int,
                                     microBlockStateUpdate: StateUpdate,
-                                    transactionStateUpdates: Seq[StateUpdate])
+                                    transactionStateUpdates: Seq[StateUpdate],
+                                    transactionIds: Seq[ByteStr])
     extends BlockchainUpdated
 final case class RollbackCompleted(to: ByteStr, height: Int)           extends BlockchainUpdated
 final case class MicroBlockRollbackCompleted(to: ByteStr, height: Int) extends BlockchainUpdated
@@ -35,7 +40,7 @@ object BlockchainUpdateNotifier {
     StateUpdate(balances, leases, dataEntries)
   }
 
-  private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdate, Seq[StateUpdate]) = {
+  private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdate, Seq[StateUpdate], Seq[ByteStr]) = {
     val DetailedDiff(parentDiff, txsDiffs) = diff
     val parentStateUpdate                  = stateUpdateFromDiff(blockchain, parentDiff)
 
@@ -43,13 +48,15 @@ object BlockchainUpdateNotifier {
       case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), composite(bc, txDiff))
     }
 
-    (parentStateUpdate, txsStateUpdates)
+    val txIds = txsDiffs.flatMap(txDiff => txDiff.transactions.keys.toSeq)
+
+    (parentStateUpdate, txsStateUpdates, txIds)
   }
 
   def notifyProcessBlock(enabled: Boolean, events: Observer[BlockchainUpdated], block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit =
     if (enabled) {
-      val (blockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      events.onNext(BlockAppended(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates))
+      val (blockStateUpdate, txsStateUpdates, txIds) = stateUpdatesFromDetailedDiff(blockchain, diff)
+      events.onNext(BlockAppended(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates, txIds))
     }
 
   def notifyProcessMicroBlock(enabled: Boolean,
@@ -58,8 +65,8 @@ object BlockchainUpdateNotifier {
                               diff: DetailedDiff,
                               blockchain: Blockchain): Unit =
     if (enabled) {
-      val (microBlockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      events.onNext(MicroBlockAppended(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates))
+      val (microBlockStateUpdate, txsStateUpdates, txIds) = stateUpdatesFromDetailedDiff(blockchain, diff)
+      events.onNext(MicroBlockAppended(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates, txIds))
     }
 
   // here height + 1 is not required, because blockchain rollback resets height and ngState no longer affects it

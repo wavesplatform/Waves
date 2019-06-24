@@ -182,17 +182,18 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // genesis block
           updates.head match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
               height shouldBe 1
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
+              txIds shouldBe block.transactionData.map(_.id.apply)
             case _ => fail()
           }
 
           // transfers block
           updates(1) match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
               height shouldBe 2
               block.transactionData.length shouldBe 5
               // miner reward, no NG — all txs fees
@@ -202,6 +203,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               // first Tx updated balances
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT / 5
               transactionsStateUpdates.head.balances.last._3 shouldBe (ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT)
+
+              txIds shouldBe block.transactionData.map(_.id.apply)
             case _ => fail()
           }
         }
@@ -219,29 +222,31 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // genesis block, same as without NG
           updates.head match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
               height shouldBe 1
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
+              txIds shouldBe block.transactionData.map(_.id.apply)
             case _ => fail()
           }
 
           // first transfers block
           updates(1) match {
-            case BlockAppended(block, height, blockStateUpdate, _) =>
+            case BlockAppended(block, height, blockStateUpdate, _, txIds) =>
               height shouldBe 2
               block.transactionData.length shouldBe 5
 
               // miner reward, with NG — 40% of all txs fees
               blockStateUpdate.balances.length shouldBe 1
               blockStateUpdate.balances.head._3 shouldBe FEE_AMT * 5 * 0.4
+              txIds shouldBe block.transactionData.map(_.id.apply)
             case _ => fail()
           }
 
           // second transfers block, with carryFee
           updates(2) match {
-            case BlockAppended(block, height, blockStateUpdate, _) =>
+            case BlockAppended(block, height, blockStateUpdate, _, txIds) =>
               height shouldBe 3
               block.transactionData.length shouldBe 4
 
@@ -252,6 +257,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
                   + FEE_AMT * 4 * 0.4 // carry from prev block
                   + FEE_AMT * 5 * 0.6 // current block reward
               )
+              txIds shouldBe block.transactionData.map(_.id.apply)
             case _ => fail()
           }
         }
@@ -300,31 +306,34 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           updates.length shouldBe 6
           updates.head match {
-            case BlockAppended(b, height, blockStateUpdate, transactionsStateUpdates) =>
+            case BlockAppended(b, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
               height shouldBe 1
               b.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
+              txIds shouldBe b.transactionData.map(_.id.apply)
             case _ => fail()
           }
 
           updates(1) match {
-            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _) =>
+            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _, txIds) =>
               height shouldBe 1
               microBlock.transactionData.length shouldBe 2
               // microBlock transactions miner reward
               microBlockStateUpdate.balances.length shouldBe 1
               microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 2 * 0.4
+              txIds shouldBe microBlock.transactionData.map(_.id.apply)
             case _ => fail()
           }
 
           updates(2) match {
-            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _) =>
+            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _, txIds) =>
               height shouldBe 1
               microBlock.transactionData.length shouldBe 1
               // microBlock transactions miner reward
               microBlockStateUpdate.balances.length shouldBe 1
               microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 0.4
+              txIds shouldBe microBlock.transactionData.map(_.id.apply)
             case _ => fail()
           }
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.events.protobuf
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.events.protobuf.StateUpdate.{
@@ -7,9 +8,7 @@ import com.wavesplatform.events.protobuf.StateUpdate.{
   DataEntryUpdate => PBDataEntryUpdate,
   LeasingUpdate => PBLeasingUpdate
 }
-
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
-
 import com.wavesplatform.state.{BlockAppended, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
 
 object PBEvents {
@@ -33,7 +32,7 @@ object PBEvents {
 
   def protobuf(event: VanillaBlockchainUpdated): PBBlockchainUpdated =
     event match {
-      case BlockAppended(block, height, blockStateUpdate, transactionStateUpdates) =>
+      case BlockAppended(block, height, blockStateUpdate, transactionStateUpdates, txIds) =>
         val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdated)
         val txsUpdates  = transactionStateUpdates.map(protobufStateUpdated)
 
@@ -42,13 +41,14 @@ object PBEvents {
           height = height,
           update = PBBlockchainUpdated.Update.Append(
             PBAppend(
+              transactionIds = txIds.map(_.toByteArray).map(ByteString.copyFrom),
               stateUpdate = blockUpdate,
               transactionStateUpdates = txsUpdates,
               body = PBAppend.Body.Block(PBBlocks.protobuf(block))
             )
           )
         )
-      case MicroBlockAppended(microBlock, height, microBlockStateUpdate, transactionStateUpdates) =>
+      case MicroBlockAppended(microBlock, height, microBlockStateUpdate, transactionStateUpdates, txIds) =>
         val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdated)
         val txsUpdates       = transactionStateUpdates.map(protobufStateUpdated)
 
@@ -57,6 +57,7 @@ object PBEvents {
           height = height,
           update = PBBlockchainUpdated.Update.Append(
             PBAppend(
+              transactionIds = txIds.map(_.toByteArray).map(ByteString.copyFrom),
               stateUpdate = microBlockUpdate,
               transactionStateUpdates = txsUpdates,
               body = PBAppend.Body.MicroBlock(PBMicroBlocks.protobuf(microBlock))

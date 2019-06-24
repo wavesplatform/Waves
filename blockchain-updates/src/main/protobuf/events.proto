@@ -14,6 +14,8 @@ message BlockchainUpdated {
             Block block = 1;
             SignedMicroBlock micro_block = 2;
         }
+        repeated bytes transaction_ids = 3;
+
         StateUpdate state_update = 11;
         repeated StateUpdate transaction_state_updates = 12;
     }
