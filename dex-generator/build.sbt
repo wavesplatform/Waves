@@ -1,1 +1,0 @@
-libraryDependencies ++= Dependencies.console
