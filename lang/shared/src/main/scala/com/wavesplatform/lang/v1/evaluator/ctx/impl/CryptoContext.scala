@@ -62,7 +62,7 @@ object CryptoContext {
     val blake2b256F: BaseFunction = hashFunction("blake2b256", BLAKE256, 10, "256 bit BLAKE")(global.blake2b256)
     val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10, "256 bit SHA-2")(global.sha256)
 
-    val sigVerifyF: BaseFunction =
+    def sigVerifyF(contextVer: StdLibVersion): BaseFunction =
       NativeFunction("sigVerify",
                      100,
                      SIGVERIFY,
@@ -71,8 +71,11 @@ object CryptoContext {
                      ("message", BYTESTR, "value"),
                      ("sig", BYTESTR, "signature"),
                      ("pub", BYTESTR, "public key")) {
-        case CONST_BYTESTR(m: ByteStr) :: CONST_BYTESTR(s: ByteStr) :: CONST_BYTESTR(p: ByteStr) :: Nil =>
-          Right(CONST_BOOLEAN(global.curve25519verify(m.arr, s.arr, p.arr)))
+        case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
+            if (contextVer != V1 && contextVer != V2 && msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
+          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs}KB")
+        case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
+          Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case _ => ???
       }
 
@@ -88,9 +91,12 @@ object CryptoContext {
         ("sig", BYTESTR, "signature"),
         ("pub", BYTESTR, "public key")
       ) {
-        case (digestAlg: CaseObj) :: CONST_BYTESTR(m: ByteStr) :: CONST_BYTESTR(s: ByteStr) :: CONST_BYTESTR(p: ByteStr) :: Nil =>
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
+            if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
+          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs}KB")
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) map { alg =>
-            CONST_BOOLEAN(global.rsaVerify(alg, m.arr, s.arr, p.arr))
+            CONST_BOOLEAN(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
           }
         case _ => ???
       }
@@ -149,7 +155,7 @@ object CryptoContext {
         keccak256F,
         blake2b256F,
         sha256F,
-        sigVerifyF,
+        sigVerifyF(version),
         toBase58StringF,
         fromBase58StringF,
         toBase64StringF,
