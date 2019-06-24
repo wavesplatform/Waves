@@ -73,7 +73,7 @@ object CryptoContext {
                      ("pub", BYTESTR, "public key")) {
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (contextVer != V1 && contextVer != V2 && msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
-          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs}KB")
+          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case _ => ???
@@ -93,7 +93,7 @@ object CryptoContext {
       ) {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
-          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs}KB")
+          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) map { alg =>
             CONST_BOOLEAN(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
