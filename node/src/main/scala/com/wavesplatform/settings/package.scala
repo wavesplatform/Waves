@@ -12,7 +12,6 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
 import scala.jdk.CollectionConverters._
-import scala.util.Try
 
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
@@ -34,7 +33,7 @@ package object settings {
         case other =>
           throw new ConfigException.WrongType(config.getValue(path).origin(), path, ConfigValueType.OBJECT.name(), other.name())
       }
-  }
+    }
 
   implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
     val x = cfg.getInt(path)
@@ -58,19 +57,19 @@ package object settings {
 
   def loadConfig(maybeUserConfig: Option[Config]): Config = {
     val sysProps = ConfigFactory.defaultOverrides()
-
-    val external = maybeUserConfig
-      .fold(sysProps)(sysProps.withFallback)
-      .withFallback(ConfigFactory.parseString(s"waves.directory = $defaultDirectory"))
+    val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback)
 
     val networkDefaults = {
       val withAppConf = external.withFallback(ConfigFactory.defaultApplication())
-      val network = withAppConf.getString("waves.network-name")
+      val network     = withAppConf.getString("waves.network-name")
       withAppConf.getConfig(s"waves.defaults.$network")
     }
 
-    external
+    val cfg = external
       .withFallback(networkDefaults.atKey("waves"))
+
+    cfg
+      .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(cfg)}"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
