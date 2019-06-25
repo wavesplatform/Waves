@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
@@ -560,7 +560,7 @@ object PBTransactions {
   }
 
   def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
-    tx match {
+    val pbTx = tx match {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(PBRecipients.create(recipient).getAddress, amount)
@@ -584,11 +584,11 @@ object PBTransactions {
 
       case tx @ vt.CreateAliasTransactionV1(sender, alias, fee, timestamp, signature) =>
         val data = CreateAliasTransactionData(alias.name)
-        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 1, Seq(signature), Data.CreateAlias(data))
+        PBTransactions.create(sender, alias.chainId, fee, tx.assetFee._1, timestamp, 1, Seq(signature), Data.CreateAlias(data))
 
       case tx @ vt.CreateAliasTransactionV2(sender, alias, fee, timestamp, proofs) =>
         val data = CreateAliasTransactionData(alias.name)
-        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.CreateAlias(data))
+        PBTransactions.create(sender, alias.chainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.CreateAlias(data))
 
       case tx @ vt.assets.exchange
             .ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature) =>
@@ -689,6 +689,11 @@ object PBTransactions {
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }
+
+    if (pbTx.getTransaction.chainId == 0)
+      pbTx.update(_.transaction.chainId := AddressScheme.current.chainId)
+    else
+      pbTx
   }
 
   def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[_] = {
