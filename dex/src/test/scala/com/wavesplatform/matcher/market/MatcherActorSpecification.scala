@@ -38,7 +38,7 @@ class MatcherActorSpecification
   private val blockchain: Blockchain = stub[Blockchain]
   (blockchain.assetDescription _)
     .when(*)
-    .returns(Some(AssetDescription(KeyPair(ByteStr.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
+    .returns(Some(AssetDescription(KeyPair(ByteStr.empty), "Unknown".getByte("UTF-8"), Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
     .anyNumberOfTimes()
 
   "MatcherActor" should {

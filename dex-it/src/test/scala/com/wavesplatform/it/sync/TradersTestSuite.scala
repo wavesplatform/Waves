@@ -75,7 +75,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       trickyBobWavesPairWB58.key shouldBe bobWavesPair.key
 
       val trickyBobWavesPairWS = AssetPair(
-        priceAsset = IssuedAsset(ByteStr("WAVES".getBytes())),
+        priceAsset = IssuedAsset(ByteStr("WAVES".getBytes("UTF-8"))),
         amountAsset = bobAssetId
       )
 

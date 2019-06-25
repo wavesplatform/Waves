@@ -28,7 +28,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   private val signatureSize = 32
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
-  val WalletSeed                   = ByteStr("Matcher".getBytes())
+  val WalletSeed                   = ByteStr("Matcher".getBytes("UTF-8"))
   val MatcherSeed: Array[Byte]     = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount               = KeyPair(MatcherSeed)
   val accountGen: Gen[KeyPair]     = bytes32gen.map(seed => KeyPair(seed))

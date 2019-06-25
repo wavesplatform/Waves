@@ -177,8 +177,8 @@ object OrdersFromScriptedAssetTestSuite {
   private val UnscriptedAsset = IssueTransactionV1
     .selfSigned(
       sender = matcher,
-      name = "UnscriptedAsset".getBytes(),
-      description = "unscripted".getBytes(),
+      name = "UnscriptedAsset".getBytes("UTF-8"),
+      description = "unscripted".getBytes("UTF-8"),
       quantity = Int.MaxValue / 3,
       decimals = 0,
       reissuable = false,
@@ -194,8 +194,8 @@ object OrdersFromScriptedAssetTestSuite {
       .selfSigned(
         AddressScheme.current.chainId,
         sender = matcher,
-        name = s"AllowAsset-$id".getBytes(),
-        description = s"AllowAsset-$id".getBytes(),
+        name = s"AllowAsset-$id".getBytes("UTF-8"),
+        description = s"AllowAsset-$id".getBytes("UTF-8"),
         quantity = Int.MaxValue / 3,
         decimals = 0,
         reissuable = false,
@@ -217,8 +217,8 @@ object OrdersFromScriptedAssetTestSuite {
     .selfSigned(
       AddressScheme.current.chainId,
       sender = matcher,
-      name = "DenyAsset".getBytes(),
-      description = "DenyAsset".getBytes(),
+      name = "DenyAsset".getBytes("UTF-8"),
+      description = "DenyAsset".getBytes("UTF-8"),
       quantity = Int.MaxValue / 3,
       decimals = 0,
       reissuable = false,

@@ -152,8 +152,8 @@ object MatcherTickerTestSuite {
   val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = alice,
-      name = usdAssetName.getBytes(),
-      description = "asset description".getBytes(),
+      name = usdAssetName.getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = Decimals,
       reissuable = false,
@@ -165,8 +165,8 @@ object MatcherTickerTestSuite {
   val IssueEightDigitAssetTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = bob,
-      name = eightDigitAssetAssetName.getBytes(),
-      description = "asset description".getBytes(),
+      name = eightDigitAssetAssetName.getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = 8,
       reissuable = false,

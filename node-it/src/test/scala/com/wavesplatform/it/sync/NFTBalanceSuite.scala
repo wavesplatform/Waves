@@ -51,7 +51,7 @@ class NFTBalanceSuite
 
   private val node: Node = nodes.head
 
-  private val issuer: KeyPair = KeyPair("issuer#1".getBytes())
+  private val issuer: KeyPair = KeyPair("issuer#1".getBytes("UTF-8"))
 
   private val (simple, nft) = fillPortfolio(issuer, 100, 100)
 
@@ -172,8 +172,8 @@ object NFTBalanceSuite {
       IssueTransactionV1
         .selfSigned(
           issuer,
-          s"SimpleAsset".getBytes(),
-          s"Simple Test Asset ${Random.nextInt(1000)}".getBytes(),
+          s"SimpleAsset".getBytes("UTF-8"),
+          s"Simple Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
           1000,
           8,
           reissuable = true,
@@ -187,8 +187,8 @@ object NFTBalanceSuite {
       IssueTransactionV1
         .selfSigned(
           issuer,
-          "NonFungibleAsset".getBytes(),
-          s"NFT Test Asset ${Random.nextInt(1000)}".getBytes(),
+          "NonFungibleAsset".getBytes("UTF-8"),
+          s"NFT Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
           1,
           0,
           reissuable = false,

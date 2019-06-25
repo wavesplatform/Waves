@@ -16,7 +16,7 @@ trait RestAPISettingsHelper {
   lazy val MaxAddressesPerRequest    = 10000
 
   lazy val restAPISettings = {
-    val keyHash = Base58.encode(crypto.secureHash(apiKey.getBytes()))
+    val keyHash = Base58.encode(crypto.secureHash(apiKey.getBytes("UTF-8")))
     ConfigFactory
       .parseString(
         s"""waves.rest-api {

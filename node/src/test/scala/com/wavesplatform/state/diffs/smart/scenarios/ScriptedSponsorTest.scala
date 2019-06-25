@@ -101,8 +101,8 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = contract,
-          name = "Asset#1".getBytes,
-          description = "description".getBytes,
+          name = "Asset#1".getBytes("UTF-8"),
+          description = "description".getBytes("UTF-8"),
           quantity = Long.MaxValue,
           decimals = 8,
           reissuable = false,
@@ -169,8 +169,8 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = sponsor,
-          name = "Asset#1".getBytes,
-          description = "description".getBytes,
+          name = "Asset#1".getBytes("UTF-8"),
+          description = "description".getBytes("UTF-8"),
           quantity = Long.MaxValue,
           decimals = 8,
           reissuable = false,

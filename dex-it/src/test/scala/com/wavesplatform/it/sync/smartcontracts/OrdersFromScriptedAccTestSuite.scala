@@ -30,8 +30,8 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   private val aliceAssetTx = IssueTransactionV1
     .selfSigned(
       sender = alice,
-      name = "AliceCoin".getBytes(),
-      description = "AliceCoin for matcher's tests".getBytes(),
+      name = "AliceCoin".getBytes("UTF-8"),
+      description = "AliceCoin for matcher's tests".getBytes("UTF-8"),
       quantity = someAssetAmount,
       decimals = 0,
       reissuable = false,

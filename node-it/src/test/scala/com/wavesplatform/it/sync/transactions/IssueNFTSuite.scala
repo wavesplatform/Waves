@@ -17,8 +17,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
   val firstNode: Node  = nodes.head
   val secondNode: Node = nodes.last
 
-  val secondNodeIssuer = KeyPair("second_node_issuer".getBytes())
-  val firstNodeIssuer  = KeyPair("first_node_issuer".getBytes())
+  val secondNodeIssuer = KeyPair("second_node_issuer".getBytes("UTF-8"))
+  val firstNodeIssuer  = KeyPair("first_node_issuer".getBytes("UTF-8"))
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -81,8 +81,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       .selfSigned(
         'I',
         secondNodeIssuer,
-        assetName.getBytes(),
-        assetDescription.getBytes(),
+        assetName.getBytes("UTF-8"),
+        assetDescription.getBytes("UTF-8"),
         1,
         0,
         false,
@@ -105,8 +105,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       .selfSigned(
         'I',
         secondNodeIssuer,
-        assetName.getBytes(),
-        assetDescription.getBytes(),
+        assetName.getBytes("UTF-8"),
+        assetDescription.getBytes("UTF-8"),
         1,
         0,
         true,
@@ -127,8 +127,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       .selfSigned(
         'I',
         secondNodeIssuer,
-        assetName.getBytes(),
-        assetDescription.getBytes(),
+        assetName.getBytes("UTF-8"),
+        assetDescription.getBytes("UTF-8"),
         2,
         0,
         true,
@@ -149,8 +149,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       .selfSigned(
         'I',
         secondNodeIssuer,
-        assetName.getBytes(),
-        assetDescription.getBytes(),
+        assetName.getBytes("UTF-8"),
+        assetDescription.getBytes("UTF-8"),
         1,
         1,
         true,

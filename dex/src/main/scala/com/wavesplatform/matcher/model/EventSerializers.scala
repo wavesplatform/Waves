@@ -21,7 +21,7 @@ class EventSerializers extends SerializerWithStringManifest {
   private val bytesWritten       = Kamon.histogram("matcher.serialization.bytes-written")
 
   private def encodeAndMeasure[A: Writes](manifest: String, v: A): Array[Byte] =
-    encodeAndMeasure(manifest, Json.toJson(v).toString().getBytes)
+    encodeAndMeasure(manifest, Json.toJson(v).toString().getBytes("UTF-8"))
 
   private def encodeAndMeasure(manifest: String, f: => Array[Byte]): Array[Byte] = {
     val bytes = serializationTimer.refine("manifest" -> manifest).measure(f)

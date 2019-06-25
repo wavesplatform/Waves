@@ -308,7 +308,7 @@ class OrderValidatorSpecification
 
         val tooLowPriceOrder =
           Order(
-            sender = KeyPair("seed".getBytes),
+            sender = KeyPair("seed".getBytes("UTF-8")),
             matcher = MatcherAccount,
             pair = pairWavesBtc,
             orderType = OrderType.SELL,
@@ -346,7 +346,7 @@ class OrderValidatorSpecification
 
         val order =
           Order(
-            sender = KeyPair("seed".getBytes),
+            sender = KeyPair("seed".getBytes("UTF-8")),
             matcher = MatcherAccount,
             pair = pairWavesBtc,
             orderType = OrderType.BUY,
