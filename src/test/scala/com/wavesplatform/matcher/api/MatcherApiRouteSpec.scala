@@ -24,8 +24,9 @@ import scala.concurrent.Future
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with PathMockFactory with Eventually with WithDB {
 
-  private val settings          = WavesSettings.fromConfig(ConfigFactory.load())
-  private val matcherPrivateKey = PrivateKeyAccount("matcher".getBytes)
+  private val settings                                 = WavesSettings.fromConfig(ConfigFactory.load())
+  private val matcherPrivateKey                        = PrivateKeyAccount("matcher".getBytes)
+  private def getAssetDecimals(asset: Option[AssetId]) = 8
 
   routePath("/balance/reserved/{publicKey}") - {
     val publicKey = matcherPrivateKey.publicKey
@@ -82,7 +83,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       orderBook = _ => None,
       getMarketStatus = _ => None,
       orderValidator = _ => Left("Not implemented"),
-      orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.matcherSettings.orderBookSnapshotHttpCache, ntpTime, _ => None),
+      orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.matcherSettings.orderBookSnapshotHttpCache, ntpTime, getAssetDecimals, _ => None),
       wavesSettings = settings,
       matcherStatus = () => Matcher.Status.Working,
       db = db,

@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{NTPTime, TransactionGenBase}
 import org.scalatest.{FreeSpec, Matchers}
@@ -13,11 +14,12 @@ import scala.concurrent.duration._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime {
 
-  private val defaultAssetPair = AssetPair(None, Some(ByteStr("asset".getBytes)))
+  private val defaultAssetPair                         = AssetPair(None, Some(ByteStr("asset".getBytes)))
+  private def getAssetDecimals(asset: Option[AssetId]) = 8
 
   "OrderBookSnapshotHttpCache" - {
     "should cache" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1))
+      def get = cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized)
 
       val a = get
       val b = get
@@ -51,6 +53,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         new OrderBookSnapshotHttpCache(
           OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)),
           ntpTime,
+          getAssetDecimals,
           _ =>
             Some(
               OrderBook.AggregatedSnapshot(
@@ -83,7 +86,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     "should clear all depth caches after invalidate" in {
       val depths = List(1, 3, 7, 9)
       using {
-        new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths), ntpTime, _ => None)
+        new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths), ntpTime, getAssetDecimals, _ => None)
       } { cache =>
         val prev = depths.map(x => x -> orderBookFrom(cache.get(defaultAssetPair, Some(x)))).toMap
 
@@ -100,7 +103,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
   }
 
-  private def createDefaultCache = new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9)), ntpTime, _ => None)
+  private def createDefaultCache =
+    new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9)), ntpTime, getAssetDecimals, _ => None)
 
   private def orderBookFrom(x: HttpResponse): OrderBookResult = JsonSerializer.deserialize[OrderBookResult](
     x.entity
