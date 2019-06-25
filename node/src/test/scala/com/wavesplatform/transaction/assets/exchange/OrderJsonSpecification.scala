@@ -14,7 +14,7 @@ import play.api.libs.json._
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Read Order from json") {
-    val keyPair   = KeyPair("123".getBytes)
+    val keyPair   = KeyPair("123".getBytes("UTF-8"))
     val pubKeyStr = Base58.encode(keyPair.publicKey)
 
     val json = Json.parse(s"""
@@ -154,7 +154,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order with empty assetId") {
-    val pk        = KeyPair("123".getBytes)
+    val pk        = KeyPair("123".getBytes("UTF-8"))
     val pubKeyStr = Base58.encode(pk.publicKey)
 
     def mkJson(priceAsset: String): String = s"""

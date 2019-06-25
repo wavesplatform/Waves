@@ -28,9 +28,9 @@ class HistoryRouterSpecification
     super.afterAll()
   }
 
-  def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes(), 0)
+  def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes("UTF-8"), 0)
 
-  val assetId    = ByteStr("asset".getBytes)
+  val assetId    = ByteStr("asset".getBytes("UTF-8"))
   val matcherFee = 30000L
 
   val assetDecimals: Byte = 8
@@ -58,7 +58,7 @@ class HistoryRouterSpecification
     LimitOrder(
       OrderV1(
         sender = privateKey(senderSeed),
-        matcher = PublicKey("matcher".getBytes()),
+        matcher = PublicKey("matcher".getBytes("UTF-8")),
         pair = AssetPair(Waves, IssuedAsset(assetId)),
         orderType = orderType,
         price = Order.PriceConstant,

@@ -59,8 +59,8 @@ object MatcherPriceAssetConfig {
     .selfSigned(
       AddressScheme.current.chainId,
       sender = alice,
-      name = usdAssetName.getBytes(),
-      description = "asset description".getBytes(),
+      name = usdAssetName.getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = Decimals,
       reissuable = false,
@@ -75,8 +75,8 @@ object MatcherPriceAssetConfig {
     .selfSigned(
       AddressScheme.current.chainId,
       sender = bob,
-      name = wctAssetName.getBytes(),
-      description = "asset description".getBytes(),
+      name = wctAssetName.getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = Decimals,
       reissuable = false,
@@ -91,8 +91,8 @@ object MatcherPriceAssetConfig {
     .selfSigned(
       AddressScheme.current.chainId,
       sender = alice,
-      name = ethAssetName.getBytes(),
-      description = "asset description".getBytes(),
+      name = ethAssetName.getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = 8,
       reissuable = false,
@@ -107,8 +107,8 @@ object MatcherPriceAssetConfig {
     .selfSigned(
       AddressScheme.current.chainId,
       sender = bob,
-      name = btcAssetName.getBytes(),
-      description = "asset description".getBytes(),
+      name = btcAssetName.getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = 8,
       reissuable = false,
@@ -192,8 +192,8 @@ object MatcherPriceAssetConfig {
     val issueAmountAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = amountAssetIssuer,
-        name = Random.nextString(4).getBytes(),
-        description = Random.nextString(10).getBytes(),
+        name = Random.nextString(4).getBytes("UTF-8"),
+        description = Random.nextString(10).getBytes("UTF-8"),
         quantity = someAssetAmount,
         decimals = amountAssetDecimals,
         reissuable = false,
@@ -205,8 +205,8 @@ object MatcherPriceAssetConfig {
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = priceAssetIssuer,
-        name = Random.nextString(4).getBytes(),
-        description = Random.nextString(10).getBytes(),
+        name = Random.nextString(4).getBytes("UTF-8"),
+        description = Random.nextString(10).getBytes("UTF-8"),
         quantity = someAssetAmount,
         decimals = priceAssetDecimals,
         reissuable = false,
@@ -230,8 +230,8 @@ object MatcherPriceAssetConfig {
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = issuer,
-        name = Random.nextString(4).getBytes(),
-        description = Random.nextString(10).getBytes(),
+        name = Random.nextString(4).getBytes("UTF-8"),
+        description = Random.nextString(10).getBytes("UTF-8"),
         quantity = someAssetAmount,
         decimals = priceAssetDecimals,
         reissuable = false,

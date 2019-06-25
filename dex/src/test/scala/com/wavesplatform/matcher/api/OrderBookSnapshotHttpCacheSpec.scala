@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime {
 
-  private val defaultAssetPair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes)))
+  private val defaultAssetPair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("UTF-8"))))
 
   "OrderBookSnapshotHttpCache" - {
     "should cache" in using(createDefaultCache) { cache =>

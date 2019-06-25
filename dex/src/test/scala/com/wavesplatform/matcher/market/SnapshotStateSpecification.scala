@@ -11,8 +11,8 @@ import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => DrivenPro
 class SnapshotStateSpecification extends PropSpecLike with DrivenPropertyChecks with Matchers with NoShrink {
   property("nextSnapshotOffset generates greater offsets than old and last processed") {
     val assetPair = AssetPair(
-      IssuedAsset(ByteStr("asset1".getBytes())),
-      IssuedAsset(ByteStr("asset2".getBytes()))
+      IssuedAsset(ByteStr("asset1".getBytes("UTF-8"))),
+      IssuedAsset(ByteStr("asset2".getBytes("UTF-8")))
     )
 
     val g = for {

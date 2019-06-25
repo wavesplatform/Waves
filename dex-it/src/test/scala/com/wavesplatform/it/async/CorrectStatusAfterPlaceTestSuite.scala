@@ -49,7 +49,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   override protected val nodeConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback)
 
-  private val traders: Seq[KeyPair] = (1 to 10).map(_ => KeyPair(Random.nextString(20).getBytes))
+  private val traders: Seq[KeyPair] = (1 to 10).map(_ => KeyPair(Random.nextString(20).getBytes("UTF-8")))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -134,7 +134,7 @@ object CorrectStatusAfterPlaceTestSuite {
   private val Asset1 = IssueTransactionV1
     .selfSigned(
       sender = Issuer,
-      name = "asset1".getBytes,
+      name = "asset1".getBytes("UTF-8"),
       description = Array.emptyByteArray,
       quantity = Long.MaxValue,
       decimals = 0,
@@ -147,7 +147,7 @@ object CorrectStatusAfterPlaceTestSuite {
   private val Asset2 = IssueTransactionV1
     .selfSigned(
       sender = Issuer,
-      name = "asset2".getBytes,
+      name = "asset2".getBytes("UTF-8"),
       description = Array.emptyByteArray,
       quantity = Long.MaxValue,
       decimals = 0,

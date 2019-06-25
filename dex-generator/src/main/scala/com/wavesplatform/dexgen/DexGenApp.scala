@@ -85,8 +85,8 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
       IssueTransactionV2
         .selfSigned(
           chainId = AddressScheme.current.chainId,
-          name = s"asset$i".getBytes(),
-          description = s"asset description - $i".getBytes(),
+          name = s"asset$i".getBytes("UTF-8"),
+          description = s"asset description - $i".getBytes("UTF-8"),
           quantity = 999999999999999L,
           decimals = 2,
           reissuable = false,

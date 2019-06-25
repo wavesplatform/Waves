@@ -120,7 +120,9 @@ inConfig(Universal)(
       // probably can't use these with jstack and others tools
       "-J-XX:+PerfDisableSharedMem",
       "-J-XX:+ParallelRefProcEnabled",
-      "-J-XX:+UseStringDeduplication"
+      "-J-XX:+UseStringDeduplication",
+      // JVM default charset for proper and deterministic getBytes behaviour
+      "-J-Dfile.encoding=UTF-8"
     )
   ))
 

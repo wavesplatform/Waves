@@ -29,12 +29,12 @@ class AddressActorSpecification
     with ImplicitSender
     with NTPTime {
 
-  private val assetId    = ByteStr("asset".getBytes)
+  private val assetId    = ByteStr("asset".getBytes("UTF-8"))
   private val matcherFee = 30000L
 
   private val sellTokenOrder1 = OrderV1(
     sender = privateKey("test"),
-    matcher = PublicKey("matcher".getBytes()),
+    matcher = PublicKey("matcher".getBytes("UTF-8")),
     pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.BUY,
     price = 100000000L,
@@ -48,7 +48,7 @@ class AddressActorSpecification
 
   private val sellTokenOrder2 = OrderV1(
     sender = privateKey("test"),
-    matcher = PublicKey("matcher".getBytes()),
+    matcher = PublicKey("matcher".getBytes("UTF-8")),
     pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.BUY,
     price = 100000000L,
@@ -62,7 +62,7 @@ class AddressActorSpecification
 
   private val sellWavesOrder = OrderV1(
     sender = privateKey("test"),
-    matcher = PublicKey("matcher".getBytes()),
+    matcher = PublicKey("matcher".getBytes("UTF-8")),
     pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.SELL,
     price = 100000000L,
@@ -214,7 +214,7 @@ class AddressActorSpecification
   }
 
   private def addr(seed: String): Address              = privateKey(seed).toAddress
-  private def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes(), 0)
+  private def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes("UTF-8"), 0)
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
