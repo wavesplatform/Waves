@@ -17,6 +17,7 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.openDB
@@ -24,6 +25,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
@@ -32,7 +34,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils.{LoggerFacade, NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -50,6 +52,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -106,6 +109,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private var extensions = Seq.empty[Extension]
 
+  private val rollbackTo = (blockId: ByteStr) => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler)
+
   def apiShutdown(): Unit = {
     for {
       u <- maybeUtx
@@ -160,15 +165,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Extensions start
     val extensionContext = new Context {
-      override def settings: WavesSettings                               = app.settings
-      override def blockchain: Blockchain with BlockchainUpdater         = app.blockchainUpdater
-      override def time: Time                                            = app.time
-      override def wallet: Wallet                                        = app.wallet
-      override def utx: UtxPool                                          = utxStorage
-      override def broadcastTx(tx: Transaction): Unit                    = allChannels.broadcastTx(tx, None)
-      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                              = app.actorSystem
-      override def blockchainUpdated: Observable[BlockchainUpdated]      = app.blockchainUpdated
+      override def settings: WavesSettings                                                      = app.settings
+      override def blockchain: Blockchain with BlockchainUpdater                                = app.blockchainUpdater
+      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] = app.rollbackTo(blockId)
+      override def time: Time                                                                   = app.time
+      override def wallet: Wallet                                                               = app.wallet
+      override def utx: UtxPool                                                                 = utxStorage
+      override def broadcastTx(tx: Transaction): Unit                                           = allChannels.broadcastTx(tx, None)
+      override def spendableBalanceChanged: Observable[(Address, Asset)]                        = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                                                     = app.actorSystem
+      override def blockchainUpdated: Observable[BlockchainUpdated]                             = app.blockchainUpdated
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -269,7 +275,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           peerDatabase,
           establishedConnections,
-          blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
+          app.rollbackTo,
           allChannels,
           utxStorage,
           miner,

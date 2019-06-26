@@ -18,7 +18,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Portfolio}
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -141,14 +141,17 @@ object Importer extends ScorexLogging {
 
   def initExtensions(wavesSettings: WavesSettings,
                      blockchainUpdater: Blockchain with BlockchainUpdater,
+                     appenderScheduler: Scheduler,
                      time: Time,
                      utxPool: UtxPool,
                      blockchainUpdatedObservable: Observable[BlockchainUpdated]): Seq[Extension] = {
     val extensionContext = {
       val t = time
       new Context {
-        override def settings: WavesSettings                               = wavesSettings
-        override def blockchain: Blockchain with BlockchainUpdater         = blockchainUpdater
+        override def settings: WavesSettings = wavesSettings
+        override def blockchain: Blockchain  = blockchainUpdater
+        override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] =
+          Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler)
         override def time: Time                                            = t
         override def wallet: Wallet                                        = ???
         override def utx: UtxPool                                          = utxPool
@@ -239,7 +242,7 @@ object Importer extends ScorexLogging {
       utxPool                          = initUtxPool()
       blockchainUpdated                = initBlockchainUpdated(wavesSettings)
       (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, blockchainUpdated)
-      extensions                       = initExtensions(wavesSettings, blockchainUpdater, time, utxPool, blockchainUpdated)
+      extensions                       = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
       _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield
       () => {

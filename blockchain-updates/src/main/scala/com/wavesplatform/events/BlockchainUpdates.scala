@@ -96,7 +96,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
         .get // guaranteed not to fail by previous checks on heights
 
       log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollbackTo")
-      context.blockchain.removeAfter(sigToRollback) match {
+      context.rollbackTo(sigToRollback).runSyncUnsafe(10.second) match {
         case Right(_) =>
         case Left(_) =>
           throw new IllegalStateException(s"Unable to rollback Node to Kafka state. Kafka is at $kafkaHeight, while node is at $blockchainHeight.")
