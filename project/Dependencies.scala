@@ -37,6 +37,8 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
+  val kafka = "org.apache.kafka" %% "kafka" % "2.1.0"
+
   val enforcedVersions = Def.setting(
     Seq(
       akkaModule("actor"),
@@ -70,7 +72,8 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros").value,
-      shapeless.value
+      shapeless.value,
+      kafka
     ))
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
@@ -181,6 +184,4 @@ object Dependencies {
     "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   )
-
-  lazy val kafka: ModuleID = "org.apache.kafka" %% "kafka" % "2.2.0"
 }
