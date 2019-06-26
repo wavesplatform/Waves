@@ -11,21 +11,15 @@ import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.Matcher.Status
-import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market.{
-  ExchangeTransactionBroadcastActor,
-  MatcherActor,
-  MatcherTransactionWriter,
-  OrderBookActor,
-  OrderBookSnapshotStoreActor
-}
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.matcher.market._
+import com.wavesplatform.matcher.model.{AssetDecimalsCache, ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -65,12 +59,16 @@ class Matcher(actorSystem: ActorSystem,
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
 
-  private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
-    matcherSettings.orderBookSnapshotHttpCache,
-    time,
-    p => Option(orderBookCache.get(p))
-  )
+  private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val assetDecimalsCache = new AssetDecimalsCache(blockchain)
+
+  private val orderBooksSnapshotCache =
+    new OrderBookSnapshotHttpCache(
+      matcherSettings.orderBookSnapshotHttpCache,
+      time,
+      assetDecimalsCache.get,
+      p => Option(orderBookCache.get(p))
+    )
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
 
@@ -118,7 +116,7 @@ class Matcher(actorSystem: ActorSystem,
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
+  lazy val matcherApiRoutes: Seq[ApiRoute] = Seq(
     MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
@@ -136,12 +134,20 @@ class Matcher(actorSystem: ActorSystem,
       () => matcherQueue.lastProcessedOffset,
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
+    ),
+    MatcherApiRouteV1(
+      pairBuilder,
+      orderBooksSnapshotCache,
+      settings,
+      () => status.get()
     )
   )
 
-  lazy val matcherApiTypes: Set[Class[_]] = Set(
-    classOf[MatcherApiRoute]
-  )
+  lazy val matcherApiTypes: Set[Class[_]] =
+    Set(
+      classOf[MatcherApiRoute],
+      classOf[MatcherApiRouteV1],
+    )
 
   private val snapshotsRestore = Promise[Unit]()
 

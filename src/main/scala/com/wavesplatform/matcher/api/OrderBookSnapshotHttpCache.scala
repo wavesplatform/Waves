@@ -3,16 +3,23 @@ package com.wavesplatform.matcher.api
 import java.util.concurrent.ScheduledFuture
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
+import cats.implicits._
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
+import com.wavesplatform.matcher.model.MatcherModel.{DecimalsFormat, Denormalized, Normalized}
 import com.wavesplatform.matcher.model.{OrderBook, OrderBookResult}
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Time
 import kamon.Kamon
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapshot: AssetPair => Option[OrderBook.AggregatedSnapshot])
+class OrderBookSnapshotHttpCache(settings: Settings,
+                                 time: Time,
+                                 assetDecimals: Option[AssetId] => Int,
+                                 orderBookSnapshot: AssetPair => Option[OrderBook.AggregatedSnapshot])
     extends AutoCloseable {
   import OrderBookSnapshotHttpCache._
 
@@ -22,23 +29,35 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
   private val orderBookSnapshotCache = CacheBuilder
     .newBuilder()
     .expireAfterAccess(settings.cacheTimeout.length, settings.cacheTimeout.unit)
-    .build[Key, HttpResponse](new CacheLoader[Key, HttpResponse] {
-      override def load(key: Key): HttpResponse = {
-        val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.AggregatedSnapshot())
-        val entity = OrderBookResult(
-          time.correctedTime(),
-          key.pair,
-          orderBook.bids.take(key.depth),
-          orderBook.asks.take(key.depth)
-        )
-        HttpResponse(
-          entity = HttpEntity(
-            ContentTypes.`application/json`,
-            OrderBookResult.toJson(entity)
+    .build[Key, HttpResponse](
+      new CacheLoader[Key, HttpResponse] {
+        override def load(key: Key): HttpResponse = {
+
+          val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.AggregatedSnapshot())
+
+          val assetPairDecimals = key.format match {
+            case Denormalized => Some(assetDecimals(key.pair.amountAsset) -> assetDecimals(key.pair.priceAsset))
+            case _            => None
+          }
+
+          val entity =
+            OrderBookResult(
+              time.correctedTime(),
+              key.pair,
+              orderBook.bids.take(key.depth),
+              orderBook.asks.take(key.depth),
+              assetPairDecimals
+            )
+
+          HttpResponse(
+            entity = HttpEntity(
+              ContentTypes.`application/json`,
+              OrderBookResult.toJson(entity)
+            )
           )
-        )
+        }
       }
-    })
+    )
 
   private val statsScheduler: ScheduledFuture[_] = {
     val period       = 3.seconds
@@ -58,17 +77,21 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
       )
   }
 
-  def get(pair: AssetPair, depth: Option[Int]): HttpResponse = {
+  def get(pair: AssetPair, depth: Option[Int], format: DecimalsFormat = Normalized): HttpResponse = {
     val nearestDepth = depth
       .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
       .getOrElse(maxDepth)
 
-    orderBookSnapshotCache.get(Key(pair, nearestDepth))
+    orderBookSnapshotCache.get(Key(pair, nearestDepth, format))
   }
 
   def invalidate(pair: AssetPair): Unit = {
-    import scala.collection.JavaConverters._
-    orderBookSnapshotCache.invalidateAll(depthRanges.map(Key(pair, _)).asJava)
+    orderBookSnapshotCache.invalidateAll {
+      depthRanges
+        .flatMap(depth => List(Normalized, Denormalized).map(depth -> _))
+        .map { case (depth, format) => Key(pair, depth, format) }
+        .asJava
+    }
   }
 
   override def close(): Unit = {
@@ -78,6 +101,5 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
 
 object OrderBookSnapshotHttpCache {
   case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int])
-
-  private case class Key(pair: AssetPair, depth: Int)
+  private case class Key(pair: AssetPair, depth: Int, format: DecimalsFormat)
 }
