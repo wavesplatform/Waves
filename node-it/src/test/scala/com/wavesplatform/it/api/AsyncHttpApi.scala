@@ -10,7 +10,7 @@ import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage._
-import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
+import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
@@ -702,7 +702,7 @@ object AsyncHttpApi extends Assertions {
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {
-    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
+    def withApiKey(x: String): RequestBuilder = self.setHeader(`X-Api-Key`.name, x)
   }
 
 }

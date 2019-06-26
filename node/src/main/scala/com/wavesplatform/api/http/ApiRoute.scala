@@ -8,7 +8,7 @@ import akka.http.scaladsl.server._
 import com.wavesplatform.api.http.ApiError.ApiErrorException
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
+import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, `X-Api-Key`, api_key}
 import com.wavesplatform.lang.ValidationError.ValidationErrorException
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -39,10 +39,10 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   }
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
-    optionalHeaderValueByType[api_key](()).flatMap {
+    optionalHeaderValueByType[`X-Api-Key`](()).flatMap {
       case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes("UTF-8")), hashFromSettings) => pass
       case _ =>
-        optionalHeaderValueByType[deprecated_api_key](()).flatMap {
+        optionalHeaderValueByType[api_key](()).flatMap {
           case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes("UTF-8")), hashFromSettings) => pass
           case _                                                                                           => complete(ApiKeyNotValid)
         }

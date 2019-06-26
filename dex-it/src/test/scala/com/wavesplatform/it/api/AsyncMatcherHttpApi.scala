@@ -7,7 +7,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.http.api_key
+import com.wavesplatform.http.`X-Api-Key`
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
@@ -365,7 +365,7 @@ object AsyncMatcherHttpApi extends Assertions {
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {
-    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
+    def withApiKey(x: String): RequestBuilder = self.setHeader(`X-Api-Key`.name, x)
   }
 
   implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
