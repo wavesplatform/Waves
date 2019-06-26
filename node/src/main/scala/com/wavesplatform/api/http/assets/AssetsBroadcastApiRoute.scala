@@ -40,7 +40,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequests]](
       _.map(_.eliminate(_.toTx, _.eliminate(_.toTx, _ => Left(UnsupportedTransactionType))))
-        .map(_.flatMap(doBroadcast).json)
+        .map(doBroadcast(_).json)
     )
   }
 
