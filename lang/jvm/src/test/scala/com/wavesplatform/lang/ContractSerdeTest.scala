@@ -1,10 +1,12 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.common.state.ByteStr
+import com.google.protobuf.ByteString
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import org.scalatest.{Assertion, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -12,7 +14,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
   def roundTrip(c: DApp): Assertion = {
     val bytes = ContractSerDe.serialize(c)
-    val conEi = ContractSerDe.deserialize(bytes)
+    val conEi = bytes.flatMap(ContractSerDe.deserialize)
 
     conEi shouldBe 'right
     conEi.right.get shouldBe c
@@ -20,7 +22,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
   "roundtrip" - {
 
-    "empty" in roundTrip(DApp(ByteStr.empty, Nil, Nil, None))
+    "empty" in roundTrip(DApp(DAppMeta(), Nil, Nil, None))
 
 //    "empty" in {
 //      val cf = ContractFunction(
@@ -33,7 +35,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "one-declaration" in roundTrip(
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List(
           LET("letName", CONST_BOOLEAN(true))
         ),
@@ -43,7 +45,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "two-declarations" in roundTrip(
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List(
           LET("letName", CONST_BOOLEAN(true)),
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
@@ -54,7 +56,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "callable function" in roundTrip(
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List(),
         List(
           CallableFunction(
@@ -67,7 +69,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "default function" in roundTrip(
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List(),
         List(
           CallableFunction(
@@ -81,7 +83,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "verifier function" in roundTrip(
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List(),
         List(),
         Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
@@ -90,7 +92,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "full contract" in roundTrip(
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List(
           LET("letName", CONST_BOOLEAN(true)),
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
@@ -115,7 +117,11 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "full contract with meta" in roundTrip(
       DApp(
-        ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+        DAppMeta(List(
+          CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
+          CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
+          CallableFuncSignature("func3", ByteString.EMPTY)
+        )),
         List(
           LET("letName", CONST_BOOLEAN(true)),
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))

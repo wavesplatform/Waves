@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.state.ByteStr
@@ -8,6 +9,8 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
 import monix.execution.Scheduler
 
@@ -174,7 +177,9 @@ class AddressRouteSpec
     }
 
     val contractWithMeta = DApp(
-      meta = ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+      meta = DAppMeta(List(
+        CallableFuncSignature("func", ByteString.copyFrom(Array[Byte](1, 2, 3)))
+      )),
       decs = List(),
       callableFuncs = List(),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))

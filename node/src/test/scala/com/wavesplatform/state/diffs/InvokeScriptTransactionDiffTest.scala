@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -83,7 +84,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         )
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(

@@ -1,0 +1,13 @@
+syntax = "proto3";
+package waves;
+option java_package = "com.wavesplatform.protobuf.dapp";
+option csharp_namespace = "Waves";
+
+message DAppMeta {
+    message CallableFuncSignature {
+        string name = 1;
+        bytes types = 2;
+    }
+
+    repeated CallableFuncSignature funcs = 1;
+}

@@ -6,6 +6,8 @@
    2. You've checked "Make project before run"
  */
 
+import java.nio.file.Paths
+
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -25,7 +27,6 @@ lazy val commonJVM = common.jvm
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
       version := "1.0.0",
@@ -33,7 +34,10 @@ lazy val lang =
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
+      resolvers += Resolver.sbtPluginRepo("releases"),
+      PB.targets in Compile := Seq(
+        scalapb.gen(flatPackage = true) -> Paths.get("lang/shared/src/main/scala/target").toAbsolutePath.toFile
+      )
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 

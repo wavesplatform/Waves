@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.compiler
+
 import cats.Show
 import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.{MetaMapper, DApp}
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 object ContractCompiler {
 
-  def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[AnnotatedFunction] = {
+  def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[(AnnotatedFunction, List[(String, Types.FINAL)])] = {
     val annotationsM: CompileM[List[Annotation]] = af.anns.toList.traverse[CompileM, Annotation] { ann =>
       for {
         n    <- handlePart(ann.name)
@@ -37,7 +37,7 @@ object ContractCompiler {
     } yield (annotations, compiledBody)
 
     r flatMap {
-      case (List(c: CallableAnnotation), (func, tpe, _)) =>
+      case (List(c: CallableAnnotation), (func, tpe, typedParams)) =>
         for {
           _ <- Either
             .cond(
@@ -50,9 +50,9 @@ object ContractCompiler {
               Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
             )
             .toCompileM
-        } yield CallableFunction(c, func)
+        } yield (CallableFunction(c, func), typedParams)
 
-      case (List(c: VerifierAnnotation), (func, tpe, _)) =>
+      case (List(c: VerifierAnnotation), (func, tpe, typedParams)) =>
         for {
           _ <- Either
             .cond(tpe match {
@@ -60,7 +60,7 @@ object ContractCompiler {
               case _                   => false
             }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '$tpe'"))
             .toCompileM
-        } yield VerifierFunction(c, func)
+        } yield (VerifierFunction(c, func), typedParams)
     }
   }
 
@@ -103,8 +103,10 @@ object ContractCompiler {
           )
         )
         .toCompileM
-      l <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
-      duplicatedFuncNames = l.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
+      l <- contract.fs.traverse[CompileM, (AnnotatedFunction, List[(String, Types.FINAL)])](af => local(compileAnnotatedFunc(af)))
+      annotatedFuncs = l.map(_._1)
+
+      duplicatedFuncNames = annotatedFuncs.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
       _ <- Either
         .cond(
           duplicatedFuncNames.isEmpty,
@@ -115,7 +117,7 @@ object ContractCompiler {
 
       _ <- Either
         .cond(
-          l.forall(_.u.args.size <= ContractLimits.MaxInvokeScriptArgs),
+          annotatedFuncs.forall(_.u.args.size <= ContractLimits.MaxInvokeScriptArgs),
           (),
           Generic(contract.position.start,
                   contract.position.end,
@@ -123,22 +125,16 @@ object ContractCompiler {
         )
         .toCompileM
 
-      meta = ByteStr.empty
-      _ <- Either
-        .cond(
-          meta.size <= ContractLimits.MaxContractMetaSizeInBytes,
-          (),
-          Generic(
-            contract.position.start,
-            contract.position.end,
-            s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}"
-          )
-        )
+      callableFuncsWithParams = l.filter(_._1.isInstanceOf[CallableFunction])
+      callableFuncs = callableFuncsWithParams.map(_._1.asInstanceOf[CallableFunction])
+      callableFuncsTypeInfo = callableFuncsWithParams.map {
+        case (f, typedParams) => (f.u.name, typedParams.map(_._2))
+      }
+      meta <- MetaMapper.toProto(callableFuncsTypeInfo)
+        .leftMap(Generic(contract.position.start, contract.position.start, _))
         .toCompileM
 
-      callableFuncs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
-
-      verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
+      verifierFunctions = annotatedFuncs.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       verifierFuncOpt <- verifierFunctions match {
         case Nil => Option.empty[VerifierFunction].pure[CompileM]
         case vf :: Nil =>

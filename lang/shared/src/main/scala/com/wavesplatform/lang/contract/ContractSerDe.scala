@@ -4,12 +4,12 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.Serde.desAux
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
 import com.wavesplatform.lang.v1.{ContractLimits, Serde}
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -19,30 +19,33 @@ object ContractSerDe {
   val CALL_ANNO: Int = 1
   val VER_ANNO: Int  = 3
 
-  def serialize(c: DApp): Array[Byte] = {
+  def serialize(c: DApp): Either[String, Array[Byte]] = {
     val out = new ByteArrayOutputStream()
 
     // version byte
     out.writeInt(0)
 
-    out.writeInt(c.meta.size)
-    out.write(c.meta)
+    val metaBytes = c.meta.toByteArray
+    for {
+      _ <- checkMetaSize(metaBytes.length)
+      _ <- tryEi {
+        out.writeInt(metaBytes.length)
+        out.write(metaBytes)
 
-    out.writeInt(c.decs.size)
-    c.decs.foreach(dec => serializeDeclaration(out, dec))
+        out.writeInt(c.decs.size)
+        c.decs.foreach(dec => serializeDeclaration(out, dec))
 
-    out.writeInt(c.callableFuncs.size)
-    c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
+        out.writeInt(c.callableFuncs.size)
+        c.callableFuncs.foreach(cFunc => serializeAnnotatedFunction(out, cFunc.u, cFunc.annotation.invocationArgName))
 
-    c.verifierFuncOpt match {
-      case None =>
-        out.writeInt(0)
-      case Some(vf) =>
-        out.writeInt(1)
-        serializeAnnotatedFunction(out, vf.u, vf.annotation.invocationArgName)
-    }
-
-    out.toByteArray
+        c.verifierFuncOpt match {
+          case None     => out.writeInt(0)
+          case Some(vf) =>
+            out.writeInt(1)
+            serializeAnnotatedFunction(out, vf.u, vf.annotation.invocationArgName)
+        }
+      }
+    } yield out.toByteArray
   }
 
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
@@ -56,14 +59,24 @@ object ContractSerDe {
     } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
-  private[lang] def deserializeMeta(bb: ByteBuffer): Either[String, ByteStr] = {
-    tryEi {
-      val len = bb.getInt()
-      val arr = new Array[Byte](len)
-      bb.get(arr, bb.arrayOffset(), len)
-      arr
-    }
+  private def checkMetaSize(metaSize: Int): Either[String, Unit] = {
+    Either.cond(
+      metaSize <= ContractLimits.MaxContractMetaSizeInBytes,
+      (),
+      s"Script meta size in bytes must be not greater than ${ContractLimits.MaxContractMetaSizeInBytes}"
+    )
   }
+
+  private[lang] def deserializeMeta(bb: ByteBuffer): Either[String, DAppMeta] =
+    for {
+      size <- tryEi(bb.getInt)
+      _    <- checkMetaSize(size)
+      meta <- tryEi {
+        val arr = new Array[Byte](size)
+        bb.get(arr, bb.arrayOffset(), size)
+        DAppMeta.parseFrom(arr)
+      }
+    } yield meta
 
   private[lang]  def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
     Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value
@@ -112,7 +125,7 @@ object ContractSerDe {
     val len = bb.getInt
     if (len <= (bb.limit() - bb.position()) && len >= 0) {
       (1 to len).toList
-        .traverse[({ type L[B] = Either[String, B] })#L, A](_ => df(bb))
+        .traverse[Either[String, ?], A](_ => df(bb))
     } else {
       Left(s"At position ${bb.position()} array of arguments too big.")
     }

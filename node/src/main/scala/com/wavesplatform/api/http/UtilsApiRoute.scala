@@ -3,11 +3,17 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 import java.util.concurrent.Executors
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.account.{Address, PrivateKey}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError.ScriptParseError
+import com.wavesplatform.lang.contract.MetaMapper
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Types
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -192,6 +198,97 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
     }
   }
 
+  @Path("/script/meta")
+  @ApiOperation(value = "Meta", notes = "Account's script meta", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Script code",
+        example = "true"
+      )
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "meta or error")
+    )
+  )
+  def scriptMeta: Route = path("script" / "meta") {
+    (
+      post
+        & entity(as[String])
+        & withExecutionContext(decompilerExecutionContext)
+    ) { code =>
+      val script = Script.fromBase64String(code.trim, checkComplexity = false)
+      val result: ToResponseMarshallable = script match {
+        case Right(ContractScriptImpl(_, dApp, _)) =>
+          MetaMapper.fromProto(dApp.meta) match {
+            case Right(funcTypes) => metaToJson(funcTypes)
+            case Left(e)          => ScriptParseError(e)
+          }
+        case Right(_)  => Json.obj()
+        case Left(err) => err
+      }
+      complete(result)
+    }
+  }
+
+  private def metaToJson(funcTypes: List[(String, List[Types.FINAL])]) = {
+    val funcTypesJson = funcTypes.map { case (name, types) =>
+      Json.obj(
+        "name"  -> name,
+        "types" -> types.map(_.name)
+      )
+    }
+    Json.obj("callableFuncTypes" -> funcTypesJson)
+  }
+
+  /*
+    @Path("/script/decompile")
+    @ApiOperation(value = "Decompile", notes = "Decompiles base64 script representation to string code", httpMethod = "POST")
+    @ApiImplicitParams(
+      Array(
+        new ApiImplicitParam(
+          name = "code",
+          required = true,
+          dataType = "string",
+          paramType = "body",
+          value = "Script code",
+          example = "true"
+        )
+      ))
+    @ApiResponses(
+      Array(
+        new ApiResponse(code = 200, message = "string or error")
+      ))
+    def decompile: Route = path("script" / "decompile") {
+      import play.api.libs.json.Json.toJsFieldJsValueWrapper
+
+      (post & entity(as[String]) & withExecutionContext(decompilerExecutionContext)) { code =>
+        Script.fromBase64String(code.trim, checkComplexity = false) match {
+          case Left(err) => complete(err)
+          case Right(script) =>
+            val (scriptText, meta) = Script.decompile(script)
+            val directives: List[(String, JsValue)] = meta.map {
+              case (k, v) =>
+                (k, v match {
+                  case n: Number => JsNumber(BigDecimal(n.toString))
+                  case s         => JsString(s.toString)
+                })
+            }
+            val result  = directives ::: "script" -> JsString(scriptText) :: Nil
+            val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
+            complete(
+              Json.obj(wrapped: _*)
+            )
+        }
+      }
+    }
+  */
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")
   @ApiResponses(

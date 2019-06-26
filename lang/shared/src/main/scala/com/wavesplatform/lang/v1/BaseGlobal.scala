@@ -85,10 +85,10 @@ trait BaseGlobal {
     s ++ checksum(s)
   }
 
-  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ ContractSerDe.serialize(c)
-    s ++ checksum(s)
-  }
+  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] =
+    ContractSerDe.serialize(c)
+      .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
+      .map(r => r ++ checksum(r))
 
   def compileExpression(input: String,
                         context: CompilerContext,
@@ -111,7 +111,8 @@ trait BaseGlobal {
     for {
       dapp       <- ContractCompiler.compile(input, ctx)
       complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp)
-    } yield (serializeContract(dapp, stdLibVersion), dapp, complexity._1, complexity._2)
+      bytes      <- serializeContract(dapp, stdLibVersion)
+    } yield (bytes, dapp, complexity._1, complexity._2)
 
   def decompile(compiledCode: String): Either[ScriptParseError, String] = {
     Script.fromBase64String(compiledCode, checkComplexity = false).right.map { script =>
