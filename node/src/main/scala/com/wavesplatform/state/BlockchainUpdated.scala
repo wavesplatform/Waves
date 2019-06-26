@@ -53,26 +53,20 @@ object BlockchainUpdateNotifier {
     (parentStateUpdate, txsStateUpdates, txIds)
   }
 
-  def notifyProcessBlock(enabled: Boolean, events: Observer[BlockchainUpdated], block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit =
-    if (enabled) {
-      val (blockStateUpdate, txsStateUpdates, txIds) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      events.onNext(BlockAppended(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates, txIds))
-    }
+  def notifyProcessBlock(events: Observer[BlockchainUpdated], block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit = {
+    val (blockStateUpdate, txsStateUpdates, txIds) = stateUpdatesFromDetailedDiff(blockchain, diff)
+    events.onNext(BlockAppended(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates, txIds))
+  }
 
-  def notifyProcessMicroBlock(enabled: Boolean,
-                              events: Observer[BlockchainUpdated],
-                              microBlock: MicroBlock,
-                              diff: DetailedDiff,
-                              blockchain: Blockchain): Unit =
-    if (enabled) {
-      val (microBlockStateUpdate, txsStateUpdates, txIds) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      events.onNext(MicroBlockAppended(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates, txIds))
-    }
+  def notifyProcessMicroBlock(events: Observer[BlockchainUpdated], microBlock: MicroBlock, diff: DetailedDiff, blockchain: Blockchain): Unit = {
+    val (microBlockStateUpdate, txsStateUpdates, txIds) = stateUpdatesFromDetailedDiff(blockchain, diff)
+    events.onNext(MicroBlockAppended(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates, txIds))
+  }
 
   // here height + 1 is not required, because blockchain rollback resets height and ngState no longer affects it
-  def notifyRollback(enabled: Boolean, events: Observer[BlockchainUpdated], blockId: ByteStr, height: Int): Unit =
-    if (enabled) events.onNext(RollbackCompleted(blockId, height))
+  def notifyRollback(events: Observer[BlockchainUpdated], blockId: ByteStr, height: Int): Unit =
+    events.onNext(RollbackCompleted(blockId, height))
 
-  def notifyMicroBlockRollback(enabled: Boolean, events: Observer[BlockchainUpdated], toSignature: ByteStr, height: Int): Unit =
-    if (enabled) events.onNext(MicroBlockRollbackCompleted(toSignature, height + 1))
+  def notifyMicroBlockRollback(events: Observer[BlockchainUpdated], toSignature: ByteStr, height: Int): Unit =
+    events.onNext(MicroBlockRollbackCompleted(toSignature, height + 1))
 }

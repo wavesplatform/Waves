@@ -49,7 +49,7 @@ import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
-import monix.reactive.subjects.{ConcurrentSubject, Subject}
+import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
 
@@ -92,13 +92,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = logReporter("History Replier"))
   private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = logReporter("Miner"))
 
-  private val (maybeBlockchainUpdatesScheduler, blockchainUpdated) = {
-    import com.wavesplatform.utils.Implicits.SubjectOps
-    if (settings.enableBlockchainUpdates) {
-      val scheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
-      (Some(scheduler), ConcurrentSubject.publish[BlockchainUpdated](scheduler))
-    } else (None, Subject.empty[BlockchainUpdated])
-  }
+  private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
+  private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
 
   private val blockchainUpdater =
     StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdated)
@@ -359,8 +354,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       network.shutdown()
 
       blockchainUpdated.onComplete()
-      maybeBlockchainUpdatesScheduler foreach (shutdownAndWait(_, "BlockchainUpdated"))
 
+      shutdownAndWait(blockchainUpdatesScheduler, "BlockchainUpdated")
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")

@@ -21,28 +21,26 @@ case class WavesSettings(directory: String,
                          utxSettings: UtxSettings,
                          featuresSettings: FeaturesSettings,
                          metrics: Metrics.Settings,
-                         config: Config,
-                         enableBlockchainUpdates: Boolean)
+                         config: Config)
 
 object WavesSettings extends CustomValueReaders {
   def fromRootConfig(rootConfig: Config): WavesSettings = {
     val waves = rootConfig.getConfig("waves")
 
-    val directory               = waves.as[String]("directory")
-    val ntpServer               = waves.as[String]("ntp-server")
-    val dbSettings              = waves.as[DBSettings]("db")
-    val extensions              = waves.as[Seq[String]]("extensions")
+    val directory                 = waves.as[String]("directory")
+    val ntpServer                 = waves.as[String]("ntp-server")
+    val dbSettings                = waves.as[DBSettings]("db")
+    val extensions                = waves.as[Seq[String]]("extensions")
     val extensionsShutdownTimeout = waves.as[FiniteDuration]("extensions-shutdown-timeout")
-    val networkSettings         = waves.as[NetworkSettings]("network")
-    val walletSettings          = waves.as[WalletSettings]("wallet")
-    val blockchainSettings      = waves.as[BlockchainSettings]("blockchain")
-    val minerSettings           = waves.as[MinerSettings]("miner")
-    val restAPISettings         = waves.as[RestAPISettings]("rest-api")
-    val synchronizationSettings = waves.as[SynchronizationSettings]("synchronization")
-    val utxSettings             = waves.as[UtxSettings]("utx")
-    val featuresSettings        = waves.as[FeaturesSettings]("features")
-    val metrics                 = rootConfig.as[Metrics.Settings]("metrics") // TODO: Move to waves section
-    val enableBlockchainUpdates = waves.as[Boolean]("enable-blockchain-updates")
+    val networkSettings           = waves.as[NetworkSettings]("network")
+    val walletSettings            = waves.as[WalletSettings]("wallet")
+    val blockchainSettings        = waves.as[BlockchainSettings]("blockchain")
+    val minerSettings             = waves.as[MinerSettings]("miner")
+    val restAPISettings           = waves.as[RestAPISettings]("rest-api")
+    val synchronizationSettings   = waves.as[SynchronizationSettings]("synchronization")
+    val utxSettings               = waves.as[UtxSettings]("utx")
+    val featuresSettings          = waves.as[FeaturesSettings]("features")
+    val metrics                   = rootConfig.as[Metrics.Settings]("metrics") // TODO: Move to waves section
 
     WavesSettings(
       directory,
@@ -59,8 +57,7 @@ object WavesSettings extends CustomValueReaders {
       utxSettings,
       featuresSettings,
       metrics,
-      rootConfig,
-      enableBlockchainUpdates
+      rootConfig
     )
   }
 }

@@ -24,7 +24,7 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.subjects.{ConcurrentSubject, Subject}
+import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
@@ -133,12 +133,6 @@ object Importer extends ScorexLogging {
     (blockchainUpdater, extAppender)
   }
 
-  def initBlockchainUpdated(wavesSettings: WavesSettings): Subject[BlockchainUpdated, BlockchainUpdated] = {
-    import com.wavesplatform.utils.Implicits.SubjectOps
-    if (wavesSettings.enableBlockchainUpdates) ConcurrentSubject.publish
-    else Subject.empty
-  }
-
   def initExtensions(wavesSettings: WavesSettings,
                      blockchainUpdater: Blockchain with BlockchainUpdater,
                      appenderScheduler: Scheduler,
@@ -240,7 +234,7 @@ object Importer extends ScorexLogging {
       scheduler                        = Schedulers.singleThread("appender")
       time                             = initTime(wavesSettings.ntpServer)
       utxPool                          = initUtxPool()
-      blockchainUpdated                = initBlockchainUpdated(wavesSettings)
+      blockchainUpdated                = ConcurrentSubject.publish[BlockchainUpdated]
       (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, blockchainUpdated)
       extensions                       = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
       _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
