@@ -134,6 +134,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     secondNode.waitForTransaction(issetsId.last)
     nodes.waitForHeightArise()
     val assetsBalance    = secondNode.assetsBalance(secondNode.address).balances.map(a => a.assetId)
+
     val nftAssetsBalance = secondNode.nftAssetsBalance(secondNode.address, 10).map(id => id.assetId)
 
     assetsBalance shouldNot contain atLeastOneElementOf nftAssetsBalance
@@ -141,11 +142,11 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     nftAssetsBalance.length shouldBe 10
 
     val remaingNftAssets = secondNode.nftAssetsBalance(secondNode.address, 15, after = nftAssetsBalance.last).map(id => id.assetId)
-    remaingNftAssets.length shouldBe 10
+    remaingNftAssets.length shouldBe 11 // 11 because we issue 1 more in previous test
     remaingNftAssets shouldNot contain atLeastOneElementOf nftAssetsBalance
 
     val allNFTAssets = secondNode.nftAssetsBalance(secondNode.address, 100).map(id => id.assetId)
-    allNFTAssets.length shouldBe 20
+    allNFTAssets.length shouldBe 21 // 21 because we issue 1 more in previous test
     allNFTAssets shouldBe nftAssetsBalance ++ remaingNftAssets
 
   }
