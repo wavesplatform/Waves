@@ -13,15 +13,15 @@ trait BroadcastRoute {
   def utx: UtxPool
   def allChannels: ChannelGroup
 
-  protected def doBroadcast(v: Either[ValidationError, Transaction]): TracedResult[ApiError, Transaction] = {
-    val result = for {
-      transaction <- TracedResult(v)
+  protected def doBroadcastVE(tracedTx: TracedResult[ValidationError, Transaction]): TracedResult[ValidationError, Transaction] =
+    for {
+      transaction <- tracedTx
       isNew <- utx.putIfNew(transaction)
     } yield {
       if (isNew || settings.allowTxRebroadcasting) allChannels.broadcastTx(transaction, None)
       transaction
     }
 
-    result.leftMap(ApiError.fromValidationError)
-  }
+  protected def doBroadcast(v: TracedResult[ValidationError, Transaction]): TracedResult[ApiError, Transaction] =
+    doBroadcastVE(v).leftMap(ApiError.fromValidationError)
 }
