@@ -15,7 +15,6 @@ import monix.reactive.{Observable, OverflowStrategy}
 import scala.util.{Failure, Success}
 
 object UtxPoolSynchronizer extends ScorexLogging {
-
   def start(utx: UtxPool,
             settings: UtxSynchronizerSettings,
             allChannels: ChannelGroup,
