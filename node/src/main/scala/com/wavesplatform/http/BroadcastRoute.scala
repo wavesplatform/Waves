@@ -12,13 +12,19 @@ trait BroadcastRoute {
   self: WithSettings =>
   def utxPoolSynchronizer: UtxPoolSynchronizer
 
-  protected def doBroadcastVE(transaction: Transaction)(implicit ec: ExecutionContext): Future[TracedResult[ValidationError, Transaction]] =
+  protected def doBroadcasTx(transaction: Transaction)(
+    implicit ec: ExecutionContext = utxPoolSynchronizer.scheduler): Future[TracedResult[ValidationError, Transaction]] =
     utxPoolSynchronizer
       .publishTransaction(transaction, forceBroadcast = settings.allowTxRebroadcasting)
       .map(_.map(_ => transaction))
 
-  protected def doBroadcast(v: TracedResult[ValidationError, Transaction])(implicit ec: ExecutionContext): Future[TracedResult[ApiError, Transaction]] = v.resultE match {
-    case Left(_) => Future.successful(v.leftMap(ApiError.fromValidationError))
-    case Right(value) => doBroadcastVE(value).map(_.leftMap(ApiError.fromValidationError))
+  protected def doBroadcastEitherTx(v: TracedResult[ValidationError, Transaction])(
+    implicit ec: ExecutionContext = utxPoolSynchronizer.scheduler): Future[TracedResult[ValidationError, Transaction]] = v.resultE match {
+    case Left(_) => Future.successful(v)
+    case Right(value) => doBroadcasTx(value).map(tr => tr.copy(trace = v.trace ::: tr.trace))
   }
+
+  protected def doBroadcast(v: TracedResult[ValidationError, Transaction])(
+    implicit ec: ExecutionContext = utxPoolSynchronizer.scheduler): Future[TracedResult[ApiError, Transaction]] =
+    doBroadcastEitherTx(v).map(_.leftMap(ApiError.fromValidationError))
 }

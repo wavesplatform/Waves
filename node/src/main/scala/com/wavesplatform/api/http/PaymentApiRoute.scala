@@ -3,6 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.assets.TransferV1Request
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time

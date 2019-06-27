@@ -6,6 +6,8 @@ import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}
 
+import scala.concurrent.{ExecutionContext, Future}
+
 final case class TracedResult[+E, +A](
                                        resultE: Either[E, A],
                                        trace: List[TraceStep] = Nil
@@ -48,4 +50,9 @@ object TracedResult {
         a.resultE |+| b.resultE,
         a.trace |+| b.trace
       )
+
+  def foldFuture[LeftT, RightT](value: TracedResult[LeftT, Future[TracedResult[LeftT, RightT]]])(implicit ec: ExecutionContext): Future[TracedResult[LeftT, RightT]] = value.resultE match {
+    case Left(_) => Future.successful(value.map(_.asInstanceOf[RightT]))
+    case Right(r) => r.map(r => r.copy(trace = value.trace ::: r.trace))
+  }
 }

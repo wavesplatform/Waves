@@ -3,12 +3,15 @@ package com.wavesplatform.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TxValidationError._
+import monix.execution.Scheduler
 
+import scala.concurrent.Future
 import scala.util.Left
 
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)
+case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)(implicit sc: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -37,16 +40,17 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronize
 
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequests]](
-      _.map(_.eliminate(_.toTx, _.eliminate(_.toTx, _ => Left(UnsupportedTransactionType))))
-        .map { eitherTx =>
-          doBroadcastVE(eitherTx)
-            .transformE {
-              case Left(AlreadyInTheState(_, _)) => eitherTx
-              case e => e
-            }
-            .json
-        }
-    )
+      reqs =>
+        Future.sequence(
+          reqs
+            .map(_.eliminate(_.toTx, _.eliminate(_.toTx, _ => Left(UnsupportedTransactionType))))
+            .map { eitherTx =>
+              doBroadcastEitherTx(eitherTx)
+                .map(_.transformE {
+                  case Left(AlreadyInTheState(_, _)) => eitherTx
+                  case e => e
+                }.json)
+            }))
   }
 
   def transfer: Route = (path("transfer") & post) {

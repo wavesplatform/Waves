@@ -19,11 +19,30 @@ import monix.reactive.{Observable, OverflowStrategy}
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-final class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])(
-    implicit sc: Scheduler)
+class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])
     extends ScorexLogging {
+  implicit val scheduler: Scheduler = Scheduler.forkJoin(settings.parallelism, settings.maxThreads, "utx-pool-sync")
   private[this] val txSource                       = ConcurrentSubject.publishToOne[BroadcastRequest]
   private[this] var future: CancelableFuture[Unit] = _
+
+  def start(): Unit = synchronized {
+    if (future == null) {
+      future = start(txSource.publish, blockSource)
+      sys.addShutdownHook(future.cancel())
+    }
+  }
+
+  //noinspection ScalaStyle
+  def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] = {
+    val promise = Promise[TxAddResult]
+    txSource.onNext(BroadcastRequest(tx, source, promise, forceBroadcast))
+    promise.future
+  }
+
+  def publishTransactions(obs: ChannelObservable[Transaction]): Task[Unit] = {
+    val dp = Promise[TxAddResult]
+    obs.foreachL { case (c, t) => txSource.onNext(BroadcastRequest(t, c, dp, forceBroadcast = false)) }
+  }
 
   private[this] def putAndBroadcastTask(source: Observable[BroadcastRequest]): Task[Unit] = {
     source
@@ -52,8 +71,6 @@ final class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings,
   }
 
   private[this] def start(txSource: Observable[BroadcastRequest], blockSource: Observable[_]): CancelableFuture[Unit] = {
-    implicit val scheduler: Scheduler = Scheduler.forkJoin(settings.parallelism, settings.maxThreads, "utx-pool-sync")
-
     val dummy = new Object()
     val knownTransactions = CacheBuilder
       .newBuilder()
@@ -79,31 +96,12 @@ final class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings,
     val synchronizerFuture = putAndBroadcastTask(newTxSource).runAsyncLogErr
 
     synchronizerFuture.onComplete {
-      case Success(_)     => log.info("UtxPoolSynschronizer stops")
+      case Success(_) => log.info("UtxPoolSynschronizer stops")
       case Failure(error) => log.error("Error in utx pool synchronizer", error)
     }
 
     synchronizerFuture.onComplete(_ => blockCacheCleaning.cancel())
     synchronizerFuture
-  }
-
-  def start(): Unit = synchronized {
-    if (future == null) {
-      future = start(txSource.publish, blockSource)
-      sys.addShutdownHook(future.cancel())
-    }
-  }
-
-  //noinspection ScalaStyle
-  def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] = {
-    val promise = Promise[TxAddResult]
-    txSource.onNext(BroadcastRequest(tx, source, promise, forceBroadcast))
-    promise.future
-  }
-
-  def publishTransactions(obs: ChannelObservable[Transaction]): Task[Unit] = {
-    val dp = Promise[TxAddResult]
-    obs.foreachL { case (c, t) => txSource.onNext(BroadcastRequest(t, c, dp, forceBroadcast = false)) }
   }
 }
 

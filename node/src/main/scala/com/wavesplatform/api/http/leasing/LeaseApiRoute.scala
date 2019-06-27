@@ -5,6 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._

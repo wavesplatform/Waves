@@ -6,13 +6,14 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.protobuf.transaction.VanillaTransaction
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.Time
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -24,13 +25,18 @@ import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)(implicit sc: Scheduler)
+case class TransactionsApiRoute(settings: RestAPISettings,
+                                wallet: Wallet,
+                                blockchain: Blockchain,
+                                utx: UtxPool,
+                                utxPoolSynchronizer: UtxPoolSynchronizer,
+                                time: Time)(implicit sc: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions
     with WithSettings {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, isNew) => if (isNew || settings.allowTxRebroadcasting) allChannels.broadcastTx(tx, None))
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -201,12 +207,15 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
   def broadcast: Route =
     (pathPrefix("broadcast") & post) {
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
-        val result: TracedResult[ApiError, VanillaTransaction] =
-          TracedResult(TransactionFactory.fromSignedRequest(transactionJson))
-            .flatMap(commonApi.broadcastTransaction)
-            .leftMap(ApiError.fromValidationError)
-
-        complete(result)
+        complete {
+          TracedResult
+            .foldFuture(
+              TransactionFactory
+                .fromSignedRequest(transactionJson)
+                .map(tx => commonApi.broadcastTransaction(tx, settings.allowTxRebroadcasting).map(_.map(_ => tx)))
+            )
+            .map(_.leftMap(ApiError.fromValidationError))
+        }
       }
     }
 

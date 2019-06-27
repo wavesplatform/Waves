@@ -8,7 +8,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.execution.Scheduler
@@ -16,7 +15,7 @@ import play.api.libs.json._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler) extends ApiRoute with WithSettings {
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)(implicit sc: Scheduler) extends ApiRoute with WithSettings {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
   private[this] val commonApi           = new CommonBlocksApi(blockchain)
 
