@@ -31,7 +31,7 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
 
   def start(): Unit = synchronized {
     if (future == null) {
-      future = start(txSource.publish, blockSource)
+      future = start(txSource, blockSource)
       sys.addShutdownHook(future.cancel())
     }
   }
