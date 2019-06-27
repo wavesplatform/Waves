@@ -19,7 +19,7 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
     libraryDependencies ++= Dependencies.common.value,
     coverageExcludedPackages := "",
     PB.targets in Compile := Seq(
-      scalapb.gen(flatPackage = true) -> Paths.get("lang/shared/src/main/scala/target").toAbsolutePath.toFile
+      scalapb.gen(flatPackage = true) -> Paths.get("common/shared/src/main/scala/target").toAbsolutePath.toFile
     )
   )
 
