@@ -10,7 +10,7 @@ object `X-Api-Key` extends ModeledCustomHeaderCompanion[`X-Api-Key`] {
   override def parse(value: String) = Try(new `X-Api-Key`(value))
 }
 
-final case class `X-Api-Key`(value: String) extends ModeledCustomHeader[`X-Api-Key`] {
+final class `X-Api-Key`(val value: String) extends ModeledCustomHeader[`X-Api-Key`] {
   override def companion = `X-Api-Key`
   override def renderInRequests  = true
   override def renderInResponses = false
@@ -22,7 +22,7 @@ object api_key extends ModeledCustomHeaderCompanion[api_key] {
   override def parse(value: String) = Try(new api_key(value))
 }
 
-final case class api_key(value: String) extends ModeledCustomHeader[api_key] {
+final class api_key(val value: String) extends ModeledCustomHeader[api_key] {
   override def companion = api_key
   override def renderInRequests  = true
   override def renderInResponses = false
