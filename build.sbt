@@ -59,29 +59,14 @@ lazy val benchmark = project
     langJVM % "compile;test->test"
   )
 
-lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
-
-lazy val `dex-it` = project
-  .dependsOn(
-    dex,
-    `node-it` % "compile;test->test"
-  )
-
-lazy val `dex-generator` = project.dependsOn(
-  dex,
-  `node-it` % "compile->test", // Without this IDEA doesn't find classes
-  `dex-it`  % "compile->test"
-)
-
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
     Test / test := Def
       .sequential(
         root / packageAll,
-        `dex-it` / Docker / docker,
-        `node-it` / Test / test,
-        `dex-it` / Test / test
+        `node-it` / Docker / docker,
+        `node-it` / Test / test
       )
       .value
   )
@@ -95,10 +80,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    dex,
-    `dex-it`,
-    `dex-generator`
+    benchmark
   )
 
 inScope(Global)(
@@ -167,8 +149,6 @@ packageAll := Def
     Def.task {
       (node /  assembly).value
       (node / Debian / packageBin).value
-      (dex / Universal / packageZipTarball).value
-      (dex / Debian / packageBin).value
     (`grpc-server` /Universal / packageZipTarball).value
     }
   )
@@ -179,10 +159,10 @@ checkPRRaw := {
   try {
     cleanAll.value // Hack to run clean before all tasks
   } finally {
-    test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
+    test.all(ScopeFilter(inProjects(commonJVM, langJVM, node), inConfigurations(Test))).value
     (commonJS / Compile / fastOptJS).value
     (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark), inConfigurations(Test))).value
   }
 }
 
