@@ -85,8 +85,8 @@ inTask(assembly)(
 
 scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
-bashScriptExtraDefines += s"""addJava "-Dwaves.directory=/var/lib/${(Universal / normalizedName).value}""""
-bashScriptExtraDefines += s"""addJava "-Dwaves.config.directory=/etc/${(Universal / normalizedName).value}""""
+bashScriptExtraDefines += s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}""""
+bashScriptExtraDefines += s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
 
 inConfig(Universal)(
   Seq(

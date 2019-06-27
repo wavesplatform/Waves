@@ -54,8 +54,12 @@ package object settings {
     val directoryDefaults = ConfigFactory
       .parseString(s"waves.directory = ${defaultDirectory(withApp)}")
 
+    val cmdDefaults = defaults
+      .getConfig("waves.defaults")
+
     external
       .withFallback(directoryDefaults)
+      .withFallback(cmdDefaults.atPath("waves"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
