@@ -59,7 +59,7 @@ object Importer extends ScorexLogging {
             val bis           = new BufferedInputStream(inputStream)
             var quit          = false
             val lenBytes      = new Array[Byte](Ints.BYTES)
-            val start = System.nanoTime()
+            val start         = System.nanoTime()
             var counter       = 0
             var blocksToSkip  = blockchainUpdater.height - 1
             val blocksToApply = importHeight - blockchainUpdater.height + 1
