@@ -7,7 +7,7 @@ import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
-private[protobuf] object PBInternalImplicits {
+object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
   import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias}
 
@@ -15,6 +15,7 @@ private[protobuf] object PBInternalImplicits {
   implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBByteString.copyFrom(bs)
 
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = PBRecipients.create(addressOrAlias)
+  implicit def fromAddress(address: VAddress): PBByteString                  = PBByteString.copyFrom(address.bytes)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
     def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)

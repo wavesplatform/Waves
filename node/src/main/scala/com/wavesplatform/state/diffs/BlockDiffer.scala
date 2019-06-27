@@ -18,7 +18,8 @@ import com.wavesplatform.utils.ScorexLogging
 
 //noinspection VariablePatternShadow
 object BlockDiffer extends ScorexLogging {
-  final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint)
+  final case class DetailedDiff(parentDiff: Diff, transactionDiffs: Seq[Diff])
+  final case class Result[Constraint <: MiningConstraint](diff: Diff, carry: Long, totalFee: Long, constraint: Constraint, detailedDiff: DetailedDiff)
   type GenResult = Result[MiningConstraint]
 
   def fromBlock[Constraint <: MiningConstraint](blockchain: Blockchain,
@@ -145,9 +146,12 @@ object BlockDiffer extends ScorexLogging {
     }
 
     txs
-      .foldLeft(TracedResult((composite(blockchain, initDiff), Result(initDiff, 0L, 0L, initConstraint)).asRight[ValidationError])) {
+      .foldLeft(
+        TracedResult((composite(blockchain, initDiff), Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Seq.empty[Diff])))
+          .asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
-        case (TracedResult(Right((blockchain, Result(currDiff, carryFee, currTotalFee, currConstraint))), _), tx) =>
+        case (TracedResult(Right((blockchain, Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs)))), _),
+              tx) =>
           txDiffer(blockchain, tx).flatMap { newDiff =>
             val updatedConstraint = updateConstraint(currConstraint, blockchain, tx, newDiff)
             if (updatedConstraint.isOverfilled)
@@ -156,30 +160,39 @@ object BlockDiffer extends ScorexLogging {
               val (curBlockFees, nextBlockFee) = clearSponsorship(blockchain, tx.feeDiff())
               val totalWavesFee                = currTotalFee + curBlockFees.balance + nextBlockFee
 
-              val (resultDiff, resultCarryFee) =
-                if (hasNg)
-                  (newDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees))), carryFee + nextBlockFee)
-                else
-                  (newDiff, 0L)
+              val (resultDiff, resultCarryFee, minerDiff) =
+                if (hasNg) {
+                  val minerDiff = Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees))
+                  (newDiff.combine(minerDiff), carryFee + nextBlockFee, minerDiff)
+                } else (newDiff, 0L, Diff.empty)
 
-              Right((composite(blockchain, resultDiff), Result(currDiff.combine(resultDiff), resultCarryFee, totalWavesFee, updatedConstraint)))
+              Right(
+                (composite(blockchain, resultDiff),
+                 Result(currDiff.combine(resultDiff),
+                        resultCarryFee,
+                        totalWavesFee,
+                        updatedConstraint,
+                        DetailedDiff(parentDiff.combine(minerDiff), txDiffs :+ newDiff))))
             }
           }
       }
       .map {
         case (blockchain, result) =>
           final case class Patch(predicate: CompositeBlockchain => Boolean, patch: CompositeBlockchain => Diff)
-          def applyAll(patches: Patch*) = patches.foldLeft((blockchain, Diff.empty)) {
-            case ((blockchain, cd), p) =>
-              if (p.predicate(blockchain)) {
-                val pd = p.patch(blockchain)
-                (composite(blockchain, pd), cd.combine(pd))
-              } else {
-                (blockchain, cd)
+          def applyAll(patches: Patch*): Diff =
+            patches
+              .foldLeft((blockchain, Diff.empty)) {
+                case ((blockchain, cd), p) =>
+                  if (p.predicate(blockchain)) {
+                    val pd = p.patch(blockchain)
+                    (composite(blockchain, pd), cd.combine(pd))
+                  } else {
+                    (blockchain, cd)
+                  }
               }
-          }
+              ._2
 
-          val (_, patchDiff) = applyAll(
+          val patchDiff = applyAll(
             Patch(
               _ => currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight,
               CancelAllLeases(_)
@@ -194,7 +207,10 @@ object BlockDiffer extends ScorexLogging {
             )
           )
 
-          result.copy(diff = result.diff.combine(patchDiff))
+          result.copy(diff = result.diff.combine(patchDiff),
+                      detailedDiff = result.detailedDiff.copy(
+                        parentDiff = result.detailedDiff.parentDiff.combine(patchDiff)
+                      ))
       }
   }
 }

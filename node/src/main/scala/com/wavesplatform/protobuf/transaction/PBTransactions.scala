@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   private[this] val NoChainId: Byte = 0: Byte
 
@@ -553,7 +553,11 @@ object PBTransactions {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)
-        PBTransactions.create(sender = PublicKey(Array.emptyByteArray), timestamp = timestamp, version = 1, proofsArray = Seq(signature), data = Data.Genesis(data))
+        PBTransactions.create(sender = PublicKey(Array.emptyByteArray),
+                              timestamp = timestamp,
+                              version = 1,
+                              proofsArray = Seq(signature),
+                              data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
         val data = PaymentTransactionData(ByteString.copyFrom(recipient.bytes), amount)

@@ -4,6 +4,7 @@ import java.nio.file.Files
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject
@@ -16,9 +17,11 @@ trait WithDB extends BeforeAndAfterEach {
   private val path                  = Files.createTempDirectory("lvl").toAbsolutePath
   private var currentDBInstance: DB = _
 
-  def db: DB = currentDBInstance
-
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
+
+  protected val ignoreBlockchainUpdated: Subject[BlockchainUpdated, BlockchainUpdated] = Subject.empty
+
+  def db: DB = currentDBInstance
 
   override def beforeEach(): Unit = {
     currentDBInstance = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))

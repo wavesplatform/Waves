@@ -28,7 +28,11 @@ import kamon.Kamon
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
+                            spendableBalanceChanged: Observer[(Address, Asset)],
+                            wavesSettings: WavesSettings,
+                            time: Time,
+                            blockchainUpdated: Observer[BlockchainUpdated])
     extends BlockchainUpdater
     with NG
     with ScorexLogging {
@@ -151,6 +155,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(blockchain, height)
 
+                BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.reference, height)
+
                 BlockDiffer
                   .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map { r =>
@@ -167,6 +173,9 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                   val height            = blockchain.unsafeHeightOf(ng.base.reference)
                   val miningConstraints = MiningConstraints(blockchain, height)
 
+                  BlockchainUpdateNotifier
+                    .notifyMicroBlockRollback(blockchainUpdated, block.reference, height)
+
                   BlockDiffer
                     .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                     .map(r => Some((r, Seq.empty[Transaction])))
@@ -180,13 +189,16 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                 case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                   if (!verify || referencedForgedBlock.signaturesValid().isRight) {
+                    val height = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
+
                     if (discarded.nonEmpty) {
+                      BlockchainUpdateNotifier
+                        .notifyMicroBlockRollback(blockchainUpdated, referencedForgedBlock.uniqueId, height)
                       metrics.microBlockForkStats.increment()
                       metrics.microBlockForkHeightStats.record(discarded.size)
                     }
 
                     val constraint: MiningConstraint = {
-                      val height            = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
                       val miningConstraints = MiningConstraints(blockchain, height)
                       miningConstraints.total
                     }
@@ -213,7 +225,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               }
         }).map {
           _ map {
-            case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint), discarded) =>
+            case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded) =>
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
@@ -225,6 +237,9 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                     .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
                 log.info(s"New height: $height")
               }
+
+              BlockchainUpdateNotifier.notifyProcessBlock(blockchainUpdated, block, detailedDiff, blockchain)
+
               discarded
           }
       })
@@ -236,13 +251,17 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     val prevNgState = ngState
     val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
+      BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, blockId, blockchain.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(_.bestLiquidBlock).toSeq
       ngState = None
       blockchain
         .rollbackTo(blockId)
-        .map(_ ++ discardedNgBlock)
+        .map { bs =>
+          BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, blockId, blockchain.height)
+          bs ++ discardedNgBlock
+        }
         .leftMap(err => GenericError(err))
     }
 
@@ -292,7 +311,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint, verify)
               }
             } yield {
-              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint) = blockDifferResult
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
+              BlockchainUpdateNotifier.notifyProcessMicroBlock(blockchainUpdated, microBlock, detailedDiff, blockchain)
               restTotalConstraint = updatedMdConstraint.constraints.head
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
