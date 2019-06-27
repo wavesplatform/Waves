@@ -39,9 +39,10 @@ class AddressRouteSpec
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
   private val blockchain   = stub[Blockchain]
-
+  private val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  +
   private val route =
-    AddressApiRoute(restAPISettings, testWallet, blockchain, mock[UtxPoolSynchronizer], new TestTime)(Scheduler.global).route
+    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime)(Scheduler.global).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

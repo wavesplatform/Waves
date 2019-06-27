@@ -21,8 +21,8 @@ import scala.util.{Failure, Success}
 
 class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])
     extends ScorexLogging {
-  implicit val scheduler: Scheduler = Scheduler.forkJoin(settings.parallelism, settings.maxThreads, "utx-pool-sync")
-  private[this] val txSource                       = ConcurrentSubject.publishToOne[BroadcastRequest]
+  implicit lazy val scheduler: Scheduler = Scheduler.forkJoin(settings.parallelism, settings.maxThreads, "utx-pool-sync")
+  private[this] lazy val txSource = ConcurrentSubject.publishToOne[BroadcastRequest]
   private[this] var future: CancelableFuture[Unit] = _
 
   def start(): Unit = synchronized {
