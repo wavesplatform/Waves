@@ -19,16 +19,18 @@ object ContractSerDe {
   val CALL_ANNO: Int = 1
   val VER_ANNO: Int  = 3
 
-  def serialize(c: DApp): Either[String, Array[Byte]] = {
-    val out = new ByteArrayOutputStream()
-
-    // version byte
-    out.writeInt(0)
-
-    val metaBytes = c.meta.toByteArray
+  def serialize(c: DApp): Either[String, Array[Byte]] =
     for {
-      _ <- checkMetaSize(metaBytes.length)
-      _ <- tryEi {
+      metaBytes <- {
+        val metaBytes = c.meta.toByteArray
+        checkMetaSize(metaBytes.length).map(_ => metaBytes)
+      }
+      out <- tryEi {
+        val out = new ByteArrayOutputStream()
+
+        // version byte
+        out.writeInt(0)
+
         out.writeInt(metaBytes.length)
         out.write(metaBytes)
 
@@ -44,9 +46,9 @@ object ContractSerDe {
             out.writeInt(1)
             serializeAnnotatedFunction(out, vf.u, vf.annotation.invocationArgName)
         }
+        out
       }
     } yield out.toByteArray
-  }
 
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
