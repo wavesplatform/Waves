@@ -7,7 +7,7 @@ import scala.util.Try
 object `X-Api-Key` extends ModeledCustomHeaderCompanion[`X-Api-Key`] {
   override val name                 = "X-API-Key"
 
-  override def parse(value: String) = Try(`X-Api-Key`(value))
+  override def parse(value: String) = Try(new `X-Api-Key`(value))
 }
 
 final case class `X-Api-Key`(value: String) extends ModeledCustomHeader[`X-Api-Key`] {
