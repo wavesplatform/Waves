@@ -12,6 +12,7 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.StringDataEntry
 import monix.execution.Scheduler
 
+import scala.concurrent.Future
 import scala.util.Random
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
@@ -39,8 +40,9 @@ class AddressRouteSpec
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
   private val blockchain   = stub[Blockchain]
-  private val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  +
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
+
   private val route =
     AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime)(Scheduler.global).route
 

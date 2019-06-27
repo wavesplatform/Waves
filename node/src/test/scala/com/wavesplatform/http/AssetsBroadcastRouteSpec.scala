@@ -6,6 +6,8 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.wallet.Wallet
@@ -28,7 +30,7 @@ class AssetsBroadcastRouteSpec
   private[this] implicit def scheduler: Scheduler = Scheduler(this.executor)
 
   private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
 
   "returns StateCheckFailed" - {
 

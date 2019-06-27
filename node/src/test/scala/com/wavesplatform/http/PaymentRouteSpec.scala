@@ -8,6 +8,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
+import monix.execution.Scheduler
 import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
@@ -25,6 +26,7 @@ class PaymentRouteSpec
 
   private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
   (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
+  (utxPoolSynchronizer.scheduler _).when().returns(Scheduler.global)
 
   "accepts payments" in {
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {

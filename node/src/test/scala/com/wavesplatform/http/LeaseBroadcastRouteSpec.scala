@@ -8,8 +8,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utx.UtxPool
+import monix.execution.Scheduler
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -17,19 +16,17 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
+import scala.concurrent.Future
+
 class LeaseBroadcastRouteSpec
     extends RouteSpec("/leasing/broadcast/")
     with RequestGen
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private[this] val utx = stub[UtxPool]
   private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
+  (utxPoolSynchronizer.scheduler _).when().returns(Scheduler.global)
 
   "returns StateCheckFailed" - {
     val route = LeaseBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
