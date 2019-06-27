@@ -66,6 +66,11 @@ object Importer extends ScorexLogging {
 
             println(s"Skipping $blocksToSkip block(s)")
 
+            sys.addShutdownHook {
+              val duration = System.currentTimeMillis() - start
+              log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
+            }
+
             while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
               if (s1 == Ints.BYTES) {
@@ -101,8 +106,6 @@ object Importer extends ScorexLogging {
             }
             bis.close()
             inputStream.close()
-            val duration = System.currentTimeMillis() - start
-            log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
 
           case Failure(error) =>
             log.error(s"Failed to open file '$blockchainFile", error)
