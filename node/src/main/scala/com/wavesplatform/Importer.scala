@@ -59,7 +59,7 @@ object Importer extends ScorexLogging {
             val bis           = new BufferedInputStream(inputStream)
             var quit          = false
             val lenBytes      = new Array[Byte](Ints.BYTES)
-            val start         = System.currentTimeMillis()
+            val start = System.nanoTime()
             var counter       = 0
             var blocksToSkip  = blockchainUpdater.height - 1
             val blocksToApply = importHeight - blockchainUpdater.height + 1
@@ -67,8 +67,9 @@ object Importer extends ScorexLogging {
             println(s"Skipping $blocksToSkip block(s)")
 
             sys.addShutdownHook {
-              val duration = System.currentTimeMillis() - start
-              log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
+              import scala.concurrent.duration._
+              val millis = (System.nanoTime() - start).nanos.toMillis
+              log.info(s"Imported $counter block(s) from ${blockchainUpdater.height} to $importHeight in ${humanReadableDuration(millis)}")
             }
 
             while (!quit && counter < blocksToApply) {
