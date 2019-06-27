@@ -104,36 +104,37 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
     }
   }
 
-  override def start(): Unit =
+  override def start(): Unit = {
     maybeProducer = Some(createProducer(settings))
-  maybeProducer foreach { producer =>
-    log.info("Performing startup node/Kafka consistency check...")
+    maybeProducer foreach { producer =>
+      log.info("Performing startup node/Kafka consistency check...")
 
-    context.blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
-      override def onNext(elem: BlockchainUpdated): Ack = {
-        producer.send(
-          createProducerRecord(settings.topic, elem),
-          (_: RecordMetadata, exception: Exception) =>
-            if (exception != null) {
-              log.error("Error sending blockchain updates", exception)
-              forceStopApplication()
-          }
-        )
-        Continue
-      }
-      override def onError(ex: Throwable): Unit = {
-        log.error("Error sending blockchain updates", ex)
-        forceStopApplication()
-      }
-      override def onComplete(): Unit = {
-        log.error("Blockchain updates Observable complete")
-        forceStopApplication() // this should never happen, but just in case, explicit stop.
-      }
-    })
+      context.blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
+        override def onNext(elem: BlockchainUpdated): Ack = {
+          producer.send(
+            createProducerRecord(settings.topic, elem),
+            (_: RecordMetadata, exception: Exception) =>
+              if (exception != null) {
+                log.error("Error sending blockchain updates", exception)
+                forceStopApplication()
+            }
+          )
+          Continue
+        }
+        override def onError(ex: Throwable): Unit = {
+          log.error("Error sending blockchain updates", ex)
+          forceStopApplication()
+        }
+        override def onComplete(): Unit = {
+          log.error("Blockchain updates Observable complete")
+          forceStopApplication() // this should never happen, but just in case, explicit stop.
+        }
+      })
 
-    // startupCheck is after subscription, so that if the check makes a rollback, it would be handled
-    startupCheck()
-    log.info("Starting sending blockchain updates to Kafka")
+      // startupCheck is after subscription, so that if the check makes a rollback, it would be handled
+      startupCheck()
+      log.info("Starting sending blockchain updates to Kafka")
+    }
   }
 
   override def shutdown(): Future[Unit] = Future {
