@@ -35,16 +35,6 @@ import scala.util.{Failure, Success, Try}
 object Importer extends ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
 
-  private implicit class TryExt[T](t: Try[T]) {
-    def tapLeft(cb: Throwable => Unit): Try[T] = {
-      t match {
-        case Failure(throwable) => cb(throwable)
-        case _                  => ()
-      }
-      t
-    }
-  }
-
   type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
 
   final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
@@ -98,8 +88,12 @@ object Importer extends ScorexLogging {
   def loadSettings(file: File): WavesSettings = Application.loadApplicationConfig(Some(file))
 
   def initFileStream(file: File): Try[FileInputStream] =
-    Try(new FileInputStream(file))
-      .tapLeft(_ => log.error(s"Failed to open file '$file"))
+    Try(new FileInputStream(file)) match {
+      case t: Failure[FileInputStream] =>
+        log.error(s"Failed to open file '$file")
+        t
+      case t => t
+    }
 
   def initTime(ntpServer: String): NTP = new NTP(ntpServer)
 
