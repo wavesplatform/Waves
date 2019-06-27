@@ -15,22 +15,30 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
+  .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
-    coverageExcludedPackages := "",
-    PB.targets in Compile := Seq(
-      scalapb.gen(flatPackage = true) -> Paths.get("common/shared/src/main/scala/target").toAbsolutePath.toFile
-    )
+    coverageExcludedPackages := ""
   )
 
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
+lazy val `lang-proto-helper` =
+  crossProject(JSPlatform, JVMPlatform)
+    .settings(
+      PB.targets in Compile := Seq(
+        scalapb.gen(flatPackage = true) -> Paths.get("lang-proto-helper/shared/src/main/scala").toAbsolutePath.toFile
+      )
+    )
+lazy val `lang-proto-helperJS`  = `lang-proto-helper`.js
+lazy val `lang-proto-helperJVM` = `lang-proto-helper`.jvm
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .disablePlugins(ProtocPlugin)
-    .dependsOn(common % "compile;test->test")
+    .dependsOn(common % "compile;test->test", `lang-proto-helper`)
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -84,7 +92,9 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark
+    benchmark,
+    `lang-proto-helperJS`,
+    `lang-proto-helperJVM`
   )
 
 inScope(Global)(
