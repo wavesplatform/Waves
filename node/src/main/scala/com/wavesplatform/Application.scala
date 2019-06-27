@@ -14,16 +14,16 @@ import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
-import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
-import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
+import com.wavesplatform.api.http.alias.AliasApiRoute
+import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
+import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
@@ -182,11 +182,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    UtxPoolSynchronizer.start(utxStorage,
+    val utxPoolSynchronizer = new UtxPoolSynchronizer(utxStorage,
                               settings.synchronizationSettings.utxSynchronizer,
                               allChannels,
-                              transactions,
                               blockchainUpdater.lastBlockInfo)
+
+    utxPoolSynchronizer.start()
+    utxPoolSynchronizer.publishTransactions(transactions).runAsyncLogErr
 
     val microBlockSink = microblockDatas
       .mapTask(scala.Function.tupled(processMicroBlock))

@@ -4,10 +4,8 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 
-case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup)
+case class LeaseBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {

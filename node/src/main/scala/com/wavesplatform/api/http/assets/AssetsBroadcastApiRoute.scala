@@ -5,12 +5,10 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 
 import scala.util.Left
 
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup)
+case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {

@@ -6,16 +6,14 @@ import com.wavesplatform.api.http.{ApiRoute, DiscontinuedApi, WithSettings}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
+import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import com.wavesplatform.wallet.Wallet
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
