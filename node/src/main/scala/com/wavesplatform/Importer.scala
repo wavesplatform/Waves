@@ -64,7 +64,7 @@ object Importer extends ScorexLogging {
             var blocksToSkip  = blockchainUpdater.height - 1
             val blocksToApply = importHeight - blockchainUpdater.height + 1
 
-            println(s"Skipping $blocksToSkip block(s)")
+            log.info(s"Skipping $blocksToSkip block(s)")
 
             sys.addShutdownHook {
               import scala.concurrent.duration._
@@ -97,11 +97,11 @@ object Importer extends ScorexLogging {
                     }
                   }
                 } else {
-                  println(s"$s2 != expected $len")
+                  log.debug(s"$s2 != expected $len")
                   quit = true
                 }
               } else {
-                println(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
+                log.debug(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
                 quit = true
               }
             }
