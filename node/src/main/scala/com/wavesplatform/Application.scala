@@ -186,7 +186,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       new UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)
 
     utxSynchronizer.start()
-    utxSynchronizer.publishTransactions(transactions).runAsyncLogErr
+    utxSynchronizer.publishTransactions(transactions)
 
     val microBlockSink = microblockDatas
       .mapTask(scala.Function.tupled(processMicroBlock))

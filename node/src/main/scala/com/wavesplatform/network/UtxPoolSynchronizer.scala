@@ -43,9 +43,9 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
     promise.future
   }
 
-  def publishTransactions(obs: ChannelObservable[Transaction]): Task[Unit] = {
+  def publishTransactions(obs: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
     val dp = Promise[TxAddResult]
-    obs.foreachL { case (c, t) => txSource.onNext(BroadcastRequest(t, c, dp, forceBroadcast = false)) }
+    obs.foreach { case (c, t) => txSource.onNext(BroadcastRequest(t, c, dp, forceBroadcast = false)) }
   }
 
   private[this] def putAndBroadcastTask(source: Observable[BroadcastRequest]): Task[Unit] = {
@@ -89,12 +89,12 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
     val newTxSource = txSource
       .observeOn(scheduler)
       .filter {
-        case BroadcastRequest(tx, _, _, _) =>
+        case BroadcastRequest(tx, _, _, forceBroadcast) =>
           var isNew = false
           knownTransactions.get(tx.id(), { () =>
             isNew = true; dummy
           })
-          isNew
+          isNew || forceBroadcast
       }
 
     val synchronizerFuture = putAndBroadcastTask(newTxSource).runAsyncLogErr
