@@ -5,19 +5,18 @@ import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
+import monix.execution.Scheduler
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.Coproduct
+
+import scala.concurrent.Future
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
@@ -25,18 +24,15 @@ class AssetsBroadcastRouteSpec
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
 
+  private[this] implicit def scheduler: Scheduler = Scheduler(this.executor)
 
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   "returns StateCheckFailed" - {
 
-    val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
@@ -66,7 +62,7 @@ class AssetsBroadcastRouteSpec
 
   "returns appropriate error code when validation fails for" - {
     "issue transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastIssueReq) { ir =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
@@ -95,7 +91,7 @@ class AssetsBroadcastRouteSpec
     }
 
     "reissue transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastReissueReq) { rr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
@@ -110,7 +106,7 @@ class AssetsBroadcastRouteSpec
     }
 
     "burn transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastBurnReq) { br =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
@@ -127,7 +123,7 @@ class AssetsBroadcastRouteSpec
     }
 
     "transfer transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastTransferReq) { tr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
@@ -157,17 +153,10 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val alwaysApproveUtx = stub[UtxPool]
-    (alwaysApproveUtx.putIfNew _).when(*, *).onCall((_: Transaction, _: Boolean) => TracedResult(Right(true))).anyNumberOfTimes()
+    val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+    (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
-    val alwaysSendAllChannels = stub[ChannelGroup]
-    (alwaysSendAllChannels
-      .writeAndFlush(_: Any, _: ChannelMatcher))
-      .when(*, *)
-      .onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture])
-      .anyNumberOfTimes()
-
-    val route = AssetsBroadcastApiRoute(restAPISettings, alwaysApproveUtx, alwaysSendAllChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

@@ -3,16 +3,16 @@ package com.wavesplatform.http
 import com.wavesplatform.api.http.{ApiKeyNotValid, PaymentApiRoute}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
-import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
+
+import scala.concurrent.Future
 
 class PaymentRouteSpec
     extends RouteSpec("/payment")
@@ -23,15 +23,8 @@ class PaymentRouteSpec
     with TransactionGen
     with NoShrink {
 
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
-
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Right(true)))
-    .anyNumberOfTimes()
-
-  (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   "accepts payments" in {
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
@@ -47,7 +40,7 @@ class PaymentRouteSpec
         val sender = testWallet.privateKeyAccounts.head
         val tx     = TransferTransactionV1.selfSigned(Asset.Waves, sender, recipient, amount, timestamp, Asset.Waves, fee, Array())
 
-        val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
+        val route = PaymentApiRoute(restAPISettings, testWallet, utxPoolSynchronizer, time).route
 
         val req = Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
 

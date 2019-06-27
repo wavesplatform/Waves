@@ -3,16 +3,14 @@ package com.wavesplatform.http
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
+
+import scala.concurrent.Future
 
 class AliasBroadcastRouteSpec
     extends RouteSpec("/alias/broadcast/")
@@ -20,17 +18,11 @@ class AliasBroadcastRouteSpec
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
-
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
-
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   "returns StateCheckFiled" - {
-    val route = AliasBroadcastApiRoute(restAPISettings, utx, allChannels).route
+    val route = AliasBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
@@ -42,7 +34,7 @@ class AliasBroadcastRouteSpec
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(restAPISettings, utx, allChannels).route
+    val route = AliasBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat

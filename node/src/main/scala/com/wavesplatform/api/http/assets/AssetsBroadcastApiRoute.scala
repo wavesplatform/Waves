@@ -38,20 +38,18 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronize
     }
   }
 
-  def batchTransfer: Route = (path("batch-transfer") & post) {
-    json[List[SignedTransferRequests]](
-      reqs =>
-        Future.sequence(
-          reqs
-            .map(_.eliminate(_.toTx, _.eliminate(_.toTx, _ => Left(UnsupportedTransactionType))))
-            .map { eitherTx =>
-              doBroadcastEitherTx(eitherTx)
-                .map(_.transformE {
-                  case Left(AlreadyInTheState(_, _)) => eitherTx
-                  case e => e
-                }.json)
-            }))
-  }
+  def batchTransfer: Route = (path("batch-transfer") & post) (json[List[SignedTransferRequests]] { reqs =>
+    Future.sequence(
+      reqs
+        .map(_.eliminate(_.toTx, _.eliminate(_.toTx, _ => Left(UnsupportedTransactionType))))
+        .map { eitherTx =>
+          doBroadcastEitherTx(eitherTx)
+            .map(_.transformE {
+              case Left(AlreadyInTheState(_, _)) => eitherTx
+              case e => e
+            }.json)
+        })
+  })
 
   def transfer: Route = (path("transfer") & post) {
     json[SignedTransferRequests] { transferReq =>
