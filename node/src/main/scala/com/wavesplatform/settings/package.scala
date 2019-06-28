@@ -55,7 +55,7 @@ package object settings {
     val directoryDefaults = ConfigFactory
       .parseString(s"waves.directory = ${defaultDirectory(withApp)}")
 
-    val cmdDefaults = Try(defaults.getConfig("waves.defaults"))
+    val cmdDefaults = Try(defaults.getConfig("waves.defaults")) // TODO: Keep network-specific defaults in master
       .getOrElse(ConfigFactory.empty())
 
     external
