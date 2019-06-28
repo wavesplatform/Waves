@@ -286,14 +286,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
-    balancesCache.putAll({
-      for {
-        (address, assetMap) <- updatedBalances
-        (asset, balance)    <- assetMap
-      } yield (address, asset) -> long2Long(balance)
-    }.asJava)
-    for (address <- newPortfolios) portfolioCache.invalidate(address)
-    for (id      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
+    for (address                 <- newPortfolios) portfolioCache.invalidate(address)
+    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
