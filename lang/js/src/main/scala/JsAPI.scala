@@ -207,6 +207,6 @@ object JsAPI {
     )
   }
 
-  @JSExportTopLevel("getNodeVersion")
-  def getNodeVersion: js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
+  @JSExportTopLevel("nodeVersion")
+  def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 }
