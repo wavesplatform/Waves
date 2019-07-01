@@ -5,6 +5,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.protobuf.transaction.{Script => PBScript}
+import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -13,12 +15,8 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
-import com.wavesplatform.protobuf.utils.PBImplicitConversions._
-import com.wavesplatform.protobuf.transaction.{Script => PBScript}
-
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
   private[this] val NoChainId: Byte = 0: Byte
 
   def create(sender: com.wavesplatform.account.PublicKey = PublicKey.empty,
@@ -669,9 +667,11 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.serialization.Deser
 
-        val data = InvokeScriptTransactionData(Some(PBRecipients.create(dappAddress)),
-                                               ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
-                                               payment.map(p => (p.assetId, p.amount): Amount))
+        val data = InvokeScriptTransactionData(
+          Some(PBRecipients.create(dappAddress)),
+          ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+          payment.map(p => (p.assetId, p.amount): Amount)
+        )
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
 
       case _ =>

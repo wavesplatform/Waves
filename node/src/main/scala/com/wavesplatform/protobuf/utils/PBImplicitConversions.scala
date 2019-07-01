@@ -41,8 +41,9 @@ object PBImplicitConversions {
   }
 
   implicit class PBByteStringOps(bs: PBByteString) {
-    def byteStr: ByteStr            = ByteStr(bs.toByteArray)
-    def publicKeyAccount: PublicKey = PublicKey(bs.toByteArray)
+    def byteStr: ByteStr = ByteStr(bs.toByteArray)
+
+    def publicKey: PublicKey = PublicKey(bs.toByteArray)
   }
 
   implicit def byteStringToByte(bytes: ByteString): Byte =
