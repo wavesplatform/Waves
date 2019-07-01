@@ -6,6 +6,8 @@
    2. You've checked "Make project before run"
  */
 
+import java.nio.file.Paths
+
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -16,8 +18,37 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
   .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
-    coverageExcludedPackages := ""
+    coverageExcludedPackages := "",
+    sourceGenerators in Compile += versionSource
   )
+
+lazy val versionSource = Def.task {
+  // WARNING!!!
+  // Please, update the fallback version every major and minor releases.
+  // This version is used then building from sources without Git repository
+  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+  val FallbackVersion = (1, 0, 0)
+
+  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
+  val (major, minor, patch) = version.value match {
+    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+    case _                            => FallbackVersion
+  }
+
+  val versionPath = Paths.get("common/shared/src/main/scala/com/wavesplatform/Version.scala").toAbsolutePath.toFile
+  
+  IO.write(
+    versionPath,
+    s"""package com.wavesplatform
+       |
+       |object Version {
+       |  val VersionString = "${version.value}"
+       |  val VersionTuple = ($major, $minor, $patch)
+       |}
+       |""".stripMargin
+  )
+  Seq(versionPath)
+}
 
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm

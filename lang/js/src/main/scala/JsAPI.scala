@@ -1,4 +1,5 @@
 import cats.kernel.Monoid
+import com.wavesplatform.Version
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
@@ -205,4 +206,7 @@ object JsAPI {
       identity
     )
   }
+
+  @JSExportTopLevel("getNodeVersion")
+  def getNodeVersion: js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 }
