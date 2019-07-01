@@ -8,9 +8,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PrivateKey}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.MetaMapper
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Types
@@ -223,16 +221,9 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
         & entity(as[String])
         & withExecutionContext(decompilerExecutionContext)
     ) { code =>
-      val script = Script.fromBase64String(code.trim, checkComplexity = false)
-      val result: ToResponseMarshallable = script match {
-        case Right(ContractScriptImpl(_, dApp, _)) =>
-          MetaMapper.fromProto(dApp.meta) match {
-            case Right(funcTypes) => metaToJson(funcTypes)
-            case Left(e)          => ScriptParseError(e)
-          }
-        case Right(_)  => Json.obj()
-        case Left(err) => err
-      }
+      val result: ToResponseMarshallable = Global.scriptMeta(code)
+        .map(metaToJson)
+        .fold(e => e, r => r)
       complete(result)
     }
   }

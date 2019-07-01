@@ -205,4 +205,20 @@ object JsAPI {
       identity
     )
   }
+
+  @JSExportTopLevel("meta")
+  def meta(input: String): js.Dynamic =
+    Global.scriptMeta(input)
+      .fold(
+        err => js.Dynamic.literal("error" -> err.m),
+        funcTypes => {
+          val funcTypesJson = funcTypes.map { case (name, types) =>
+            js.Dynamic.literal(
+              "name"  -> name,
+              "types" -> types.map(_.name)
+            )
+          }
+          js.Dynamic.literal("callableFuncTypes" -> funcTypesJson)
+        }
+      )
 }

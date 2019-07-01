@@ -92,6 +92,57 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
   }
 
+  routePath("/script/meta") in {
+    //Expression
+    val exprBase64 = ExprScript(script).explicitGet().bytes().base64
+    Post(routePath("/script/meta"), exprBase64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      json.toString shouldBe "{\"callableFuncTypes\":[]}"
+    }
+
+    //DApp
+    val dApp = DApp(
+      DAppMeta(List(
+        CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
+        CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
+        CallableFuncSignature("func3", ByteString.EMPTY)
+      )),
+      List(
+        LET("letName", CONST_BOOLEAN(true)),
+        FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
+      ),
+      List(
+        CallableFunction(
+          CallableAnnotation("whoooo"),
+          FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
+        ),
+        CallableFunction(
+          CallableAnnotation("whoooo"),
+          FUNC("default", List(), CONST_BOOLEAN(false))
+        )
+      ),
+      Some(
+        VerifierFunction(
+          VerifierAnnotation("hmmm"),
+          FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
+        )
+      )
+    )
+    val dappBase64 = ContractScript(V3, dApp).explicitGet().bytes().base64
+    Post(routePath("/script/meta"), dappBase64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      json.toString shouldBe
+        """{"callableFuncTypes":[
+          |{"name":"func1","types":["Int","ByteVector","Boolean","String"]},
+          |{"name":"func2","types":["String","Boolean","ByteVector","Int"]},
+          |{"name":"func3","types":[]}
+          |]}
+          |"""
+          .stripMargin
+          .replace("\n", "")
+    }
+  }
+
   private def testdAppDirective(str: String) =
     Post(routePath("/script/decompile"), str) ~> route ~> check {
       val json = responseAs[JsValue]

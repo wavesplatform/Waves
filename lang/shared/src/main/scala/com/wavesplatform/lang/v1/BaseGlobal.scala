@@ -2,12 +2,16 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.contract.MetaMapper.FuncArgTypes
+import com.wavesplatform.lang.contract.{ContractSerDe, DApp, MetaMapper}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
+
+import cats.implicits._
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -118,6 +122,15 @@ trait BaseGlobal {
     Script.fromBase64String(compiledCode, checkComplexity = false).right.map { script =>
       val (scriptText, _) = Script.decompile(script)
       scriptText
+    }
+  }
+
+  def scriptMeta(code: String): Either[ScriptParseError, List[FuncArgTypes]] = {
+    val script = Script.fromBase64String(code.trim, checkComplexity = false)
+    script match {
+      case Right(ContractScriptImpl(_, dApp, _)) => MetaMapper.fromProto(dApp.meta).leftMap(ScriptParseError)
+      case Right(_)                              => Right(Nil)
+      case Left(err)                             => err.asLeft[List[FuncArgTypes]]
     }
   }
 
