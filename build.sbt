@@ -26,7 +26,9 @@ lazy val commonJVM = common.jvm
 
 lazy val `lang-proto-helper` =
   crossProject(JSPlatform, JVMPlatform)
+    .withoutSuffixFor(JVMPlatform)
     .settings(
+      libraryDependencies ++= Dependencies.lang.value,
       PB.targets in Compile := Seq(
         scalapb.gen(flatPackage = true) -> Paths.get("lang-proto-helper/shared/src/main/scala").toAbsolutePath.toFile
       )
