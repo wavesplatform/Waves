@@ -8,10 +8,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBBlocks {
-  def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
+  def vanilla(block: PBCachedBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
     def create(version: Int,
                timestamp: Long,
                reference: ByteStr,
@@ -24,7 +23,7 @@ object PBBlocks {
     }
 
     for {
-      header       <- block.header.toRight(GenericError("No block header"))
+      header <- Right(block.header)
       transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
       result = create(
         header.version,
@@ -34,7 +33,7 @@ object PBBlocks {
         transactions,
         header.featureVotes.map(intToShort).toSet,
         PublicKey(header.generator.toByteArray),
-        ByteStr(block.signature.toByteArray)
+        ByteStr(block.signature)
       )
     } yield result
   }

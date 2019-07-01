@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.protobuf.transaction.{Script => PBScript}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -14,10 +13,12 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.protobuf.utils.PBImplicitConversions._
+import com.wavesplatform.protobuf.transaction.{Script => PBScript}
+
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
-
+  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
   private[this] val NoChainId: Byte = 0: Byte
 
   def create(sender: com.wavesplatform.account.PublicKey = PublicKey.empty,
@@ -35,9 +36,9 @@ object PBTransactions {
     )
   }
 
-  def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
+  def vanilla(signedTx: PBCachedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     for {
-      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
+      parsedTx <- signedTx.transaction.transaction.toRight(GenericError("Transaction must be specified"))
       fee      <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
       _        <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
       feeAmount = PBAmounts.toAssetAndAmount(fee)
@@ -51,7 +52,7 @@ object PBTransactions {
             feeAmount._2,
             feeAmount._1,
             parsedTx.timestamp,
-            Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
+            Proofs(signedTx.proofs.map(ByteStr(_))),
             parsedTx.data
           ))
       else
@@ -62,7 +63,7 @@ object PBTransactions {
           feeAmount._2,
           feeAmount._1,
           parsedTx.timestamp,
-          Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
+          Proofs(signedTx.proofs.map(ByteStr(_))),
           parsedTx.data
         )
     } yield tx
