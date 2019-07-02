@@ -29,7 +29,7 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
   }
 
   //noinspection ScalaStyle
-  private lazy val vanillaTx: VanillaTransaction = PBTransactions.vanilla(transaction, unsafe = true).explicitGet()
+  protected lazy val vanillaTx: VanillaTransaction = PBTransactions.vanilla(transaction, unsafe = true).explicitGet()
 
   override def builder: TransactionParser = PBTransactionAdapter
 
@@ -93,7 +93,10 @@ object PBTransactionAdapter extends TransactionParser {
   def apply(tx: PBCachedTransaction): PBTransactionAdapter = new PBTransactionAdapter(tx)
   def apply(tx: VanillaTransaction): PBTransactionAdapter = tx match {
     case a: PBTransactionAdapter => a
-    case _                       => new PBTransactionAdapter(PBTransactions.protobuf(tx))
+    case _ =>
+      new PBTransactionAdapter(PBTransactions.protobuf(tx)) {
+        override lazy val vanillaTx: VanillaTransaction = tx
+      }
   }
 
   // TODO: Remove
