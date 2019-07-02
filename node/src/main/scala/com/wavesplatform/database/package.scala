@@ -270,9 +270,11 @@ package object database {
     val dataInput = newDataInput(bs)
 
     val size = dataInput.readInt()
-    val _ = dataInput.readInt() // TX count
+    val txCount = dataInput.readInt()
     val headerBytes = dataInput.readByteStr(bs.length - Ints.BYTES * 2)
-    val header = PBBlockAdapter(PBCachedBlock.fromBytes(headerBytes))
+    val header = new PBBlockAdapter(PBCachedBlock.fromBytes(headerBytes)) {
+      override val transactionCount: Int = txCount
+    }
 
     (header, size)
   }

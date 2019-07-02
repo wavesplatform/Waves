@@ -27,7 +27,7 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
     blockHeaders.generator shouldBe blocks.generator
     blockHeaders.timestamp shouldBe blocks.timestamp
     blockHeaders.signature shouldBe blocks.signature
-    // blockHeaders.transactionCount shouldBe blocks.transactions.size
+    blockHeaders.transactionCount shouldBe blocks.transactions.size
   }
 
   test("blockAt content should be equal to blockHeaderAt, except transactions info") {
