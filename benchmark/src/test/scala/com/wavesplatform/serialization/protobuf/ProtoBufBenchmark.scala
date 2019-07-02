@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
+import com.wavesplatform.protobuf.transaction.PBCachedTransaction.PBCachedTransactionImplicitOps
 import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBTransactions}
 import com.wavesplatform.serialization.protobuf.ProtoBufBenchmark.ExchangeTransactionSt
 import com.wavesplatform.transaction.Asset.Waves
@@ -15,6 +16,7 @@ import com.wavesplatform.transaction.{FastHashId, Proofs}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
+//noinspection ScalaStyle
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
@@ -88,7 +90,7 @@ class ProtoBufBenchmark {
   def readUncachedTx_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     bh.consume(st.exchangeTransaction.toByteArray)
     bh.consume(FastHashId.create(st.exchangeTransaction.getTransaction.toByteArray))
-    bh.consume(st.exchangeTransaction.withProofs(st.exchangeTransaction.proofs.reverse).toByteArray)
+    bh.consume(st.exchangeTransaction.withProofs(st.exchangeTransaction.proofs.reverse: _*).toByteArray)
   }
 }
 

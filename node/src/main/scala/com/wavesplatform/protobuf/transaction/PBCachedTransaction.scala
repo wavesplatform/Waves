@@ -33,7 +33,7 @@ object PBCachedTransaction {
     tx.transaction
 
   implicit class PBCachedTransactionImplicitOps(private val tx: PBCachedTransaction) extends AnyVal {
-    def withProofs(proofs: ByteString*): PBCachedTransaction = tx match {
+    def withProofsBS(proofs: ByteString*): PBCachedTransaction = tx match {
       case bbtx: PBCachedTransactionImplWithBodyBytes =>
         new PBCachedTransactionImplWithBodyBytes(bbtx.underlying, proofs.map(_.toByteArray))
 
@@ -41,9 +41,9 @@ object PBCachedTransaction {
         new PBCachedTransactionImplWithBodyBytes(tx.bodyBytes, proofs.map(_.toByteArray))
     }
 
-    def withProofs(proof1: ByteStr, proofs: ByteStr*): PBCachedTransaction = withProofs((proof1 +: proofs).map(PBUtils.toByteStringUnsafe(_)): _*)
+    def withProofs(proofs: Array[Byte]*): PBCachedTransaction = withProofsBS(proofs.map(PBUtils.toByteStringUnsafe): _*)
 
-    def withProofs(proofs: Proofs): PBCachedTransaction = withProofs(proofs.proofs.map(PBUtils.toByteStringUnsafe(_)): _*)
+    def withProofs(proofs: Proofs): PBCachedTransaction = withProofsBS(proofs.proofs.map(PBUtils.toByteStringUnsafe(_)): _*)
 
     def withBody(body: PBTransaction): PBCachedTransaction = tx match {
       case bbtx: PBCachedTransactionImplWithBodyBytes =>

@@ -1,6 +1,5 @@
 package com.wavesplatform.protobuf.transaction
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -10,7 +9,7 @@ import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.description.{ByteEntity, BytesArrayUndefinedLength}
+import com.wavesplatform.transaction.description.{ByteEntity, BytesArrayDefinedLength, BytesArrayUndefinedLength}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -19,7 +18,7 @@ import play.api.libs.json.JsObject
 
 import scala.annotation.switch
 import scala.reflect.ClassTag
-import scala.util.Try
+import scala.util.{Success, Try}
 
 class PBTransactionAdapter(val transaction: PBCachedTransaction) extends VanillaTransaction with Signed with Proven {
   private[this] val txBody: PBTransaction = transaction.transaction.getTransaction
@@ -42,8 +41,7 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
     Coeval.evalOnce((txBody.data.isGenesis || txBody.version > 1) || this.verifySignature())
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    if (isLegacy) vanillaTx.bytes()
-    else PBTransactionAdapter.toBytes(this)
+    transaction.bytes
   )
 
   override val proofs: Proofs =
@@ -90,7 +88,7 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
     proofs.nonEmpty && crypto.verify(proofs.head, bodyBytes(), sender)
 }
 
-object PBTransactionAdapter extends TransactionParser.OneVersion {
+object PBTransactionAdapter extends TransactionParser {
   def apply(tx: PBCachedTransaction): PBTransactionAdapter = new PBTransactionAdapter(tx)
   def apply(tx: VanillaTransaction): PBTransactionAdapter = tx match {
     case a: PBTransactionAdapter => a
@@ -102,7 +100,7 @@ object PBTransactionAdapter extends TransactionParser.OneVersion {
     case _                                     => tx
   }
 
-  override def version: Byte = 1
+  override def supportedVersions: Set[Byte] = Set(1)
 
   override type TransactionT = PBTransactionAdapter
 
@@ -114,9 +112,14 @@ object PBTransactionAdapter extends TransactionParser.OneVersion {
     byteTailDescription.deserializeFromByteArray(bytes)
 
   override val byteTailDescription: ByteEntity[TransactionT] =
-    BytesArrayUndefinedLength(0, "PB bytes", Int.MaxValue)
+    BytesArrayUndefinedLength(1, "PB bytes", Int.MaxValue)
       .map(bs => apply(PBCachedTransaction.fromBytes(bs)))
 
-  private def toBytes(tx: TransactionT): Array[Byte] =
-    Bytes.concat(Array[Byte](PBTransactionAdapter.typeId, PBTransactionAdapter.version), tx.transaction.bytes)
+  /** @return offset */
+  override protected def parseHeader(bytes: Array[Byte]): Try[Int] =
+    Success(0)
+
+  /** Byte description of the header of the transaction */
+  override val byteHeaderDescription: ByteEntity[Unit] =
+    BytesArrayDefinedLength(1, "", 0).map(_ => Unit)
 }

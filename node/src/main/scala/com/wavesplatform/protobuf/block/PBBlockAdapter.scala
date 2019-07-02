@@ -32,7 +32,7 @@ class PBBlockAdapter(val block: PBCachedBlock)
   )
 
   override def getHeader(): BlockHeader =
-    new PBBlockAdapter(block.withTransactions(Nil))
+    new PBBlockAdapter(block.withTransactionsCached(Nil))
 }
 
 object PBBlockAdapter {

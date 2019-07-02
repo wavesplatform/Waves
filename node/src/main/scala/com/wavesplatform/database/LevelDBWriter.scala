@@ -18,6 +18,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.block.PBBlockAdapter
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -525,7 +526,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           transactions.foreach {
             case (num, tx) =>
               forgetTransaction(tx.id())
-              tx match {
+              // TODO: replace unwraps with native txs in transactionData
+              PBTransactionAdapter.unwrap(tx) match {
                 case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
                 case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>
                 // balances already restored

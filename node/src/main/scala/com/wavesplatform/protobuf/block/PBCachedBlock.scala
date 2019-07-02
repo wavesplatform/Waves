@@ -27,8 +27,11 @@ object PBCachedBlock {
 
   def fromBytes(bytes: Array[Byte]): PBCachedBlock = new PBCachedBlockImplWithBytes(bytes)
 
+  implicit def toBlock(block: PBCachedBlock): PBBlock =
+    block.block
+
   implicit class PBCachedBlockImplicitOps(private val block: PBCachedBlock) extends AnyVal {
-    def withSignature(signature: ByteStr): PBCachedBlock = block match {
+    def withSignatureCached(signature: ByteStr): PBCachedBlock = block match {
       case whtxs: PBCachedBlockImplWithHeaderAndTransactions =>
         new PBCachedBlockImplWithHeaderAndTransactions(whtxs.headerV, signature, whtxs.transactionsSz)
 
@@ -36,7 +39,7 @@ object PBCachedBlock {
         new PBCachedBlockImplWithHeaderAndTransactions(block.headerBytes, signature, block.transactions)
     }
 
-    def withTransactions(transactions: Seq[PBCachedTransaction]): PBCachedBlock = block match {
+    def withTransactionsCached(transactions: Seq[PBCachedTransaction]): PBCachedBlock = block match {
       case whtxs: PBCachedBlockImplWithHeaderAndTransactions =>
         new PBCachedBlockImplWithHeaderAndTransactions(whtxs.headerV, whtxs.signatureBs, transactions)
 

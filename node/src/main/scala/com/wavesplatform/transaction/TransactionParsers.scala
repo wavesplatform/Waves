@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.crypto._
+import com.wavesplatform.protobuf
 import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
@@ -47,8 +48,7 @@ object TransactionParsers {
     LeaseCancelTransactionV2,
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
-    InvokeScriptTransaction,
-    PBTransactionAdapter
+    InvokeScriptTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
@@ -69,13 +69,18 @@ object TransactionParsers {
   def by(name: String): Option[TransactionParser]                = byName.get(name)
   def by(typeId: Byte, version: Byte): Option[TransactionParser] = all.get((typeId, version))
 
-  def parseBytes(data: Array[Byte]): Try[Transaction] =
+  def parseBytesLegacy(data: Array[Byte]): Try[Transaction] =
     data.headOption
       .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
       .flatMap { headByte =>
         if (headByte == 0) modernParseBytes(data)
         else oldParseBytes(headByte, data)
       }
+
+  def parseBytes(data: Array[Byte]): Try[Transaction] =
+    Try(protobuf.transaction.PBTransaction.parseFrom(data))
+      .map(PBTransactionAdapter(_))
+      .orElse(parseBytesLegacy(data))
 
   def forTypes(types: Byte*): Set[TransactionParser] =
     forTypeSet(types.toSet)

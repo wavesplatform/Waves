@@ -8,6 +8,7 @@ private[transaction] object PBTransactionSerialization {
     val outputStream = CodedOutputStream.newInstance(outArray)
     outputStream.useDeterministicSerialization()
 
+    outputStream.write(0.toByte)
     outputStream.write(0xff.toByte)
     outputStream.write(0x01.toByte)
     tx.writeTo(outputStream)

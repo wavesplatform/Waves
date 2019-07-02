@@ -257,6 +257,7 @@ package object database {
     val dataOutput = newDataOutput()
 
     dataOutput.writeInt(size)
+    dataOutput.writeInt(blockHeader.transactionCount)
 
     val (header, signature) = PBBlocks.protobufHeaderAndSignature(blockHeader)
     val block = PBCachedBlock.create(header, signature)
@@ -269,7 +270,8 @@ package object database {
     val dataInput = newDataInput(bs)
 
     val size = dataInput.readInt()
-    val headerBytes = dataInput.readByteStr(bs.length - Ints.BYTES)
+    val _ = dataInput.readInt() // TX count
+    val headerBytes = dataInput.readByteStr(bs.length - Ints.BYTES * 2)
     val header = PBBlockAdapter(protobuf.block.PBBlock.parseFrom(headerBytes))
 
     (header, size)

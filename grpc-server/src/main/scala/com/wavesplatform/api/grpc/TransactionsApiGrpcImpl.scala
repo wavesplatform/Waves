@@ -82,7 +82,7 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
     commonApi
       .broadcastTransaction(tx.toVanilla)
-      .map(_.toPB)
+      .map(_.toPB.transaction)
       .resultE
       .toFuture
   }
