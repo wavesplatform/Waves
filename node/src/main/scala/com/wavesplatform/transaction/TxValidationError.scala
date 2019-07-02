@@ -95,4 +95,16 @@ object TxValidationError {
   case class UnsupportedTypeAndVersion(typeId: Byte, version: Int) extends ValidationError {
     override def toString: String = s"Bad transaction type ($typeId) and version ($version)"
   }
+
+  case class UsupportedProofVersion(version: Int, supported: List[Int]) extends ValidationError {
+    override def toString: String = s"Unsupported proofs version - $version. Expected one of ${supported.mkString("[", ", ", "]")}"
+  }
+
+  case class TooManyProofs(max: Int, actual: Int) extends ValidationError {
+    override def toString: String = s"Too many proofs ($actual), only $max allowed"
+  }
+
+  case class ToBigProof(max: Int, actual: Int) extends ValidationError {
+    override def toString: String = s"Too large proof ($actual), must be max $max bytes" 
+  }
 }

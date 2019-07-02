@@ -48,6 +48,8 @@ object ApiError {
       case TxValidationError.UnsupportedTransactionType      => UnsupportedTransactionType
       case TxValidationError.Mistiming(err)                  => Mistiming(err)
       case TxValidationError.WrongChain(ex, pr)              => InvalidChainId(ex, pr)
+      case err: TxValidationError.TooManyProofs              => InvalidProofs(err.toString())
+      case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
       case TransactionValidationError(error, tx) =>
         error match {
           case TxValidationError.TransactionNotAllowedByScript(_, isTokenScript) =>
@@ -340,6 +342,12 @@ case class OrderInvalid(o: Order, error: String) extends ApiError {
 case class InvalidChainId(expected: Byte, provided: Byte) extends ApiError {
   override val id: Int          = 404
   override val message: String  = s"Wrong chain-id. Expected - $expected, provided - $provided"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+case class InvalidProofs(msg: String) extends ApiError {
+  override val id: Int          = 405
+  override val message: String  = msg
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
