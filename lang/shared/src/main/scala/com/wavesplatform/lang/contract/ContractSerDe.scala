@@ -91,7 +91,7 @@ object ContractSerDe {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
       _ <- Either.cond(
-        cf.name.getBytes().size <= ContractLimits.MaxAnnotatedFunctionNameInBytes,
+        cf.name.getBytes("UTF-8").size <= ContractLimits.MaxAnnotatedFunctionNameInBytes,
         (),
         s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}"
       )

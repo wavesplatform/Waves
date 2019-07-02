@@ -181,7 +181,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       )
       _ <- Either.cond(
         fc.isEmpty || (fc.get.function match {
-          case FunctionHeader.User(name) => name.getBytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
+          case FunctionHeader.User(name) => name.getBytes("UTF-8").length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
           case _                         => true
         }),
         (),

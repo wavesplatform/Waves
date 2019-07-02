@@ -68,8 +68,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
     val tx = InvokeScriptTransaction
       .selfSigned(
-        KeyPair("test3".getBytes()),
-        KeyPair("test4".getBytes()),
+        KeyPair("test3".getBytes("UTF-8")),
+        KeyPair("test4".getBytes("UTF-8")),
         Some(Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
@@ -110,8 +110,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
     val tx = InvokeScriptTransaction
       .selfSigned(
-        KeyPair("test3".getBytes()),
-        KeyPair("test4".getBytes()),
+        KeyPair("test3".getBytes("UTF-8")),
+        KeyPair("test4".getBytes("UTF-8")),
         None,
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,

@@ -43,8 +43,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         .selfSigned(
           AddressScheme.current.chainId,
           issueTransactionSender,
-          "TRADE".getBytes,
-          "Waves DEX is the best exchange ever".getBytes,
+          "TRADE".getBytes("UTF-8"),
+          "Waves DEX is the best exchange ever".getBytes("UTF-8"),
           100000000,
           2,
           reissuable = false,

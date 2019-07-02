@@ -322,10 +322,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns an success if sigVerify return a success") {
-    val seed                    = "seed".getBytes()
+    val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    val bodyBytes = "message".getBytes()
+    val bodyBytes = "message".getBytes("UTF-8")
     val signature = Curve25519.sign(privateKey, bodyBytes)
 
     val r = sigVerifyTest(bodyBytes, publicKey, signature)
@@ -333,11 +333,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns correct context") {
-    val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes())
-    val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes())
-    val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes())
+    val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes("UTF-8"))
+    val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes("UTF-8"))
+    val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes("UTF-8"))
 
-    val bodyBytes = "message".getBytes()
+    val bodyBytes = "message".getBytes("UTF-8")
 
     val (log, result) = multiSig(
       bodyBytes,
@@ -356,11 +356,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns an error if sigVerify return an error") {
-    val seed           = "seed".getBytes()
+    val seed           = "seed".getBytes("UTF-8")
     val (_, publicKey) = Curve25519.createKeyPair(seed)
-    val bodyBytes      = "message".getBytes()
+    val bodyBytes      = "message".getBytes("UTF-8")
 
-    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes()))
+    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes("UTF-8")))
     r.isLeft shouldBe false
   }
 
@@ -764,7 +764,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("checking a hash of some message by crypto function invoking") {
     val bodyText      = "some text for test"
-    val bodyBytes     = bodyText.getBytes()
+    val bodyBytes     = bodyText.getBytes("UTF-8")
     val hashFunctions = Map(SHA256 -> Sha256, BLAKE256 -> Blake2b256, KECCAK256 -> Keccak256)
 
     for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteStr(funcClass.hash(bodyText)))
