@@ -272,7 +272,7 @@ package object database {
     val size = dataInput.readInt()
     val _ = dataInput.readInt() // TX count
     val headerBytes = dataInput.readByteStr(bs.length - Ints.BYTES * 2)
-    val header = PBBlockAdapter(protobuf.block.PBBlock.parseFrom(headerBytes))
+    val header = PBBlockAdapter(PBCachedBlock.fromBytes(headerBytes))
 
     (header, size)
   }
