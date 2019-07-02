@@ -13,7 +13,6 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
-  //.disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
     coverageExcludedPackages := ""
@@ -25,7 +24,6 @@ lazy val commonJVM = common.jvm
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
       version := "1.0.0",

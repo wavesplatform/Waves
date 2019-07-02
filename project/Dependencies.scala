@@ -105,7 +105,8 @@ object Dependencies {
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
-    ))
+    ) ++ protobuf.value
+  )
 
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
