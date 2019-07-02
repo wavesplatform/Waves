@@ -18,6 +18,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.block.PBBlockAdapter
+import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBTransactionAdapter}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -37,7 +38,7 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
-import scala.util.{Success, Try}
+import scala.util.Try
 
 object LevelDBWriter {
 
@@ -864,9 +865,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     db.get(Keys.blockHeaderBytesAt(height))
       .map { headerBytes =>
-        val txCount = Ints.fromByteArray(headerBytes.take(Ints.BYTES))
+        val txCount         = Ints.fromByteArray(headerBytes.take(Ints.BYTES))
         val bytesAfterCount = headerBytes.drop(Ints.BYTES)
-        val txBytes = readTransactionBytes(txCount)
+        val txBytes         = readTransactionBytes(txCount)
         Bytes.concat(bytesAfterCount, txBytes)
       }
   }
@@ -1033,6 +1034,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, TxNum, Transaction)] =
     readStream { db =>
+      val ofCodes = ofTypes.map(_.typeId).toSet
       val baseIterator: CloseableIterator[(Height, TxNum)] =
         if (reverse) {
           for {
@@ -1053,20 +1055,16 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         }
 
       baseIterator
-        .transform(_.flatMap {
+        .flatMap {
           case (height, txNum) =>
             db.get(Keys.transactionBytesAt(height, txNum))
               .flatMap { txBytes =>
-                if (ofTypes.isEmpty)
-                  TransactionParsers.parseBytes(txBytes).toOption
-                else {
-                  ofTypes.iterator
-                    .map(_.parseBytes(txBytes))
-                    .collectFirst { case Success(tx) => tx }
-                }
+                val tx = PBTransactionAdapter(PBCachedTransaction.fromBytes(txBytes))
+                if (ofCodes.contains(tx.typeId)) Some(tx)
+                else None
               }
               .map((height, txNum, _))
-        })
+        }
     }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
@@ -1100,7 +1098,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx  <- TransactionParsers.parseBytes(v)
+        tx = PBTransactionAdapter(PBCachedTransaction.fromBytes(v))
       } txs.append((TxNum(idx), tx))
     }
 

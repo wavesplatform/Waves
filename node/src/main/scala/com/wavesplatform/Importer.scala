@@ -243,7 +243,7 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     run(args) match {
       case Success(shutdown) => shutdown()
-      case Failure(ext)      => log.error(ext.getMessage)
+      case Failure(ext)      => log.error("Import error", ext)
     }
   }
 }

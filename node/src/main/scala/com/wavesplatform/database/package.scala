@@ -16,7 +16,6 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.{PBBlockAdapter, PBBlocks, PBCachedBlock}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
 import org.iq80.leveldb.{DB, ReadOptions}
 
@@ -175,16 +174,7 @@ package object database {
     ndo.toByteArray
   }
 
-  def readTransactionInfo(data: Array[Byte]): (Int, Transaction) =
-    (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)
-
   def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
-
-  def writeTransactionInfo(txInfo: (Int, Transaction)) = {
-    val (h, tx) = txInfo
-    val txBytes = tx.bytes()
-    ByteBuffer.allocate(4 + txBytes.length).putInt(h).put(txBytes).array()
-  }
 
   def readTransactionIds(data: Array[Byte]): Seq[(Int, ByteStr)] = Option(data).fold(Seq.empty[(Int, ByteStr)]) { d =>
     val b   = ByteBuffer.wrap(d)

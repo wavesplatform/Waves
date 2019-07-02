@@ -1,8 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.crypto._
-import com.wavesplatform.protobuf
-import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
+import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBTransactionAdapter}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
@@ -78,9 +77,8 @@ object TransactionParsers {
       }
 
   def parseBytes(data: Array[Byte]): Try[Transaction] =
-    Try(protobuf.transaction.PBSignedTransaction.parseFrom(data))
-      .map(PBTransactionAdapter(_))
-      .orElse(parseBytesLegacy(data))
+    parseBytesLegacy(data)
+      .orElse(Try(PBTransactionAdapter(PBCachedTransaction.fromBytes(data))))
 
   def forTypes(types: Byte*): Set[TransactionParser] =
     forTypeSet(types.toSet)
