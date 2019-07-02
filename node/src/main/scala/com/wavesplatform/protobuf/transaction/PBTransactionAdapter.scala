@@ -31,7 +31,7 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
 
   override def timestamp: Long = txBody.timestamp
 
-  override protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(
     if (isLegacy) PBTransactions.vanilla(txBody).explicitGet() match {
       case s: Signed => s.signatureValid()
       case _         => true

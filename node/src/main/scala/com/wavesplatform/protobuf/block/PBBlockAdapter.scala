@@ -16,7 +16,7 @@ class PBBlockAdapter(val block: PBCachedBlock)
       SignerData(block.block.getHeader.generator.publicKey, block.block.signature),
       NxtLikeConsensusBlockData(block.block.getHeader.baseTarget, block.block.getHeader.generationSignature),
       block.transactions.map(PBTransactionAdapter(_)),
-      block.block.getHeader.featureVotes
+      block.block.getHeader.featureVotes.iterator.map(_.toShort).toSet
     ) {
   def isLegacy: Boolean = (this.version: @switch) match {
     case 1 | 2 | 3 => true
@@ -27,7 +27,7 @@ class PBBlockAdapter(val block: PBCachedBlock)
     Coeval.evalOnce(block.bytes)
 
   override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(
-    if (isLegacy) super.bytesWithoutSignature()
+    if (isLegacy) PBBlocks.vanilla(block, unsafe = true).right.get.bytesWithoutSignature()
     else block.headerBytes // Without txs
   )
 

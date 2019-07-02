@@ -2,6 +2,9 @@ package com.wavesplatform.protobuf.utils
 import com.google.protobuf.{ByteString, CodedOutputStream}
 import scalapb.GeneratedMessage
 
+import scala.util.{Failure, Success, Try}
+
+//noinspection ScalaStyle
 object PBUtils {
   def encodeDeterministic(msg: GeneratedMessage): Array[Byte] = {
     val outArray     = new Array[Byte](msg.serializedSize)
@@ -13,20 +16,27 @@ object PBUtils {
   }
 
   def toByteStringUnsafe(bs: Array[Byte]): ByteString = {
-    val cls = Class.forName("com.google.protobuf.LiteralByteString")
-    val cons = cls.getDeclaredConstructor(classOf[Array[Byte]])
-    cons.setAccessible(true)
-    cons.newInstance(bs).asInstanceOf[ByteString]
+    Try(Class.forName("com.google.protobuf.ByteString")) match {
+      case Success(cls) =>
+        val cons = cls.getDeclaredMethod("wrap", classOf[Array[Byte]])
+        cons.setAccessible(true)
+        cons.invoke(null, bs).asInstanceOf[ByteString]
+
+      case Failure(_) =>
+        ???
+        ByteString.copyFrom(bs)
+    }
   }
 
   def toByteArrayUnsafe(bs: ByteString): Array[Byte] = {
-    val cls = Class.forName("com.google.protobuf.LiteralByteString")
-    if (cls.isInstance(bs)) {
-      val m = cls.getDeclaredField("bytes")
-      m.setAccessible(true)
-      m.get(bs).asInstanceOf[Array[Byte]]
-    } else {
-      bs.toByteArray
+    Try(bs.getClass.getDeclaredField("bytes")) match {
+      case Success(m) =>
+        m.setAccessible(true)
+        m.get(bs).asInstanceOf[Array[Byte]]
+
+      case Failure(_) =>
+        ???
+        bs.toByteArray
     }
   }
 }

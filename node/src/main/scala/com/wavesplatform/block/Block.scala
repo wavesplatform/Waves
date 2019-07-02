@@ -116,13 +116,13 @@ object BlockHeader extends ScorexLogging {
 
 }
 
-case class Block private[block] (override val timestamp: Long,
-                                 override val version: Byte,
-                                 override val reference: ByteStr,
-                                 override val signerData: SignerData,
-                                 override val consensusData: NxtLikeConsensusBlockData,
-                                 transactionData: Seq[Transaction],
-                                 override val featureVotes: Set[Short])
+case class Block private[wavesplatform] (override val timestamp: Long,
+                                         override val version: Byte,
+                                         override val reference: ByteStr,
+                                         override val signerData: SignerData,
+                                         override val consensusData: NxtLikeConsensusBlockData,
+                                         transactionData: Seq[Transaction],
+                                         override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
     with Signed {
 
@@ -290,7 +290,8 @@ object Block extends ScorexLogging {
       _ <- Either.cond(signerData.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-    } yield PBBlockAdapter(Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes))).left.map(GenericError(_)) // TODO: Directly create PB block
+    } yield PBBlockAdapter(Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes))).left
+      .map(GenericError(_)) // TODO: Directly create PB block
   }
 
   def buildAndSign(version: Byte,

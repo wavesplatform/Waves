@@ -16,7 +16,7 @@ object PBMicroBlocks {
           reference = microBlock.prevResBlockSig,
           updatedBlockSignature = microBlock.totalResBlockSig,
           senderPublicKey = ByteStr(microBlock.sender),
-          transactions = microBlock.transactionData.map(PBTransactions.protobuf)
+          transactions = microBlock.transactionData.map(PBTransactions.protobuf(_).transaction)
         )
       ),
       signature = microBlock.signature
