@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.protobuf.transaction.AssetId
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
@@ -70,7 +71,7 @@ object Asset {
     }
 
     def protoId: AssetId = ai match {
-      case IssuedAsset(id) => AssetId().withIssuedAsset(ByteString.copyFrom(id))
+      case IssuedAsset(id) => AssetId().withIssuedAsset(PBUtils.toByteStringUnsafe(id))
       case Waves => AssetId().withWaves(com.google.protobuf.empty.Empty())
     }
 

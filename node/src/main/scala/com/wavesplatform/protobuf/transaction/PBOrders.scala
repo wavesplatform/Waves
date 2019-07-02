@@ -2,6 +2,7 @@ package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
 import com.wavesplatform.{transaction => vt}
@@ -42,8 +43,8 @@ object PBOrders {
   def protobuf(order: VanillaOrder): PBOrder = {
     PBOrder(
       chainId = 0,
-      ByteString.copyFrom(order.senderPublicKey),
-      ByteString.copyFrom(order.matcherPublicKey),
+      PBUtils.toByteStringUnsafe(order.senderPublicKey),
+      PBUtils.toByteStringUnsafe(order.matcherPublicKey),
       Some(PBOrder.AssetPair(Some(order.assetPair.amountAsset.protoId), Some(order.assetPair.priceAsset.protoId))),
       order.orderType match {
         case vt.assets.exchange.OrderType.BUY  => PBOrder.Side.BUY

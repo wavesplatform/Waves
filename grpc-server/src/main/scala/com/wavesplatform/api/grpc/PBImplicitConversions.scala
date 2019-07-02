@@ -5,11 +5,11 @@ import com.wavesplatform.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.{block => vb}
+import com.wavesplatform.{crypto, block => vb}
 
 //noinspection ScalaStyle
 trait PBImplicitConversions {
@@ -23,13 +23,13 @@ trait PBImplicitConversions {
 
   implicit class PBTransactionConversions(tx: PBTransaction) {
     def toVanilla = PBSignedTransaction(Some(tx)).toVanilla
-    def sender    = PublicKey(tx.senderPublicKey.toByteArray)
+    def sender    = tx.senderPublicKey.toPublicKey
 
     def signed(signer: PrivateKey): PBSignedTransaction = {
       import com.wavesplatform.common.utils._
       PBSignedTransaction(
         Some(tx),
-        Proofs.create(Seq(ByteStr(crypto.sign(signer, toVanilla.bodyBytes())))).explicitGet().map(bs => ByteString.copyFrom(bs.arr)))
+        Proofs.create(Seq(ByteStr(crypto.sign(signer, toVanilla.bodyBytes())))).explicitGet().map(bs => PBUtils.toByteStringUnsafe(bs.arr)))
     }
   }
 
@@ -47,7 +47,7 @@ trait PBImplicitConversions {
         header.timestamp,
         header.version.toByte,
         header.reference.toByteStr,
-        vb.SignerData(header.generator.toPublicKeyAccount, signature),
+        vb.SignerData(header.generator.toPublicKey, signature),
         NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
         0,
         header.featureVotes.map(intToShort).toSet
@@ -64,7 +64,7 @@ trait PBImplicitConversions {
       header.featureVotes.map(shortToInt).toSeq,
       header.timestamp,
       header.version,
-      ByteString.copyFrom(header.signerData.generator)
+      PBUtils.toByteStringUnsafe(header.signerData.generator)
     )
   }
 
@@ -75,15 +75,15 @@ trait PBImplicitConversions {
   }
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
-    def toPBByteString     = ByteString.copyFrom(bytes.arr)
+    def toPBByteString     = PBUtils.toByteStringUnsafe(bytes.arr)
     def toPublicKeyAccount = PublicKey(bytes)
     def toAddress          = Address.fromBytes(bytes).explicitGet()
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
-    def toByteStr          = ByteStr(bytes.toByteArray)
-    def toPublicKeyAccount = PublicKey(bytes.toByteArray)
-    def toAddress          = Address.fromBytes(bytes.toByteArray).explicitGet()
+    def toByteStr   = ByteStr(PBUtils.toByteArrayUnsafe(bytes))
+    def toPublicKey = PublicKey(toByteStr)
+    def toAddress   = Address.fromBytes(toByteStr).explicitGet()
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

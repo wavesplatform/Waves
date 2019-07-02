@@ -1,6 +1,6 @@
 package com.wavesplatform.api.grpc
-import com.google.protobuf.ByteString
 import com.wavesplatform.api.common.CommonAssetsApi
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -17,8 +17,8 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
 
     AssetInfoResponse(
       info.description.issuer,
-      ByteString.copyFrom(info.description.name),
-      ByteString.copyFrom(info.description.description),
+      PBUtils.toByteStringUnsafe(info.description.name),
+      PBUtils.toByteStringUnsafe(info.description.description),
       info.description.decimals,
       info.description.reissuable,
       info.description.totalVolume.longValue(),

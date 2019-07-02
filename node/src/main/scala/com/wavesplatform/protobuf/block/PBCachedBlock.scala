@@ -1,9 +1,10 @@
 package com.wavesplatform.protobuf.block
-import com.google.protobuf.{ByteString, CodedInputStream, CodedOutputStream}
+import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.PBSerializable
 import com.wavesplatform.protobuf.transaction.PBCachedTransaction
 import com.wavesplatform.protobuf.transaction.PBCachedTransaction.PBCachedTransactionSerializable
+import com.wavesplatform.protobuf.utils.PBUtils
 import monix.eval.Coeval
 
 sealed trait PBCachedBlock {
@@ -78,7 +79,7 @@ object PBCachedBlock {
     override private[block] val transactionsCoeval = Coeval.evalOnce(transactionsSz)
 
     override private[block] val blockCoeval = Coeval.evalOnce {
-      PBBlock(Some(headerCoeval()), ByteString.copyFrom(signatureBs), transactionsCoeval().map(_.transaction))
+      PBBlock(Some(headerCoeval()), PBUtils.toByteStringUnsafe(signatureBs), transactionsCoeval().map(_.transaction))
     }
     override private[block] val bytesCoeval = Coeval.evalOnce {
       val header = Option(headerBytesCoeval()._1).filter(_.nonEmpty)

@@ -1,12 +1,12 @@
 package com.wavesplatform.protobuf.transaction
-import com.google.protobuf.ByteString
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object PBAmounts {
   def toPBAssetId(asset: Asset): AssetId = asset match {
     case Asset.IssuedAsset(id) =>
-      AssetId().withIssuedAsset(ByteString.copyFrom(id))
+      AssetId().withIssuedAsset(PBUtils.toByteStringUnsafe(id))
 
     case Asset.Waves =>
       AssetId().withWaves(com.google.protobuf.empty.Empty())

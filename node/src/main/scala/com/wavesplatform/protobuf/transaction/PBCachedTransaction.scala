@@ -2,6 +2,7 @@ package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.{ByteString, CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.PBSerializable
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.{FastHashId, Proofs}
 import monix.eval.Coeval
 
@@ -28,6 +29,9 @@ object PBCachedTransaction {
   def fromBytes(bytes: Array[Byte]): PBCachedTransaction           = new PBCachedTransactionImplWithBytes(bytes)
   def fromBodyBytes(bodyBytes: Array[Byte]): PBCachedTransaction   = new PBCachedTransactionImplWithBodyBytes(bodyBytes, Nil)
 
+  implicit def toSignedTransaction(tx: PBCachedTransaction): PBSignedTransaction =
+    tx.transaction
+
   implicit class PBCachedTransactionImplicitOps(private val tx: PBCachedTransaction) extends AnyVal {
     def withProofs(proofs: ByteString*): PBCachedTransaction = tx match {
       case bbtx: PBCachedTransactionImplWithBodyBytes =>
@@ -37,9 +41,9 @@ object PBCachedTransaction {
         new PBCachedTransactionImplWithBodyBytes(tx.bodyBytes, proofs.map(_.toByteArray))
     }
 
-    def withProofs(proof1: ByteStr, proofs: ByteStr*): PBCachedTransaction = withProofs((proof1 +: proofs).map(ByteString.copyFrom(_)): _*)
+    def withProofs(proof1: ByteStr, proofs: ByteStr*): PBCachedTransaction = withProofs((proof1 +: proofs).map(PBUtils.toByteStringUnsafe(_)): _*)
 
-    def withProofs(proofs: Proofs): PBCachedTransaction = withProofs(proofs.proofs.map(ByteString.copyFrom(_)): _*)
+    def withProofs(proofs: Proofs): PBCachedTransaction = withProofs(proofs.proofs.map(PBUtils.toByteStringUnsafe(_)): _*)
 
     def withBody(body: PBTransaction): PBCachedTransaction = tx match {
       case bbtx: PBCachedTransactionImplWithBodyBytes =>
@@ -109,7 +113,7 @@ object PBCachedTransaction {
         case ms: PBSerializable.PBMessageSerializable => ms.underlyingMessage.asInstanceOf[PBTransaction]
         case _                                        => PBTransaction.parseFrom(underlying.toBytes)
       }
-      PBSignedTransaction(Some(tx), proofsBs.map(ByteString.copyFrom))
+      PBSignedTransaction(Some(tx), proofsBs.map(PBUtils.toByteStringUnsafe))
     }
   }
 

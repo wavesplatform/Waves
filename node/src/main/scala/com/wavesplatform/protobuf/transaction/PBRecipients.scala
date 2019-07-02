@@ -1,13 +1,13 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.common.primitives.Bytes
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
   def create(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
-    case a: Address => Recipient().withAddress(ByteString.copyFrom(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
+    case a: Address => Recipient().withAddress(PBUtils.toByteStringUnsafe(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
     case a: Alias   => Recipient().withAlias(a.name)
     case _          => sys.error("Should not happen " + addressOrAlias)
   }

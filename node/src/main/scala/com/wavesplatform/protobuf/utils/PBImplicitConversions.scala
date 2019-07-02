@@ -11,11 +11,11 @@ object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
   import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias}
 
-  implicit def byteStringToByteStr(bs: PBByteString): ByteStr = bs.toByteArray
-  implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBByteString.copyFrom(bs)
+  implicit def byteStringToByteStr(bs: PBByteString): ByteStr = PBUtils.toByteArrayUnsafe(bs)
+  implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBUtils.toByteStringUnsafe(bs)
 
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = PBRecipients.create(addressOrAlias)
-  implicit def fromAddress(address: VAddress): PBByteString                  = PBByteString.copyFrom(address.bytes)
+  implicit def fromAddress(address: VAddress): PBByteString                  = PBUtils.toByteStringUnsafe(address.bytes)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
     def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)
@@ -51,6 +51,6 @@ object PBImplicitConversions {
     else bytes.byteAt(0)
 
   implicit def byteToByteString(chainId: Byte): ByteString = {
-    if (chainId == 0) ByteString.EMPTY else ByteString.copyFrom(Array(chainId))
+    if (chainId == 0) ByteString.EMPTY else ByteStr(Array(chainId))
   }
 }

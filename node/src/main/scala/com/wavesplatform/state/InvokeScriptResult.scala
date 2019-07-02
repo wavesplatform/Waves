@@ -1,6 +1,5 @@
 package com.wavesplatform.state
 import cats.kernel.Monoid
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
@@ -52,7 +51,7 @@ object InvokeScriptResult {
       isr.transfers.map(
         payment =>
           PBInvokeScriptResult.Payment(
-            ByteString.copyFrom(payment.address.bytes),
+            PBUtils.toByteStringUnsafe(payment.address.bytes),
             Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
           ))
     )

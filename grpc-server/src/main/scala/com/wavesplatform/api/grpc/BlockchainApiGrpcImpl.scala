@@ -1,8 +1,8 @@
 package com.wavesplatform.api.grpc
-import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.FeaturesSettings
 import com.wavesplatform.state.Blockchain
 import monix.execution.Scheduler
@@ -50,6 +50,6 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
   }
 
   override def getCumulativeScore(request: Empty): Future[ScoreResponse] = Future {
-    ScoreResponse(ByteString.copyFrom(blockchain.score.toByteArray))
+    ScoreResponse(PBUtils.toByteStringUnsafe(blockchain.score.toByteArray))
   }
 }

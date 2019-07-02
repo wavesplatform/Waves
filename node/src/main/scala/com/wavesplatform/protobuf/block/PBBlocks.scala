@@ -1,13 +1,13 @@
 package com.wavesplatform.protobuf.block
 import cats.instances.all._
 import cats.syntax.traverse._
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.SignerData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
+import com.wavesplatform.protobuf.utils.PBUtils
 
 object PBBlocks {
   def vanilla(block: PBCachedBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
@@ -51,7 +51,7 @@ object PBBlocks {
 
         new PBBlock(
           Some(protobufHeaderAndSignature(block)._1),
-          ByteString.copyFrom(signature),
+          PBUtils.toByteStringUnsafe(signature),
           transactionData.map(PBTransactions.protobuf(_).transaction)
         )
     }
@@ -67,13 +67,13 @@ object PBBlocks {
       import signerData._
       val header = PBBlock.Header(
         AddressScheme.current.chainId,
-        ByteString.copyFrom(reference),
+        PBUtils.toByteStringUnsafe(reference),
         baseTarget,
-        ByteString.copyFrom(generationSignature),
+        PBUtils.toByteStringUnsafe(generationSignature),
         featureVotes.map(shortToInt).toSeq,
         timestamp,
         version,
-        ByteString.copyFrom(generator)
+        PBUtils.toByteStringUnsafe(generator)
       )
       (header, h.signerData.signature)
   }
@@ -81,7 +81,7 @@ object PBBlocks {
   def vanillaHeader(h: PBBlock.Header, signature: Array[Byte]): VanillaBlockHeader = {
     val block = PBBlock()
       .withHeader(h)
-      .withSignature(ByteString.copyFrom(signature))
+      .withSignature(PBUtils.toByteStringUnsafe(signature))
     PBBlockAdapter(block) // Not contains transactionsCount
   }
 

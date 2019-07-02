@@ -1,5 +1,4 @@
 package com.wavesplatform.protobuf.transaction
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -7,6 +6,7 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -30,7 +30,7 @@ object PBTransactions {
     : SignedTransaction = {
     new SignedTransaction(
       Some(Transaction(chainId, sender: ByteStr, Some((feeAssetId, fee): Amount), timestamp, version, data)),
-      proofsArray.map(bs => ByteString.copyFrom(bs.arr))
+      proofsArray.map(bs => PBUtils.toByteStringUnsafe(bs.arr))
     )
   }
 
@@ -556,7 +556,7 @@ object PBTransactions {
 
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
-        val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)
+        val data = GenesisTransactionData(ByteStr(recipient.bytes), amount)
         PBTransactions.create(sender = PublicKey(Array.emptyByteArray),
                               timestamp = timestamp,
                               version = 1,
@@ -564,15 +564,15 @@ object PBTransactions {
                               data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
-        val data = PaymentTransactionData(ByteString.copyFrom(recipient.bytes), amount)
+        val data = PaymentTransactionData(ByteStr(recipient.bytes), amount)
         PBTransactions.create(sender, NoChainId, fee, Waves, timestamp, 1, Seq(signature), Data.Payment(data))
 
       case vt.transfer.TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, fee, attachment, signature) =>
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), ByteString.copyFrom(attachment))
+        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), ByteStr(attachment))
         PBTransactions.create(sender, NoChainId, fee, feeAssetId, timestamp, 1, Seq(signature), Data.Transfer(data))
 
       case vt.transfer.TransferTransactionV2(sender, recipient, assetId, amount, timestamp, feeAssetId, fee, attachment, proofs) =>
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), ByteString.copyFrom(attachment))
+        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), ByteStr(attachment))
         PBTransactions.create(sender, NoChainId, fee, feeAssetId, timestamp, 2, proofs, Data.Transfer(data))
 
       case tx @ vt.CreateAliasTransactionV1(sender, alias, fee, timestamp, signature) =>
@@ -674,7 +674,7 @@ object PBTransactions {
 
         val data = InvokeScriptTransactionData(
           Some(PBRecipients.create(dappAddress)),
-          ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+          ByteStr(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
           payment.map(p => (p.assetId, p.amount): Amount)
         )
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
