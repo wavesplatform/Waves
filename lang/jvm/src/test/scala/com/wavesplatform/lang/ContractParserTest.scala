@@ -19,7 +19,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
 
   private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
     import e.{index => i}
-    println(s"val code1 = new String(Array[Byte](${x.getBytes.mkString(",")}))")
+    println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
     println(s"""val code2 = "${escapedCode(x)}"""")
     println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
       .mkString("\n")}")

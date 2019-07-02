@@ -16,7 +16,7 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
 
   property("should parse all bytes for V1") {
     forAll(exprGen) { sc =>
-      val body     = Array(V1.id.toByte) ++ Serde.serialize(sc) ++ "foo".getBytes
+      val body     = Array(V1.id.toByte) ++ Serde.serialize(sc) ++ "foo".getBytes("UTF-8")
       val allBytes = body ++ crypto.secureHash(body).take(checksumLength)
       ScriptReader.fromBytes(allBytes) should produce("bytes left")
     }

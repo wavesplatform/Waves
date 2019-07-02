@@ -446,7 +446,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         //DECODE SIGNATURE
         val msg: Try[Array[Byte]] =
           if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
-          else Success(m.message.getBytes)
+          else Success(m.message.getBytes("UTF-8"))
         verifySigned(msg, m.signature, m.publickey, address)
       }
     }

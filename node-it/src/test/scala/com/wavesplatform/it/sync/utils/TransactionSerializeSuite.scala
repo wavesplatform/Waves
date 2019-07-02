@@ -160,8 +160,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val issueV1 = IssueTransactionV1
     .create(
       publicKey,
-      "Gigacoin".getBytes,
-      "Gigacoin".getBytes,
+      "Gigacoin".getBytes("UTF-8"),
+      "Gigacoin".getBytes("UTF-8"),
       someAssetAmount,
       8,
       true,
@@ -176,8 +176,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      "Gigacoin".getBytes,
-      "Gigacoin".getBytes,
+      "Gigacoin".getBytes("UTF-8"),
+      "Gigacoin".getBytes("UTF-8"),
       someAssetAmount,
       8,
       true,

@@ -51,7 +51,7 @@ object GenesisBlockGenerator extends App {
                              accountAddress: Address)
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
-    val seedHash = item.seedText.getBytes
+    val seedHash = item.seedText.getBytes("UTF-8")
     val acc      = Wallet.generateNewAccount(seedHash, item.nonce)
 
     FullAddressInfo(

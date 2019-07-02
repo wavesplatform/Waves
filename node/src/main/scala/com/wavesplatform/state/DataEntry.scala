@@ -59,7 +59,7 @@ object DataEntry {
 
       case t if t == Type.String.id =>
         val (blob, p1)            = Deser.parseArrayWithLength(bytes, p + 1)
-        implicit val dataBytesOpt: DataBytesOpt = Some(bytes.slice(p - 2 - key.getBytes.length, p1))      //all bytes of this data entry
+        implicit val dataBytesOpt: DataBytesOpt = Some(bytes.slice(p - 2 - key.getBytes("UTF-8").length, p1))      //all bytes of this data entry
         (StringDataEntry(key, new String(blob, UTF_8)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }

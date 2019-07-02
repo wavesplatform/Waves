@@ -193,7 +193,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransactionV1.selfSigned(sender, "test".getBytes, Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
+            IssueTransactionV1.selfSigned(sender, "test".getBytes("UTF-8"), Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
 
           d.appendBlock(
             TestBlock.create(

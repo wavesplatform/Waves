@@ -343,7 +343,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("bytestring") {
     val test = Base58.encode("abc".getBytes("UTF-8"))
     // ([REVIEW]: may be i`am make a mistake here)
-    val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes())).explicitGet()), REF("param"))
+    val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes("UTF-8"))).explicitGet()), REF("param"))
     Decompiler(expr, decompilerContext) shouldEq
       """let param = base58'3K3F4C'
         |param""".stripMargin

@@ -25,7 +25,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val allChannels = stub[ChannelGroup]
   private val state       = stub[Blockchain]
 
-  private val seed               = "seed".getBytes()
+  private val seed               = "seed".getBytes("UTF-8")
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 

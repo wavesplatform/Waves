@@ -259,7 +259,7 @@ object UtilApp {
           System.in
 
         case Input.Str(s) =>
-          new ByteArrayInputStream(s.getBytes)
+          new ByteArrayInputStream(s.getBytes("UTF-8"))
 
         case Input.File(file) =>
           new FileInputStream(file)

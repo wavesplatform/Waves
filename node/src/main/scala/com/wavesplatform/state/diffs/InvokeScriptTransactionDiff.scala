@@ -196,9 +196,14 @@ object InvokeScriptTransactionDiff {
           val isr = InvokeScriptResult(data = dataEntries, transfers = paymentReceiversMap.toVector.flatMap {
             case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
           })
-          dataAndPaymentDiff.copy(scriptsRun = scriptsInvoked + 1, scriptsComplexity = scriptsComplexity) |+| Diff.stateOps(portfolios = transfers,
-                                                                                                                            scriptResults =
-                                                                                                                              Map(tx.id() -> isr))
+          val dataAndPaymentDiffTx = dataAndPaymentDiff.transactions(tx.id())
+          val dataAndPaymentDiffTxWithTransfers = dataAndPaymentDiffTx.copy(_2 = dataAndPaymentDiffTx._2 ++ transfers.keys)
+          val transferSetDiff = Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
+          dataAndPaymentDiff.copy(
+            transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
+            scriptsRun = scriptsInvoked + 1,
+            scriptsComplexity = scriptsComplexity
+          ) |+| transferSetDiff
         }
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
@@ -212,7 +217,7 @@ object InvokeScriptTransactionDiff {
                                  feePart: Map[Address, Portfolio]) = {
     if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
       Left(GenericError(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
-    } else if (dataEntries.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
+    } else if (dataEntries.exists(_.key.getBytes("UTF-8").length > ContractLimits.MaxKeySizeInBytes)) {
       Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
     } else {
       val totalDataBytes = dataEntries.map(_.toBytes.length).sum
