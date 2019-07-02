@@ -564,7 +564,7 @@ object PBTransactions {
   }
 
   def protobuf(tx: VanillaTransaction): PBCachedTransaction = {
-    val pbTx = tx match {
+    val pbTx: PBCachedTransaction = tx match {
       case a: PBTransactionAdapter =>
         a.transaction
 
