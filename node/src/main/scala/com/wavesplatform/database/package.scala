@@ -9,12 +9,12 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.{Block, BlockHeader, SignerData}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.block.{PBBlockAdapter, PBBlocks, PBCachedBlock}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
@@ -26,9 +26,8 @@ package object database {
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
 
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
-    def writeByteStr(s: ByteStr) = {
+    def writeByteStr(s: ByteStr): Unit =
       output.write(s.arr)
-    }
 
     def writeBigInt(v: BigInt): Unit = {
       val b = v.toByteArray
@@ -253,57 +252,25 @@ package object database {
   }
 
   def writeBlockHeaderAndSize(data: (BlockHeader, Int)): Array[Byte] = {
-    val (bh, size) = data
+    val (blockHeader, size) = data
 
-    val ndo = newDataOutput()
+    val dataOutput = newDataOutput()
 
-    ndo.writeInt(size)
+    dataOutput.writeInt(size)
 
-    ndo.writeByte(bh.version)
-    ndo.writeLong(bh.timestamp)
-    ndo.writeByteStr(bh.reference)
-    ndo.writeLong(bh.consensusData.baseTarget)
-    ndo.writeByteStr(bh.consensusData.generationSignature)
+    val (header, signature) = PBBlocks.protobufHeaderAndSignature(blockHeader)
+    val block = PBCachedBlock.create(header, signature)
+    dataOutput.writeByteStr(block.bytes)
 
-    if (bh.version == 1 | bh.version == 2)
-      ndo.writeByte(bh.transactionCount)
-    else
-      ndo.writeInt(bh.transactionCount)
-
-    ndo.writeInt(bh.featureVotes.size)
-    bh.featureVotes.foreach(s => ndo.writeShort(s))
-    ndo.write(bh.signerData.generator)
-    ndo.writeByteStr(bh.signerData.signature)
-
-    ndo.toByteArray
+    dataOutput.toByteArray
   }
 
   def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int) = {
-    val ndi = newDataInput(bs)
+    val dataInput = newDataInput(bs)
 
-    val size = ndi.readInt()
-
-    val version    = ndi.readByte()
-    val timestamp  = ndi.readLong()
-    val reference  = ndi.readSignature
-    val baseTarget = ndi.readLong()
-    val genSig     = ndi.readByteStr(Block.GeneratorSignatureLength)
-    val transactionCount = {
-      if (version == 1 || version == 2) ndi.readByte()
-      else ndi.readInt()
-    }
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-    val generator         = ndi.readPublicKey
-    val signature         = ndi.readSignature
-
-    val header = new BlockHeader(timestamp,
-                                 version,
-                                 reference,
-                                 SignerData(generator, signature),
-                                 NxtLikeConsensusBlockData(baseTarget, genSig),
-                                 transactionCount,
-                                 featureVotes)
+    val size = dataInput.readInt()
+    val headerBytes = dataInput.readByteStr(bs.length - Ints.BYTES)
+    val header = PBBlockAdapter(protobuf.block.PBBlock.parseFrom(headerBytes))
 
     (header, size)
   }

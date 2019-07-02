@@ -4,10 +4,9 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
-import com.wavesplatform.block.Block
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlocks, PBCachedBlock}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
@@ -24,7 +23,7 @@ object Exporter extends ScorexLogging {
 
     def list         = Seq(Binary, Protobuf, Json)
     def importerList = Seq(Binary, Protobuf)
-    def default      = Binary
+    def default      = Protobuf
 
     def isSupported(f: String)           = list.contains(f.toUpperCase)
     def isSupportedInImporter(f: String) = importerList.contains(f.toUpperCase)
@@ -78,14 +77,18 @@ object Exporter extends ScorexLogging {
     def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
       val maybeBlockBytes = blockchain.blockBytes(height)
       maybeBlockBytes
-        .map { oldBytes =>
-          val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
-          val bytesLength = bytes.length
+        .map { pbBytes =>
+          import com.wavesplatform.common.utils._
+          val bytes =
+            if (legacy)
+              PBBlocks.vanilla(PBCachedBlock.fromBytes(pbBytes)).explicitGet().bytes()
+            else
+              pbBytes
 
-          stream.write(Ints.toByteArray(bytesLength))
+          stream.write(Ints.toByteArray(bytes.length))
           stream.write(bytes)
 
-          Ints.BYTES + bytesLength
+          Ints.BYTES + bytes.length
         }
         .getOrElse(0)
     }

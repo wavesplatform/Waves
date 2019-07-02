@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.crypto._
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
@@ -46,7 +47,8 @@ object TransactionParsers {
     LeaseCancelTransactionV2,
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
-    InvokeScriptTransaction
+    InvokeScriptTransaction,
+    PBTransactionAdapter
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)

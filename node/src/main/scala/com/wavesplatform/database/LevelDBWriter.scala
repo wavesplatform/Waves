@@ -1,10 +1,12 @@
 package com.wavesplatform.database
 
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Shorts}
+import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -15,6 +17,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.block.PBBlockAdapter
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -265,6 +268,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         k -> v
       }.toMap
 
+    assert(block.isInstanceOf[PBBlockAdapter], "Not PB block")
     rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
@@ -840,57 +844,30 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
-    import com.wavesplatform.crypto._
-
     val height = Height(h)
 
-    val consensuDataOffset = 1 + 8 + SignatureLength
-
-    // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
-
-    val headerKey = Keys.blockHeaderBytesAt(height)
-
-    def readTransactionBytes(count: Int) = {
-      (0 until count).toArray.flatMap { n =>
+    def readTransactionBytes(count: Int): Array[Byte] = {
+      val transactionsBytes = (0 until count).toArray.map { n =>
         db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
-          .map { txBytes =>
-            Ints.toByteArray(txBytes.length) ++ txBytes
-          }
           .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
       }
+
+      val bytesOutput = new ByteArrayOutputStream()
+      val codedOutput = CodedOutputStream.newInstance(bytesOutput)
+      transactionsBytes.foreach { txBytes =>
+        codedOutput.writeTag(3, 2)
+        codedOutput.writeByteArrayNoTag(txBytes)
+      }
+      codedOutput.flush()
+      bytesOutput.toByteArray
     }
 
-    db.get(headerKey)
+    db.get(Keys.blockHeaderBytesAt(height))
       .map { headerBytes =>
-        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
-        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
-        val version            = headerBytes.head
-        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
-          val byte = headerBytes(txCountOffset)
-          (byte.toInt, Array[Byte](byte))
-        } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
-          (Ints.fromByteArray(bytes), bytes)
-        }
-
-        val bytesAfterTxs =
-          if (version > 2) {
-            headerBytes.drop(txCountOffset + txCountBytes.length)
-          } else {
-            headerBytes.takeRight(SignatureLength + KeyLength)
-          }
-
-        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
-
-        val bytes = bytesBeforeCData ++
-          Ints.toByteArray(consensusDataBytes.length) ++
-          consensusDataBytes ++
-          Ints.toByteArray(txBytes.length) ++
-          txBytes ++
-          bytesAfterTxs
-
-        bytes
+        val txCount = Ints.fromByteArray(headerBytes.take(Ints.BYTES))
+        val bytesAfterCount = headerBytes.drop(Ints.BYTES)
+        val txBytes = readTransactionBytes(txCount)
+        Bytes.concat(bytesAfterCount, txBytes)
       }
   }
 

@@ -82,7 +82,7 @@ object MicroBlock extends ScorexLogging {
       nonSigned.copy(signature = ByteStr(signature))
     }
 
-  def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =
+  def parseBytes(bytes: Array[Byte]): Try[MicroBlock] = // TODO: PB microblock
     Try {
 
       val version = bytes.head

@@ -19,11 +19,13 @@ object PBBlocks {
                featureVotes: Set[Short],
                generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
+      new VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
     }
 
-    for {
-      header <- Right(block.header)
+    if (block.block.getHeader.version > 3)
+      Right(PBBlockAdapter(block))
+    else for {
+      header       <- Right(block.header)
       transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
       result = create(
         header.version,
@@ -38,26 +40,49 @@ object PBBlocks {
     } yield result
   }
 
-  def protobuf(block: VanillaBlock): PBBlock = {
-    import block._
-    import consensusData._
-    import signerData._
+  def protobuf(block: VanillaBlock): PBCachedBlock = {
+    block match {
+      case a: PBBlockAdapter =>
+        a.block
 
-    new PBBlock(
-      Some(
-        PBBlock.Header(
-          0: Byte,
-          ByteString.copyFrom(reference),
-          baseTarget,
-          ByteString.copyFrom(generationSignature),
-          featureVotes.map(shortToInt).toSeq,
-          timestamp,
-          version,
-          ByteString.copyFrom(generator)
-        )),
-      ByteString.copyFrom(signature),
-      transactionData.map(PBTransactions.protobuf)
-    )
+      case _ =>
+        import block._
+        import signerData._
+
+        new PBBlock(
+          Some(protobufHeaderAndSignature(block)._1),
+          ByteString.copyFrom(signature),
+          transactionData.map(PBTransactions.protobuf(_).transaction)
+        )
+    }
+  }
+
+  def protobufHeaderAndSignature(h: VanillaBlockHeader): (PBBlock.Header, Array[Byte]) = h match {
+    case a: PBBlockAdapter =>
+      (a.block.header, a.block.signature)
+
+    case _ =>
+      import h._
+      import consensusData._
+      import signerData._
+      val header = PBBlock.Header(
+        AddressScheme.current.chainId,
+        ByteString.copyFrom(reference),
+        baseTarget,
+        ByteString.copyFrom(generationSignature),
+        featureVotes.map(shortToInt).toSeq,
+        timestamp,
+        version,
+        ByteString.copyFrom(generator)
+      )
+      (header, h.signerData.signature)
+  }
+
+  def vanillaHeader(h: PBBlock.Header, signature: Array[Byte]): VanillaBlockHeader = {
+    val block = PBBlock()
+      .withHeader(h)
+      .withSignature(ByteString.copyFrom(signature))
+    PBBlockAdapter(block) // Not contains transactionsCount
   }
 
   def clearChainId(block: PBBlock): PBBlock = {

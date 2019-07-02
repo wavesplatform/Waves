@@ -12,6 +12,7 @@ import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensus
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlockAdapter}
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -236,7 +237,7 @@ object Block extends ScorexLogging {
     }
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Block] =
+  def parseBytesLegacy(bytes: Array[Byte]): Try[Block] =
     for {
       (blockHeader, transactionBytes) <- BlockHeader.parseBytes(bytes)
       transactionsData                <- transParseBytes(blockHeader.version, transactionBytes)
@@ -250,6 +251,15 @@ object Block extends ScorexLogging {
         blockHeader.featureVotes
       ).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
     } yield block
+
+  def parseBytesPB(bytes: Array[Byte]): Try[PBBlock] =
+    Try(PBBlock.parseFrom(bytes))
+
+  def parseBytes(bytes: Array[Byte]): Try[Block] = {
+    parseBytesPB(bytes)
+      .map(PBBlockAdapter(_))
+      .orElse(parseBytesLegacy(bytes))
+  }
 
   def areTxsFitInBlock(blockVersion: Byte, txsCount: Int): Boolean = {
     (blockVersion == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (blockVersion <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2)
@@ -280,7 +290,7 @@ object Block extends ScorexLogging {
       _ <- Either.cond(signerData.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-    } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left.map(GenericError(_))
+    } yield PBBlockAdapter(Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes))).left.map(GenericError(_)) // TODO: Directly create PB block
   }
 
   def buildAndSign(version: Byte,

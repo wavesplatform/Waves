@@ -1,5 +1,6 @@
 package com.wavesplatform.protobuf
 
+//noinspection TypeAnnotation
 package object block {
   type PBBlock = com.wavesplatform.protobuf.block.Block
   val PBBlock = com.wavesplatform.protobuf.block.Block
@@ -15,4 +16,7 @@ package object block {
 
   type VanillaMicroBlock = com.wavesplatform.block.MicroBlock
   val VanillaMicroBlock = com.wavesplatform.block.MicroBlock
+
+  type VanillaBlockHeader = com.wavesplatform.block.BlockHeader
+  val VanillaBlockHeader = com.wavesplatform.block.BlockHeader
 }

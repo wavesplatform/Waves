@@ -14,7 +14,6 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Portfolio}
@@ -186,9 +185,7 @@ object Importer extends ScorexLogging {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
-            val Right(block) =
-              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer).toEither
-              else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
+            val block = Block.parseBytes(buffer).get
 
             if (blockchainUpdater.lastBlockId.contains(block.reference)) {
               Await.result(appendBlock(block).runAsync(scheduler), Duration.Inf) match {

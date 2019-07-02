@@ -35,7 +35,9 @@ object PBTransactions {
   }
 
   def vanilla(signedTx: PBCachedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
-    for {
+    if (signedTx.transaction.getTransaction.version > 2)
+      Right(PBTransactionAdapter(signedTx))
+    else for {
       parsedTx <- signedTx.transaction.transaction.toRight(GenericError("Transaction must be specified"))
       fee      <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
       _        <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
@@ -547,8 +549,11 @@ object PBTransactions {
     }
   }
 
-  def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
+  def protobuf(tx: VanillaTransaction): PBCachedTransaction = {
     tx match {
+      case a: PBTransactionAdapter =>
+        a.transaction
+
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(ByteString.copyFrom(recipient.bytes), amount)

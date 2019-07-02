@@ -1,6 +1,8 @@
 package com.wavesplatform.protobuf.transaction
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.transaction.description.{ByteEntity, BytesArrayUndefinedLength}
@@ -12,49 +14,55 @@ import scala.annotation.switch
 import scala.reflect.ClassTag
 import scala.util.Try
 
-class PBTransactionAdapter(tx: PBCachedTransaction) extends VanillaTransaction with Signed with FastHashId {
-  def isLegacy: Boolean = (tx.transaction.getTransaction.version: @switch) match {
+class PBTransactionAdapter(val transaction: PBCachedTransaction) extends VanillaTransaction with Signed with FastHashId {
+  private[this] val txBody: PBTransaction = transaction.transaction.getTransaction
+
+  def isLegacy: Boolean = (txBody.version: @switch) match {
     case 1 | 2 => true
     case _     => false
   }
 
   //noinspection ScalaStyle
-  private[this] lazy val vanillaTx: VanillaTransaction = if (isLegacy) PBTransactions.vanilla(tx, unsafe = true).explicitGet() else null
+  private[this] lazy val vanillaTx: VanillaTransaction = if (isLegacy) PBTransactions.vanilla(txBody, unsafe = true).explicitGet() else null
 
   override def builder: TransactionParser = PBTransactionAdapter
 
-  override def assetFee: (VanillaAssetId, Long) = PBAmounts.toAssetAndAmount(tx.transaction.getTransaction.getFee)
+  override def assetFee: (VanillaAssetId, Long) = PBAmounts.toAssetAndAmount(txBody.getFee)
 
-  override def timestamp: Long = tx.transaction.getTransaction.timestamp
+  override def timestamp: Long = txBody.timestamp
 
   override protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(
-    if (isLegacy) PBTransactions.vanilla(tx).explicitGet() match {
+    if (isLegacy) PBTransactions.vanilla(txBody).explicitGet() match {
       case s: Signed => s.signatureValid()
       case _         => true
     } else true
   )
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    if (isLegacy) vanillaTx.bytes()
-    else tx.bytes
-  )
+  override val bytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(PBTransactionAdapter.toBytes(this))
 
-  override def proofs: Proofs = ???
+  override val proofs: Proofs =
+    Proofs(transaction.proofs.map(ByteStr(_)))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     if (isLegacy) vanillaTx.bodyBytes()
-    else tx.bodyBytes
-  )
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    if (isLegacy) vanillaTx.json()
-    else ???
+    else transaction.bodyBytes
   )
 
-  override val sender: PublicKey = tx.transaction.getTransaction.senderPublicKey.publicKey
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
+    if (isLegacy) vanillaTx.json()
+    else ??? // TODO: PB json format
+  )
+
+  override val sender: PublicKey = txBody.senderPublicKey.publicKey
 }
 
 object PBTransactionAdapter extends TransactionParser.OneVersion {
   def apply(tx: PBCachedTransaction): PBTransactionAdapter = new PBTransactionAdapter(tx)
+  def apply(tx: VanillaTransaction): PBTransactionAdapter = tx match {
+    case a: PBTransactionAdapter => a
+    case _                       => new PBTransactionAdapter(PBTransactions.protobuf(tx))
+  }
 
   override def version: Byte = 1
 
@@ -69,5 +77,8 @@ object PBTransactionAdapter extends TransactionParser.OneVersion {
 
   override val byteTailDescription: ByteEntity[TransactionT] =
     BytesArrayUndefinedLength(0, "PB bytes", Int.MaxValue)
-      .map(bs => new PBTransactionAdapter(PBCachedTransaction.fromBytes(bs)))
+      .map(bs => apply(PBCachedTransaction.fromBytes(bs)))
+
+  private def toBytes(tx: TransactionT): Array[Byte] =
+    Bytes.concat(Array[Byte](PBTransactionAdapter.typeId, PBTransactionAdapter.version), tx.transaction.bytes)
 }
