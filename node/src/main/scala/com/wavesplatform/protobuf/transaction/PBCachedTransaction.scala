@@ -145,7 +145,7 @@ object PBCachedTransaction {
 
     private[transaction] val proofsCoeval = Coeval.evalOnce(underlying match {
       case ms: PBSerializable.PBMessageSerializable =>
-        ms.underlyingMessage.asInstanceOf[PBSignedTransaction].proofs.map(_.toByteArray)
+        ms.underlyingMessage.asInstanceOf[PBSignedTransaction].proofs.map(PBUtils.toByteArrayUnsafe)
       case _ =>
         val inputStream = CodedInputStream.newInstance(underlying.toBytes)
         val proofsBuilder = Vector.newBuilder[Array[Byte]]

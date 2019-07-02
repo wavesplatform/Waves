@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.metrics._
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
@@ -33,7 +34,7 @@ object Verifier extends ScorexLogging {
   type ValidationResult[T] = Either[ValidationError, T]
 
   def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
-    val validatedTx: TracedResult[ValidationError, Transaction] = tx match {
+    val validatedTx: TracedResult[ValidationError, Transaction] = PBTransactionAdapter.unwrap(tx) match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {

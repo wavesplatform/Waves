@@ -4,6 +4,7 @@ import com.google.common.primitives.Bytes
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.transaction._
@@ -13,7 +14,6 @@ import com.wavesplatform.transaction.description.{ByteEntity, BytesArrayUndefine
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.{transaction => vt}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -21,7 +21,7 @@ import scala.annotation.switch
 import scala.reflect.ClassTag
 import scala.util.Try
 
-class PBTransactionAdapter(val transaction: PBCachedTransaction) extends VanillaTransaction with vt.SignedTransaction {
+class PBTransactionAdapter(val transaction: PBCachedTransaction) extends VanillaTransaction with Signed with Proven {
   private[this] val txBody: PBTransaction = transaction.transaction.getTransaction
 
   def isLegacy: Boolean = (txBody.version: @switch) match {
@@ -30,7 +30,7 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
   }
 
   //noinspection ScalaStyle
-  private lazy val vanillaTx: VanillaTransaction = PBTransactions.vanilla(txBody, unsafe = true).explicitGet()
+  private lazy val vanillaTx: VanillaTransaction = PBTransactions.vanilla(transaction, unsafe = true).explicitGet()
 
   override def builder: TransactionParser = PBTransactionAdapter
 
@@ -53,8 +53,6 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
     if (isLegacy) vanillaTx.bodyBytes()
     else transaction.bodyBytes
   )
-
-  override val signature: ByteStr = transaction.proofs.headOption.fold(ByteStr.empty)(ByteStr(_))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(
     if (isLegacy) vanillaTx.id()
@@ -87,6 +85,9 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
     case Data.SetAssetScript(_)  => SetAssetScriptTransaction.typeId
     case Data.InvokeScript(_)    => InvokeScriptTransaction.typeId
   }
+
+  private[this] def verifySignature(): Boolean =
+    proofs.nonEmpty && crypto.verify(proofs.head, bodyBytes(), sender)
 }
 
 object PBTransactionAdapter extends TransactionParser.OneVersion {
