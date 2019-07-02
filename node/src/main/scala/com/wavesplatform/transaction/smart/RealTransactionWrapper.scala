@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.transfer._
 object RealTransactionWrapper {
 
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
-    val v = tx match {
+    val v = tx matchData {
       case vt: VersionedTransaction => vt.version
       case _                        => 1
     }
@@ -59,7 +59,7 @@ object RealTransactionWrapper {
   }
 
   def apply(tx: Transaction, txIdOpt: Option[ByteStr] = None): Tx = {
-    tx match {
+    tx matchData {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient)
       case t: TransferTransaction => mapTransferTx(t)
       case i: IssueTransaction =>

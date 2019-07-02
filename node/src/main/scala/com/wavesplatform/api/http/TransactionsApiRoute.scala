@@ -216,7 +216,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
-    tx match {
+    tx matchData {
       case lease: LeaseTransaction =>
         import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
@@ -238,7 +238,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
         */
       def txToCompactJson(address: Address, tx: Transaction): JsObject = {
         import com.wavesplatform.transaction.transfer._
-        tx match {
+        tx matchData {
           case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
           case _                                                               => txToExtendedJson(tx)
         }

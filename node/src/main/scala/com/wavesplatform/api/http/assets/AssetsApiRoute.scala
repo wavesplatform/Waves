@@ -288,7 +288,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
       tt <- blockchain.transactionInfo(id).toRight("Failed to find issue transaction by ID")
       (h, mtx) = tt
-      tx <- (mtx match {
+      tx <- (mtx matchData {
         case t: IssueTransaction => Some(t)
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")

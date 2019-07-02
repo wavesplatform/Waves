@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
@@ -60,7 +59,7 @@ object TransactionDiffer extends ScorexLogging {
 
   def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.typeId) {
-      PBTransactionAdapter.unwrap(tx) match {
+      tx matchData {
         case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction =>
           PaymentTransactionDiff(blockchain.settings.functionalitySettings, blockchain.height, currentBlockTimestamp)(ptx)

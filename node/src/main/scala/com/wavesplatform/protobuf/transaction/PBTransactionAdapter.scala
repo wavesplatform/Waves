@@ -20,8 +20,8 @@ import scala.annotation.switch
 import scala.reflect.ClassTag
 import scala.util.{Success, Try}
 
-class PBTransactionAdapter(val transaction: PBCachedTransaction) extends VanillaTransaction with Signed with Proven {
-  private[this] val txBody: PBTransaction = transaction.transaction.getTransaction
+class PBTransactionAdapter(val transaction: PBCachedTransaction) extends VanillaTransaction with Signed with Proven with Authorized {
+  private[this] lazy val txBody: PBTransaction = transaction.transaction.getTransaction
 
   def isLegacy: Boolean = (txBody.version: @switch) match {
     case 1 | 2 => true
@@ -41,7 +41,8 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
     Coeval.evalOnce((txBody.data.isGenesis || txBody.version > 1) || this.verifySignature())
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    transaction.bytes
+    if (isLegacy) vanillaTx.bytes()
+    else transaction.bytes
   )
 
   override val proofs: Proofs =
@@ -62,9 +63,9 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
     else ??? // TODO: PB json format
   )
 
-  override val sender: PublicKey = txBody.senderPublicKey.publicKey
+  override lazy val sender: PublicKey = txBody.senderPublicKey.publicKey
 
-  override val typeId: Byte = txBody.data match {
+  override lazy val typeId: Byte = txBody.data match {
     case Data.Empty              => 0
     case Data.Genesis(_)         => GenesisTransaction.typeId
     case Data.Payment(_)         => PaymentTransaction.typeId
@@ -95,9 +96,10 @@ object PBTransactionAdapter extends TransactionParser {
     case _                       => new PBTransactionAdapter(PBTransactions.protobuf(tx))
   }
 
+  // TODO: Remove
   def unwrap(tx: VanillaTransaction) = tx match {
-    case a: PBTransactionAdapter if a.isLegacy => a.vanillaTx
-    case _                                     => tx
+    case a: PBTransactionAdapter => a.vanillaTx
+    case _                       => tx
   }
 
   override def supportedVersions: Set[Byte] = Set(1)

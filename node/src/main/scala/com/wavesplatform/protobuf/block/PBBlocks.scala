@@ -40,6 +40,9 @@ object PBBlocks {
     } yield result
   }
 
+  def vanillaUnsafe(block: PBCachedBlock): VanillaBlock =
+    vanilla(block).fold(throw _, identity)
+
   def protobuf(block: VanillaBlock): PBCachedBlock = {
     block match {
       case a: PBBlockAdapter =>

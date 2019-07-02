@@ -78,7 +78,7 @@ object TransactionParsers {
       }
 
   def parseBytes(data: Array[Byte]): Try[Transaction] =
-    Try(protobuf.transaction.PBTransaction.parseFrom(data))
+    Try(protobuf.transaction.PBSignedTransaction.parseFrom(data))
       .map(PBTransactionAdapter(_))
       .orElse(parseBytesLegacy(data))
 

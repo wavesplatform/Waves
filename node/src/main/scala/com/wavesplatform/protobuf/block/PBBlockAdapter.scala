@@ -39,6 +39,11 @@ object PBBlockAdapter {
   def apply(block: PBCachedBlock): PBBlockAdapter = new PBBlockAdapter(block)
   def apply(block: VanillaBlock): PBBlockAdapter = block match {
     case a: PBBlockAdapter => a
-    case _ => new PBBlockAdapter(PBBlocks.protobuf(block))
+    case _                 => new PBBlockAdapter(PBBlocks.protobuf(block))
+  }
+
+  def unwrap(block: VanillaBlock): VanillaBlock = block match {
+    case a: PBBlockAdapter => PBBlocks.vanillaUnsafe(a.block)
+    case _                 => block
   }
 }

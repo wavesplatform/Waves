@@ -7,9 +7,10 @@ import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.transaction.{PBCachedTransaction, PBTransactions}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.Transaction
 
 object Keys {
   import KeyHelpers._
@@ -120,8 +121,8 @@ object Keys {
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
       hNum(TransactionInfoPrefix, height, n),
-      data => TransactionParsers.parseBytes(data).get,
-      _.bytes()
+      data => PBTransactions.vanillaUnsafe(PBCachedTransaction.fromBytes(data)),
+      tx => PBTransactions.protobuf(tx).bytes
     )
 
   def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =

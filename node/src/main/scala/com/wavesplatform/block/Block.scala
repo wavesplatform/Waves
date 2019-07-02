@@ -116,13 +116,13 @@ object BlockHeader extends ScorexLogging {
 
 }
 
-class Block private[wavesplatform] (override val timestamp: Long,
-                                    override val version: Byte,
-                                    override val reference: ByteStr,
-                                    override val signerData: SignerData,
-                                    override val consensusData: NxtLikeConsensusBlockData,
-                                    val transactionData: Seq[Transaction],
-                                    override val featureVotes: Set[Short])
+case class Block private[wavesplatform] (override val timestamp: Long,
+                                         override val version: Byte,
+                                         override val reference: ByteStr,
+                                         override val signerData: SignerData,
+                                         override val consensusData: NxtLikeConsensusBlockData,
+                                         val transactionData: Seq[Transaction],
+                                         override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
     with Signed {
 

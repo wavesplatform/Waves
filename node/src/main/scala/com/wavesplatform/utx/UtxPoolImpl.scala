@@ -58,19 +58,19 @@ class UtxPoolImpl(time: Time,
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
       object LimitChecks {
         def canReissue(tx: Transaction): Either[GenericError, Unit] =
-          PoolMetrics.checkCanReissue.measure(tx match {
+          PoolMetrics.checkCanReissue.measure(tx matchData {
             case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
             case _                                                     => Right(())
           })
 
         def checkAlias(tx: Transaction): Either[GenericError, Unit] =
-          PoolMetrics.checkAlias.measure(tx match {
+          PoolMetrics.checkAlias.measure(tx matchData {
             case cat: CreateAliasTransaction if !TxCheck.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
             case _                                                                 => Right(())
           })
 
         def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
-          PoolMetrics.checkScripted.measure(tx match {
+          PoolMetrics.checkScripted.measure(tx matchData {
             case scripted if TxCheck.isScripted(scripted) =>
               for {
                 _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts,
@@ -98,7 +98,7 @@ class UtxPoolImpl(time: Time,
 
             sender match {
               case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
-                val recipients = tx match {
+                val recipients = tx matchData {
                   case tt: TransferTransaction      => Seq(tt.recipient)
                   case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
                   case _                            => Seq()

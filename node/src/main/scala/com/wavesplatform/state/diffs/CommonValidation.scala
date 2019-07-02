@@ -9,7 +9,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -83,7 +82,7 @@ object CommonValidation {
         }
       }
 
-      PBTransactionAdapter.unwrap(tx) match {
+      tx matchData {
         case ptx: PaymentTransaction if blockchain.balance(ptx.sender, Waves) < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
@@ -97,7 +96,7 @@ object CommonValidation {
       }
     } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
+  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx matchData {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
@@ -135,7 +134,7 @@ object CommonValidation {
 
     }
 
-    PBTransactionAdapter.unwrap(tx) match {
+    tx matchData {
       case _: BurnTransactionV1     => Right(tx)
       case _: PaymentTransaction    => Right(tx)
       case _: GenesisTransaction    => Right(tx)
@@ -218,7 +217,7 @@ object CommonValidation {
     FeeConstants
       .get(tx.typeId)
       .map { baseFee =>
-        tx match {
+        tx matchData {
           case tx: MassTransferTransaction =>
             baseFee + (tx.transfers.size + 1) / 2
           case tx: DataTransaction =>
@@ -273,7 +272,7 @@ object CommonValidation {
 
     def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
       val (feeAssetInfo, feeAmount) = inputFee
-      val assetsCount = tx match {
+      val assetsCount = tx matchData {
         case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
         case _                       => tx.checkedAssets().count(blockchain.hasAssetScript)
       }
@@ -285,7 +284,7 @@ object CommonValidation {
       }
     }
 
-    def smartAccountScriptsCount: Int = tx match {
+    def smartAccountScriptsCount: Int = tx matchData {
       case tx: Transaction with Authorized => cond(blockchain.hasScript(tx.sender))(1, 0)
       case _                               => 0
     }

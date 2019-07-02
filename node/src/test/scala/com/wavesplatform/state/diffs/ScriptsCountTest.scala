@@ -26,18 +26,18 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 object ScriptsCountTest {
   def calculateLegacy(blockchain: Blockchain, tx: Transaction): Int = {
     import com.wavesplatform.transaction.Asset.IssuedAsset
+    import com.wavesplatform.transaction.Authorized
     import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
     import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
     import com.wavesplatform.transaction.smart.InvokeScriptTransaction
     import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-    import com.wavesplatform.transaction.{Authorized, Transaction}
 
     val smartAccountRun = tx match {
-      case x: Transaction with Authorized if blockchain.hasScript(x.sender) => 1
-      case _                                                                => 0
+      case x: Authorized if blockchain.hasScript(x.sender) => 1
+      case _                                               => 0
     }
 
-    val assetIds = tx match {
+    val assetIds = tx matchData {
       case x: TransferTransaction     => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
       case x: MassTransferTransaction => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
       case x: BurnTransaction         => Seq(x.asset)
@@ -52,7 +52,7 @@ object ScriptsCountTest {
     }
     val smartTokenRuns = assetIds.flatMap(blockchain.assetDescription).count(_.script.isDefined)
 
-    val invokeScriptRun = tx match {
+    val invokeScriptRun = tx matchData {
       case tx: InvokeScriptTransaction => 1
       case _                           => 0
     }

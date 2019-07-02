@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -32,15 +33,17 @@ trait Transaction extends BytesSerializable with JsonSerializable {
 }
 
 object Transaction {
-
   type Type = Byte
 
-  implicit class TransactionExt(tx: Transaction) {
+  implicit class TransactionExt(private val tx: Transaction) extends AnyVal {
     def feeDiff(): Portfolio = tx.assetFee match {
       case (asset @ IssuedAsset(_), fee) =>
         Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> fee))
       case (Waves, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
     }
-  }
 
+    def matchData[T](pf: PartialFunction[Transaction, T]): T = {
+      pf(PBTransactionAdapter.unwrap(tx))
+    }
+  }
 }

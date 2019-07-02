@@ -4,7 +4,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.state.{Blockchain, TransactionId}
-import com.wavesplatform.transaction.AuthorizedTransaction
+import com.wavesplatform.transaction.Authorized
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utx.UtxPool
@@ -16,10 +16,7 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(wallet: Wallet,
-                              blockchain: Blockchain,
-                              utx: UtxPool,
-                              broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
+class TransactionsApiGrpcImpl(wallet: Wallet, blockchain: Blockchain, utx: UtxPool, broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, _) => broadcast(tx))
@@ -89,11 +86,11 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {
     val senderMatches = request.sender.isEmpty || (tx match {
-      case a: AuthorizedTransaction => request.sender.isEmpty || a.sender.toAddress == request.sender.toAddress
-      case _                        => false
+      case a: Authorized => request.sender.isEmpty || a.sender.toAddress == request.sender.toAddress
+      case _             => false
     })
 
-    val recipientMatches = tx match {
+    val recipientMatches = tx matchData {
       case tt: TransferTransaction => request.recipient.isEmpty || tt.recipient == request.getRecipient.toAddressOrAlias
       case _                       => request.recipient.isEmpty
     }

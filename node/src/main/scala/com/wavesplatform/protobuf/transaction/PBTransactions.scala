@@ -69,6 +69,9 @@ object PBTransactions {
     } yield tx
   }
 
+  def vanillaUnsafe(signedTx: PBCachedTransaction): VanillaTransaction =
+    vanilla(signedTx, unsafe = true).fold(throw _, identity)
+
   private[this] def createVanilla(version: Int,
                                   chainId: Byte,
                                   sender: PublicKey,
@@ -292,7 +295,7 @@ object PBTransactions {
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
 
-          desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1
+          desFCOpt = Deser.parseOption(PBUtils.toByteArrayUnsafe(functionCall), 0, functionCall.size() - 1)(Serde.deserialize(_, all = false))._1
 
           _ <- Either.cond(desFCOpt.isEmpty || desFCOpt.get.isRight,
                            (),
@@ -536,7 +539,7 @@ object PBTransactions {
           chainId,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
-          Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
+          Deser.parseOption(PBUtils.toByteArrayUnsafe(functionCall), 0, functionCall.size() - 1)(Serde.deserialize(_, all = false))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
           feeAmount,
           feeAssetId,
