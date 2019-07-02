@@ -40,4 +40,4 @@ Dockerfile
 package
 !src/package
 native
-protobuf/
+lang-proto/shared

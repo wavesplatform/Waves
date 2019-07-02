@@ -24,7 +24,7 @@ lazy val commonJVM = common.jvm
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .dependsOn(common % "compile;test->test")
+    .dependsOn(common % "compile;test->test", `lang-proto` % "compile;provided;runtime")
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -37,6 +37,17 @@ lazy val lang =
 
 lazy val langJS  = lang.js
 lazy val langJVM = lang.jvm
+
+lazy val `lang-proto` =
+  crossProject(JSPlatform, JVMPlatform)
+    .withoutSuffixFor(JVMPlatform)
+    .dependsOn(common % Provided)
+    .settings(
+      libraryDependencies ++= Dependencies.protobuf.value
+    )
+
+lazy val `lang-protoJS`  = `lang-proto`.js
+lazy val `lang-protoJVM` = `lang-proto`.jvm
 
 lazy val node = project
   .dependsOn(
@@ -71,6 +82,8 @@ lazy val it = project
 
 lazy val root = (project in file("."))
   .aggregate(
+    `lang-protoJS`,
+    `lang-protoJVM`,
     commonJS,
     commonJVM,
     langJS,
