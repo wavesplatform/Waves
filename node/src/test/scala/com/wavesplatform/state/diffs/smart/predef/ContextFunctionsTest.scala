@@ -1,25 +1,34 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import cats.kernel.Monoid
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.state.diffs.{CommonValidation, ENOUGH_AMT, assertDiffAndState}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
+import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -27,7 +36,7 @@ import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  def compactDataTransactionGen(sender: KeyPair) =
+  def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
     for {
       long <- longEntryGen(dataAsciiKeyGen)
       bool <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
@@ -411,6 +420,70 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("blockInfoByHeight(height) is the same as lastBlock") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, _) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val script =
+            s"""{-# STDLIB_VERSION 3 #-}
+               |{-# CONTENT_TYPE DAPP #-}
+               |
+               |@Callable(xx)
+               |func compareBlocks() = {
+               |     let lastBlockByHeight = extract(blockInfoByHeight(height))
+               |
+               |     if lastBlock.height              == lastBlockByHeight.height &&
+               |        lastBlock.timestamp           == lastBlockByHeight.timestamp &&
+               |        lastBlock.baseTarget          == lastBlockByHeight.baseTarget &&
+               |        lastBlock.generationSignature == lastBlockByHeight.generationSignature &&
+               |        lastBlock.generator           == lastBlockByHeight.generator &&
+               |        lastBlock.generatorPublicKey  == lastBlockByHeight.generatorPublicKey
+               |     then WriteSet([])
+               |     else throw("blocks do not match")
+               |}
+               |""".stripMargin
+          val expr = Parser.parseContract(script).get.value
+
+          val ctx = {
+            utils.functionCosts(V3)
+            Monoid
+              .combineAll(
+                Seq(
+                  PureContext.build(Global, V3),
+                  CryptoContext.build(Global, V3),
+                  WavesContext.build(
+                    DirectiveSet(V3, Account, Expression).explicitGet(),
+                    new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+                  )
+                ))
+          }
+
+          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr).explicitGet()).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
+
+          val ci = InvokeScriptTransaction
+            .selfSigned(
+              masterAcc,
+              masterAcc,
+              Some(fc),
+              Seq.empty,
+              CommonValidation.FeeUnit * (CommonValidation.FeeConstants(InvokeScriptTransaction.typeId) + CommonValidation.ScriptExtraFee),
+              Waves,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(ci)).explicitGet()
         }
     }
   }
