@@ -139,7 +139,7 @@ class Block private[wavesplatform] (override val timestamp: Long,
       Json.obj("fee" -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
       transactionField.json())
 
-  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val txBytesSize = transactionField.bytes().length
     val txBytes     = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes()
 
@@ -152,13 +152,15 @@ class Block private[wavesplatform] (override val timestamp: Long,
       referenceField.bytes(),
       cBytes,
       txBytes,
-      supportedFeaturesField.bytes()
+      supportedFeaturesField.bytes(),
+      signerField.bytes()
     )
   }
 
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    Bytes.concat(bytesWithoutSignature(), signerField.bytes())
-  }
+  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(
+    if (signerData.signature.isEmpty) bytes()
+    else bytes().dropRight(SignatureLength)
+  )
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
 
