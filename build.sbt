@@ -6,8 +6,6 @@
    2. You've checked "Make project before run"
  */
 
-import java.nio.file.Paths
-
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -15,7 +13,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
-  .disablePlugins(ProtocPlugin)
+  //.disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
     coverageExcludedPackages := ""
@@ -24,23 +22,11 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
-lazy val `lang-proto-helper` =
-  crossProject(JSPlatform, JVMPlatform)
-    .withoutSuffixFor(JVMPlatform)
-    .settings(
-      libraryDependencies ++= Dependencies.lang.value,
-      PB.targets in Compile := Seq(
-        scalapb.gen(flatPackage = true) -> Paths.get("lang-proto-helper/shared/src/main/scala").toAbsolutePath.toFile
-      )
-    )
-lazy val `lang-proto-helperJS`  = `lang-proto-helper`.js
-lazy val `lang-proto-helperJVM` = `lang-proto-helper`.jvm
-
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .disablePlugins(ProtocPlugin)
-    .dependsOn(common % "compile;test->test", `lang-proto-helper`)
+    .dependsOn(common % "compile;test->test")
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -94,9 +80,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    `lang-proto-helperJS`,
-    `lang-proto-helperJVM`
+    benchmark
   )
 
 inScope(Global)(
