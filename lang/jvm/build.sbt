@@ -20,12 +20,12 @@ val dest   = Paths.get("lang/shared/src/main/scala").toAbsolutePath.toFile
 
 val moveGeneratedModel = Def.task {
   val filePath = "com/wavesplatform/protobuf/dapp/DAppMeta.scala"
-  IO.move(
+  IO.copyFile(
     source / filePath,
     dest / filePath
   )
   val filePath2 = "com/wavesplatform/protobuf/dapp/DAppMetaProto.scala"
-  IO.move(
+  IO.copyFile(
     source / filePath2,
     dest / filePath2
   )
