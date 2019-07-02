@@ -6,6 +6,8 @@
    2. You've checked "Make project before run"
  */
 
+import java.nio.file.Paths
+
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -13,6 +15,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
+  .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
     coverageExcludedPackages := ""
@@ -21,33 +24,29 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
+lazy val sharedSourceManaged = Paths.get("lang/shared/src/main/scala/src_managed").toAbsolutePath.toFile
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .dependsOn(common % "compile;test->test", `lang-proto` % "compile;provided;runtime")
+    .dependsOn(common % "compile;test->test")
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
+      resolvers += Resolver.sbtPluginRepo("releases"),
+      sourceManaged := sharedSourceManaged,
+      cleanFiles += sharedSourceManaged,
+      inConfig(Compile)(Seq(
+        PB.targets += scalapb.gen(flatPackage = true) -> sharedSourceManaged,
+      ))
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
 lazy val langJS  = lang.js
 lazy val langJVM = lang.jvm
-
-lazy val `lang-proto` =
-  crossProject(JSPlatform, JVMPlatform)
-    .withoutSuffixFor(JVMPlatform)
-    .dependsOn(common % Provided)
-    .settings(
-      libraryDependencies ++= Dependencies.protobuf.value
-    )
-
-lazy val `lang-protoJS`  = `lang-proto`.js
-lazy val `lang-protoJVM` = `lang-proto`.jvm
 
 lazy val node = project
   .dependsOn(
@@ -82,8 +81,6 @@ lazy val it = project
 
 lazy val root = (project in file("."))
   .aggregate(
-    `lang-protoJS`,
-    `lang-protoJVM`,
     commonJS,
     commonJVM,
     langJS,
