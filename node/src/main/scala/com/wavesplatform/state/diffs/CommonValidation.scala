@@ -9,7 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.protobuf.transaction.{PBTransactionAdapter, PBTransactions}
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -83,7 +83,7 @@ object CommonValidation {
         }
       }
 
-      tx match {
+      PBTransactionAdapter.unwrap(tx) match {
         case ptx: PaymentTransaction if blockchain.balance(ptx.sender, Waves) < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
@@ -135,7 +135,7 @@ object CommonValidation {
 
     }
 
-    tx match {
+    PBTransactionAdapter.unwrap(tx) match {
       case _: BurnTransactionV1     => Right(tx)
       case _: PaymentTransaction    => Right(tx)
       case _: GenesisTransaction    => Right(tx)
@@ -184,7 +184,6 @@ object CommonValidation {
       case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)
-      case a: PBTransactionAdapter => disallowBeforeActivationTime[T](blockchain, PBTransactions.vanilla(a.transaction, unsafe = true).right.get.asInstanceOf[T])
       case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
