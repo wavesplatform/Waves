@@ -6,8 +6,6 @@
    2. You've checked "Make project before run"
  */
 
-import java.nio.file.Paths
-
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -18,27 +16,27 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
   .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
-    coverageExcludedPackages := "",
-    sourceGenerators in Compile += versionSource
+    coverageExcludedPackages := ""
   )
 
-lazy val versionSource = Def.task {
+lazy val commonJS  = common.js
+lazy val commonJVM = common.jvm
+
+lazy val versionSourceTask = Def.task {
   // WARNING!!!
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
   val FallbackVersion = (1, 0, 0)
 
+  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
   val (major, minor, patch) = version.value match {
     case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
     case _                            => FallbackVersion
   }
-
-  val versionPath = Paths.get("common/shared/src/main/scala/com/wavesplatform/Version.scala").toAbsolutePath.toFile
-  
   IO.write(
-    versionPath,
+    versionFile,
     s"""package com.wavesplatform
        |
        |object Version {
@@ -47,11 +45,10 @@ lazy val versionSource = Def.task {
        |}
        |""".stripMargin
   )
-  Seq(versionPath)
+  Seq(versionFile)
 }
 
-lazy val commonJS  = common.js
-lazy val commonJVM = common.jvm
+lazy val versionSourceSetting = inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -59,12 +56,12 @@ lazy val lang =
     .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
-      version := "1.0.0",
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
+      resolvers += Resolver.sbtPluginRepo("releases"),
+      versionSourceSetting
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
@@ -76,6 +73,7 @@ lazy val node = project
     commonJVM % "compile;test->test",
     langJVM   % "compile;test->test"
   )
+  .settings(versionSourceSetting)
 
 lazy val `grpc-server` = project
   .dependsOn(node % "compile;test->test;runtime->provided")

@@ -40,4 +40,3 @@ Dockerfile
 package
 !src/package
 native
-Version.scala
