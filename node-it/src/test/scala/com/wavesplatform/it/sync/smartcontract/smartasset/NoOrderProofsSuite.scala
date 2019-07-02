@@ -80,7 +80,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         Waves,
         smartMinFee,
         Array.emptyByteArray,
-        Proofs(Seq(ByteStr("assetWProofs".getBytes())))
+        Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
       )
       .right
       .get
@@ -98,7 +98,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         1,
         smartMinFee,
         System.currentTimeMillis + 10.minutes.toMillis,
-        Proofs(Seq(ByteStr("assetWProofs".getBytes())))
+        Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
       )
       .right
       .get

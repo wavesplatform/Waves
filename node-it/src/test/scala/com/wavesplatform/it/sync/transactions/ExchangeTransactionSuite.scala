@@ -15,8 +15,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   var exchAsset: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = sender.privateKey,
-      name = "myasset".getBytes(),
-      description = "my asset description".getBytes(),
+      name = "myasset".getBytes("UTF-8"),
+      description = "my asset description".getBytes("UTF-8"),
       quantity = someAssetAmount,
       decimals = 2,
       reissuable = true,
@@ -128,8 +128,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val IssueTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = buyer,
-        name = "myasset".getBytes(),
-        description = assetDescription.getBytes(),
+        name = "myasset".getBytes("UTF-8"),
+        description = assetDescription.getBytes("UTF-8"),
         quantity = someAssetAmount,
         decimals = 8,
         reissuable = true,

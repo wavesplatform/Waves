@@ -47,7 +47,7 @@ package object state {
         }
         .collect {
           case itx: IssueTransaction if itx.isNFT => itx
-        } ++ b.nftList(address, None)
+        }
     }
 
     d.fold(b.nftList(address, after)) { d =>

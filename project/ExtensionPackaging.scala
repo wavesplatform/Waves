@@ -46,7 +46,7 @@ object ExtensionPackaging extends AutoPlugin {
         val baseConfigName = s"${name.value}-${network.value}.conf"
         val localFile      = (Compile / baseDirectory).value / baseConfigName
         if (localFile.exists()) {
-          val artifactPath = "doc/dex.conf.sample"
+          val artifactPath = s"doc/${name.value}.conf.sample"
           Seq(localFile -> artifactPath)
         } else Seq.empty
       },

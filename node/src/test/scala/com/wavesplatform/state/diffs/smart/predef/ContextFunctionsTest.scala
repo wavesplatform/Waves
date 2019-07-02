@@ -279,8 +279,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .selfSigned(
               AddressScheme.current.chainId,
               masterAcc,
-              "testAsset".getBytes(),
-              "Test asset".getBytes(),
+              "testAsset".getBytes("UTF-8"),
+              "Test asset".getBytes("UTF-8"),
               quantity,
               decimals,
               reissuable,
