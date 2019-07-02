@@ -175,26 +175,12 @@ object Order {
             expiration: Long,
             matcherFee: Long,
             proofs: Proofs,
-            version: Byte = 1): Order = version match {
+            version: Byte = 1,
+            matcherFeeAssetId: Asset = Asset.Waves): Order = version match {
     case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-  }
-
-  def apply(senderPublicKey: PublicKey,
-            matcherPublicKey: PublicKey,
-            assetPair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            proofs: Proofs,
-            version: Byte,
-            matcherFeeAssetId: Asset): Order = version match {
     case 3 =>
       OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, proofs)
-    case _ => Order(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
   }
 
   def correctAmount(a: Long, price: Long): Long = {
@@ -214,11 +200,8 @@ object Order {
           matcherFee: Long,
           version: Byte = 1,
           matcherFeeAssetId: Asset = Waves): Order = {
-    val unsigned = version match {
-      case 3 =>
-        Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-      case _ => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
-    }
+    val unsigned =
+      Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 
@@ -232,11 +215,8 @@ object Order {
            matcherFee: Long,
            version: Byte = 1,
            matcherFeeAssetId: Asset = Waves): Order = {
-    val unsigned = version match {
-      case 3 =>
-        Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-      case _ => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
-    }
+    val unsigned =
+      Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 

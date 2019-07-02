@@ -13,7 +13,7 @@ class PBBlockAdapter(val block: PBCachedBlock)
       block.block.getHeader.timestamp,
       block.block.getHeader.version.toByte,
       block.block.getHeader.reference,
-      SignerData(block.block.getHeader.generator.publicKey, block.block.signature),
+      SignerData(block.block.getHeader.generator.publicKey, block.signature),
       NxtLikeConsensusBlockData(block.block.getHeader.baseTarget, block.block.getHeader.generationSignature),
       block.transactions.map(PBTransactionAdapter(_)),
       block.block.getHeader.featureVotes.iterator.map(_.toShort).toSet

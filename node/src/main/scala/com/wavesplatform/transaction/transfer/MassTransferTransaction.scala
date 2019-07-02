@@ -41,7 +41,7 @@ case class MassTransferTransaction private (assetId: Asset,
       .fold(Array())(_ ++ _)
 
     Bytes.concat(
-      Array(builder.typeId, version),
+      Array(typeId, version),
       sender,
       assetIdBytes,
       Shorts.toByteArray(transfers.size.toShort),

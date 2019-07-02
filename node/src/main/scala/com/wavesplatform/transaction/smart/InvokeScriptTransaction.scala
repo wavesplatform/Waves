@@ -45,7 +45,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Bytes.concat(
-        Array(builder.typeId, version, chainId),
+        Array(typeId, version, chainId),
         sender,
         dAppAddressOrAlias.bytes.arr,
         Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),

@@ -37,7 +37,7 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
 
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
-      Array(builder.typeId) ++
+      Array(typeId) ++
         Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
         buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
         Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++

@@ -39,17 +39,17 @@ object Verifier extends ScorexLogging {
         (pt, blockchain.accountScript(pt.sender)) match {
           case (stx: SignedTransaction, None) =>
             stats.signatureVerification
-              .measureForType(stx.builder.typeId)(stx.signaturesValid())
+              .measureForType(stx.typeId)(stx.signaturesValid())
           case (et: ExchangeTransaction, scriptOpt) =>
             verifyExchange(et, blockchain, scriptOpt)
           case (_: SignedTransaction, Some(_)) =>
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_, Some(script)) =>
             stats.accountScriptExecution
-              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, pt, None))
+              .measureForType(pt.typeId)(verifyTx(blockchain, script, pt, None))
           case _ =>
             stats.signatureVerification
-              .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
+              .measureForType(tx.typeId)(verifyAsEllipticCurveSignature(pt))
         }
     }
     validatedTx.flatMap { tx =>
@@ -61,7 +61,7 @@ object Verifier extends ScorexLogging {
         .foldRight(TracedResult(tx.asRight[ValidationError])) { (assetInfo, txr) =>
           txr.flatMap(tx =>
             stats.assetScriptExecution
-              .measureForType(tx.builder.typeId)(verifyTx(blockchain, assetInfo._1, tx, Some(assetInfo._2.id))))
+              .measureForType(tx.typeId)(verifyTx(blockchain, assetInfo._1, tx, Some(assetInfo._2.id))))
         }
     }
   }
@@ -139,7 +139,7 @@ object Verifier extends ScorexLogging {
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script]): TracedResult[ValidationError, Transaction] = {
 
-    val typeId    = et.builder.typeId
+    val typeId    = et.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
 

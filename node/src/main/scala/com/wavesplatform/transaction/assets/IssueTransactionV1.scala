@@ -30,8 +30,8 @@ case class IssueTransactionV1 private (sender: PublicKey,
 
   override val version: Byte                    = 1
   override val builder: IssueTransactionV1.type = IssueTransactionV1
-  override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
-  override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
+  override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(typeId), bytesBase()))
+  override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(typeId), signature.arr, bodyBytes()))
   override val script: Option[Script]           = None
   override val json: Coeval[JsObject]           = issueJson
 }

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
@@ -39,7 +40,7 @@ object TransactionDiffer extends ScorexLogging {
       _ <- Verifier(blockchain)(tx)
       _ <- TracedResult(
         stats.commonValidation
-          .measureForType(tx.builder.typeId) {
+          .measureForType(tx.typeId) {
             for {
               _ <- CommonValidation.disallowTxFromFuture(blockchain.settings.functionalitySettings, currentBlockTimestamp, tx)
               _ <- CommonValidation.disallowTxFromPast(blockchain.settings.functionalitySettings, prevBlockTimestamp, tx)
@@ -51,15 +52,15 @@ object TransactionDiffer extends ScorexLogging {
           })
       diff <- unverified(currentBlockTimestamp)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
-        .measureForType(tx.builder.typeId) {
+        .measureForType(tx.typeId) {
           BalanceDiffValidation(blockchain, blockchain.settings.functionalitySettings)(diff)
         }
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
   def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
-    stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
-      tx match {
+    stats.transactionDiffValidation.measureForType(tx.typeId) {
+      PBTransactionAdapter.unwrap(tx) match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction =>
           PaymentTransactionDiff(blockchain.settings.functionalitySettings, blockchain.height, currentBlockTimestamp)(ptx)

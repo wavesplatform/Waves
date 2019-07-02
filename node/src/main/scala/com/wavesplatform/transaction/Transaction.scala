@@ -14,6 +14,8 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   def assetFee: (Asset, Long)
   def timestamp: Long
 
+  def typeId: Byte = builder.typeId
+
   override def toString: String = json().toString
 
   def toPrettyString: String = json.map(Json.prettyPrint).value

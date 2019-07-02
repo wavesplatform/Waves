@@ -31,7 +31,7 @@ case class SponsorFeeTransaction private (sender: PublicKey,
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Bytes.concat(
-        Array(builder.typeId),
+        Array(typeId),
         Array(version),
         sender,
         asset.id.arr,
@@ -51,7 +51,7 @@ case class SponsorFeeTransaction private (sender: PublicKey,
     )
 
   override val assetFee: (Asset, Long)    = (Waves, fee)
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, typeId, version), bodyBytes(), proofs.bytes()))
 
   override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
   override def version: Byte               = SponsorFeeTransaction.version

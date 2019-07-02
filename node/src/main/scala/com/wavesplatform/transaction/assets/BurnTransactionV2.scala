@@ -28,7 +28,7 @@ final case class BurnTransactionV2 private (chainId: Byte,
   override def chainByte: Option[Byte]    = Some(chainId)
 
   override val bodyBytes: Coeval[Array[Byte]] =
-    byteBase.map(base => Bytes.concat(Array(builder.typeId, version, chainId), base))
+    byteBase.map(base => Bytes.concat(Array(typeId, version, chainId), base))
 
   override val bytes: Coeval[Array[Byte]] =
     (bodyBytes, proofs.bytes)

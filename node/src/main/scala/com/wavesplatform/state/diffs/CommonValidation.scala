@@ -9,6 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.protobuf.transaction.{PBTransactionAdapter, PBTransactions}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -47,9 +48,7 @@ object CommonValidation {
     smart.InvokeScriptTransaction.typeId -> 5
   )
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          blockTime: Long,
-                                                          tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
@@ -98,8 +97,7 @@ object CommonValidation {
       }
     } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             tx: T): Either[ValidationError, T] = tx match {
+  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
@@ -186,6 +184,7 @@ object CommonValidation {
       case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case a: PBTransactionAdapter => disallowBeforeActivationTime[T](blockchain, PBTransactions.vanilla(a.transaction, unsafe = true).right.get.asInstanceOf[T])
       case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
@@ -218,7 +217,7 @@ object CommonValidation {
 
   private def feeInUnits(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Long] = {
     FeeConstants
-      .get(tx.builder.typeId)
+      .get(tx.typeId)
       .map { baseFee =>
         tx match {
           case tx: MassTransferTransaction =>
@@ -319,14 +318,14 @@ object CommonValidation {
           minFee <= tx.assetFee._2,
           (),
           GenericError(
-            s"Fee for ${Constants.TransactionNames(tx.builder.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.id.toString)})" ++
+            s"Fee for ${Constants.TransactionNames(tx.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.id.toString)})" ++
               " does not exceed minimal value of " ++
               s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.id.toString}")}"
           )
         )
       } yield ()
     } else {
-      Either.cond(tx.assetFee._2 > 0 || !tx.isInstanceOf[Authorized], (), GenericError(s"Fee must be positive."))
+      Either.cond(tx.assetFee._2 > 0 || tx.typeId == GenesisTransaction.typeId, (), GenericError(s"Fee must be positive."))
     }
   }
 

@@ -10,7 +10,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
 trait Signed extends Authorized {
-  private[wavesplatform] val signatureValid: Coeval[Boolean]
+  protected val signatureValid: Coeval[Boolean]
 
   @ApiModelProperty(hidden = true)
   protected val signedDescendants: Coeval[Seq[Signed]] =

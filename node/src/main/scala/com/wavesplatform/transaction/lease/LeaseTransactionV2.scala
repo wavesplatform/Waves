@@ -24,7 +24,7 @@ case class LeaseTransactionV2 private (sender: PublicKey, amount: Long, fee: Lon
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val assetId: Asset = Waves // placeholder for future enhancement
-    Bytes.concat(Array(builder.typeId, version), assetId.byteRepr, bytesBase())
+    Bytes.concat(Array(typeId, version), assetId.byteRepr, bytesBase())
   }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))

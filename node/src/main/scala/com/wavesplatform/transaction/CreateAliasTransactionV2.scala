@@ -15,8 +15,8 @@ import scala.util.Try
 final case class CreateAliasTransactionV2 private (sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, proofs: Proofs)
     extends CreateAliasTransaction {
 
-  override val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
-  override val bodyBytes: Coeval[Array[Byte]] = baseBytes.map(base => Bytes.concat(Array(builder.typeId, version), base))
+  override val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(typeId +: alias.bytes.arr)))
+  override val bodyBytes: Coeval[Array[Byte]] = baseBytes.map(base => Bytes.concat(Array(typeId, version), base))
   override val bytes: Coeval[Array[Byte]]     = (bodyBytes, proofs.bytes).mapN { case (bb, pb) => Bytes.concat(Array(0: Byte), bb, pb) }
 
   override def builder: TransactionParser = CreateAliasTransactionV2

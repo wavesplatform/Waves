@@ -38,7 +38,7 @@ case class IssueTransactionV2 private (chainId: Byte,
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Bytes.concat(
-        Array(builder.typeId, version, chainId),
+        Array(typeId, version, chainId),
         bytesBase(),
         Deser.serializeOptionOfArray(script)(s => s.bytes().arr)
       )

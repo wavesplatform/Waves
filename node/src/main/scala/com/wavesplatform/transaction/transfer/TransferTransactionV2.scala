@@ -28,7 +28,7 @@ case class TransferTransactionV2 private (sender: PublicKey,
     with FastHashId {
 
   override val builder: TransactionParser     = TransferTransactionV2
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(builder.typeId, version) ++ bytesBase())
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(typeId, version) ++ bytesBase())
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
   override def version: Byte = 2

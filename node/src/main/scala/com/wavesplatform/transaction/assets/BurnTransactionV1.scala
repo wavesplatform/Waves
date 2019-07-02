@@ -23,7 +23,7 @@ case class BurnTransactionV1 private (sender: PublicKey, asset: IssuedAsset, qua
   override def chainByte: Option[Byte] = None
 
   override val builder: BurnTransactionV1.type = BurnTransactionV1
-  override val bodyBytes: Coeval[Array[Byte]]  = byteBase.map(base => Bytes.concat(Array(builder.typeId), base))
+  override val bodyBytes: Coeval[Array[Byte]]  = byteBase.map(base => Bytes.concat(Array(typeId), base))
   override val bytes: Coeval[Array[Byte]]      = bodyBytes.map(body => Bytes.concat(body, signature.arr))
 }
 

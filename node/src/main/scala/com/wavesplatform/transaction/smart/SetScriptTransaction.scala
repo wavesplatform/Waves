@@ -28,7 +28,7 @@ case class SetScriptTransaction private (chainId: Byte, sender: PublicKey, scrip
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Bytes.concat(
-        Array(builder.typeId, version, chainId),
+        Array(typeId, version, chainId),
         sender,
         Deser.serializeOptionOfArray(script)(s => s.bytes().arr),
         Longs.toByteArray(fee),

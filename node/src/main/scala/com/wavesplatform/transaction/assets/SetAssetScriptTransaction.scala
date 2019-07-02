@@ -45,7 +45,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Bytes.concat(
-        Array(builder.typeId, version, chainId),
+        Array(typeId, version, chainId),
         sender,
         asset.id.arr,
         Longs.toByteArray(fee),

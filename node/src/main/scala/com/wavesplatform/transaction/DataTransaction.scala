@@ -25,7 +25,7 @@ case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]],
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce {
       Bytes.concat(
-        Array(builder.typeId, version),
+        Array(typeId, version),
         sender,
         Shorts.toByteArray(data.size.toShort),
         Bytes.concat(data.view.map(_.toBytes): _*),

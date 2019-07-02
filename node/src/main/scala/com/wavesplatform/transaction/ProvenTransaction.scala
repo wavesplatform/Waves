@@ -9,7 +9,7 @@ trait ProvenTransaction extends Transaction with Proven {
 
   protected def jsonBase(): JsObject =
     Json.obj(
-      "type"            -> builder.typeId,
+      "type"            -> typeId,
       "id" -> id().toString,
       "sender"          -> sender.address,
       "senderPublicKey" -> Base58.encode(sender),

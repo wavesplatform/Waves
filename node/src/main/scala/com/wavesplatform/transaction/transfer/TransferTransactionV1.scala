@@ -28,8 +28,8 @@ case class TransferTransactionV1 private (assetId: Asset,
     with FastHashId {
 
   override val builder: TransactionParser     = TransferTransactionV1
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(builder.typeId) ++ bytesBase())
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(typeId) ++ bytesBase())
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(Bytes.concat(Array(typeId), signature.arr, bodyBytes()))
   override val version: Byte                  = 1: Byte
 }
 

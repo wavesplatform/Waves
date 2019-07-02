@@ -116,13 +116,13 @@ object BlockHeader extends ScorexLogging {
 
 }
 
-case class Block private[wavesplatform] (override val timestamp: Long,
-                                         override val version: Byte,
-                                         override val reference: ByteStr,
-                                         override val signerData: SignerData,
-                                         override val consensusData: NxtLikeConsensusBlockData,
-                                         transactionData: Seq[Transaction],
-                                         override val featureVotes: Set[Short])
+class Block private[wavesplatform] (override val timestamp: Long,
+                                    override val version: Byte,
+                                    override val reference: ByteStr,
+                                    override val signerData: SignerData,
+                                    override val consensusData: NxtLikeConsensusBlockData,
+                                    val transactionData: Seq[Transaction],
+                                    override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
     with Signed {
 
@@ -134,28 +134,31 @@ case class Block private[wavesplatform] (override val timestamp: Long,
 
   val uniqueId: ByteStr = signerData.signature
 
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+  val json: Coeval[JsObject] = Coeval.evalOnce(
+    BlockHeader.json(this, bytes().length) ++
+      Json.obj("fee" -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
+      transactionField.json())
+
+  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
     val txBytesSize = transactionField.bytes().length
     val txBytes     = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes()
 
     val cBytesSize = consensusField.bytes().length
     val cBytes     = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusField.bytes()
 
-    versionField.bytes() ++
-      timestampField.bytes() ++
-      referenceField.bytes() ++
-      cBytes ++
-      txBytes ++
-      supportedFeaturesField.bytes() ++
-      signerField.bytes()
+    Bytes.concat(
+      versionField.bytes(),
+      timestampField.bytes(),
+      referenceField.bytes(),
+      cBytes,
+      txBytes,
+      supportedFeaturesField.bytes()
+    )
   }
 
-  val json: Coeval[JsObject] = Coeval.evalOnce(
-    BlockHeader.json(this, bytes().length) ++
-      Json.obj("fee" -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
-      transactionField.json())
-
-  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    Bytes.concat(bytesWithoutSignature(), signerField.bytes())
+  }
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
 
@@ -188,6 +191,15 @@ case class Block private[wavesplatform] (override val timestamp: Long,
 
   def getHeader(): BlockHeader =
     new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
+
+  def copy(timestamp: Long = this.timestamp,
+           version: Byte = this.version,
+           reference: ByteStr = this.reference,
+           signerData: SignerData = this.signerData,
+           consensusData: NxtLikeConsensusBlockData = this.consensusData,
+           transactionData: Seq[Transaction] = this.transactionData,
+           featureVotes: Set[Short] = this.featureVotes): Block =
+    Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
 }
 
 object Block extends ScorexLogging {
@@ -210,6 +222,16 @@ object Block extends ScorexLogging {
   val BlockIdLength: Int = SignatureLength
 
   val TransactionSizeLength = 4
+
+  def apply(timestamp: Long,
+            version: Byte,
+            reference: ByteStr,
+            signerData: SignerData,
+            consensusData: NxtLikeConsensusBlockData,
+            transactionData: Seq[Transaction],
+            featureVotes: Set[Short]): Block = {
+    PBBlockAdapter(new Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)) // TODO: Directly create PB block
+  }
 
   def transParseBytes(version: Int, bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
     if (bytes.isEmpty) {
@@ -290,8 +312,8 @@ object Block extends ScorexLogging {
       _ <- Either.cond(signerData.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-    } yield PBBlockAdapter(Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes))).left
-      .map(GenericError(_)) // TODO: Directly create PB block
+    } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left
+      .map(GenericError(_))
   }
 
   def buildAndSign(version: Byte,
@@ -301,8 +323,10 @@ object Block extends ScorexLogging {
                    transactionData: Seq[Transaction],
                    signer: KeyPair,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
-    build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
+    build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map { unsigned =>
+      val signature = ByteStr(crypto.sign(signer, unsigned.bytesWithoutSignature()))
+      unsigned.copy(signerData = SignerData(signer, signature))
+    }
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>

@@ -25,7 +25,7 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
-      "type"      -> builder.typeId,
+      "type"      -> typeId,
       "id" -> id().toString,
       "fee"       -> 0,
       "timestamp" -> timestamp,
@@ -35,7 +35,7 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
     ))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val typeBytes      = Array(builder.typeId)
+    val typeBytes      = Array(typeId)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes    = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
     val rcpBytes       = recipient.bytes.arr

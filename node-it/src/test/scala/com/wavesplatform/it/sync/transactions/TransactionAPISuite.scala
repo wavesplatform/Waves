@@ -52,7 +52,7 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
 
   "should accept transactions" in {
     transactions.foreach { tx =>
-      sender.broadcastRequest(tx.json() + ("type" -> JsNumber(tx.builder.typeId.toInt)))
+      sender.broadcastRequest(tx.json() + ("type" -> JsNumber(tx.typeId.toInt)))
     }
 
     val h = sender.height

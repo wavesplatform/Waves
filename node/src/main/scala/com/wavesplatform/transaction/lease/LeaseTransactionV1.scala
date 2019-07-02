@@ -19,7 +19,7 @@ case class LeaseTransactionV1 private (sender: PublicKey, amount: Long, fee: Lon
     with FastHashId {
 
   override val builder: TransactionParser = LeaseTransactionV1
-  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
+  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(Bytes.concat(Array(typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
   override def version: Byte = 1
