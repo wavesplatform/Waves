@@ -16,10 +16,6 @@ resolvers ++= Seq(
 libraryDependencies ++= Dependencies.node.value
 coverageExcludedPackages := ""
 
-resolvers += Resolver.sonatypeRepo("snapshots")
-libraryDependencies += "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT"
-libraryDependencies  += "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT" % "protobuf"
-
 inConfig(Compile)(
   Seq(
     PB.unpackDependencies := {

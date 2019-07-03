@@ -1,8 +1,6 @@
 name := "grpc-server"
 
 libraryDependencies ++= Dependencies.grpc
-resolvers += Resolver.sonatypeRepo("snapshots")
-libraryDependencies += "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT" % "protobuf"
 
 inConfig(Compile)(Seq(
   PB.unpackDependencies := {
