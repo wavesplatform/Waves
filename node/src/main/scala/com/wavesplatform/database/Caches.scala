@@ -143,9 +143,15 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long
 
-  protected val assetDescriptionCache: LoadingCache[IssuedAsset, Option[(AssetDescription, (Height, TxNum))]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
+  protected val assetHNCache: LoadingCache[IssuedAsset, Option[(Height, TxNum)]] = cache(dbSettings.maxCacheSize, loadAssetHN)
+  protected def loadAssetHN(asset: IssuedAsset): Option[(Height, TxNum)]
+  protected val assetDescriptionCache: LoadingCache[IssuedAsset, Option[(AssetDescription, (Height, TxNum))]] =
+    cache(dbSettings.maxCacheSize, loadAssetDescription)
   protected def loadAssetDescription(asset: IssuedAsset): Option[(AssetDescription, (Height, TxNum))]
-  protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
+  protected def discardAssetDescription(asset: IssuedAsset): Unit = {
+    assetHNCache.invalidate(asset)
+    assetDescriptionCache.invalidate(asset)
+  }
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset).map(_._1)
 
   private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
@@ -318,7 +324,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     balancesCache.putAll(newBalances.result().asJava)
     for (address <- newPortfolios.result()) portfolioCache.invalidate(address)
-    for (id      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for (asset   <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) discardAssetDescription(asset)
     leaseBalanceCache.putAll(updatedLeaseBalances.result().asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
