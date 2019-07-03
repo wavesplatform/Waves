@@ -51,16 +51,11 @@ package object settings {
 
     val withApp = external
       .withFallback(ConfigFactory.defaultApplication())
-
-    val directoryDefaults = ConfigFactory
-      .parseString(s"waves.directory = ${defaultDirectory(withApp)}")
-
-    val cmdDefaults = Try(defaults.getConfig("waves.defaults")) // TODO: Keep network-specific defaults in master
-      .getOrElse(ConfigFactory.empty())
+      .withFallback(ConfigFactory.defaultReference())
+      .resolve()
 
     external
-      .withFallback(directoryDefaults)
-      .withFallback(cmdDefaults.atPath("waves"))
+      .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(withApp)}"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
@@ -77,7 +72,7 @@ package object settings {
 
     def nixDefaultDirectory: String = {
       val maybeXdgDir = sys.env.get("XDG_DATA_HOME")
-      val defaultDir = s"$${user.home}/.local/share"
+      val defaultDir  = s"$${user.home}/.local/share"
 
       maybeXdgDir getOrElse defaultDir
     }
