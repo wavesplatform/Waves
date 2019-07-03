@@ -128,7 +128,7 @@ trait BaseGlobal {
   def scriptMeta(code: String): Either[ScriptParseError, List[FuncArgTypes]] = {
     val script = Script.fromBase64String(code.trim, checkComplexity = false)
     script match {
-      case Right(ContractScriptImpl(_, dApp, _)) => MetaMapper.fromProto(dApp.meta).leftMap(ScriptParseError)
+      case Right(ContractScriptImpl(_, dApp, _)) => MetaMapper.textMapFromProto(dApp.meta).leftMap(ScriptParseError)
       case Right(_)                              => Right(Nil)
       case Left(err)                             => err.asLeft[List[FuncArgTypes]]
     }
