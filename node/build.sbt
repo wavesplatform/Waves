@@ -16,8 +16,21 @@ resolvers ++= Seq(
 libraryDependencies ++= Dependencies.node.value
 coverageExcludedPackages := ""
 
+resolvers += Resolver.sonatypeRepo("snapshots")
+libraryDependencies += "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT"
+libraryDependencies  += "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT" % "protobuf"
+
 inConfig(Compile)(
   Seq(
+    PB.unpackDependencies := {
+      val deps = PB.unpackDependencies.value
+      val waves = PB.externalIncludePath.value / "waves"
+      val targetWaves = target.value / "protobuf" / "waves"
+      IO.move(waves, targetWaves)
+      IO.delete(targetWaves / "grpc")
+      deps.copy(files = deps.files.filter(_.exists()))
+    },
+    PB.protoSources += target.value / "protobuf",
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
