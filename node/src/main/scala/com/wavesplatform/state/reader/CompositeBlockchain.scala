@@ -236,7 +236,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
 
   /** Returns the most recent block IDs, starting from the most recent  one */
   override def lastBlockIds(howMany: Int): Seq[ByteStr] =
-    newBlock.map(_.uniqueId).toSeq ++ inner.lastBlockIds(howMany - 1)
+    if (howMany <= 0) Seq.empty else newBlock.map(_.uniqueId).toSeq ++ inner.lastBlockIds(howMany - 1)
 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] =
