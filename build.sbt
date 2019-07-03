@@ -24,7 +24,8 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
-lazy val sharedSourceManaged = Paths.get("lang/shared/src/main/scala/src_managed").toAbsolutePath.toFile
+lazy val langSharedSources = Paths.get("lang/shared/src/main/scala").toAbsolutePath.toFile
+lazy val langProtoModels   = Paths.get("lang/shared/src/main/protobuf").toAbsolutePath.toFile
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -37,10 +38,11 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
       resolvers += Resolver.sbtPluginRepo("releases"),
-      sourceManaged := sharedSourceManaged,
-      cleanFiles += sharedSourceManaged,
+      cleanFiles += langSharedSources / "com" / "wavesplatform" / "protobuf",
       inConfig(Compile)(Seq(
-        PB.targets += scalapb.gen(flatPackage = true) -> sharedSourceManaged,
+        PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources,
+        PB.protoSources := Seq(langProtoModels),
+        PB.deleteTargetDirectory := false
       ))
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )

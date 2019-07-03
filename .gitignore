@@ -40,4 +40,4 @@ Dockerfile
 package
 !src/package
 native
-src_managed/
+lang/shared/src/main/scala/com/wavesplatform/protobuf/
