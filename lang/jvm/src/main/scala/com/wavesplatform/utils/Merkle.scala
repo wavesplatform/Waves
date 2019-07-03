@@ -55,7 +55,8 @@ object Merkle {
       } else Right(acc.reverse)
     }
 
-    parseLevels(arr, Nil)
+    Try(parseLevels(arr, Nil))
+      .getOrElse(Left("Can't parse proof bytes"))
   }
 
   private val blakeCH: CryptographicHash[Digest32] =
