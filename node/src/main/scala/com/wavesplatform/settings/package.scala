@@ -59,8 +59,8 @@ package object settings {
       .getOrElse(ConfigFactory.empty())
 
     external
-      .withFallback(directoryDefaults)
       .withFallback(cmdDefaults.atPath("waves"))
+      .withFallback(directoryDefaults)
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
