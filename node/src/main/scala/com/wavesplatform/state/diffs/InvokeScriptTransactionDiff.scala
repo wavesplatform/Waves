@@ -313,7 +313,7 @@ object InvokeScriptTransactionDiff {
             tx.timestamp,
             tx.id()
           )),
-        CompositeBlockchain.composite(blockchain, totalDiff),
+        CompositeBlockchain(blockchain, Some(totalDiff)),
         script,
         isAssetScript = true,
         tx.dAppAddressOrAlias.bytes
