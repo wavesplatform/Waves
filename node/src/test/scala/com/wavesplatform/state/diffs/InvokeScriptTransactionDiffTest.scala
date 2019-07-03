@@ -129,7 +129,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -169,7 +169,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
