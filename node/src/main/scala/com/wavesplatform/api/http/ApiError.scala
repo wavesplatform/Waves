@@ -198,7 +198,7 @@ case class StateCheckFailed(err: ApiError, tx: Transaction) extends ApiError {
   override val id: Int          = err.id
   override val message: String  = s"State check failed. Reason: ${err.message}"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json        = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
+  override lazy val json        = err.json ++ Json.obj("message" -> message, "tx" -> tx.json())
 }
 
 case object OverflowError extends ApiError {
@@ -307,7 +307,7 @@ case class AlreadyInState(transactionId: ByteStr, height: Int) extends ApiError 
 case object UnsupportedTransactionType extends ApiError {
   override val id: Int          = 401
   override val message: String  = "Unsupported transaction type"
-  override val code: StatusCode = StatusCodes.UnprocessableEntity
+  override val code: StatusCode = StatusCodes.BadRequest
 }
 
 case class AccountBalanceErrors(errs: Map[Address, String]) extends ApiError {

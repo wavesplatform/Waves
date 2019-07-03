@@ -92,7 +92,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       miner.waitForTransaction(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
-      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "negative asset balance")
+      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "Accounts balance errors")
     }
   }
 
@@ -113,7 +113,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity - transferredQuantity)
       sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
 
-      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "negative asset balance")
+      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "Accounts balance errors")
     }
   }
 

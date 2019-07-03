@@ -127,7 +127,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     for (j <- List(jsonV1, jsonV2)) {
       assertBroadcastBadJson(j - "type", "failed to parse json message")
       assertBroadcastBadJson(j - "type" + ("type" -> Json.toJson(88)), "Bad transaction type")
-      assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Invalid chain id")
+      assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Wrong chain-id")
       assertBroadcastBadJson(j - "alias", "failed to parse json message")
     }
   }
