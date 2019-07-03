@@ -10,7 +10,6 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
 import scala.collection.JavaConverters._
-import scala.util.Try
 
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
