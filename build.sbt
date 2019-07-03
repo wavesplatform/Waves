@@ -22,7 +22,7 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
-lazy val versionSourceTask = Def.task {
+lazy val versionSourceTask = (path: String) => Def.task {
   // WARNING!!!
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
@@ -37,7 +37,7 @@ lazy val versionSourceTask = Def.task {
   }
   IO.write(
     versionFile,
-    s"""package com.wavesplatform
+    s"""package $path
        |
        |object Version {
        |  val VersionString = "${version.value}"
@@ -48,7 +48,7 @@ lazy val versionSourceTask = Def.task {
   Seq(versionFile)
 }
 
-lazy val versionSourceSetting = inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
+lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += versionSourceTask(path)))
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -60,12 +60,11 @@ lazy val lang =
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases"),
-      versionSourceSetting
+      resolvers += Resolver.sbtPluginRepo("releases")
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
-lazy val langJS  = lang.js
+lazy val langJS  = lang.js.settings(versionSourceSetting("com.wavesplatform.lang"))
 lazy val langJVM = lang.jvm
 
 lazy val node = project
@@ -73,7 +72,7 @@ lazy val node = project
     commonJVM % "compile;test->test",
     langJVM   % "compile;test->test"
   )
-  .settings(versionSourceSetting)
+  .settings(versionSourceSetting("com.wavesplatform"))
 
 lazy val `grpc-server` = project
   .dependsOn(node % "compile;test->test;runtime->provided")
