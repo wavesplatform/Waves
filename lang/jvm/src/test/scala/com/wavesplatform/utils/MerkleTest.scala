@@ -19,6 +19,7 @@ import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest, Digest32}
 
 import scala.util.Random
+import org.scalacheck.Arbitrary
 
 class MerkleTest extends PropSpec with PropertyChecks with Matchers {
 
@@ -62,12 +63,13 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
         l2 <- Gen.oneOf(leafs).suchThat(_ != l1)
       } yield (l1, l2)
 
-    forAll(twoLeafsGen) { case (l1, l2) =>
-      val proof = tree
-        .proofByElement(Leaf[Digest32](l1)(fastHash))
-        .get
+    forAll(twoLeafsGen) {
+      case (l1, l2) =>
+        val proof = tree
+          .proofByElement(Leaf[Digest32](l1)(fastHash))
+          .get
 
-      eval(scriptSrc(tree.rootHash, proofBytes(proof), l2)) shouldBe Right(CONST_BOOLEAN(false))
+        eval(scriptSrc(tree.rootHash, proofBytes(proof), l2)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
@@ -81,6 +83,26 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
         .get
 
       eval(scriptSrc(tree2.rootHash, proofBytes(proof), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    }
+  }
+
+  property("FALSE on incorrect proof bytes") {
+    val (tree, leafs) = testData()
+
+    forAll(Gen.oneOf(leafs), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { (leaf, bytes) =>
+      eval(scriptSrc(tree.rootHash, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    }
+  }
+
+  property("FALSE on incorrect root bytes") {
+    val (tree, leafs) = testData()
+
+    forAll(Gen.oneOf(leafs), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { (leaf, bytes) =>
+      val proof = tree
+        .proofByElement(Leaf[Digest32](leaf)(fastHash))
+        .get
+
+      eval(scriptSrc(bytes, proofBytes(proof), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
