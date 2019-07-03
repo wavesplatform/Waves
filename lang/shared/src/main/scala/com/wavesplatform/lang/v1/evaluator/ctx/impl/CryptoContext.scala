@@ -128,10 +128,10 @@ object CryptoContext {
         30,
         CHECK_MERKLE_PROOF,
         BOOLEAN,
-        "Check validity of merkle tree proof",
-        ("merkleRoot", BYTESTR, "root hash of merkle tree"),
+        "Check validity of Merkle tree proof",
+        ("merkleRoot", BYTESTR, "root hash of Merkle tree"),
         ("merkleProof", BYTESTR, "proof bytes"),
-        ("valueBytes", BYTESTR, "bytes of value to be prooven")
+        ("valueBytes", BYTESTR, "bytes of value that must be proven")
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
           Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
@@ -184,10 +184,10 @@ object CryptoContext {
       ("SHA256", ((sha256, "SHA256 digest algorithm"), digestAlgValue(sha256))),
       ("SHA384", ((sha384, "SHA384 digest algorithm"), digestAlgValue(sha384))),
       ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512))),
-      ("SHA3224", ((sha3224, "SHA3-256 digest algorithm"), digestAlgValue(sha3224))),
+      ("SHA3224", ((sha3224, "SHA3-224 digest algorithm"), digestAlgValue(sha3224))),
       ("SHA3256", ((sha3256, "SHA3-256 digest algorithm"), digestAlgValue(sha3256))),
-      ("SHA3384", ((sha3384, "SHA3-256 digest algorithm"), digestAlgValue(sha3384))),
-      ("SHA3512", ((sha3512, "SHA3-256 digest algorithm"), digestAlgValue(sha3512)))
+      ("SHA3384", ((sha3384, "SHA3-384 digest algorithm"), digestAlgValue(sha3384))),
+      ("SHA3512", ((sha3512, "SHA3-512 digest algorithm"), digestAlgValue(sha3512)))
     )
 
     val v3Functions =
