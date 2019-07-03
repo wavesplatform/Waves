@@ -27,7 +27,7 @@ lazy val versionSourceTask = (path: String) => Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (1, 0, 0)
+  val FallbackVersion = (1, 0, 1)
 
   val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
