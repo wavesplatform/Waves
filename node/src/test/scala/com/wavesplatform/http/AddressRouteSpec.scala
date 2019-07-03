@@ -191,8 +191,13 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAQBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "scriptText").as[String] shouldBe "DApp(2VfUX,List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA0KCwoEZnVuYxIDAQIDAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAGtzkKpg=="
+      (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
+        "DAppMeta\\(List\\(CallableFuncSignature\\(func,<ByteString@(.*) size=3>\\)\\)\\)," +
+        "List\\(\\)," +
+        "List\\(\\)," +
+        "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),TRUE\\)\\)\\)" +
+      "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)

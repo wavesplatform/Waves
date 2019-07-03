@@ -35,7 +35,7 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ estimate ~ scriptMeta ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   private[this] val decompilerExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
@@ -238,48 +238,6 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
     Json.obj("callableFuncTypes" -> funcTypesJson)
   }
 
-  /*
-    @Path("/script/decompile")
-    @ApiOperation(value = "Decompile", notes = "Decompiles base64 script representation to string code", httpMethod = "POST")
-    @ApiImplicitParams(
-      Array(
-        new ApiImplicitParam(
-          name = "code",
-          required = true,
-          dataType = "string",
-          paramType = "body",
-          value = "Script code",
-          example = "true"
-        )
-      ))
-    @ApiResponses(
-      Array(
-        new ApiResponse(code = 200, message = "string or error")
-      ))
-    def decompile: Route = path("script" / "decompile") {
-      import play.api.libs.json.Json.toJsFieldJsValueWrapper
-
-      (post & entity(as[String]) & withExecutionContext(decompilerExecutionContext)) { code =>
-        Script.fromBase64String(code.trim, checkComplexity = false) match {
-          case Left(err) => complete(err)
-          case Right(script) =>
-            val (scriptText, meta) = Script.decompile(script)
-            val directives: List[(String, JsValue)] = meta.map {
-              case (k, v) =>
-                (k, v match {
-                  case n: Number => JsNumber(BigDecimal(n.toString))
-                  case s         => JsString(s.toString)
-                })
-            }
-            val result  = directives ::: "script" -> JsString(scriptText) :: Nil
-            val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
-            complete(
-              Json.obj(wrapped: _*)
-            )
-        }
-      }
-    }
-  */
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")
   @ApiResponses(
