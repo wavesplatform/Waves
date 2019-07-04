@@ -25,7 +25,7 @@ import scala.util.control.NonFatal
 // TODO: refactor, implement rollback
 private[database] final class BlocksWriter(writableDB: DB) extends Closeable with ScorexLogging {
   private[this] val flushDelay: FiniteDuration = 3 seconds
-  private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 300) max (1 * 1024 * 1024)
+  private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 30) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
   private[this] val blocks       = TrieMap.empty[Height, Block]
