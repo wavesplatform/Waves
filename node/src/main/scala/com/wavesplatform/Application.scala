@@ -341,7 +341,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes)
 
       log.info("Closing storage")
-      db.close()
+      blockchainUpdater.close()
 
       time.close()
       log.info("Shutdown complete")

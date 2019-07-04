@@ -88,6 +88,8 @@ object Importer extends ScorexLogging {
                         case _ =>
                           counter = counter + 1
                       }
+                    } else {
+                      log.warn(s"Block reference is ${block.reference}, but lastBlockId is ${blockchainUpdater.lastBlockId}")
                     }
                   }
                 } else {

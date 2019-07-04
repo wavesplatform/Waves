@@ -26,7 +26,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   val dbSettings: DBSettings
 
   @volatile
-  private var current = (loadHeight(), loadScore(), loadLastBlock())
+  private var _current: (Int, BigInt, Option[Block]) = _
+  private def current: (Int, BigInt, Option[Block]) = {
+    if (_current == null) _current = (loadHeight(), loadScore(), loadLastBlock())
+    _current
+  }
 
   protected def loadHeight(): Int
   override def height: Int = current._1
@@ -298,7 +302,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
           case (_, txId) => txId
         })
 
-    current = (newHeight, current._2 + block.blockScore(), Some(block))
+    _current = (newHeight, current._2 + block.blockScore(), Some(block))
 
     doAppend(
       block,
@@ -346,7 +350,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         )
       discardedBlocks = doRollback(targetBlockId)
     } yield {
-      current = (loadHeight(), loadScore(), loadLastBlock())
+      _current = (loadHeight(), loadScore(), loadLastBlock())
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

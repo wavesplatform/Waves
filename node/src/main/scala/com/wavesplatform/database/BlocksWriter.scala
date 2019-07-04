@@ -1,8 +1,9 @@
 package com.wavesplatform.database
 
-import java.io.{Closeable, RandomAccessFile}
+import java.io._
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
+import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.protobuf
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -17,24 +18,36 @@ import org.iq80.leveldb.DB
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
+//noinspection ScalaStyle
 // TODO: refactor, implement rollback
 private[database] final class BlocksWriter(writableDB: DB) extends Closeable with ScorexLogging {
-  private[this] val flushDelay: FiniteDuration = 30 seconds
-  private[this] implicit val scheduler                       = Scheduler.singleThread("write-db", daemonic = false)
+  private[this] val flushDelay: FiniteDuration = 3 seconds
+  private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 30) max (5 * 1024 * 1024)
+  private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
   private[this] val blocks       = TrieMap.empty[Height, Block]
   private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, Transaction)]
 
-  private[this] val rwLock      = new ReentrantReadWriteLock()
-  private[this] lazy val fileChannel = new RandomAccessFile("blocks", "rw")
+  private[this] val rwLock = new ReentrantReadWriteLock()
+  private[this] var closed = false
 
   // Init
-  scheduler.scheduleWithFixedDelay(flushDelay, flushDelay)(flushBlocks())
-  sys.addShutdownHook(this.close _)
+  scheduler.scheduleWithFixedDelay(flushDelay, flushDelay) {
+    @noinline
+    def calculateFlushableBlocksSize(): Long =
+      blocks.valuesIterator.map(_.bytes().length.toLong).sum
+
+    val blocksSize = calculateFlushableBlocksSize()
+    log.info(s"Blocks size is ${blocksSize / 1024 / 1024} mb")
+    if (blocksSize >= flushMinSize) flushBlocks()
+  }
+  sys.addShutdownHook(this.close())
 
   def writeBlock(height: Height, block: Block): Unit = {
     // No lock
+    require(!closed, "Already closed")
     for ((tx, num) <- block.transactionData.zipWithIndex) transactions(TransactionId(tx.id())) = (height, TxNum @@ num.toShort, tx)
     blocks(height) = block
   }
@@ -43,19 +56,20 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   def getBlock(height: Height, withTxs: Boolean = false): Block = {
     blocks.getOrElse(
       height,
-      locked(_.readLock()) {
+      optimisticLocked { input =>
         val offset = writableDB.get(Keys.blockOffset(height))
-        fileChannel.seek(offset)
-        val headerSize  = fileChannel.readInt()
+        input.skip(offset).ensuring(_ == offset)
+
+        val headerSize  = input.readInt()
         val headerBytes = new Array[Byte](headerSize)
-        fileChannel.read(headerBytes)
+        input.read(headerBytes)
 
         val transactions = if (withTxs) {
-          val txCount = fileChannel.readInt()
+          val txCount = input.readInt()
           for (_ <- 1 to txCount) yield {
-            val txSize  = fileChannel.readInt()
+            val txSize  = input.readInt()
             val txBytes = new Array[Byte](txSize)
-            fileChannel.read(txBytes)
+            input.read(txBytes)
             transaction.PBSignedTransaction.parseFrom(txBytes)
           }
         } else Nil
@@ -74,19 +88,19 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
     transactions
       .get(id)
       .fold {
-        val (_, height, num) = locked(_.readLock())(writableDB.get(Keys.transactionOffset(id)))
+        val (_, height, num) = optimisticLocked(_ => writableDB.get(Keys.transactionOffset(id)))
         (height, num)
       }(v => (v._1, v._2))
 
   def getTransaction(id: TransactionId): (Height, TxNum, Transaction) =
     transactions.getOrElse(
       id,
-      locked(_.readLock()) {
+      optimisticLocked { input =>
         val (offset, height, num) = writableDB.get(Keys.transactionOffset(id))
-        fileChannel.seek(offset)
-        val txSize  = fileChannel.readInt()
+        input.skip(offset).ensuring(_ == offset)
+        val txSize  = input.readInt()
         val txBytes = new Array[Byte](txSize)
-        fileChannel.read(txBytes)
+        input.read(txBytes)
 
         import com.wavesplatform.common.utils._
         (height, num, PBTransactions.vanilla(transaction.PBSignedTransaction.parseFrom(txBytes), unsafe = true).explicitGet())
@@ -95,50 +109,54 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
 
   @noinline
   private[this] def flushBlocks(): Unit = {
+    require(!closed, "Already closed")
     log.warn("Flushing blocks1")
     if (blocks.isEmpty) return
 
-    locked(_.writeLock()) {
-      log.warn("Flushing blocks2")
+    lockedWrite {
+      case (offset, output) =>
+        log.warn("Flushing blocks2")
 
-      val blocksToRemove = new ArrayBuffer[Height]()
-      val txsToRemove    = new ArrayBuffer[TransactionId]()
+        val blocksToRemove = new ArrayBuffer[Height]()
+        val txsToRemove    = new ArrayBuffer[TransactionId]()
 
-      writableDB.readWrite(rw =>
-        for ((height, block) <- blocks.toSeq.sortBy(_._1); headerBytes = PBBlocks.protobuf(block.copy(transactionData = Nil)).toByteArray) {
-          val blockOffset = fileChannel.length()
-          fileChannel.seek(blockOffset)
-          fileChannel.writeInt(headerBytes.length)
-          fileChannel.write(headerBytes)
-          rw.put(Keys.blockOffset(height), blockOffset)
+        writableDB.readWrite(rw =>
+          for ((height, block) <- blocks.toSeq.sortBy(_._1); headerBytes = PBBlocks.protobuf(block.copy(transactionData = Nil)).toByteArray) {
+            var currentOffset = offset
+            output.writeInt(headerBytes.length)
+            output.write(headerBytes)
+            rw.put(Keys.blockOffset(height), currentOffset)
+            currentOffset += Ints.BYTES + headerBytes.length
 
-          fileChannel.writeInt(block.transactionData.length)
-          for ((tx, num) <- block.transactionData.zipWithIndex; txBytes = PBTransactions.protobuf(tx).toByteArray;
-               transactionId = TransactionId(tx.id())) {
-            val txOffset = fileChannel.length().ensuring(_ == fileChannel.getFilePointer)
-            fileChannel.writeInt(txBytes.length)
-            fileChannel.write(txBytes)
-            /* if (tx.isInstanceOf[TransferTransaction]) */
-            rw.put(Keys.transactionOffset(transactionId), (txOffset, height, TxNum @@ num.toShort))
-            txsToRemove += transactionId
-          }
-          blocksToRemove += height
-      })
+            output.writeInt(block.transactionData.length)
+            for ((tx, num) <- block.transactionData.zipWithIndex; txBytes = PBTransactions.protobuf(tx).toByteArray;
+                 transactionId = TransactionId(tx.id())) {
+              output.writeInt(txBytes.length)
+              output.write(txBytes)
+              /* if (tx.isInstanceOf[TransferTransaction]) */
+              rw.put(Keys.transactionOffset(transactionId), (currentOffset, height, TxNum @@ num.toShort))
+              currentOffset += Ints.BYTES + txBytes.length
+              txsToRemove += transactionId
+            }
+            blocksToRemove += height
+        })
 
-      this.blocks --= blocksToRemove
-      this.transactions --= txsToRemove
+        this.blocks --= blocksToRemove
+        this.transactions --= txsToRemove
     }
+    log.warn("Flushing blocks3")
   }
 
   def close(): Unit = synchronized {
-    import scala.concurrent.duration._
-    if (!scheduler.isShutdown) {
-      scheduler.shutdown()
-      scheduler.awaitTermination(10 minutes)
+    if (!this.closed) {
       flushBlocks()
-      fileChannel.close()
+      scheduler.shutdown()
+      this.closed = true
     }
   }
+
+  override def finalize(): Unit =
+    this.close()
 
   @noinline
   private[this] def locked[T](lockF: ReentrantReadWriteLock => Lock)(f: => T): T = {
@@ -146,5 +164,38 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
     concurrent.blocking(lock.lock())
     try f
     finally lock.unlock()
+  }
+
+  private[this] def fileChannelWrite() = new FileOutputStream("blocks", true)
+  private[this] def fileChannelRead()  = {
+    val f = new File("blocks")
+    if (!f.exists()) f.createNewFile()
+    new FileInputStream(f)
+  }
+
+  @noinline
+  private[this] def lockedRead[T](f: DataInputStream => T): T =
+    locked(_.readLock())(unlockedRead(f))
+
+  @noinline
+  private[this] def unlockedRead[T](f: DataInputStream => T): T = {
+    val fs = fileChannelRead()
+    val ds = new DataInputStream(fs)
+    try f(ds)
+    finally ds.close()
+  }
+
+  @noinline
+  private[this] def lockedWrite[T](f: (Long, DataOutputStream) => T): T = {
+    val fs = fileChannelWrite()
+    val ds = new DataOutputStream(fs)
+    try locked(_.writeLock())(f(fs.getChannel.position(), ds))
+    finally ds.close()
+  }
+
+  @noinline
+  private[this] def optimisticLocked[T](f: DataInputStream => T): T = {
+    try unlockedRead(f)
+    catch { case NonFatal(_) => lockedRead(f) }
   }
 }

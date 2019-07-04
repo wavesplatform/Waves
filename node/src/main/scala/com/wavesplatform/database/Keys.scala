@@ -5,12 +5,10 @@ import java.nio.ByteBuffer
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 object Keys {
   import KeyHelpers._
@@ -223,7 +221,7 @@ object Keys {
   def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
     Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 
-  def blockOffset(height: Height): Key[Long] =
+  def blockOffset(height: Int): Key[Long] =
     Key("block-offset", h(132, height), Longs.fromByteArray, Longs.toByteArray)
 
   def transactionOffset(id: TransactionId): Key[(Long, Height, TxNum)] = {

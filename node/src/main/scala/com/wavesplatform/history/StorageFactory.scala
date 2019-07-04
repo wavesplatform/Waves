@@ -1,5 +1,7 @@
 package com.wavesplatform.history
 
+import java.io.Closeable
+
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.settings.WavesSettings
@@ -12,10 +14,12 @@ import org.iq80.leveldb.DB
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 5
 
-  def apply(settings: WavesSettings, db: DB, time: Time, spendableBalanceChanged: Observer[(Address, Asset)]): BlockchainUpdater with NG = {
+  def apply(settings: WavesSettings, db: DB, time: Time, spendableBalanceChanged: Observer[(Address, Asset)]): BlockchainUpdater with NG with Closeable = {
     checkVersion(db)
     val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings)
-    new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time)
+    new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time) with Closeable {
+      override def close(): Unit = levelDBWriter.close()
+    }
   }
 
   private def checkVersion(db: DB): Unit = db.readWrite { rw =>
