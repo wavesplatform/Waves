@@ -4,8 +4,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import monix.reactive.Observer
 
 final case class StateUpdate(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)], dataEntries: Seq[(Address, DataEntry[_])]) {
@@ -44,8 +44,8 @@ object BlockchainUpdateNotifier {
     val DetailedDiff(parentDiff, txsDiffs) = diff
     val parentStateUpdate                  = stateUpdateFromDiff(blockchain, parentDiff)
 
-    val (txsStateUpdates, _) = txsDiffs.foldLeft((Seq.empty[StateUpdate], composite(blockchain, parentDiff))) {
-      case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), composite(bc, txDiff))
+    val (txsStateUpdates, _) = txsDiffs.foldLeft((Seq.empty[StateUpdate], CompositeBlockchain(blockchain, Some(parentDiff)))) {
+      case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), CompositeBlockchain(bc, Some(txDiff)))
     }
 
     val txIds = txsDiffs.flatMap(txDiff => txDiff.transactions.keys.toSeq)

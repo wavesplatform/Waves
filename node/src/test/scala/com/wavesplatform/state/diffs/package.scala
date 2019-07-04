@@ -43,7 +43,7 @@ package object diffs extends WithState with Matchers {
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
       assertion: (Diff, Blockchain) => Unit): Unit = withStateAndHistory(fs) { state =>
-    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.GenResult] =
+    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
@@ -53,7 +53,7 @@ package object diffs extends WithState with Matchers {
     }
 
     val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val cb              = CompositeBlockchain.composite(state, Some(diff))
+    val cb              = CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 
     state.append(diff, fees, totalFee, block)

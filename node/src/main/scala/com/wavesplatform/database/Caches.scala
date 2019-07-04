@@ -40,14 +40,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def lastBlock: Option[Block] = current._3
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = {
-    val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
-      Some(c._2)
-    } else {
-      loadScoreOf(blockId)
-    }
-  }
 
   def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {

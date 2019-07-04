@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import java.util.concurrent.ThreadPoolExecutor.{DiscardOldestPolicy, DiscardPolicy}
+import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.{RejectedExecutionHandler, ScheduledThreadPoolExecutor, ThreadFactory}
 
 import monix.execution.UncaughtExceptionReporter.LogExceptionsToStandardErr
