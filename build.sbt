@@ -120,8 +120,8 @@ inScope(Global)(
       "-Xlint",
       "-Ypartial-unification",
       // Comment these for profiling
-      "-opt:l:inline",
-      "-opt-inline-from:**"
+      //"-opt:l:inline",
+      //"-opt-inline-from:**"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,

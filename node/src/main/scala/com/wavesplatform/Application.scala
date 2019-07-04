@@ -403,7 +403,7 @@ object Application {
     args.headOption.getOrElse("") match {
       case "export"                 => Exporter.main(args.tail)
       case "import"                 => Importer.main(args.tail)
-      case "explore"                => Explorer.main(args.tail)
+//      case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
       case _                        => startNode(args.headOption)

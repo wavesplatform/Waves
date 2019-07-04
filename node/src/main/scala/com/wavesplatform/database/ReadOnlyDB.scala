@@ -15,6 +15,11 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
+  def getOptional[V](key: Key[V]): Option[V] = Option(db.get(key.keyBytes, readOptions)).filterNot(_.isEmpty).map { bytes =>
+    LevelDBStats.read.recordTagged(key, bytes)
+    key.parse(bytes)
+  }
+
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(key.keyBytes, readOptions)
     LevelDBStats.read.recordTagged(key, bytes)
@@ -29,7 +34,8 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOverStream(): CloseableIterator[DBEntry] = db.iterateOverStream()
 
-  def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = db.iterateOverStream(prefix, suffix)
+  def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] =
+    db.iterateOverStream(prefix, suffix)
 
   def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
 

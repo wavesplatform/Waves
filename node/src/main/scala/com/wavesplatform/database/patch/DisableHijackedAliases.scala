@@ -4,7 +4,7 @@ import java.util
 
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.Alias
-import com.wavesplatform.database.{Keys, RW}
+import com.wavesplatform.database.{BlocksWriter, Keys, RW}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -12,35 +12,19 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.JavaConverters._
 
 object DisableHijackedAliases extends ScorexLogging {
-  def apply(rw: RW): Unit = {
+  def apply(rw: RW, bw: BlocksWriter): Unit = {
     log.info("Collecting hijacked aliases")
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
     val height  = Height(rw.get(Keys.height))
 
     for (h <- 1 until height) {
-      val (header, _) = rw
-        .get(Keys.blockHeaderAndSizeAt(Height(h)))
-        .get
+      val header = bw.getBlock(Height @@ h, withTxs = true)
+      for (tx <- header.transactionData) tx match {
+        case cat: CreateAliasTransaction =>
+          aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
 
-      for (n <- 0 until header.transactionCount) {
-        val txNum = TxNum(n.toShort)
-
-        val transactionBytes = rw
-          .get(Keys.transactionBytesAt(Height(h), txNum))
-          .get
-
-        val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
-          transactionBytes(0) == 0 &&
-            transactionBytes(1) == CreateAliasTransaction.typeId
-
-        if (isCreateAlias) {
-          TransactionParsers
-            .parseBytes(transactionBytes)
-            .foreach {
-              case cat: CreateAliasTransaction => aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
-              case _                           =>
-            }
-        }
+        case _ =>
+          // Ignore
       }
     }
 
