@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.contract
+package com.wavesplatform.lang.contract.meta
 
 sealed trait RecKeyValue
 case class Single(s: String)                extends RecKeyValue

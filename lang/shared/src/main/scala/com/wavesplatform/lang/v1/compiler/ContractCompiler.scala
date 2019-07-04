@@ -2,8 +2,9 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import cats.implicits._
-import com.wavesplatform.lang.contract.{MetaMapper, DApp}
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.contract.meta.{MetaMapper, V1}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
@@ -130,7 +131,7 @@ object ContractCompiler {
       callableFuncsTypeInfo = callableFuncsWithParams.map {
         case (f, typedParams) => (f.u.name, typedParams.map(_._2))
       }
-      meta <- MetaMapper.toProto(callableFuncsTypeInfo)
+      meta <- MetaMapper.toProto(V1)(callableFuncsTypeInfo)
         .leftMap(Generic(contract.position.start, contract.position.start, _))
         .toCompileM
 

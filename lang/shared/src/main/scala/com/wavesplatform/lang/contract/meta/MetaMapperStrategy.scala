@@ -1,25 +1,23 @@
-package com.wavesplatform.lang.contract
+package com.wavesplatform.lang.contract.meta
 
+import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.lang.v1.compiler.Types
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import cats.implicits._
 
-trait MetaMapperStrategy {
-  type Data
-  def toProto(data: Data): Either[String, DAppMeta]
-  def fromProto(meta: DAppMeta): Either[String, Data]
-  def textMap(data: Data): Dic
+trait MetaMapperStrategy[V <: MetaVersion] {
+  def toProto(data: V#Data): Either[String, DAppMeta]
+  def fromProto(meta: DAppMeta): Either[String, V#Data]
+  def textMap(data: V#Data): Dic
   def textMapFromProto(meta: DAppMeta): Either[String, Dic] = fromProto(meta).map(textMap)
 }
 
-object MetaMapperStrategyV1 extends MetaMapperStrategy {
+object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
   type FuncArgType = (String, List[FINAL])
-  override type Data = List[FuncArgType]
 
-  def toProto(funcTypes: Data): Either[String, DAppMeta] =
+  def toProto(funcTypes: List[FuncArgType]): Either[String, DAppMeta] =
     funcTypes
       .traverse { case (funcName, types) => funcToProto(funcName, types) }
       .map(DAppMeta(1, _))
@@ -37,7 +35,7 @@ object MetaMapperStrategyV1 extends MetaMapperStrategy {
       .map(ByteString.copyFrom)
       .map(CallableFuncSignature(funcName, _))
 
-  def fromProto(meta: DAppMeta): Either[String, Data] =
+  def fromProto(meta: DAppMeta): Either[String, List[FuncArgType]] =
     meta.funcs.toList.traverse(protoToFunc)
 
   private def protoToFunc(funcs: CallableFuncSignature): Either[String, FuncArgType] = {
@@ -53,7 +51,7 @@ object MetaMapperStrategyV1 extends MetaMapperStrategy {
       .map((name, _))
   }
 
-  override def textMap(data: Data): Dic = {
+  override def textMap(data: List[FuncArgType]): Dic = {
     val funcTypesJson = data.map { case (name, types) =>
       Dic(
         Map(

@@ -5,11 +5,11 @@ import java.util.concurrent.Executors
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{Address, PrivateKey}
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.contract.{Chain, Dic, RecKeyValue, Single}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, RecKeyValue, Single}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
