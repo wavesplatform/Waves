@@ -119,6 +119,7 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-Ypartial-unification",
+      // Comment these for profiling
       "-opt:l:inline",
       "-opt-inline-from:**"
     ),

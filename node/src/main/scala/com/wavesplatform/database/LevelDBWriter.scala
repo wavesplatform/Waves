@@ -308,14 +308,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
                                   scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
-    rw.put(Keys.height, height)
-
-    val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
-
-    if (previousSafeRollbackHeight < (height - dbSettings.maxRollbackDepth)) {
-      rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
-    }
-
     val transactions: Map[TransactionId, (Transaction, TxNum)] =
       block.transactionData.zipWithIndex.map { in =>
         val (tx, idx) = in
@@ -324,159 +316,240 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
-    rw.put(Keys.heightOf(block.uniqueId), Some(height))
-
-    val lastAddressId = AddressId @@ (loadMaxAddressId() + newAddresses.size)
-
-    rw.put(Keys.lastAddressId, Some(lastAddressId))
-    rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
-
-    for ((address, id) <- newAddresses) {
-      rw.put(Keys.addressId(address), Some(id))
-      log.trace(s"WRITE ${address.address} -> $id")
-      rw.put(Keys.idToAddress(id), address)
-    }
-    log.trace(s"WRITE lastAddressId = $lastAddressId")
-
     val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
-      val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
-      rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
-      addressId
-    }
+    object writes {
+      @noinline
+      def writeNewBlock(): Unit = {
+        rw.put(Keys.height, height)
 
-    val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
+        val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
+        if (previousSafeRollbackHeight < (height - dbSettings.maxRollbackDepth)) {
+          rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
+        }
+        rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
+        rw.put(Keys.heightOf(block.uniqueId), Some(height))
+        rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
+      }
 
-    for ((addressId, leaseBalance) <- leaseBalances) {
-      rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
-    }
+      @noinline
+      def writeNewAddresses(): Unit = {
+        val lastAddressId = AddressId @@ (loadMaxAddressId() + newAddresses.size)
+        rw.put(Keys.lastAddressId, Some(lastAddressId))
 
-    def getHNForAsset(assetId: IssuedAsset) = {
-      lazy val maybeHNFromState = assetDescriptionCache.get(assetId).map(_._2)
-      lazy val maybeHNFromNewTransactions = transactions
-        .get(TransactionId @@ assetId.id)
-        .map { case (_, n) => (Height @@ height, n) }
+        for ((address, id) <- newAddresses) {
+          rw.put(Keys.addressId(address), Some(id))
+          log.trace(s"WRITE ${address.address} -> $id")
+          rw.put(Keys.idToAddress(id), address)
+        }
+        log.trace(s"WRITE lastAddressId = $lastAddressId")
+      }
 
-      maybeHNFromNewTransactions
-        .orElse(maybeHNFromState)
-    }
+      @noinline
+      def writeWavesBalances(): Unit = {
+        val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
+          val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
+          rw.put(Keys.wavesBalance(addressId)(height), balance)
+          expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
+          addressId
+        }
 
-    for ((addressId, assets) <- assetBalances; (assetId, balance) <- assets; (h, n) <- getHNForAsset(assetId)) {
-      rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
-      rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
-      expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, h, n), threshold, Keys.assetBalance(addressId, h, n))
-    }
+        val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
+        rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
+      }
 
-    rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
+      @noinline
+      private[this] def getHNForAsset(assetId: IssuedAsset) = {
+        lazy val maybeHNFromState = assetDescriptionCache.get(assetId).map(_._2)
+        lazy val maybeHNFromNewTransactions = transactions
+          .get(TransactionId @@ assetId.id)
+          .map { case (_, n) => (Height @@ height, n) }
 
-    for ((orderId, volumeAndFee) <- filledQuantity) {
-      rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
-    }
+        maybeHNFromNewTransactions
+          .orElse(maybeHNFromState)
+      }
 
-    for ((asset, assetInfo) <- reissuedAssets; (h, n) <- getHNForAsset(asset)) {
-      val combinedAssetInfo =
-        readLastValue(rw)(Keys.AssetInfoPrefix, Keys.heightWithNum(h, n), readAssetInfo).fold(assetInfo)(old => Monoid.combine(old, assetInfo))
-      rw.put(Keys.assetInfo(h, n)(height), combinedAssetInfo)
-    }
+      @noinline
+      def writeAssetBalances(): Unit = {
+        for ((addressId, assets) <- assetBalances; (assetId, balance) <- assets; (h, n) <- getHNForAsset(assetId)) {
+          rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
+          rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
+          expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, h, n), threshold, Keys.assetBalance(addressId, h, n))
+        }
+      }
 
-    for ((leaseId, state) <- leaseStates) {
-      rw.put(Keys.leaseStatus(leaseId)(height), state)
-    }
+      @noinline
+      def writeVolumeAndFee(): Unit = {
+        for ((orderId, volumeAndFee) <- filledQuantity) {
+          rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
+        }
+      }
 
-    for ((addressId, script) <- scripts) {
-      rw.put(Keys.addressScript(addressId)(height), script)
-    }
+      @noinline
+      def writeAssets(): Unit = {
+        for ((asset, assetInfo) <- reissuedAssets; (h, n) <- getHNForAsset(asset)) {
+          val combinedAssetInfo =
+            readLastValue(rw)(Keys.AssetInfoPrefix, Keys.heightWithNum(h, n), readAssetInfo).fold(assetInfo)(old => Monoid.combine(old, assetInfo))
+          rw.put(Keys.assetInfo(h, n)(height), combinedAssetInfo)
+        }
+      }
 
-    for ((asset, script) <- assetScripts; (h, n) <- getHNForAsset(asset)) {
-      rw.put(Keys.assetScript(h, n)(height), script)
-    }
+      @noinline
+      def writeLeaseBalances(): Unit ={
+        for ((addressId, leaseBalance) <- leaseBalances) {
+          rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
+          expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
+        }
 
-    for ((addressId, addressData) <- data) {
-      rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
-      val newKeys = (
-        for {
-          (key, value) <- addressData.data
-          dataKeySuffix = Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))
-          isNew         = rw.lastValue(Keys.DataPrefix, dataKeySuffix, this.height).isEmpty
-          _             = rw.put(Keys.data(addressId, key)(height), Some(value))
-          // _             = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
-          if isNew
-        } yield key
-      ).toSeq
+        for ((leaseId, state) <- leaseStates) {
+          rw.put(Keys.leaseStatus(leaseId)(height), state)
+        }
+      }
 
-      if (newKeys.nonEmpty) {
-        val chunkCountKey = Keys.dataKeyChunkCount(addressId)
-        val chunkCount    = rw.get(chunkCountKey)
-        rw.put(Keys.dataKeyChunk(addressId, chunkCount), newKeys)
-        rw.put(chunkCountKey, chunkCount + 1)
+      @noinline
+      def writeScripts(): Unit ={
+        for ((addressId, script) <- scripts) {
+          rw.put(Keys.addressScript(addressId)(height), script)
+        }
+
+        for ((asset, script) <- assetScripts; (h, n) <- getHNForAsset(asset)) {
+          rw.put(Keys.assetScript(h, n)(height), script)
+        }
+      }
+
+      @noinline
+      def writeDataEntries(): Unit = {
+        for ((addressId, addressData) <- data) {
+          rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
+          val newKeys = (
+            for {
+              (key, value) <- addressData.data
+              dataKeySuffix = Bytes.concat(AddressId.toBytes(addressId), key.getBytes(UTF_8))
+              isNew         = rw.lastValue(Keys.DataPrefix, dataKeySuffix, height).isEmpty
+              _             = rw.put(Keys.data(addressId, key)(height), Some(value))
+              // _             = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
+              if isNew
+            } yield key
+            ).toSeq
+
+          if (newKeys.nonEmpty) {
+            val chunkCountKey = Keys.dataKeyChunkCount(addressId)
+            val chunkCount    = rw.get(chunkCountKey)
+            rw.put(Keys.dataKeyChunk(addressId, chunkCount), newKeys)
+            rw.put(chunkCountKey, chunkCount + 1)
+          }
+        }
+      }
+
+      @noinline
+      def writeTransactionsByAddress(): Unit ={
+        if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
+          val kk        = Keys.addressTransactionSeqNr(addressId)
+          val nextSeqNr = rw.get(kk) + 1
+          val txTypeNumSeq = txIds.map { txId =>
+            val (tx, num) = transactions(txId)
+
+            (tx.builder.typeId, num)
+          }
+          rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
+          rw.put(kk, nextSeqNr)
+        }
+      }
+
+      @noinline
+      def writeAliases(): Unit = {
+        for ((alias, addressId) <- aliases) {
+          rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
+        }
+      }
+
+      @noinline
+      def writeTransactions(): Unit = {
+        for ((id, (tx, num)) <- transactions) {
+          rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+          rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
+        }
+      }
+
+      @noinline
+      def writeFeatures(): Unit = {
+        val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
+        if (height % activationWindowSize == 0) {
+          val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
+          val newlyApprovedFeatures = featureVotes(height)
+            .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
+            .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
+
+          if (newlyApprovedFeatures.nonEmpty) {
+            approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
+            rw.put(Keys.approvedFeatures, approvedFeaturesCache)
+
+            val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
+
+            activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
+            rw.put(Keys.activatedFeatures, featuresToSave)
+          }
+        }
+      }
+
+      @noinline
+      def writeSponsorship(): Unit = {
+        for ((asset, sp: SponsorshipValue) <- sponsorship; (h, n) <- getHNForAsset(asset)) {
+          rw.put(Keys.sponsorship(h, n)(height), sp)
+        }
+      }
+
+      @noinline
+      def writeFee(): Unit = {
+        rw.put(Keys.carryFee(height), carry)
+        expiredKeys += Keys.carryFee(threshold - 1).keyBytes
+
+        rw.put(Keys.blockTransactionsFee(height), totalFee)
+      }
+
+      @noinline
+      def writeInvokeScriptResults(): Unit = {
+        if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
+          case (txId, result) =>
+            val (txHeight, txNum) = transactions
+              .get(TransactionId(txId))
+              .map { case (_, txN) => (height, txN) }
+              .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
+              .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
+
+            rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+        }
+      }
+
+      @noinline
+      def deleteExpiredKeys(): Unit = {
+        expiredKeys.foreach(rw.delete(_, "expired-keys"))
+      }
+
+      @noinline
+      def writeAllEntities(): Unit = {
+        writeNewBlock()
+        writeNewAddresses()
+        writeWavesBalances()
+        writeAssets()
+        writeAssetBalances()
+        writeVolumeAndFee()
+        writeLeaseBalances()
+        writeScripts()
+        writeDataEntries()
+        writeAliases()
+        writeFeatures()
+        writeSponsorship()
+        writeFee()
+        writeInvokeScriptResults()
+        writeTransactions()
+        writeTransactionsByAddress()
+        deleteExpiredKeys()
       }
     }
 
-    if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
-      val kk        = Keys.addressTransactionSeqNr(addressId)
-      val nextSeqNr = rw.get(kk) + 1
-      val txTypeNumSeq = txIds.map { txId =>
-        val (tx, num) = transactions(txId)
-
-        (tx.builder.typeId, num)
-      }
-      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
-      rw.put(kk, nextSeqNr)
-    }
-
-    for ((alias, addressId) <- aliases) {
-      rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
-    }
-
-    for ((id, (tx, num)) <- transactions) {
-      rw.put(Keys.transactionAt(Height(height), num), Some(tx))
-      rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
-    }
-
-    val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
-    if (height % activationWindowSize == 0) {
-      val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
-      val newlyApprovedFeatures = featureVotes(height)
-        .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-        .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
-
-      if (newlyApprovedFeatures.nonEmpty) {
-        approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
-        rw.put(Keys.approvedFeatures, approvedFeaturesCache)
-
-        val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
-
-        activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
-        rw.put(Keys.activatedFeatures, featuresToSave)
-      }
-    }
-
-    for ((asset, sp: SponsorshipValue) <- sponsorship; (h, n) <- getHNForAsset(asset)) {
-      rw.put(Keys.sponsorship(h, n)(height), sp)
-    }
-
-    rw.put(Keys.carryFee(height), carry)
-    expiredKeys += Keys.carryFee(threshold - 1).keyBytes
-
-    rw.put(Keys.blockTransactionsFee(height), totalFee)
-
-    if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
-      case (txId, result) =>
-        val (txHeight, txNum) = transactions
-          .get(TransactionId(txId))
-          .map { case (_, txN) => (height, txN) }
-          .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
-          .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
-
-        rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
-    }
-
-    expiredKeys.foreach(rw.delete(_, "expired-keys"))
+    writes.writeAllEntities()
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
