@@ -19,7 +19,6 @@ trait Blockchain {
 
   def height: Int
   def score: BigInt
-  def scoreOf(blockId: ByteStr): Option[BigInt]
 
   def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
   def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]

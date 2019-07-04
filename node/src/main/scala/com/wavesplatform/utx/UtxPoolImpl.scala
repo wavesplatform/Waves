@@ -13,7 +13,7 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.reader.CompositeBlockchain.composite
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
@@ -205,7 +205,7 @@ class UtxPoolImpl(time: Time,
               remove(tx.id())
               bumpIterations(r)
             } else {
-              val updatedBlockchain = composite(blockchain, diff)
+              val updatedBlockchain = CompositeBlockchain(blockchain, Some(diff))
               differ(updatedBlockchain, tx).resultE match {
                 case Right(newDiff) =>
                   val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
