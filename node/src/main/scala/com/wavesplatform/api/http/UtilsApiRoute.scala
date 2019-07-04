@@ -9,7 +9,7 @@ import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, RecKeyValue, Single}
+import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
@@ -222,23 +222,18 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
         & withExecutionContext(decompilerExecutionContext)
     ) { code =>
       val result: ToResponseMarshallable = Global.scriptMeta(code)
-        .map(dicToJson)
+        .map(metaConverter.foldRoot)
         .fold(e => e, r => r)
       complete(result)
     }
   }
 
-  private def dicToJson(meta: Dic): JsObject = {
-    val result = meta.m.toSeq.map { case (k, v) => k -> kvToJson(v) }
-    Json.obj(result: _*)
-  }
-
-  private def kvToJson(value: RecKeyValue): JsValueWrapper =
-    value match {
-      case Single(s) => s
-      case Chain(l)  => Json.arr(l.map(kvToJson): _*)
-      case m: Dic    => dicToJson(m)
-    }
+  lazy val metaConverter: RecKeyValueFolder[JsValueWrapper, JsObject] =
+    RecKeyValueFolder(
+      Json.toJsFieldJsValueWrapper(_),
+      l => Json.arr(l: _*),
+      m => Json.obj(m: _*)
+    )
 
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")

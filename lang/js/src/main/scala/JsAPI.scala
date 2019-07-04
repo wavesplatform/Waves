@@ -2,6 +2,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, RecKeyValue, RecKeyValueFolder, Single}
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
@@ -208,12 +209,12 @@ object JsAPI {
   }
 
   @JSExportTopLevel("meta")
-  def meta(input: String): js.Dynamic = ???/*
+  def meta(input: String): js.Dynamic =
     Global.scriptMeta(input)
-      .map(_.mapValues(Any.fromString).toSeq)
       .fold(
-        err  => js.Dynamic.literal("error" -> err.m),
-        meta => js.Dynamic.literal.applyDynamic("apply")(meta: _*)
+        err => js.Dynamic.literal("error" -> err.m),
+        metaConverter.foldRoot
       )
-      */
+
+  lazy val metaConverter = RecKeyValueFolder(Any.fromString, _.toJSArray, js.Dynamic.literal(_: _*))
 }
