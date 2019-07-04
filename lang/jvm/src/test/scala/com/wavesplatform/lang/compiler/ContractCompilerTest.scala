@@ -63,10 +63,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
-        DAppMeta(List(
-          CallableFuncSignature("foo", ByteString.copyFrom(Array[Byte](1))),
-          CallableFuncSignature("default", ByteString.EMPTY)
-        )),
+        DAppMeta(
+          version = 1,
+          List(
+            CallableFuncSignature("foo", ByteString.copyFrom(Array[Byte](1))),
+            CallableFuncSignature("default", ByteString.EMPTY)
+          )
+        ),
         List.empty,
         List(
           CallableFunction(
@@ -143,9 +146,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
-        DAppMeta(List(
-          CallableFuncSignature("default", ByteString.EMPTY)
-        )),
+        DAppMeta(
+          version = 1,
+          List(
+            CallableFuncSignature("default", ByteString.EMPTY)
+          )
+        ),
         List.empty,
         List(
           CallableFunction(

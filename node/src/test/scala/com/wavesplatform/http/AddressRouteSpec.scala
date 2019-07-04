@@ -177,9 +177,12 @@ class AddressRouteSpec
     }
 
     val contractWithMeta = DApp(
-      meta = DAppMeta(List(
-        CallableFuncSignature("func", ByteString.copyFrom(Array[Byte](1, 2, 3)))
-      )),
+      meta = DAppMeta(
+        version = 1,
+        List(
+          CallableFuncSignature("func", ByteString.copyFrom(Array[Byte](1, 2, 3)))
+        )
+      ),
       decs = List(),
       callableFuncs = List(),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
@@ -191,9 +194,11 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA0KCwoEZnVuYxIDAQIDAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAGtzkKpg=="
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA8IARILCgRmdW5jEgMBAgMAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAb6VlAi"
       (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
-        "DAppMeta\\(List\\(CallableFuncSignature\\(func,<ByteString@(.*) size=3>\\)\\)\\)," +
+      "DAppMeta\\(" +
+        "1," +
+        "List\\(CallableFuncSignature\\(func,<ByteString@(.*) size=3>\\)\\)\\)," +
         "List\\(\\)," +
         "List\\(\\)," +
         "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),TRUE\\)\\)\\)" +

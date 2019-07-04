@@ -2,15 +2,13 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.MetaMapper.FuncArgTypes
-import com.wavesplatform.lang.contract.{ContractSerDe, DApp, MetaMapper}
+import com.wavesplatform.lang.contract.{ContractSerDe, DApp, MetaMapper, Dic, RecKeyValue}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-
 import cats.implicits._
 
 /**
@@ -125,12 +123,12 @@ trait BaseGlobal {
     }
   }
 
-  def scriptMeta(code: String): Either[ScriptParseError, List[FuncArgTypes]] = {
+  def scriptMeta(code: String): Either[ScriptParseError, Dic] = {
     val script = Script.fromBase64String(code.trim, checkComplexity = false)
     script match {
       case Right(ContractScriptImpl(_, dApp, _)) => MetaMapper.textMapFromProto(dApp.meta).leftMap(ScriptParseError)
-      case Right(_)                              => Right(Nil)
-      case Left(err)                             => err.asLeft[List[FuncArgTypes]]
+      case Right(_)                              => Right(Dic(Map()))
+      case Left(err)                             => err.asLeft[Dic]
     }
   }
 

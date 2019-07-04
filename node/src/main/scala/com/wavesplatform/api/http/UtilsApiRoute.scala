@@ -9,15 +9,15 @@ import com.wavesplatform.account.{Address, PrivateKey}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.contract.{Chain, Dic, RecKeyValue, Single}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Types
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
@@ -222,21 +222,23 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
         & withExecutionContext(decompilerExecutionContext)
     ) { code =>
       val result: ToResponseMarshallable = Global.scriptMeta(code)
-        .map(metaToJson)
+        .map(dicToJson)
         .fold(e => e, r => r)
       complete(result)
     }
   }
 
-  private def metaToJson(funcTypes: List[(String, List[Types.FINAL])]) = {
-    val funcTypesJson = funcTypes.map { case (name, types) =>
-      Json.obj(
-        "name"  -> name,
-        "types" -> types.map(_.name)
-      )
-    }
-    Json.obj("callableFuncTypes" -> funcTypesJson)
+  private def dicToJson(meta: Dic): JsObject = {
+    val result = meta.m.toSeq.map { case (k, v) => k -> kvToJson(v) }
+    Json.obj(result: _*)
   }
+
+  private def kvToJson(value: RecKeyValue): JsValueWrapper =
+    value match {
+      case Single(s) => s
+      case Chain(l)  => Json.arr(l.map(kvToJson): _*)
+      case m: Dic    => dicToJson(m)
+    }
 
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")

@@ -6,16 +6,20 @@ import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, FINAL, LONG, 
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import cats.implicits._
-import com.wavesplatform.lang.contract.MetaMapper.{MetaVersion, V1}
-import shapeless.Nat
 
-trait MetaMapperStrategy[Version <: MetaVersion] {
-  def fromProto(meta: DAppMeta): Either[String, Version#Data]
-  def toProto(data: Version#Data): Either[String, DAppMeta]
+trait MetaMapperStrategy {
+  type Data
+  def toProto(data: Data): Either[String, DAppMeta]
+  def fromProto(meta: DAppMeta): Either[String, Data]
+  def textMap(data: Data): Dic
+  def textMapFromProto(meta: DAppMeta): Either[String, Dic] = fromProto(meta).map(textMap)
 }
 
-object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
-  def toProto(funcTypes: V1.Data): Either[String, DAppMeta] =
+object MetaMapperStrategyV1 extends MetaMapperStrategy {
+  type FuncArgType = (String, List[FINAL])
+  override type Data = List[FuncArgType]
+
+  def toProto(funcTypes: Data): Either[String, DAppMeta] =
     funcTypes
       .traverse { case (funcName, types) => funcToProto(funcName, types) }
       .map(DAppMeta(1, _))
@@ -47,5 +51,17 @@ object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
         case n => Left(s"Unexpected callable func arg type byte: $n")
       }
       .map((name, _))
+  }
+
+  override def textMap(data: Data): Dic = {
+    val funcTypesJson = data.map { case (name, types) =>
+      Dic(
+        Map(
+          "name"  -> Single(name),
+          "types" -> Chain(types.map(_.name).map(Single))
+        )
+      )
+    }
+    Dic(Map("callableFuncTypes" -> Chain(funcTypesJson)))
   }
 }

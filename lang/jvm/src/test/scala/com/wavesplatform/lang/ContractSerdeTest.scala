@@ -117,11 +117,14 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
     "full contract with meta" in roundTrip(
       DApp(
-        DAppMeta(List(
-          CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
-          CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
-          CallableFuncSignature("func3", ByteString.EMPTY)
-        )),
+        DAppMeta(
+          version = 1,
+          List(
+            CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
+            CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
+            CallableFuncSignature("func3", ByteString.EMPTY)
+          )
+        ),
         List(
           LET("letName", CONST_BOOLEAN(true)),
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))

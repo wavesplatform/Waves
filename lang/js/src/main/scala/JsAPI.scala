@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 
 import scala.scalajs.js
+import scala.scalajs.js.Any
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
@@ -207,18 +208,12 @@ object JsAPI {
   }
 
   @JSExportTopLevel("meta")
-  def meta(input: String): js.Dynamic =
+  def meta(input: String): js.Dynamic = ???/*
     Global.scriptMeta(input)
+      .map(_.mapValues(Any.fromString).toSeq)
       .fold(
-        err => js.Dynamic.literal("error" -> err.m),
-        funcTypes => {
-          val funcTypesJson = funcTypes.map { case (name, types) =>
-            js.Dynamic.literal(
-              "name"  -> name,
-              "types" -> types.map(_.name)
-            )
-          }
-          js.Dynamic.literal("callableFuncTypes" -> funcTypesJson)
-        }
+        err  => js.Dynamic.literal("error" -> err.m),
+        meta => js.Dynamic.literal.applyDynamic("apply")(meta: _*)
       )
+      */
 }

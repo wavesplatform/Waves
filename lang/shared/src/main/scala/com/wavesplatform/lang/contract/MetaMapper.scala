@@ -1,56 +1,26 @@
 package com.wavesplatform.lang.contract
 
-import com.wavesplatform.lang.v1.compiler.Types
-import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import cats.implicits._
-import com.google.protobuf.ByteString
-import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import shapeless.{HList, HMap, Nat}
-import shapeless.Nat._
 
 object MetaMapper {
-  trait Serializable {
-    def serialized: Map[String, String]
-  }
+  def toProto(data: Any): Either[String, DAppMeta] =
+    data match {
+      case v1Data: MetaMapperStrategyV1.Data => MetaMapperStrategyV1.toProto(v1Data)
+      case _ => Left(s"Unexpected meta type: ${data.getClass}")
+    }
 
-  trait MetaVersion {
-    type Data <: Serializable
-    implicit val serializer: Data => Map[String, String]
-  }
-  case object V1 extends MetaVersion {
-    type Data = List[(String, List[FINAL])]
-    override implicit val serializer: List[(String, List[FINAL])] => Map[String, String] = _
-  }
-  case object V2 extends MetaVersion {
-    type Data = List[(String, List[FINAL])]
-    override implicit val serializer: List[(String, List[FINAL])] => Map[String, String] = _
-  }
-
-  def toProto(funcTypes: List[FuncArgTypes]): Either[String, DAppMeta] =
-    funcTypes
-      .traverse { case (funcName, types) => funcToProto(funcName, types) }
-      .map(DAppMeta(_))
-
-  def textMapFromProto(meta: DAppMeta): Either[String, Map[String, String]] = {
+  def textMapFromProto(meta: DAppMeta): Either[String, Dic] = {
     for {
-      version <- resolveVersion(meta.version)
-      data    <- fromProto[version.type](meta)
-    } yield data.serialized
+      strategy <- resolveStrategy(meta.version)
+      data     <- strategy.textMapFromProto(meta)
+    } yield data
   }
 
-   */
-  private def fromProto[V <: MetaVersion](meta: DAppMeta)(implicit s: MetaMapperStrategy[V]): Either[String, V#Data] =
-    s.fromProto(meta)
-
-  private def toProto[V <: MetaVersion](data: V#Data)(implicit s: MetaMapperStrategy[V]): Either[String, DAppMeta] =
-    s.toProto(data)
-
-  private def resolveVersion(version: Int): Either[String, MetaVersion] = {
+  private def resolveStrategy(version: Int): Either[String, MetaMapperStrategy] = {
     version match {
-      case 1          => Right(V1)
+      case 1          => Right(MetaMapperStrategyV1)
       case n if n > 0 => Left(s"Unsupported meta version $n")
-      case n          => Left(s"Illegal meta version $n, expected postive value")
+      case n          => Left(s"Illegal meta version $n, expected positive value")
     }
   }
 }
