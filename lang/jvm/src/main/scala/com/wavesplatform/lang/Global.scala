@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
-import com.wavesplatform.utils.Merkle
+import com.wavesplatform.utils.MerkleFunctions
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
@@ -40,7 +40,7 @@ object Global extends BaseGlobal {
   def sha256(message: Array[Byte]): Array[Byte]     = Sha256.hash(message)
 
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
-    Merkle.verify(rootBytes, proofBytes, valueBytes)
+    MerkleFunctions.verify(rootBytes, proofBytes, valueBytes)
 
   // Math functions
   def roundMode(round: BaseGlobal.Rounds) : RoundingMode = {

@@ -7,7 +7,7 @@ import scorex.crypto.hash.{CryptographicHash, CryptographicHash32, Digest, Diges
 
 import scala.util.Try
 
-object Merkle {
+object MerkleFunctions {
 
   def verify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean = {
     (for {
