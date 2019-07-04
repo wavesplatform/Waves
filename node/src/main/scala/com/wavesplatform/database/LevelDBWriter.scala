@@ -69,7 +69,7 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
+class LevelDBWriter(val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging with Closeable {
 
@@ -78,8 +78,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
-
-  private[this] lazy val blocksWriter: BlocksWriter = new BlocksWriter(writableDB)
 
   import LevelDBWriter._
 
@@ -101,6 +99,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   override protected def loadLastBlock(): Option[Block] = readOnly { db =>
     val height = Height(db.get(Keys.height))
+    log.warn(s"Last block is $height")
     loadBlock(height, db)
   }
 
@@ -1169,8 +1168,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   }
 
   private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    Try(blocksWriter.getBlock(height, withTxs = true))
-      .toOption
+    val tr = Try(blocksWriter.getBlock(height, withTxs = true))
+    // tr.failed.foreach(log.error(s"Error loading block at $height", _))
+    // tr.foreach(block => log.warn(s"Loaded block at $height is $block"))
+    tr.toOption
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>

@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import java.io.Closeable
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.implicits._
@@ -31,7 +32,8 @@ import monix.reactive.{Observable, Observer}
 class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
-    with ScorexLogging {
+    with ScorexLogging
+with Closeable {
 
   import com.wavesplatform.state.BlockchainUpdaterImpl._
   import wavesSettings.blockchainSettings.functionalitySettings
@@ -305,11 +307,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
             }
         }
     }
-  }
-
-  def shutdown(): Unit = {
-    internalLastBlockInfo.onComplete()
-    service.shutdown()
   }
 
   private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
@@ -708,6 +705,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       case None =>
         blockchain.leaseBalance(address)
     }
+  }
+
+  override def close(): Unit ={
+    internalLastBlockInfo.onComplete()
+    service.shutdown()
   }
 
   private[this] object metrics {

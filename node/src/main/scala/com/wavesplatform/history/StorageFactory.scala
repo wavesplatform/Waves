@@ -18,7 +18,10 @@ object StorageFactory extends ScorexLogging {
     checkVersion(db)
     val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings)
     new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time) with Closeable {
-      override def close(): Unit = levelDBWriter.close()
+      override def close(): Unit = {
+        super.close()
+        levelDBWriter.close()
+      }
     }
   }
 

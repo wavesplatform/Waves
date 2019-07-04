@@ -328,7 +328,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       Try(Await.result(actorSystem.terminate(), 2.minute)).failed.map(e => log.error("Failed to terminate actor system", e))
       log.debug("Node's actor system shutdown successful")
 
-      blockchainUpdater.shutdown()
       rxExtensionLoaderShutdown.foreach(_.shutdown())
 
       log.info("Stopping network services")

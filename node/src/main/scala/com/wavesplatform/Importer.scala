@@ -89,7 +89,7 @@ object Importer extends ScorexLogging {
                           counter = counter + 1
                       }
                     } else {
-                      log.warn(s"Block reference is ${block.reference}, but lastBlockId is ${blockchainUpdater.lastBlockId}")
+                      //log.warn(s"Block reference is ${block.reference}, but lastBlockId is ${blockchainUpdater.lastBlockId}")
                     }
                   }
                 } else {
@@ -103,6 +103,7 @@ object Importer extends ScorexLogging {
             }
             bis.close()
             inputStream.close()
+            blockchainUpdater.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
 

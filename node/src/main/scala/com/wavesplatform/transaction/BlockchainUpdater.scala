@@ -1,4 +1,6 @@
 package com.wavesplatform.transaction
+import java.io.Closeable
+
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -11,7 +13,12 @@ trait BlockchainUpdater {
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
   def lastBlockInfo: Observable[LastBlockInfo]
   def isLastBlockId(id: ByteStr): Boolean
-  def shutdown(): Unit
+
+  // Compatibility
+  @inline def shutdown(): Unit = this match {
+    case c: Closeable => c.close()
+    case _ => // Ignore
+  }
 }
 
 case class LastBlockInfo(id: BlockId, height: Int, score: BigInt, ready: Boolean)
