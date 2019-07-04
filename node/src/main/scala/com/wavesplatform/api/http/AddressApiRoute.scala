@@ -182,6 +182,24 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         .getOrElse(InvalidAddress))
   }
 
+  @Path("/balance/proof/{address}/{height}")
+  @ApiOperation(value = "Proof for address balance at height", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Account address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "mining", value = "Is mining balance", required = false, dataType = "boolean", paramType = "query"),
+    )
+  )
+  def balanceProof: Route = (path("balance" / "proof" / Segment / IntNumber) & parameter('mning.as[Boolean] ? false) & get) { (addressStr, height, mining) =>
+    complete(
+      Address
+        .fromString(addressStr)
+        .flatMap(commonAccountApi.balanceProof(_, height, mining))
+        .map(ToResponseMarshallable(_))
+    )
+  }
+
   @Path("/balance/{address}/{confirmations}")
   @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
   @ApiImplicitParams(

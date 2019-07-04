@@ -3,10 +3,13 @@ package com.wavesplatform.crypto
 import java.nio.ByteBuffer
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.transaction.Transaction
-import scorex.crypto.authds.LeafData
+import com.wavesplatform.utils.MerkleFunctions
+import play.api.libs.json.{Json, Writes}
+import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
+import scorex.crypto.hash.{CryptographicHash32, Digest, Digest32}
 import supertagged.TaggedType
 
 object Merkle {
@@ -85,6 +88,29 @@ object Merkle {
       .put(addr.bytes.arr)
       .putLong(balance)
       .array()
+  }
+
+  implicit val balanceProofWrites: Writes[BalanceProof] =
+    implicitly[Writes[String]]
+      .contramap[MerkleProof[Digest32]] { proof =>
+        Base64.encode(proofBytes(proof))
+      }
+
+  implicit val transactionProofWrites: Writes[TransactionProof] =
+    implicitly[Writes[String]]
+      .contramap[MerkleProof[Digest32]] { proof =>
+        Base64.encode(proofBytes(proof))
+      }
+
+  private def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
+    def loop(lvls: List[(Digest, Side)], acc: Array[Byte]): Array[Byte] = {
+      lvls match {
+        case (d, s) :: xs => loop(xs, Array.concat(acc, s +: d.length.toByte +: d))
+        case Nil          => acc
+      }
+    }
+
+    loop(mp.levels.toList, Array.emptyByteArray)
   }
 
 }

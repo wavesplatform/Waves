@@ -10,6 +10,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -283,6 +284,20 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
+    val miners: mutable.HashMap[AddressId, BalanceInfo] =
+      mutable.HashMap.empty[AddressId, BalanceInfo]
+
+    if (height > 1) {
+      rw.get(Keys.balancesInfoAtHeight(Height @@ (height - 1)))
+        .foreach {
+          case (addrId, balance) =>
+            miners.put(addrId, balance)
+        }
+    }
+
+    val requiredBalance = GeneratingBalanceProvider.minimalEffectiveBalance(height, activatedFeatures)
+    val requiredBlocks  = GeneratingBalanceProvider.minimalBlockInterval(height, activatedFeatures)
+
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val kwbh = Keys.wavesBalanceHistory(addressId)
@@ -290,10 +305,44 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       if (wbh.isEmpty) {
         newAddressesForWaves += addressId
       }
+
+      val knownMiner: Boolean      = miners.contains(AddressId @@ addressId)
+      val haveEnoughWaves: Boolean = balance >= requiredBalance
+
+      lazy val miningBalance = {
+        val snapshots = {
+          Try {
+            rw.get(Keys.idToAddress(addressId))
+          }.toOption
+            .map { addr =>
+              balanceSnapshots(addr, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
+            }
+            .getOrElse(Seq(BalanceSnapshot(1, 0, 0, 0)))
+            .map(_.effectiveBalance)
+        }
+        (balance +: snapshots).min
+      }
+
+      val shouldBeAdded   = haveEnoughWaves
+      val shouldBeUpdated = knownMiner && haveEnoughWaves
+      val shouldBeRemoved = knownMiner && !haveEnoughWaves
+
+      if (shouldBeAdded || shouldBeUpdated) {
+        miners.update(AddressId @@ addressId, BalanceInfo(balance, miningBalance))
+      } else if (shouldBeRemoved) {
+        miners.remove(AddressId @@ addressId)
+      }
+
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
+
+    rw.put(Keys.balancesInfoAtHeight(Height @@ height), miners.toMap)
+
+    val expiredMiners = Keys.balancesInfoAtHeight(Height @@ threshold)
+
+    expiredKeys.append(expiredMiners.keyBytes)
 
     val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
 
@@ -573,6 +622,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
           rw.delete(Keys.blockHeaderAndSizeAt(h))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.balancesInfoAtHeight(Height @@ height))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
@@ -1044,6 +1094,15 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
     )
   }
+
+  def minerBalancesAtHeight(height: Height): Map[Address, BalanceInfo] =
+    readOnly { db =>
+      db.get(Keys.balancesInfoAtHeight(height))
+        .map {
+          case (addressId, balanceInfo) =>
+            db.get(Keys.idToAddress(addressId)) -> balanceInfo
+        }
+    }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =
     for {

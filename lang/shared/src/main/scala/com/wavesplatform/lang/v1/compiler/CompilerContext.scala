@@ -38,6 +38,6 @@ object CompilerContext {
   }
 
   val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> 'predefTypes
-  val vars: Lens[CompilerContext, VariableTypes]             = lens[CompilerContext] >> 'varDefs
-  val functions: Lens[CompilerContext, FunctionTypes]        = lens[CompilerContext] >> 'functionDefs
+  val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> 'varDefs
+  val functions: Lens[CompilerContext, FunctionTypes]  = lens[CompilerContext] >> 'functionDefs
 }

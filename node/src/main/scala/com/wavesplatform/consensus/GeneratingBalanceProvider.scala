@@ -13,10 +13,20 @@ object GeneratingBalanceProvider {
   private val FirstDepth                                 = 50
   private val SecondDepth                                = 1000
 
-  def isMiningAllowed(blockchain: Blockchain, height: Int, effectiveBalance: Long): Boolean = {
-    val activated = blockchain.activatedFeatures.get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(height >= _)
-    (!activated && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) || (activated && effectiveBalance >= MinimalEffectiveBalanceForGenerator2)
+  def minimalEffectiveBalance(height: Int, activatedFeatures: Map[Short, Int]): Long = {
+    val activated = activatedFeatures.get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(height >= _)
+    if (activated) MinimalEffectiveBalanceForGenerator2
+    else MinimalEffectiveBalanceForGenerator1
   }
+
+  def minimalBlockInterval(height: Int, activatedFeatures: Map[Short, Int]): Int = {
+    val activated = activatedFeatures.get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(height >= _)
+    if (activated) SecondDepth
+    else FirstDepth
+  }
+
+  def isMiningAllowed(blockchain: Blockchain, height: Int, effectiveBalance: Long): Boolean =
+    effectiveBalance >= minimalEffectiveBalance(blockchain.height, blockchain.activatedFeatures)
 
   //noinspection ScalaStyle
   def isEffectiveBalanceValid(blockchain: Blockchain, height: Int, block: Block, effectiveBalance: Long): Boolean =

@@ -1,6 +1,7 @@
 package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.Merkle.BalanceProof
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
@@ -77,6 +78,10 @@ class CommonAccountApi(blockchain: Blockchain) {
         case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
           (height, leaseTransaction)
       })
+  }
+
+  def balanceProof(address: Address, height: Int, mining: Boolean): Either[String, BalanceProof] = {
+    ???
   }
 }
 
