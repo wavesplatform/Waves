@@ -752,7 +752,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
     for {
-      (height, _, tx) <- Some(bw.getTransaction(TransactionId(id))) // TODO Try().toOption
+      (height, _, tx) <- Try(bw.getTransaction(TransactionId(id))).toOption
     } yield (height, tx)
   }
 
