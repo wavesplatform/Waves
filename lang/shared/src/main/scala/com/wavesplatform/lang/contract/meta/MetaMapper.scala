@@ -8,13 +8,13 @@ object MetaMapper {
 
   def dicFromProto(meta: DAppMeta): Either[String, Dic] =
     for {
-      strategy <- resolveVersion(meta.version)
-      data     <- strategy.textMapFromProto(meta)
+      version <- resolveVersion(meta.version)
+      data    <- version.strategy.textMapFromProto(meta)
     } yield data
 
-  private def resolveVersion(version: Int): Either[String, MetaMapperStrategy[_]] = {
+  private def resolveVersion(version: Int): Either[String, MetaVersion] = {
     version match {
-      case 1          => Right(MetaMapperStrategyV1)
+      case 1          => Right(V1)
       case n if n > 0 => Left(s"Unsupported meta version $n")
       case n          => Left(s"Illegal meta version $n, expected positive value")
     }
