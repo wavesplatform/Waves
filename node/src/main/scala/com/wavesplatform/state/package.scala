@@ -73,9 +73,9 @@ package object state {
 
     d.fold(b.nftList(address, after)) { d =>
       after match {
-        case None                                         => nftFromDiff(d, after) ++ nftFromBlockchain
-        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ nftFromBlockchain
-        case _                                            => nftFromBlockchain
+        case None                                         => CloseableIterator.seq(nftFromDiff(d, after), b.nftList(address, after))
+        case Some(asset) if d.issuedAssets contains asset => CloseableIterator.seq(nftFromDiff(d, after), b.nftList(address, None))
+        case _                                            => b.nftList(address, after)
       }
     }
   }

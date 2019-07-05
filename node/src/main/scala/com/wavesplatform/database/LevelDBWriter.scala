@@ -722,7 +722,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
               case None                   => Nil
           })
 
-        takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
+        CloseableIterator.fromIterator(takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter))
           .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
       } else {
         def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
@@ -1086,7 +1086,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val baseIterator: CloseableIterator[(Height, TxNum)] =
         if (reverse) {
           for {
-            height  <- (this.height to 0 by -1).iterator
+            height  <- CloseableIterator.fromIterator((this.height to 0 by -1).iterator)
             (bh, _) <- this.blockHeaderAndSize(height).iterator
             txNum   <- bh.transactionCount to 0 by -1
           } yield (Height(height), TxNum(txNum.toShort))

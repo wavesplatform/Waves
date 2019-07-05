@@ -65,7 +65,7 @@ sealed trait CloseableIterator[+A] extends Iterator[A] with Closeable {
 object CloseableIterator {
   def empty[T]: CloseableIterator[T] = apply(Iterator.empty, () => ())
 
-  def apply[T](iterator: Iterator[T], doClose: () => Unit): CloseableIterator[T] = new AbstractIterator[T] with CloseableIterator[T] {
+  def apply[T](iterator: Iterator[T], doClose: () => Unit): CloseableIterator[T] = new AbstractIterator[T] with CloseableIterator[T] with ScorexLogging {
     private[this] var closed = false
 
     override def close(): Unit = {
@@ -86,7 +86,7 @@ object CloseableIterator {
 
     override def finalize(): Unit = {
       if (!this.closed) {
-        System.err.println(s"CloseableIterator leaked: $this [${System.identityHashCode(this)}]")
+        log.debug(s"CloseableIterator leaked: $this [${System.identityHashCode(this)}]")
         this.close()
       }
       super.finalize()
@@ -96,10 +96,10 @@ object CloseableIterator {
       s"Closeable($iterator)"
   }
 
-  def seq[T](iterators: CloseableIterator[T]*): CloseableIterator[T] = {
+  def seq[T](iterators: Iterator[T]*): CloseableIterator[T] = {
     apply(
       iterators.fold(Iterator.empty: Iterator[T])(_ ++ _),
-      () => iterators.foreach(_.close())
+      () => iterators.foreach(this.close)
     )
   }
 
@@ -115,10 +115,14 @@ object CloseableIterator {
   def using[T, V](iterator: CloseableIterator[T])(f: CloseableIterator[T] => V): V =
     iterator.closeAfter(f)
 
-  implicit def fromIterator[T](iterator: Iterator[T]): CloseableIterator[T] = iterator match {
+  /*implicit */ def fromIterator[T](iterator: Iterator[T]): CloseableIterator[T] = iterator match {
     case c: CloseableIterator[T] => c
     case _                       => apply(iterator, () => ())
   }
+
+  /* implicit class IteratorAsCloseable[T](private val iter: Iterator[T]) extends AnyVal {
+    def asCloseable: CloseableIterator[T] = CloseableIterator(iter, () => ())
+  } */
 
   private[this] class DeferredCloseableIterator[+T](createIterator: () => CloseableIterator[T]) extends CloseableIterator[T] {
     //noinspection ScalaStyle
