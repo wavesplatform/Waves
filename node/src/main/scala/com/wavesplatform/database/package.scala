@@ -434,7 +434,6 @@ package object database {
     def withContext[T](f: LocalDBContext => T): T = {
       val context = openContext()
       try {
-        context.incCounter()
         f(context)
       } finally {
         val err = Try(context.close()).failed
