@@ -665,7 +665,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
 
-  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
+  override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
     val assetIdStream: CloseableIterator[IssuedAsset] = db
       .get(Keys.addressId(address))
       .fold(CloseableIterator.empty[IssuedAsset]) { id =>

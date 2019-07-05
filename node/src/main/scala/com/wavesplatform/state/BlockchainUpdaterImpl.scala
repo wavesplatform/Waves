@@ -479,7 +479,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       .orElse(blockchain.transactionInfo(id))
   }
 
-  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
+  override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
     readLock {
       nftListFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, from)
     }

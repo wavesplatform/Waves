@@ -42,10 +42,8 @@ class CommonAccountApi(blockchain: Blockchain) {
     portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
   }
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    val iterator = blockchain.nftList(address, from)
-    Observable.fromIterator(iterator, () => iterator.close())
-  }
+  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+    blockchain.nftObs(address, from)
 
   def script(address: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain.accountScript(address)

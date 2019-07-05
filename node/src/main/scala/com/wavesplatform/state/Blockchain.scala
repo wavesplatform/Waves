@@ -53,9 +53,23 @@ trait Blockchain {
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
 
-  def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction]
+  private[state] def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
+    CloseableIterator.empty
 
-  private[state] def addressTransactionsIterator(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
+  final def nftObs(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+    Observable.defer {
+      val iterator = nftIterator(address, from)
+      Observable.fromIterator(iterator, () => iterator.close())
+    }
+
+  final def nftList(address: Address, from: Option[IssuedAsset], count: Int): Seq[IssueTransaction] =
+    nftIterator(address, from)
+      .take(count)
+      .closeAfter(_.toVector)
+
+  private[state] def addressTransactionsIterator(address: Address,
+                                                 types: Set[TransactionParser],
+                                                 fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     CloseableIterator.empty // Fix stub[Blockchain] in tests
 
   def addressTransactionsObs(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] =
