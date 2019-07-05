@@ -10,6 +10,7 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
@@ -53,7 +54,13 @@ package object settings {
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
 
+    val cmdDefaults =
+      Try(withApp.getConfig("waves.defaults"))
+        .getOrElse(ConfigFactory.empty())
+        .atPath("waves")
+
     external
+      .withFallback(cmdDefaults)
       .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(withApp)}"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
