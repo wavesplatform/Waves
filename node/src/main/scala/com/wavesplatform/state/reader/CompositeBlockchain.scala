@@ -128,7 +128,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
       .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
 
     val fromInner = inner.collectActiveLeases {
-      case lt if canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt)
+      case lt if !canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt)
     }
     fromDiff.toVector ++ fromInner
   }
