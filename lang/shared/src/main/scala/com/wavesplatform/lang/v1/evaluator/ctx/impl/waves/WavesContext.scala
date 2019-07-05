@@ -76,7 +76,7 @@ object WavesContext {
         internalName,
         UNION(dataType.innerType, UNIT),
         "Find and extract data by key",
-        ("data", LIST(dataEntryType), "DataEntry vector, usually tx.data"),
+        ("data", LIST(dataEntryType), "DataEntry list, usually tx.data"),
         ("key", STRING, "key")
       ) {
         case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
@@ -104,7 +104,7 @@ object WavesContext {
         30,
         UNION(dataType.innerType, UNIT),
         "Extract data by index",
-        ("@data", LIST(dataEntryType), "DataEntry vector, usually tx.data"),
+        ("@data", LIST(dataEntryType), "DataEntry list, usually tx.data"),
         ("@index", LONG, "index")
       ) {
         LET_BLOCK(

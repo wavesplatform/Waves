@@ -7,9 +7,8 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.{LazyVal, NativeFunction}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 
 package object compiler {
 
