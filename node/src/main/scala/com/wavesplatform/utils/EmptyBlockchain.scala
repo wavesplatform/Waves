@@ -65,9 +65,9 @@ case object EmptyBlockchain extends Blockchain {
 
   override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = CloseableIterator.empty
 
-  override def addressTransactions(address: Address,
-                                   types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = CloseableIterator.empty
+  override def addressTransactionsIterator(address: Address,
+                                           types: Set[TransactionParser],
+                                           fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = CloseableIterator.empty
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
@@ -104,7 +104,7 @@ case object EmptyBlockchain extends Blockchain {
 
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = CloseableIterator.empty
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = Nil
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,
                                          height: Int,

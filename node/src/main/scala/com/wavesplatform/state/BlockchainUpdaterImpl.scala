@@ -484,7 +484,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       nftListFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, from)
     }
 
-  override def addressTransactions(address: Address,
+  override def addressTransactionsIterator(address: Address,
                                    types: Set[TransactionParser],
                                    fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     readLock {
@@ -632,15 +632,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = readLock {
-    ngState.fold(blockchain.allActiveLeases) { ng =>
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
+    ngState.fold(blockchain.collectActiveLeases(pf)) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
-      val fromDiff = active.keysIterator
+      val fromDiff = active.keys
         .map(id => ng.bestLiquidDiff.transactions(id)._2)
-        .collect { case lt: LeaseTransaction => lt }
+        .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
 
-      val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
-      CloseableIterator.seq(fromDiff, fromInner)
+      val fromInner = blockchain.collectActiveLeases { case lt if canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt) }
+      fromDiff.toVector ++ fromInner
     }
   }
 

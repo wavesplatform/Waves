@@ -110,9 +110,9 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
     nftListFromDiff(inner, maybeDiff)(address, from)
   }
 
-  override def addressTransactions(address: Address,
-                                   types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
+  override def addressTransactionsIterator(address: Address,
+                                  types: Set[TransactionParser],
+                                  fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
     addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
@@ -121,14 +121,16 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keysIterator
+    val fromDiff = active.keys
       .map(id => diff.transactions(id)._2)
-      .collect { case lt: LeaseTransaction => lt }
+      .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
 
-    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
-    CloseableIterator.seq(fromDiff, fromInner)
+    val fromInner = inner.collectActiveLeases {
+      case lt if canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt)
+    }
+    fromDiff.toVector ++ fromInner
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {

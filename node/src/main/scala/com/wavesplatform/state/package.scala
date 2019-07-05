@@ -101,12 +101,12 @@ package object state {
     def transactions: Diff => Iterator[(Int, Transaction)] =
       withFilterAndLimit _ compose withPagination compose transactionsFromDiff
 
-    d.fold(b.addressTransactions(address, types, fromId)) { diff =>
+    d.fold(b.addressTransactionsIterator(address, types, fromId)) { diff =>
       fromId match {
-        case Some(id) if !diff.transactions.contains(id) => b.addressTransactions(address, types, fromId)
+        case Some(id) if !diff.transactions.contains(id) => b.addressTransactionsIterator(address, types, fromId)
         case _ =>
           val diffTxs = transactions(diff).map(kv => (Height(kv._1), kv._2))
-          CloseableIterator.seq(diffTxs, b.addressTransactions(address, types, None))
+          CloseableIterator.seq(diffTxs, b.addressTransactionsIterator(address, types, None))
       }
     }
   }
@@ -168,15 +168,18 @@ package object state {
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
-    def aliasesOfAddress(address: Address): CloseableIterator[Alias] =
+    def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
-        .addressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None)
-        .collect { case (_, a: CreateAliasTransaction) => a.alias }
+        .collectAddressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None) {
+          case (_, a: CreateAliasTransaction) => a.alias
+        }
 
-    def activeLeases(address: Address): CloseableIterator[(Int, LeaseTransaction)] =
+    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
       blockchain
-        .addressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None)
-        .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
+        .collectAddressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None) {
+          case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
+            (height, leaseTransaction)
+        }
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain

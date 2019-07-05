@@ -14,10 +14,8 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 
 private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, broadcast: (VanillaTransaction, Boolean) => Unit) {
-  def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = Observable.defer {
-    val iterator = blockchain.addressTransactions(address, Set.empty, fromId)
-    Observable.fromIterator(iterator, () => iterator.close())
-  }
+  def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] =
+    blockchain.addressTransactionsObs(address, Set.empty, fromId)
 
   def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] = {
     blockchain.transactionInfo(transactionId)

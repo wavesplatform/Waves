@@ -695,7 +695,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
   }
 
-  override def addressTransactions(address: Address,
+  override def addressTransactionsIterator(address: Address,
                                    types: Set[TransactionParser],
                                    fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
@@ -818,20 +818,25 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = readStream { db =>
-    db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix).flatMap { kv =>
-      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
+    val iterator = readStream { db =>
+      db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix).flatMap { kv =>
+        val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
 
-      if (loadLeaseStatus(db, txId)) {
-        val heightNumBytes = kv.getValue
+        if (loadLeaseStatus(db, txId)) {
+          val heightNumBytes = kv.getValue
 
-        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+          val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+          val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        db.get(Keys.transactionAt(height, txNum))
-          .collect { case lt: LeaseTransaction => lt }
-      } else None
+          db.get(Keys.transactionAt(height, txNum))
+        } else None
+      }
     }
+
+    iterator
+      .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
+      .closeAfter(_.toVector)
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
