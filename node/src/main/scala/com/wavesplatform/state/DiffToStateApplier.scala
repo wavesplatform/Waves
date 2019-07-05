@@ -12,20 +12,36 @@ import com.wavesplatform.transaction.Asset.Waves
   * state values (only changed ones)
   */
 object DiffToStateApplier {
-  def balances(blockchain: Blockchain, diff: Diff): Map[(Address, Asset), Long] =
-    for {
-      (address, portfolioDiff) <- diff.portfolios
-      wavesUpdate = {
-        if (portfolioDiff.balance != 0)
-          Some(Waves -> portfolioDiff.balance)
-        else None
-      }
-      (asset, balanceDiff) <- portfolioDiff.assets ++ wavesUpdate
-      newBalance = balanceDiff + blockchain.balance(address, asset)
-    } yield (address, asset) -> newBalance
+  case class PortfolioUpdates(
+      balances: Map[Address, Map[Asset, Long]],
+      leases: Map[Address, LeaseBalance]
+  )
 
-  def leases(blockchain: Blockchain, diff: Diff): Map[Address, LeaseBalance] =
-    diff.portfolios
-      .withFilter { case (_, portfolio) => portfolio.lease != LeaseBalance.empty }
-      .map { case (address, portfolio) => address -> blockchain.leaseBalance(address).combine(portfolio.lease) }
+  def portfolios(blockchain: Blockchain, diff: Diff): PortfolioUpdates = {
+    val balances = Map.newBuilder[Address, Map[Asset, Long]]
+    val leases   = Map.newBuilder[Address, LeaseBalance]
+
+    for ((address, portfolioDiff) <- diff.portfolios) {
+      // balances for address
+      val bs = Map.newBuilder[Asset, Long]
+
+      if (portfolioDiff.balance != 0) {
+        bs += Waves -> (blockchain.balance(address, Waves) + portfolioDiff.balance)
+      }
+
+      portfolioDiff.assets.foreach {
+        case (asset, newBalance) =>
+          bs += asset -> (blockchain.balance(address, asset) + newBalance)
+      }
+
+      balances += address -> bs.result()
+
+      // leases
+      if (portfolioDiff.lease != LeaseBalance.empty) {
+        leases += address -> blockchain.leaseBalance(address).combine(portfolioDiff.lease)
+      }
+    }
+
+    PortfolioUpdates(balances.result(), leases.result())
+  }
 }
