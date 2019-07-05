@@ -18,8 +18,9 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
-import org.iq80.leveldb.{DB, ReadOptions}
+import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
+import scala.util.Try
 import scala.util.control.NonFatal
 
 package object database {
@@ -341,6 +342,108 @@ package object database {
     ndo.toByteArray
   }
 
+  private[database] class LocalDBContext(val db: DB) {
+    private[this] var counter = 0
+    private[this] var snapshotV: Snapshot = _
+    private[this] var rw: RW = _
+    private[this] var ro: ReadOnlyDB = _
+
+    def snapshot(): Snapshot = {
+      require(!isClosed)
+      if (snapshotV == null) snapshotV = db.getSnapshot.ensuring(_ != null, "Snapshot is null")
+      snapshotV
+    }
+
+    def readOnlyDB(): ReadOnlyDB = {
+      require(!isClosed)
+
+      if (rw != null) rw
+      else if (ro != null) ro
+      else {
+        val snapshot = this.snapshot()
+        ro = new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot))
+        ro
+      }
+    }
+
+    def readWriteDB(): RW = {
+      require(!isClosed)
+
+      if (rw == null) {
+        val snapshot = this.snapshot()
+        val readOptions = new ReadOptions().snapshot(snapshot)
+        val batch = db.createWriteBatch()
+        rw = RW(db, readOptions, batch)
+      }
+      rw
+    }
+
+    def incCounter(): Unit = {
+      counter += 1
+    }
+
+    //noinspection ScalaStyle
+    def close(): Unit = {
+      if (isClosed) return
+
+      counter -= 1
+      if (counter == 0) {
+        Option(rw).foreach(rw => db.write(rw.batch))
+        Option(snapshotV).foreach(_.close())
+        ro = null
+        rw = null
+        snapshotV = null
+      }
+    }
+
+    def isClosed: Boolean =
+      counter <= 0
+  }
+
+  private[database] class SynchronizedDBContext(db: DB) extends LocalDBContext(db) {
+    override def snapshot(): Snapshot = synchronized(super.snapshot())
+
+    override def readOnlyDB(): ReadOnlyDB = synchronized(super.readOnlyDB())
+
+    override def readWriteDB(): RW = synchronized(super.readWriteDB())
+
+    override def incCounter(): Unit = synchronized(super.incCounter())
+
+    override def close(): Unit = synchronized(super.close())
+
+    override def isClosed: Boolean = synchronized(super.isClosed)
+  }
+
+  private[database] final class DBContextHolder(val db: DB) {
+    private[this] val tlContexts = new ThreadLocal[LocalDBContext]
+
+    def openContext(): LocalDBContext = {
+      val context = Option(tlContexts.get()) match {
+        case Some(localContext) =>
+          localContext
+        case None =>
+          val context = new LocalDBContext(db)
+          tlContexts.set(context)
+          context
+      }
+
+      context.incCounter()
+      context
+    }
+
+    def withContext[T](f: LocalDBContext => T): T = {
+      val context = openContext()
+      try {
+        context.incCounter()
+        f(context)
+      } finally {
+        val err = Try(context.close()).failed
+        if (context.isClosed) tlContexts.remove()
+        err.foreach(throw _)
+      }
+    }
+  }
+
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestSize
     def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
@@ -350,39 +453,39 @@ package object database {
     }
   }
 
-  implicit class DBExt(val db: DB) extends AnyVal {
+  implicit class DBContextHolderExt(private val ch: DBContextHolder) extends AnyVal {
     def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = {
-      val snapshot = db.getSnapshot
-      val iterator = f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
+      val ctx = new SynchronizedDBContext(ch.db)
+      ctx.incCounter()
+      val iterator = f(ctx.readOnlyDB())
       CloseableIterator(iterator, { () =>
         iterator.close()
-        snapshot.close()
+        ctx.close()
       })
     }
 
-    def readOnly[A](f: ReadOnlyDB => A): A = {
-      val snapshot = db.getSnapshot
-      try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
-      finally snapshot.close()
-    }
+    def readOnly[A](f: ReadOnlyDB => A): A =
+      ch.withContext { ctx =>
+        val db = ctx.readOnlyDB()
+        f(db)
+      }
 
     /**
       * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
-    def readWrite[A](f: RW => A): A = {
-      val snapshot    = db.getSnapshot
-      val readOptions = new ReadOptions().snapshot(snapshot)
-      val batch       = db.createWriteBatch()
-      val rw          = new RW(db, readOptions, batch)
-      try {
-        val r = f(rw)
-        db.write(batch)
-        r
-      } finally {
-        batch.close()
-        snapshot.close()
-      }
-    }
+    def readWrite[A](f: RW => A): A =
+      ch.withContext(ctx => f(ctx.readWriteDB()))
+  }
+
+  implicit class DBExt(private val db: DB) extends AnyVal {
+    def createContext(): DBContextHolder = new DBContextHolder(db)
+
+    // Compatibility
+    def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = createContext().readOnlyStream(f)
+
+    def readOnly[A](f: ReadOnlyDB => A): A = createContext().readOnly(f)
+
+    def readWrite[A](f: RW => A): A = createContext().readWrite(f)
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
 

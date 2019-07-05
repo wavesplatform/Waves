@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
-import org.iq80.leveldb.DB
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -25,16 +24,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   import Caches._
 
   val dbSettings: DBSettings
-  val writableDB: DB
-  val blocksWriter = new BlocksWriter(writableDB)
+  protected val dbContext: DBContextHolder
+  protected val blocksWriter = new BlocksWriter(dbContext)
 
   @volatile
-  private var _current: (Int, BigInt, Option[Block]) = _
-  private def current: (Int, BigInt, Option[Block]) = {
-    require(writableDB != null && blocksWriter != null)
-    if (_current == null) _current = (loadHeight(), loadScore(), loadLastBlock())
-    _current
-  }
+  private var current: (Int, BigInt, Option[Block]) = (loadHeight(), loadScore(), loadLastBlock())
 
   protected def loadHeight(): Int
   override def height: Int = current._1
@@ -306,7 +300,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
           case (_, txId) => txId
         })
 
-    _current = (newHeight, current._2 + block.blockScore(), Some(block))
+    current = (newHeight, current._2 + block.blockScore(), Some(block))
 
     doAppend(
       block,
@@ -354,7 +348,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         )
       discardedBlocks = doRollback(targetBlockId)
     } yield {
-      _current = (loadHeight(), loadScore(), loadLastBlock())
+      current = (loadHeight(), loadScore(), loadLastBlock())
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()

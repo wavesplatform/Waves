@@ -13,7 +13,6 @@ import com.wavesplatform.state.{Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
 import monix.execution.Scheduler
-import org.iq80.leveldb.DB
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ArrayBuffer
@@ -23,7 +22,7 @@ import scala.util.{Failure, Success, Try}
 
 //noinspection ScalaStyle
 // TODO: refactor, implement rollback
-private[database] final class BlocksWriter(writableDB: DB) extends Closeable with ScorexLogging {
+private[database] final class BlocksWriter(dbContext: DBContextHolder) extends Closeable with ScorexLogging {
   private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
   private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 30) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
@@ -31,12 +30,12 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   private[this] val blocks       = TrieMap.empty[Height, Block]
   private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, Transaction)]
 
-  private[this] val rwLock               = new ReentrantReadWriteLock()
-  @volatile private[this] var lastOffset = Try(writableDB.readOnly { db =>
+  private[this] val rwLock = new ReentrantReadWriteLock()
+  @volatile private[this] var lastOffset = Try(dbContext.readOnly { db =>
     val h = db.get(Keys.height)
     db.get(Keys.blockOffset(h))
   }).getOrElse(0L)
-  private[this] var closed               = false
+  private[this] var closed = false
 
   // Init
   scheduler.scheduleWithFixedDelay(flushDelay, flushDelay) {
@@ -45,7 +44,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
       blocks.valuesIterator.map(_.bytes().length.toLong).sum
 
     val blocksSize = calculateFlushableBlocksSize()
-    log.info(s"Blocks size is ${blocksSize / 1024 / 1024} mb")
+    // log.info(s"Blocks size is ${blocksSize / 1024 / 1024} mb")
     if (blocksSize >= flushMinSize) flushBlocks()
   }
   sys.addShutdownHook(this.close())
@@ -89,7 +88,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   }
 
   // Not really safe
-  def blocksIterator(): CloseableIterator[Block] = Try(writableDB.get(Keys.blockOffset(1))) match {
+  def blocksIterator(): CloseableIterator[Block] = Try(dbContext.db.get(Keys.blockOffset(1))) match {
     case Success(startOffset) =>
       val (inMemBlocks, endOffset) = locked(_.readLock()) {
         (this.blocks.toVector.sortBy(_._1).map(_._2), this.lastOffset)
@@ -113,29 +112,45 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
       Iterator.empty
   }
 
+  def deleteBlock(h: Height): Unit =
+    lockedWrite { (_, _) =>
+      dbContext.readWrite { rw =>
+        Try(getBlock(h, withTxs = true))
+          .fold(_ => Nil, _.transactionData)
+          .foreach(tx => rw.delete(Keys.transactionOffset(TransactionId @@ tx.id())))
+
+        rw.delete(Keys.blockOffset(h))
+      }
+
+      blocks.remove(h) match {
+        case Some(block) => this.transactions --= block.transactionData.map(tx => TransactionId(tx.id()))
+        case None => // Ignore
+      }
+    }
+
   // TODO: Get block raw bytes etc
   def getBlock(height: Height, withTxs: Boolean = false): Block =
-    blocks.getOrElse(height, readBlockAt(writableDB.get(Keys.blockOffset(height)), withTxs)._1)
+    blocks.getOrElse(height, readBlockAt(dbContext.db.get(Keys.blockOffset(height)), withTxs)._1)
 
   def getTransactionHN(id: TransactionId): (Height, TxNum) = // No lock
     transactions
       .get(id)
       .fold {
-        val (_, height, num) = optimisticRead(0)(_ => writableDB.get(Keys.transactionOffset(id)))
+        val (_, height, num) = optimisticRead(0)(_ => dbContext.db.get(Keys.transactionOffset(id)))
         (height, num)
       }(v => (v._1, v._2))
 
   def getTransaction(id: TransactionId): (Height, TxNum, Transaction) =
     transactions.getOrElse(
       id, {
-        val optimisticOffset = Try(writableDB.get(Keys.transactionOffset(id)))
+        val optimisticOffset = Try(dbContext.db.get(Keys.transactionOffset(id)))
         optimisticRead(optimisticOffset.get._1) { input =>
           val txSize  = input.readInt()
           val txBytes = new Array[Byte](txSize)
           input.read(txBytes)
 
           import com.wavesplatform.common.utils._
-          val (_, height, num) = optimisticOffset.getOrElse(writableDB.get(Keys.transactionOffset(id)))
+          val (_, height, num) = optimisticOffset.getOrElse(dbContext.db.get(Keys.transactionOffset(id)))
           (height, num, PBTransactions.vanilla(transaction.PBSignedTransaction.parseFrom(txBytes), unsafe = true).explicitGet())
         }
       }
@@ -153,7 +168,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
         val blocksToRemove = new ArrayBuffer[Height]()
         val txsToRemove    = new ArrayBuffer[TransactionId]()
 
-        writableDB.readWrite(rw =>
+        dbContext.readWrite(rw =>
           for ((height, block) <- blocks.toSeq.sortBy(_._1); headerBytes = PBBlocks.protobuf(block.copy(transactionData = Nil)).toByteArray) {
             this.lastOffset = currentOffset
 
@@ -174,7 +189,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
               txsToRemove += transactionId
             }
             blocksToRemove += height
-            log.info(s"block at $height is $block, offset is $offset")
+            // log.info(s"block at $height is $block, offset is $offset")
         })
 
         this.blocks --= blocksToRemove

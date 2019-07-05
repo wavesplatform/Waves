@@ -186,18 +186,20 @@ object Keys {
 //      identity
 //    )
 //
-//  val AddressTransactionSeqNrPrefix: Short = 52
-//  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
-//    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, AddressId.toBytes(addressId))
-//
-//  val AddressTransactionHNPrefix: Short = 53
-//  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
-//    Key.opt(
-//      "address-transaction-height-type-and-nums",
-//      hBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
-//      readTransactionHNSeqAndType,
-//      writeTransactionHNSeqAndType
-//    )
+val AddressTransactionSeqNrPrefix: Short = 52
+
+  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
+    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, AddressId.toBytes(addressId))
+
+  val AddressTransactionHNPrefix: Short = 53
+
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
+    Key.opt(
+      "address-transaction-height-type-and-nums",
+      hBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
+      readTransactionHNSeqAndType,
+      writeTransactionHNSeqAndType
+    )
 //
 //  val TransactionHeightNumByIdPrefix: Short = 54
 //  def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
@@ -242,4 +244,7 @@ object Keys {
     }
     Key("transaction-offset", bytes(123, id), read, write _ tupled)
   }
+
+  def transactionIdByHN(height: Height, txNum: TxNum): Key[TransactionId] =
+    Key("transaction-hn-by-id", hNum(123, height, txNum), bs => TransactionId @@ ByteStr(bs), (_: TransactionId).arr)
 }
