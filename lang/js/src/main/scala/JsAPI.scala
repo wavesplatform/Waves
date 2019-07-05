@@ -216,5 +216,10 @@ object JsAPI {
         metaConverter.foldRoot
       )
 
-  lazy val metaConverter = RecKeyValueFolder(Any.fromString, _.toJSArray, js.Dynamic.literal(_: _*))
+  lazy val metaConverter: RecKeyValueFolder[Any, js.Object with js.Dynamic] =
+    RecKeyValueFolder(
+      Any.fromString,
+      _.toJSArray,
+      js.Dynamic.literal.applyDynamic("apply")(_: _*)
+    )
 }
