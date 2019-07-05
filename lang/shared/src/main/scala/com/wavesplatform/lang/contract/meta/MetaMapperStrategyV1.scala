@@ -2,7 +2,7 @@ package com.wavesplatform.lang.contract.meta
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.lang.v1.compiler.Types
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, FINAL, LONG, STRING, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, FINAL, LONG, REAL, STRING, UNION}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import cats.implicits._
@@ -32,10 +32,10 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
 
   private def mapSingleType(t: FINAL): Either[String, Int] =
     t match {
-      case LONG    => Right(1 << 0)
-      case BYTESTR => Right(1 << 1)
-      case BOOLEAN => Right(1 << 2)
-      case STRING  => Right(1 << 3)
+      case LONG    => Right(1 << typeOrder(LONG))
+      case BYTESTR => Right(1 << typeOrder(BYTESTR))
+      case BOOLEAN => Right(1 << typeOrder(BOOLEAN))
+      case STRING  => Right(1 << typeOrder(STRING))
       case argType => Left(s"Unexpected callable func arg type: $argType")
     }
 
@@ -53,18 +53,28 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
     if (b > 15 || b < 1) {
       Left("Illegal func arg type bytes")
     } else {
-      val long    = if (((b &    1) >> 0) == 1) Some(LONG)    else None
-      val byteStr = if (((b &   10) >> 1) == 1) Some(BYTESTR) else None
-      val boolean = if (((b &  100) >> 2) == 1) Some(BOOLEAN) else None
-      val string  = if (((b & 1000) >> 3) == 1) Some(STRING)  else None
-
-      val existingTypes = List(long, byteStr, boolean, string).flatMap(_.toList)
+      val existingTypes = definedTypes
+        .map(checkTypeExistence(b, _))
+        .flatMap(_.toList)
 
       existingTypes match {
         case List(single)     => Right(single)
         case l@List(_, _@ _*) => Right(UNION(l, None))
       }
     }
+  }
+
+  private lazy val definedTypes = List(LONG, BYTESTR, BOOLEAN, STRING)
+
+  private lazy val typeOrder: Map[REAL, Int] =
+    definedTypes
+      .mapWithIndex((_, _))
+      .toMap
+
+  private def checkTypeExistence(b: Byte, t: REAL): Option[REAL] = {
+    val order = typeOrder(t)
+    if (((b & Math.pow(10, order).toInt) >> order) == 1) Some(t)
+    else None
   }
 
   override def textMap(data: List[FuncArgType]): Dic = {
