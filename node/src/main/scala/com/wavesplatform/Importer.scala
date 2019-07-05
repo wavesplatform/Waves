@@ -75,6 +75,7 @@ object Importer extends ScorexLogging {
                 if (s2 == len) {
                   if (blocksToSkip > 0) {
                     blocksToSkip -= 1
+                    if (blocksToSkip % 100000 == 0) log.info(s"Skipped $blocksToSkip blocks")
                   } else {
                     val Right(block) =
                       if (format == Formats.Binary) Block.parseBytes(buffer).toEither
@@ -89,7 +90,8 @@ object Importer extends ScorexLogging {
                           counter = counter + 1
                       }
                     } else {
-                      //log.warn(s"Block reference is ${block.reference}, but lastBlockId is ${blockchainUpdater.lastBlockId}")
+                      log.warn(s"Block reference is ${block.reference}, but lastBlockId is ${blockchainUpdater.lastBlockId}")
+                      quit = true
                     }
                   }
                 } else {

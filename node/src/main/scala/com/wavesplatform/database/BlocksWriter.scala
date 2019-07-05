@@ -11,20 +11,20 @@ import com.wavesplatform.protobuf.transaction
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
 import monix.execution.Scheduler
 import org.iq80.leveldb.DB
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 //noinspection ScalaStyle
 // TODO: refactor, implement rollback
 private[database] final class BlocksWriter(writableDB: DB) extends Closeable with ScorexLogging {
-  private[this] val flushDelay: FiniteDuration = 3 seconds
+  private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
   private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 30) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
@@ -32,7 +32,10 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, Transaction)]
 
   private[this] val rwLock               = new ReentrantReadWriteLock()
-  @volatile private[this] var lastOffset = 0L
+  @volatile private[this] var lastOffset = Try(writableDB.readOnly { db =>
+    val h = db.get(Keys.height)
+    db.get(Keys.blockOffset(h))
+  }).getOrElse(0L)
   private[this] var closed               = false
 
   // Init
@@ -47,6 +50,37 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   }
   sys.addShutdownHook(this.close())
 
+  private[this] def readBlockFrom(input: DataInputStream, withTxs: Boolean): (Block, Int) = {
+    val headerSize = input.readInt()
+    val headerBytes = new Array[Byte](headerSize)
+    input.read(headerBytes)
+
+    var allTxsSize = 0
+    val transactions = if (withTxs) {
+      val txCount = input.readInt()
+      for (_ <- 1 to txCount) yield {
+        val txSize = input.readInt()
+        val txBytes = new Array[Byte](txSize)
+        input.read(txBytes)
+        allTxsSize += Ints.BYTES + txSize
+        transaction.PBSignedTransaction.parseFrom(txBytes)
+      }
+    } else Nil
+
+    val protoBlock = protobuf.block.PBBlock
+      .parseFrom(headerBytes)
+      .withTransactions(transactions)
+
+    import com.wavesplatform.common.utils._
+    val block = PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet()
+    val size = Ints.BYTES + headerBytes.length + Ints.BYTES + allTxsSize
+    (block, size)
+  }
+
+  private[this] def readBlockAt(offset: Long, withTxs: Boolean): (Block, Int) = {
+    optimisticRead(offset)(readBlockFrom(_, withTxs))
+  }
+
   def writeBlock(height: Height, block: Block): Unit = {
     // No lock
     require(!closed, "Already closed")
@@ -54,42 +88,40 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
     blocks(height) = block
   }
 
-  // TODO: Get block raw bytes etc
-  def getBlock(height: Height, withTxs: Boolean = false): Block = {
-    blocks.getOrElse(
-      height, {
-        optimisticLocked(writableDB.get(Keys.blockOffset(height))) {
-          input =>
-            val headerSize  = input.readInt()
-            val headerBytes = new Array[Byte](headerSize)
-            input.read(headerBytes)
-
-            val transactions = if (withTxs) {
-              val txCount = input.readInt()
-              for (_ <- 1 to txCount) yield {
-                val txSize  = input.readInt()
-                val txBytes = new Array[Byte](txSize)
-                input.read(txBytes)
-                transaction.PBSignedTransaction.parseFrom(txBytes)
-              }
-            } else Nil
-
-            val block = protobuf.block.PBBlock
-              .parseFrom(headerBytes)
-              .withTransactions(transactions)
-
-            import com.wavesplatform.common.utils._
-            PBBlocks.vanilla(block, unsafe = true).explicitGet()
-        }
+  // Not really safe
+  def blocksIterator(): CloseableIterator[Block] = Try(writableDB.get(Keys.blockOffset(1))) match {
+    case Success(startOffset) =>
+      val (inMemBlocks, endOffset) = locked(_.readLock()) {
+        (this.blocks.toVector.sortBy(_._1).map(_._2), this.lastOffset)
       }
-    )
+
+      unlockedRead(startOffset, close = false) { input =>
+        def createIter(offset: Long): Iterator[Block] = {
+          if (offset <= endOffset) Try(readBlockFrom(input, withTxs = true)) match {
+            case Success((block, size)) => Iterator.single(block) ++ createIter(offset + size)
+            case Failure(err) => throw new IOException("Failed to create blocks iterator", err)
+          } else Iterator.empty
+        }
+
+        CloseableIterator(
+          createIter(startOffset) ++ inMemBlocks,
+          () => input.close()
+        )
+      }
+
+    case Failure(_) =>
+      Iterator.empty
   }
+
+  // TODO: Get block raw bytes etc
+  def getBlock(height: Height, withTxs: Boolean = false): Block =
+    blocks.getOrElse(height, readBlockAt(writableDB.get(Keys.blockOffset(height)), withTxs)._1)
 
   def getTransactionHN(id: TransactionId): (Height, TxNum) = // No lock
     transactions
       .get(id)
       .fold {
-        val (_, height, num) = optimisticLocked(0)(_ => writableDB.get(Keys.transactionOffset(id)))
+        val (_, height, num) = optimisticRead(0)(_ => writableDB.get(Keys.transactionOffset(id)))
         (height, num)
       }(v => (v._1, v._2))
 
@@ -97,7 +129,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
     transactions.getOrElse(
       id, {
         val optimisticOffset = Try(writableDB.get(Keys.transactionOffset(id)))
-        optimisticLocked(optimisticOffset.get._1) { input =>
+        optimisticRead(optimisticOffset.get._1) { input =>
           val txSize  = input.readInt()
           val txBytes = new Array[Byte](txSize)
           input.read(txBytes)
@@ -142,7 +174,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
               txsToRemove += transactionId
             }
             blocksToRemove += height
-            // log.info(s"block at $height is $block, offset is $offset")
+            log.info(s"block at $height is $block, offset is $offset")
         })
 
         this.blocks --= blocksToRemove
@@ -158,7 +190,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
       scheduler.awaitTermination(5 minutes)
       while (blocks.nonEmpty) {
         val flushingLastHeight = blocks.keys.max
-        // log.warn(s"Last height is $flushingLastHeight")
+        log.warn(s"Last height is $flushingLastHeight")
         flushBlocks()
       }
     }
@@ -186,12 +218,12 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   }
 
   @noinline
-  private[this] def unlockedRead[T](offset: Long)(f: DataInputStream => T): T = {
+  private[this] def unlockedRead[T](offset: Long, close: Boolean = true)(f: DataInputStream => T): T = {
     val fs = fileChannelRead()
     fs.skip(offset).ensuring(_ == offset)
     val ds = new DataInputStream(fs)
     try f(ds)
-    finally ds.close()
+    finally if (close) ds.close()
   }
 
   @noinline
@@ -209,7 +241,7 @@ private[database] final class BlocksWriter(writableDB: DB) extends Closeable wit
   }
 
   @noinline
-  private[this] def optimisticLocked[T](offset: => Long)(f: DataInputStream => T): T = {
+  private[this] def optimisticRead[T](offset: => Long)(f: DataInputStream => T): T = {
     try {
       val offsetV = offset
       require(offsetV < this.lastOffset)

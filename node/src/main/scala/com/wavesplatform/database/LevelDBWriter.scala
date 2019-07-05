@@ -791,11 +791,10 @@ class LevelDBWriter(val writableDB: DB, spendableBalanceChanged: Observer[(Addre
   override def addressTransactions(address: Address,
                                    types: Set[TransactionParser],
                                    fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
-    ???
-//    val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
-//
-//    db.get(Keys.addressId(address)).fold(CloseableIterator.empty[(Height, Transaction)]) { id =>
-//      val heightAndTxs: CloseableIterator[(Height, TxNum, Transaction)] = if (dbSettings.storeTransactionsByAddress) {
+    val maybeAfter = fromId.flatMap(id => Try(blocksWriter.getTransactionHN(TransactionId(id))).toOption)
+
+    db.get(Keys.addressId(address)).fold(CloseableIterator.empty[(Height, Transaction)]) { id =>
+      val heightAndTxs: CloseableIterator[(Height, TxNum, Transaction)] = if (dbSettings.storeTransactionsByAddress) {
 //        def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
 //          if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 //
@@ -818,22 +817,23 @@ class LevelDBWriter(val writableDB: DB, spendableBalanceChanged: Observer[(Addre
 //
 //        takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
 //          .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
-//      } else {
-//        def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
-//          case None => txNums
-//          case Some((filterHeight, filterNum)) =>
-//            txNums
-//              .dropWhile { case (streamHeight, _, _) => streamHeight > filterHeight }
-//              .dropWhile { case (streamHeight, streamNum, _) => streamNum >= filterNum && streamHeight >= filterHeight }
-//        }
-//
-//        transactionsIterator(types.toVector, reverse = true)
-//          .transform(takeAfter(_, maybeAfter))
-//      }
-//
-//      heightAndTxs
-//        .transform(_.map { case (height, _, tx) => (height, tx) })
-//    }
+        ???
+      } else {
+        def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
+          case None => txNums
+          case Some((filterHeight, filterNum)) =>
+            txNums
+              .dropWhile { case (streamHeight, _, _) => streamHeight > filterHeight }
+              .dropWhile { case (streamHeight, streamNum, _) => streamNum >= filterNum && streamHeight >= filterHeight }
+        }
+
+        transactionsIterator(types.toVector, reverse = true)
+          .transform(takeAfter(_, maybeAfter))
+      }
+
+      heightAndTxs
+        .transform(_.map { case (height, _, tx) => (height, tx) })
+    }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
@@ -1145,22 +1145,26 @@ class LevelDBWriter(val writableDB: DB, spendableBalanceChanged: Observer[(Addre
   private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, TxNum, Transaction)] =
     readStream { db =>
       val baseIterator: CloseableIterator[(Height, TxNum, Transaction)] =
-        if (reverse) {
+        if (false) {
           for {
             height  <- (this.height to 1 by -1).iterator
             block = blocksWriter.getBlock(Height @@ height, withTxs = true)
+            _ = log.info(s"Block $height of ${this.height} processed")
             (height, txNum, tx) <- block.transactionData.zipWithIndex.map(kv => (Height @@ height, TxNum @@ kv._2.toShort, kv._1))
           } yield (height, txNum, tx)
         } else {
           for {
-            height  <- (1 to this.height).iterator
-            block = blocksWriter.getBlock(Height @@ height, withTxs = true)
+            //            height  <- (1 to this.height).iterator
+            //            block = blocksWriter.getBlock(Height @@ height, withTxs = true)
+            (block, height) <- blocksWriter.blocksIterator().zipWithIndex
+            _ = log.info(s"Block $height of ${this.height} processed")
             (height, txNum, tx) <- block.transactionData.zipWithIndex.map(kv => (Height @@ height, TxNum @@ kv._2.toShort, kv._1))
           } yield (height, txNum, tx)
         }
 
+      val codeSet = ofTypes.map(_.typeId).toSet
       baseIterator
-        .filter(v => ofTypes.contains(v._3.builder))
+        .filter(v => codeSet.contains(v._3.builder.typeId))
     }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
