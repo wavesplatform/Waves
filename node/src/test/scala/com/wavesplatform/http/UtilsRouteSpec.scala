@@ -107,8 +107,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       DAppMeta(
         version = 1,
         List(
-          CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
-          CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
+          CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](1, 2, 4, 8))),
+          CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](8, 4, 2, 1))),
           CallableFuncSignature("func3", ByteString.EMPTY)
         )
       ),
