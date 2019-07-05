@@ -51,8 +51,8 @@ object Deser {
     val arraysCount = Shorts.fromByteArray(bytes.slice(0, 2))
     require(arraysCount >= 0, s"Arrays count should be positive, but $arraysCount found")
     require(
-      arraysCount <= bytes.length / 2,
-      s"Bytes with length = ${bytes.length} can't contain $arraysCount array(s)"
+      arraysCount <= (bytes.length - 2) / 2,
+      s"Bytes with length = ${bytes.length - 2} can't contain $arraysCount array(s)"
     )
     val r = (0 until arraysCount).foldLeft((Seq.empty[Array[Byte]], 2)) {
       case ((acc, pos), _) =>

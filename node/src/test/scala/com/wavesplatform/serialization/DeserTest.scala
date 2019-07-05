@@ -11,7 +11,7 @@ class DeserTest extends PropSpec with Matchers {
 
   property("too big arrays count") {
     checkDeserError(
-      "Bytes with length = 6 can't contain 100 array(s)",
+      "Bytes with length = 4 can't contain 100 array(s)",
       Array(0, 100, 1, 2, 3, 4)
     )
   }
