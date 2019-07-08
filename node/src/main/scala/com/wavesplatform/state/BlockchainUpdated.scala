@@ -3,10 +3,13 @@ package com.wavesplatform.state
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import monix.reactive.Observer
+
+import scala.collection.mutable.ArrayBuffer
 
 final case class StateUpdate(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)], dataEntries: Seq[(Address, DataEntry[_])]) {
   def isEmpty: Boolean = balances.isEmpty && leases.isEmpty && dataEntries.isEmpty
@@ -31,21 +34,24 @@ final case class MicroBlockRollbackCompleted(to: ByteStr, height: Int) extends B
 object BlockchainUpdateNotifier {
 
   private def stateUpdateFromDiff(blockchain: Blockchain, diff: Diff): StateUpdate = {
-    val balances = DiffToStateApplier.balances(blockchain, diff).toSeq.map { case ((address, asset), balance) => (address, asset, balance) }
-    val leases   = DiffToStateApplier.leases(blockchain, diff).toSeq
+    val PortfolioUpdates(updatedBalances, updatedLeases) = DiffToStateApplier.portfolios(blockchain, diff)
+
+    val balances = ArrayBuffer.empty[(Address, Asset, Long)]
+    for ((address, assetMap) <- updatedBalances; (asset, balance) <- assetMap) balances += ((address, asset, balance))
+
     val dataEntries = diff.accountData.toSeq.flatMap {
       case (address, AccountDataInfo(data)) =>
         data.toSeq.map { case (_, entry) => (address, entry) }
     }
-    StateUpdate(balances, leases, dataEntries)
+    StateUpdate(balances, updatedLeases.toSeq, dataEntries)
   }
 
   private def stateUpdatesFromDetailedDiff(blockchain: Blockchain, diff: DetailedDiff): (StateUpdate, Seq[StateUpdate], Seq[ByteStr]) = {
     val DetailedDiff(parentDiff, txsDiffs) = diff
     val parentStateUpdate                  = stateUpdateFromDiff(blockchain, parentDiff)
 
-    val (txsStateUpdates, _) = txsDiffs.foldLeft((Seq.empty[StateUpdate], composite(blockchain, parentDiff))) {
-      case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), composite(bc, txDiff))
+    val (txsStateUpdates, _) = txsDiffs.foldLeft((Seq.empty[StateUpdate], CompositeBlockchain(blockchain, Some(parentDiff)))) {
+      case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), CompositeBlockchain(bc, Some(txDiff)))
     }
 
     val txIds = txsDiffs.flatMap(txDiff => txDiff.transactions.keys.toSeq)

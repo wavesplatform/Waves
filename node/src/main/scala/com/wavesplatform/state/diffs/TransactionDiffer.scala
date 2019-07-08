@@ -32,9 +32,8 @@ object TransactionDiffer extends ScorexLogging {
     func(blockchain, tx)
   }
 
-  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long)(
-      blockchain: Blockchain,
-      tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long)(blockchain: Blockchain,
+                                                                              tx: Transaction): TracedResult[ValidationError, Diff] = {
     for {
       _ <- Verifier(blockchain)(tx)
       _ <- TracedResult(
@@ -58,11 +57,10 @@ object TransactionDiffer extends ScorexLogging {
   }.leftMap(TransactionValidationError(_, tx))
 
   def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
-    stats.transactionDiffValidation.measureForType(tx.typeId) {
+    stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx matchData {
-        case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx)
-        case ptx: PaymentTransaction =>
-          PaymentTransactionDiff(blockchain.settings.functionalitySettings, blockchain.height, currentBlockTimestamp)(ptx)
+        case gtx: GenesisTransaction         => GenesisTransactionDiff(blockchain.height)(gtx)
+        case ptx: PaymentTransaction         => PaymentTransactionDiff(blockchain)(ptx)
         case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain)(itx)
         case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
         case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain)(btx)

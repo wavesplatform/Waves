@@ -12,7 +12,11 @@ import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 import scopt.OParser
+import kamon.Kamon
+import com.wavesplatform.metrics.Metrics
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
@@ -67,6 +71,8 @@ object Exporter extends ScorexLogging {
         }
 
         time.close()
+        Await.ready(Kamon.stopAllReporters(), 20.seconds)
+        Metrics.shutdown()
     }
   }
 

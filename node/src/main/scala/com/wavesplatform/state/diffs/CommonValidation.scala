@@ -107,7 +107,7 @@ object CommonValidation {
 
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
-        blockchain.isFeatureActivated(b, blockchain.height - 1),
+        blockchain.isFeatureActivated(b, blockchain.height),
         tx,
         TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )

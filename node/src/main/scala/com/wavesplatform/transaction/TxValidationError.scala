@@ -3,7 +3,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.assets.exchange.Order
 
