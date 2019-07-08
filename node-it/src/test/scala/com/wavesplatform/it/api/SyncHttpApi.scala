@@ -134,6 +134,12 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       sync(async(n).assetsBalance(address))
 
+    def nftAssetsBalance(address: String, limit: Int): Seq[NFTAssetInfo] =
+      sync(async(n).nftAssetsBalance(address, limit))
+
+    def nftAssetsBalance(address: String, limit: Int, after: String): Seq[NFTAssetInfo] =
+      sync(async(n).nftAssetsBalance(address, limit, after))
+
     def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None): AssetDistributionPage =
       sync(async(n).assetDistributionAtHeight(asset, height, limit, maybeAfter))
 

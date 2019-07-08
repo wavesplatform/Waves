@@ -538,6 +538,21 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
+  property("invoking script transaction can be found for recipient") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (paymentContractGen(a, am) _)
+      r <- preconditionsAndSetContract(contractGen)
+    } yield (a, am, r._1, r._2, r._3)) {
+      case (acc, amount, genesis, setScript, ci) =>
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          case (blockDiff, newState) =>
+            newState.addressTransactions(acc.toAddress, Set.empty, None).toList.head._2 shouldBe ci
+        }
+    }
+  }
+
   property("invoking default func payment contract results in accounts state") {
     forAll(for {
       a  <- accountGen
@@ -651,7 +666,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),
@@ -678,11 +693,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       ts     <- timestampGen
 
       transferringAsset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
 
       attachedAsset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#2".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
 
       contractGen = paymentContractGen(master, am, List(IssuedAsset(transferringAsset.id()))) _
@@ -725,7 +740,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetBanned), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),
@@ -752,7 +767,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       master <- accountGen
       ts     <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, master, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
@@ -775,7 +790,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       master <- accountGen
       ts     <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetBanned), enoughFee, ts)
+        .selfSigned(chainId, master, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
@@ -795,10 +810,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       master <- accountGen
       ts     <- timestampGen
       asset1 = IssueTransactionV2
-        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, master, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
       asset2 = IssueTransactionV2
-        .selfSigned(chainId, master, "Asset#2".getBytes, "".getBytes, quantity, 8, false, Some(assetBanned), enoughFee, ts)
+        .selfSigned(chainId, master, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(2))
@@ -832,11 +847,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       ts      <- timestampGen
 
       attachedAsset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
 
       transferringAsset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, Some(throwingAsset), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(throwingAsset), enoughFee, ts)
         .explicitGet()
 
       r <- preconditionsAndSetContract(
@@ -873,7 +888,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       master <- accountGen
       ts     <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, master, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
       contractGen = (paymentContractGen(a, -1, List(IssuedAsset(asset.id()))) _)
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
@@ -910,7 +925,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       master <- accountGen
       ts     <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetBanned), enoughFee, ts)
+        .selfSigned(chainId, master, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
       contractGen = (paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _)
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(0))
@@ -930,7 +945,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransactionV2
-        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
+        .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),

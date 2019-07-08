@@ -69,7 +69,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   test("'Asset distribution' works properly") {
-    val receivers = for (i <- 0 until 10) yield KeyPair(s"receiver#$i".getBytes)
+    val receivers = for (i <- 0 until 10) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
     val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 
@@ -93,7 +93,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   test("Correct last page and entry count") {
-    val receivers = for (i <- 0 until 50) yield KeyPair(s"receiver#$i".getBytes)
+    val receivers = for (i <- 0 until 50) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
     val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 

@@ -20,6 +20,7 @@ trait BaseGlobal {
   val MaxBase64String  = 44 * 1024
   val MaxLiteralLength = 12 * 1024
   val MaxAddressLength = 36
+  val MaxByteStrSizeForVerifyFuncs = 32 * 1024
 
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]

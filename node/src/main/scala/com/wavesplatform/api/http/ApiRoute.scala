@@ -40,10 +40,10 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[api_key](()).flatMap {
-      case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes()), hashFromSettings) => pass
+      case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes("UTF-8")), hashFromSettings) => pass
       case _ =>
         optionalHeaderValueByType[deprecated_api_key](()).flatMap {
-          case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes()), hashFromSettings) => pass
+          case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes("UTF-8")), hashFromSettings) => pass
           case _                                                                                           => complete(ApiKeyNotValid)
         }
     }

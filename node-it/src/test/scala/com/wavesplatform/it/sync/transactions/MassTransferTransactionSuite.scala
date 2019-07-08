@@ -130,7 +130,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
       (request(fee = 0), "insufficient fee"),
       (request(fee = 99999), "Fee .* does not exceed minimal value"),
-      (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes), "invalid.attachment")
+      (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "invalid.attachment")
     )
 
     for (((req, idOpt), diag) <- invalidTransfers) {

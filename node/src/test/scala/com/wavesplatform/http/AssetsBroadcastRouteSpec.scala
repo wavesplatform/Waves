@@ -170,7 +170,7 @@ class AssetsBroadcastRouteSpec
 
     val route = AssetsBroadcastApiRoute(restAPISettings, alwaysApproveUtx, alwaysSendAllChannels).route
 
-    val seed               = "seed".getBytes()
+    val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 

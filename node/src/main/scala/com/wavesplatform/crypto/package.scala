@@ -13,11 +13,11 @@ package object crypto {
 
   def fastHash(m: Array[Byte]): Array[Byte] = Blake2b256.hash(m)
 
-  def fastHash(s: String): Array[Byte] = fastHash(s.getBytes())
+  def fastHash(s: String): Array[Byte] = fastHash(s.getBytes("UTF-8"))
 
   def secureHash(m: Array[Byte]): Array[Byte] = Keccak256.hash(Blake2b256.hash(m))
 
-  def secureHash(s: String): Array[Byte] = secureHash(s.getBytes())
+  def secureHash(s: String): Array[Byte] = secureHash(s.getBytes("UTF-8"))
 
   def sign(account: PrivateKey, message: ByteStr): ByteStr =
     Curve25519.sign(SPrivateKey(account.arr), message)

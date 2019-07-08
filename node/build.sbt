@@ -6,31 +6,6 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
 
-val versionSource = Def.task {
-  // WARNING!!!
-  // Please, update the fallback version every major and minor releases.
-  // This version is used then building from sources without Git repository
-  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 17, 3)
-
-  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
-  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-  val (major, minor, patch) = version.value match {
-    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case _                            => FallbackVersion
-  }
-  IO.write(
-    versionFile,
-    s"""package com.wavesplatform
-       |
-       |object Version {
-       |  val VersionString = "${version.value}"
-       |  val VersionTuple = ($major, $minor, $patch)
-       |}
-       |""".stripMargin
-  )
-  Seq(versionFile)
-}
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
@@ -43,7 +18,6 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
-    sourceGenerators += versionSource,
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
@@ -120,7 +94,9 @@ inConfig(Universal)(
       // probably can't use these with jstack and others tools
       "-J-XX:+PerfDisableSharedMem",
       "-J-XX:+ParallelRefProcEnabled",
-      "-J-XX:+UseStringDeduplication"
+      "-J-XX:+UseStringDeduplication",
+      // JVM default charset for proper and deterministic getBytes behaviour
+      "-J-Dfile.encoding=UTF-8"
     )
   ))
 
@@ -131,10 +107,8 @@ inConfig(Linux)(
     packageDescription := "Waves node"
   ))
 
-val packageSource = Def.settingKey[File]("Additional files for DEB")
 inConfig(Debian)(
   Seq(
-    packageSource := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
     serviceAutostart := false,
@@ -173,9 +147,5 @@ val nameFix = Seq(
   normalizedName := s"${name.value}${network.value.packageSuffix}"
 )
 
-inConfig(Universal)(nameFix)
-inConfig(Linux)(nameFix)
-inConfig(Debian)(nameFix)
-
-inTask(packageBin)(nameFix)
-inTask(assembly)(nameFix)
+nameFix
+inScope(Global)(nameFix)

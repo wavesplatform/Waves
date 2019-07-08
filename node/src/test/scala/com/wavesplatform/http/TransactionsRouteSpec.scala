@@ -171,8 +171,8 @@ class TransactionsRouteSpec
           .expects(assetId)
           .returning(Some(AssetDescription(
             issuer = accountGen.sample.get,
-            name = "foo".getBytes,
-            description = "bar".getBytes,
+            name = "foo".getBytes("UTF-8"),
+            description = "bar".getBytes("UTF-8"),
             decimals = 8,
             reissuable = false,
             totalVolume = Long.MaxValue,
@@ -215,8 +215,8 @@ class TransactionsRouteSpec
           .expects(assetId)
           .returning(Some(AssetDescription(
             issuer = accountGen.sample.get,
-            name = "foo".getBytes,
-            description = "bar".getBytes,
+            name = "foo".getBytes("UTF-8"),
+            description = "bar".getBytes("UTF-8"),
             decimals = 8,
             reissuable = false,
             totalVolume = Long.MaxValue,

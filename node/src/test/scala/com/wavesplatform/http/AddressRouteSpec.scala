@@ -101,10 +101,10 @@ class AddressRouteSpec
           val resp      = responseAs[JsObject]
           val signature = Base58.tryDecodeWithLimit((resp \ "signature").as[String]).get
 
-          (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
+          (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
           (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)
 
-          crypto.verify(signature, message.getBytes, account.publicKey) shouldBe true
+          crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
         }
     }
 
@@ -116,7 +116,7 @@ class AddressRouteSpec
     forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) {
       case ((account, message), b58) =>
         val uri          = routePath(s"/$path/${account.address}")
-        val messageBytes = message.getBytes()
+        val messageBytes = message.getBytes("UTF-8")
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(
           "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),

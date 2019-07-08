@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.Eval
-import cats.syntax.either._
 import cats.data.EitherT
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
@@ -61,7 +61,7 @@ object CryptoContext {
     val blake2b256F: BaseFunction = hashFunction("blake2b256", BLAKE256, 10, "256 bit BLAKE")(global.blake2b256)
     val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10, "256 bit SHA-2")(global.sha256)
 
-    val sigVerifyF: BaseFunction =
+    def sigVerifyF(contextVer: StdLibVersion): BaseFunction =
       NativeFunction("sigVerify",
                      100,
                      SIGVERIFY,
@@ -70,15 +70,18 @@ object CryptoContext {
                      ("message", BYTESTR, "value"),
                      ("sig", BYTESTR, "signature"),
                      ("pub", BYTESTR, "public key")) {
-        case CONST_BYTESTR(m: ByteStr) :: CONST_BYTESTR(s: ByteStr) :: CONST_BYTESTR(p: ByteStr) :: Nil =>
-          Right(CONST_BOOLEAN(global.curve25519verify(m.arr, s.arr, p.arr)))
+        case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
+            if (contextVer != V1 && contextVer != V2 && msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
+          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
+        case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
+          Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case _ => ???
       }
 
     val rsaVerifyF: BaseFunction =
       NativeFunction(
         "rsaVerify",
-        100,
+        300,
         RSAVERIFY,
         BOOLEAN,
         "check RSA signature",
@@ -87,9 +90,12 @@ object CryptoContext {
         ("sig", BYTESTR, "signature"),
         ("pub", BYTESTR, "public key")
       ) {
-        case (digestAlg: CaseObj) :: CONST_BYTESTR(m: ByteStr) :: CONST_BYTESTR(s: ByteStr) :: CONST_BYTESTR(p: ByteStr) :: Nil =>
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
+            if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
+          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) map { alg =>
-            CONST_BOOLEAN(global.rsaVerify(alg, m.arr, s.arr, p.arr))
+            CONST_BOOLEAN(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
           }
         case _ => ???
       }
@@ -122,10 +128,10 @@ object CryptoContext {
         30,
         CHECK_MERKLE_PROOF,
         BOOLEAN,
-        "Check validity of merkle tree proof",
-        ("merkleRoot", BYTESTR, "root hash of merkle tree"),
+        "Check validity of Merkle tree proof",
+        ("merkleRoot", BYTESTR, "root hash of Merkle tree"),
         ("merkleProof", BYTESTR, "proof bytes"),
-        ("valueBytes", BYTESTR, "bytes of value to be prooven")
+        ("valueBytes", BYTESTR, "bytes of value that must be proven")
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
           Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
@@ -148,7 +154,7 @@ object CryptoContext {
         keccak256F,
         blake2b256F,
         sha256F,
-        sigVerifyF,
+        sigVerifyF(version),
         toBase58StringF,
         fromBase58StringF,
         toBase64StringF,
@@ -178,10 +184,10 @@ object CryptoContext {
       ("SHA256", ((sha256, "SHA256 digest algorithm"), digestAlgValue(sha256))),
       ("SHA384", ((sha384, "SHA384 digest algorithm"), digestAlgValue(sha384))),
       ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512))),
-      ("SHA3224", ((sha3224, "SHA3-256 digest algorithm"), digestAlgValue(sha3224))),
+      ("SHA3224", ((sha3224, "SHA3-224 digest algorithm"), digestAlgValue(sha3224))),
       ("SHA3256", ((sha3256, "SHA3-256 digest algorithm"), digestAlgValue(sha3256))),
-      ("SHA3384", ((sha3384, "SHA3-256 digest algorithm"), digestAlgValue(sha3384))),
-      ("SHA3512", ((sha3512, "SHA3-256 digest algorithm"), digestAlgValue(sha3512)))
+      ("SHA3384", ((sha3384, "SHA3-384 digest algorithm"), digestAlgValue(sha3384))),
+      ("SHA3512", ((sha3512, "SHA3-512 digest algorithm"), digestAlgValue(sha3512)))
     )
 
     val v3Functions =

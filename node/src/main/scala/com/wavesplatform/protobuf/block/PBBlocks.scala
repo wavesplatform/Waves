@@ -47,7 +47,7 @@ object PBBlocks {
     new PBBlock(
       Some(
         PBBlock.Header(
-          0: Byte,
+          AddressScheme.current.chainId,
           ByteString.copyFrom(reference),
           baseTarget,
           ByteString.copyFrom(generationSignature),

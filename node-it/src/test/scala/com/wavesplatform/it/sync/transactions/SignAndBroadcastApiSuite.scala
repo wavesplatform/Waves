@@ -170,7 +170,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
           "recipient"  -> secondAddress,
           "assetId"    -> issueId,
           "amount"     -> 1.waves,
-          "attachment" -> Base58.encode("asset transfer".getBytes)
+          "attachment" -> Base58.encode("asset transfer".getBytes("UTF-8"))
         ),
         usesProofs = isProof,
         version = v
@@ -186,7 +186,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
           "sender"     -> firstAddress,
           "recipient"  -> secondAddress,
           "amount"     -> transferAmount,
-          "attachment" -> Base58.encode("falafel".getBytes)
+          "attachment" -> Base58.encode("falafel".getBytes("UTF-8"))
         ),
         usesProofs = Option(v).nonEmpty,
         version = v
@@ -201,7 +201,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
         "version"    -> 1,
         "sender"     -> firstAddress,
         "transfers"  -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
-        "attachment" -> Base58.encode("masspay".getBytes)
+        "attachment" -> Base58.encode("masspay".getBytes("UTF-8"))
       ),
       usesProofs = true,
       version = 1

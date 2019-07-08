@@ -1,46 +1,93 @@
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
+import com.typesafe.sbt.SbtNativePackager.autoImport.{maintainer, packageDescription, packageSummary}
 import com.typesafe.sbt.packager.Compat._
-import com.typesafe.sbt.packager.Keys.packageName
+import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
+import com.typesafe.sbt.packager.archetypes.JavaAppPackaging.autoImport.maintainerScriptsAppend
+import com.typesafe.sbt.packager.debian.DebianPlugin.Names.Postinst
+import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.Debian
+import com.typesafe.sbt.packager.debian.JDebPackaging
+import com.typesafe.sbt.packager.linux.LinuxPackageMapping
+import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{Linux, defaultLinuxInstallLocation, linuxPackageMappings}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.{Users, mapGenericMappingsToLinux}
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
 import sbt._
 
+/**
+  * @note Specify "maintainer" to solve DEB warnings
+  */
 object ExtensionPackaging extends AutoPlugin {
 
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = UniversalDeployPlugin && CommonSettings
+  override def requires: Plugins = UniversalDeployPlugin && CommonSettings && JDebPackaging
 
-  override def projectSettings: Seq[Def.Setting[_]] = Seq(
+  override def projectSettings: Seq[Def.Setting[_]] =
+    Seq(
+      packageName := s"${name.value}${network.value.packageSuffix}",
+      packageDoc / publishArtifact := false,
+      packageSrc / publishArtifact := false,
+      Universal / javaOptions := Nil,
+      // Here we record the classpath as it's added to the mappings separately, so
+      // we can use its order to generate the bash/bat scripts.
+      classpathOrdering := Nil,
+      // Note: This is sometimes on the classpath via dependencyClasspath in Runtime.
+      // We need to figure out why sometimes the Attributed[File] is correctly configured
+      // and sometimes not.
+      classpathOrdering += {
+        val jar = (Compile / packageBin).value
+        val id  = projectID.value
+        val art = (Compile / packageBin / artifact).value
+        jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
+      },
+      classpathOrdering ++= excludeProvidedArtifacts((Runtime / dependencyClasspath).value, findProvidedArtifacts.value),
+      Universal / mappings ++= classpathOrdering.value ++ {
+        val baseConfigName = s"${name.value}-${network.value}.conf"
+        val localFile      = (Compile / baseDirectory).value / baseConfigName
+        if (localFile.exists()) {
+          val artifactPath = s"doc/${name.value}.conf.sample"
+          Seq(localFile -> artifactPath)
+        } else Seq.empty
+      },
+      classpath := makeRelativeClasspathNames(classpathOrdering.value),
+      nodePackageName := (LocalProject("node") / Linux / packageName).value,
+      debianPackageDependencies := Seq((LocalProject("node") / Debian / packageName).value),
+      // To write files to Waves NODE directory
+      linuxPackageMappings := getUniversalFolderMappings(
+        nodePackageName.value,
+        defaultLinuxInstallLocation.value,
+        (Universal / mappings).value
+      ),
+      Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postinst)(
+        Postinst ->
+          s"""#!/bin/sh
+             |set -e
+             |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
+      )
+    ) ++ nameFix ++ inScope(Global)(nameFix) ++ maintainerFix
+
+  private def maintainerFix = inConfig(Linux)(
+    Seq(
+      maintainer := "wavesplatform.com",
+      packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
+      packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension"
+    ))
+  
+  private def nameFix = Seq(
     packageName := s"${name.value}${network.value.packageSuffix}",
-    publishArtifact in packageDoc := false,
-    publishArtifact in packageSrc := false,
-    javaOptions in Universal := Nil,
-    // Here we record the classpath as it's added to the mappings separately, so
-    // we can use its order to generate the bash/bat scripts.
-    classpathOrdering := Nil,
-    // Note: This is sometimes on the classpath via dependencyClasspath in Runtime.
-    // We need to figure out why sometimes the Attributed[File] is correctly configured
-    // and sometimes not.
-    classpathOrdering += {
-      val jar = (packageBin in Compile).value
-      val id  = projectID.value
-      val art = (artifact in Compile in packageBin).value
-      jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
-    },
-    classpathOrdering ++= excludeProvidedArtifacts((dependencyClasspath in Runtime).value, findProvidedArtifacts.value),
-    mappings in Universal ++= classpathOrdering.value ++ {
-      val baseConfigName = s"${normalizedName.value}-${network.value}.conf"
-      val localFile      = (Compile / baseDirectory).value / baseConfigName
-      if (localFile.exists()) {
-        val artifactPath = "doc/dex.conf.sample"
-        Seq(localFile -> artifactPath)
-      } else Seq.empty
-    },
-    classpath := makeRelativeClasspathNames(classpathOrdering.value),
+    normalizedName := s"${name.value}${network.value.packageSuffix}"
   )
+
+  // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings
+  private def getUniversalFolderMappings(pkg: String, installLocation: String, mappings: Seq[(File, String)]): Seq[LinuxPackageMapping] = {
+    def isWindowsFile(f: (File, String)): Boolean = f._2 endsWith ".bat"
+
+    val filtered = mappings.filterNot(isWindowsFile)
+    if (filtered.isEmpty) Seq.empty
+    else mapGenericMappingsToLinux(filtered, Users.Root, Users.Root)(name => installLocation + "/" + pkg + "/" + name)
+  }
 
   private def makeRelativeClasspathNames(mappings: Seq[(File, String)]): Seq[String] =
     for {
