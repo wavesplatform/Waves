@@ -10,6 +10,7 @@ import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
@@ -41,7 +42,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~
+        balanceProof
     } ~ root ~ create
 
   @Path("/scriptInfo/{address}")
@@ -191,13 +193,14 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "mining", value = "Is mining balance", required = false, dataType = "boolean", paramType = "query"),
     )
   )
-  def balanceProof: Route = (path("balance" / "proof" / Segment / IntNumber) & parameter('mning.as[Boolean] ? false) & get) { (addressStr, height, mining) =>
-    complete(
-      Address
-        .fromString(addressStr)
-        .flatMap(commonAccountApi.balanceProof(_, height, mining))
-        .map(ToResponseMarshallable(_))
-    )
+  def balanceProof: Route = (path("balance" / "proof" / Segment / IntNumber) & get) {
+    (addressStr, height) =>
+      complete(
+        Address
+          .fromString(addressStr)
+          .flatMap(commonAccountApi.balanceProof(_, height))
+          .map(ToResponseMarshallable(_))
+      )
   }
 
   @Path("/balance/{address}/{confirmations}")

@@ -326,6 +326,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       discardedBlocks
     }
   }
+
+
 }
 
 object Caches {

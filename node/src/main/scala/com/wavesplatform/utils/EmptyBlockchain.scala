@@ -111,6 +111,8 @@ case object EmptyBlockchain extends Blockchain {
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
     Right(AssetDistributionPage(Paged[Address, AssetDistribution](false, None, Monoid.empty[AssetDistribution])))
 
+  override def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance] = None
+
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */

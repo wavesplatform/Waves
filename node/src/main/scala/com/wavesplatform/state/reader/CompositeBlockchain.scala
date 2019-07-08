@@ -277,6 +277,8 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
   override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
+
+  override def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance] = inner.proofForBalanceOnHeight(address, height)
 }
 
 object CompositeBlockchain {

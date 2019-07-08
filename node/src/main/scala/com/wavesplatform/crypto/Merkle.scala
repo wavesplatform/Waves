@@ -5,10 +5,9 @@ import java.nio.ByteBuffer
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.MerkleFunctions
-import play.api.libs.json.{Json, Writes}
-import scorex.crypto.authds.{LeafData, Side}
+import play.api.libs.json.Writes
 import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
+import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.hash.{CryptographicHash32, Digest, Digest32}
 import supertagged.TaggedType
 

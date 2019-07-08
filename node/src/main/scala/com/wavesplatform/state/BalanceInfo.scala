@@ -1,3 +1,9 @@
 package com.wavesplatform.state
 
-case class BalanceInfo(currentBalance: Long, miningBalance: Long)
+import play.api.libs.json.Json
+
+case class BalanceInfo(regularBalance: Long, miningBalance: Long)
+
+object BalanceInfo {
+  implicit val writes = Json.writes[BalanceInfo]
+}

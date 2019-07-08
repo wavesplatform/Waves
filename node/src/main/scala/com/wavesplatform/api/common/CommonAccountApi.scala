@@ -2,11 +2,13 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.Merkle.BalanceProof
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
+import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height, ProvenBalance}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import monix.reactive.Observable
@@ -80,8 +82,10 @@ class CommonAccountApi(blockchain: Blockchain) {
       })
   }
 
-  def balanceProof(address: Address, height: Int, mining: Boolean): Either[String, BalanceProof] = {
-    ???
+  def balanceProof(address: Address, height: Int): Either[ValidationError, ProvenBalance] = {
+    blockchain
+      .proofForBalanceOnHeight(address, Height @@ height)
+      .toRight(GenericError(s"Can't proove ${address.stringRepr} balance on height - $height"))
   }
 }
 

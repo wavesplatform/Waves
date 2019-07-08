@@ -11,6 +11,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.crypto.Merkle
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -284,19 +285,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    val miners: mutable.HashMap[AddressId, BalanceInfo] =
-      mutable.HashMap.empty[AddressId, BalanceInfo]
+    val miners: mutable.HashMap[Address, BalanceInfo] =
+      mutable.HashMap.empty[Address, BalanceInfo]
 
     if (height > 1) {
       rw.get(Keys.balancesInfoAtHeight(Height @@ (height - 1)))
-        .foreach {
-          case (addrId, balance) =>
-            miners.put(addrId, balance)
-        }
+        .foreach { case (addr, balance) => miners.put(addr, balance) }
     }
 
     val requiredBalance = GeneratingBalanceProvider.minimalEffectiveBalance(height, activatedFeatures)
     val requiredBlocks  = GeneratingBalanceProvider.minimalBlockInterval(height, activatedFeatures)
+
+    val newAddressIds = newAddresses.map { case (addr, addrId) => addrId -> addr }
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
@@ -306,7 +306,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         newAddressesForWaves += addressId
       }
 
-      val knownMiner: Boolean      = miners.contains(AddressId @@ addressId)
+      val address = newAddressIds.getOrElse(addressId, rw.get(Keys.idToAddress(addressId)))
+
+      val knownMiner: Boolean      = miners.contains(address)
       val haveEnoughWaves: Boolean = balance >= requiredBalance
 
       lazy val miningBalance = {
@@ -328,9 +330,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       val shouldBeRemoved = knownMiner && !haveEnoughWaves
 
       if (shouldBeAdded || shouldBeUpdated) {
-        miners.update(AddressId @@ addressId, BalanceInfo(balance, miningBalance))
+        miners.update(address, BalanceInfo(balance, miningBalance))
       } else if (shouldBeRemoved) {
-        miners.remove(AddressId @@ addressId)
+        miners.remove(address)
       }
 
       rw.put(Keys.wavesBalance(addressId)(height), balance)
@@ -1095,15 +1097,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     )
   }
 
-  def minerBalancesAtHeight(height: Height): Map[Address, BalanceInfo] =
-    readOnly { db =>
-      db.get(Keys.balancesInfoAtHeight(height))
-        .map {
-          case (addressId, balanceInfo) =>
-            db.get(Keys.idToAddress(addressId)) -> balanceInfo
-        }
-    }
-
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =
     for {
       _ <- Either.cond(dbSettings.storeInvokeScriptResults, (), GenericError("InvokeScript results are disabled"))
@@ -1187,5 +1180,26 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     }
 
     txs.toList
+  }
+
+  override def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance] = readOnly { db =>
+    val miners = db.get(Keys.balancesInfoAtHeight(height))
+
+    lazy val (miningBalances, regularBalances) = (miners foldLeft ((Seq.empty[(Address, Long)], Seq.empty[(Address, Long)]))) {
+      case ((miningAcc, regularAcc), (address, BalanceInfo(regularBalance, miningBalance))) =>
+        ((address, miningBalance) +: miningAcc, (address, regularBalance) +: regularAcc)
+    }
+
+    lazy val miningTree = Merkle
+      .mkBalanceTree(miningBalances)
+
+    lazy val regularTree = Merkle
+      .mkBalanceTree(regularBalances)
+
+    for {
+      balanceInfo            <- miners.get(address)
+      proofForMiningBalance  <- miningTree.getProofForBalance((address, balanceInfo.miningBalance))
+      proofForRegularBalance <- regularTree.getProofForBalance((address, balanceInfo.regularBalance))
+    } yield ProvenBalance(address, proofForMiningBalance, proofForRegularBalance, balanceInfo)
   }
 }

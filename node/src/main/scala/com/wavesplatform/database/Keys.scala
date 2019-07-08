@@ -168,7 +168,7 @@ object Keys {
     Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 
   val BalancesInfoAtHeightPrefix: Short = 57
-  def balancesInfoAtHeight(height: Height): Key[Map[AddressId, BalanceInfo]] =
+  def balancesInfoAtHeight(height: Height): Key[Map[Address, BalanceInfo]] =
     Key(
       "miner-balances-info-at-height",
       h(BalancesInfoAtHeightPrefix, height),
