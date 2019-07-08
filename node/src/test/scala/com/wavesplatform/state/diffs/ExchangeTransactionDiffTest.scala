@@ -725,11 +725,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           )
         )
 
-        val exchangeWithResignedOrder = exchange match {
-          case e1 @ ExchangeTransactionV1(_, so, _, _, _, _, _, _, _) =>
-            e1.copy(buyOrder = so.updateProofs(newProofs).asInstanceOf[OrderV1])
-          case e2 @ ExchangeTransactionV2(_, so, _, _, _, _, _, _, _) =>
-            e2.copy(buyOrder = so.updateProofs(newProofs))
+        val exchangeWithResignedOrder = exchange matchData {
+          case e1@ExchangeTransactionV1(bo, _, _, _, _, _, _, _, _) =>
+            e1.copy(buyOrder = bo.updateProofs(newProofs).asInstanceOf[OrderV1])
+          case e2@ExchangeTransactionV2(bo, _, _, _, _, _, _, _, _) =>
+            e2.copy(buyOrder = bo.updateProofs(newProofs))
         }
 
         val preconBlocks = Seq(
