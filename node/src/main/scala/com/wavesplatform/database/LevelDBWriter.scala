@@ -1185,9 +1185,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance] = readOnly { db =>
     val miners = db.get(Keys.balancesInfoAtHeight(height))
 
-    lazy val (miningBalances, regularBalances) = (miners foldLeft ((Seq.empty[(Address, Long)], Seq.empty[(Address, Long)]))) {
-      case ((miningAcc, regularAcc), (address, BalanceInfo(regularBalance, miningBalance))) =>
-        ((address, miningBalance) +: miningAcc, (address, regularBalance) +: regularAcc)
+    lazy val (regularBalances, miningBalances) = (miners foldLeft ((List.empty[(Address, Long)], List.empty[(Address, Long)]))) {
+      case ((regularAcc, miningAcc), (addr, BalanceInfo(regularBalance, miningBalance))) =>
+        ((addr, regularBalance) :: regularAcc, (addr, miningBalance) :: miningAcc)
     }
 
     lazy val miningTree = Merkle

@@ -56,12 +56,11 @@ object Merkle {
   object BalanceTree extends TaggedType[MerkleTree[Digest32]]
   type BalanceTree = BalanceTree.Type
 
-  def mkBalanceTree(bs: Seq[(Address, Long)]): BalanceTree = {
+  def mkBalanceTree(bs: List[(Address, Long)]): BalanceTree = {
+
     val elements =
-      bs.view
-        .map(balanceToBytes)
-        .map(LeafData @@ _)
-        .force
+      bs.sortBy(_._2)
+        .map(tup => LeafData @@ balanceToBytes(tup))
 
     BalanceTree @@ MerkleTree[Digest32](elements)(FastHash)
   }
@@ -101,7 +100,7 @@ object Merkle {
         Base64.encode(proofBytes(proof))
       }
 
-  private def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
+  def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {
     def loop(lvls: List[(Digest, Side)], acc: Array[Byte]): Array[Byte] = {
       lvls match {
         case (d, s) :: xs => loop(xs, Array.concat(acc, s +: d.length.toByte +: d))
