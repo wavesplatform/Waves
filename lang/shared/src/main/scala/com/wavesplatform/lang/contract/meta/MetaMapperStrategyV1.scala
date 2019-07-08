@@ -51,15 +51,16 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
 
   private def buildType(b: Byte): Either[String, FINAL] = {
     if (b > 15 || b < 1) {
-      Left("Illegal func arg type bytes")
+      Left("Illegal callable func arg type bytes")
     } else {
       val existingTypes = definedTypes
         .map(checkTypeExistence(b, _))
         .flatMap(_.toList)
 
       existingTypes match {
-        case List(single)     => Right(single)
-        case l@List(_, _@ _*) => Right(UNION(l, None))
+        case List(single)  => Right(single)
+        case l@List(_, _*) => Right(UNION(l, None))
+        case Nil           => Left("Unexpected callable func arg type absence")
       }
     }
   }
