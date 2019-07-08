@@ -13,10 +13,10 @@ import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
+import com.wavesplatform.api.http.{assets, _}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.openDB
@@ -263,6 +263,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         WavesApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time),
         AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time)(apiScheduler),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
+        assets.AssetsBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)(apiScheduler),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxSynchronizer),
         AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
