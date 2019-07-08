@@ -51,7 +51,7 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
 
   private def buildType(b: Byte): Either[String, FINAL] = {
     if (b > 15 || b < 1) {
-      Left("Illegal callable func arg type bytes")
+      Left("Illegal callable func arg type bits")
     } else {
       val existingTypes = definedTypes
         .map(checkTypeExistence(b, _))
