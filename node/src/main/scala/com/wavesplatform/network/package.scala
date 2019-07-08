@@ -4,6 +4,9 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
@@ -11,18 +14,21 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
+import kamon.Kamon
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Transaction
-import kamon.Kamon
 
 import scala.concurrent.duration._
 
+//noinspection ScalaStyle
 package object network extends ScorexLogging {
   private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
+
+  // TODO: Will be enabled by default in future
+  lazy val isPBMessagesEnabled: Boolean = sys.props
+    .get("waves.network.protobuf-messages-enabled")
+    .fold(false)(_.toBoolean)
 
   def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
     val uri = new URI(s"node://$addr")

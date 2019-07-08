@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
 import com.wavesplatform.protobuf.block.{PBBlocks, PBCachedBlock}
@@ -55,15 +54,9 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
       }.runAsyncLogErr
 
     case GetBlock(sig) =>
-      def convertToLegacy(bytes: Array[Byte]) = {
-        import com.wavesplatform.common.utils._
-        import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
-
-        if (ng.isFeatureActivated(BlockchainFeatures.OrderV3)) // TODO: Invent more convenient feature
-          bytes
-        else
-          PBBlocks.vanilla(PBCachedBlock.fromBytes(bytes), unsafe = true).explicitGet().bytes()
-      }
+      def convertToLegacy(bytes: Array[Byte]) =
+        if (isPBMessagesEnabled) bytes
+        else PBBlocks.vanillaUnsafe(PBCachedBlock.fromBytes(bytes)).bytes()
 
       Task(knownBlocks.get(sig))
         .map(convertToLegacy)

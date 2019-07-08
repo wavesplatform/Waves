@@ -6,6 +6,8 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.protobuf.block.PBBlockAdapter
+import com.wavesplatform.protobuf.transaction.PBTransactionAdapter
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
 
@@ -30,15 +32,28 @@ case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
 object RawBytes {
-  def from(tx: Transaction): RawBytes = RawBytes(TransactionSpec.messageCode, tx.bytes())
-  def from(b: Block): RawBytes        = RawBytes(BlockSpec.messageCode, b.bytes())
+  def from(tx: Transaction): RawBytes = {
+    val bytes =
+      if (isPBMessagesEnabled) PBTransactionAdapter(tx).protoBytes
+      else tx.bytes()
+
+    RawBytes(TransactionSpec.messageCode, bytes)
+  }
+
+  def from(b: Block): RawBytes = {
+    val bytes =
+      if (isPBMessagesEnabled) PBBlockAdapter(b).protoBytes
+      else b.bytes()
+
+    RawBytes(BlockSpec.messageCode, bytes)
+  }
 }
 
 case class BlockForged(block: Block) extends Message
 
 case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
-case class MicroBlockResponse(microblock: MicroBlock) extends Message
+case class MicroBlockResponse(microblock: MicroBlock) extends Message // TODO: Microblock PB formats
 
 case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =

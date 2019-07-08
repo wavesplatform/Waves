@@ -18,16 +18,21 @@ class PBBlockAdapter(val block: PBCachedBlock)
       block.transactions.map(PBTransactionAdapter(_)),
       block.block.getHeader.featureVotes.iterator.map(_.toShort).toSet
     ) {
+  private[this] lazy val vanillaBlock: VanillaBlock = PBBlocks.vanillaUnsafe(block)
+
   def isLegacy: Boolean = (this.version: @switch) match {
     case 1 | 2 | 3 => true
     case _         => false
   }
 
+  def protoBytes: Array[Byte] = block.bytes
+
   override val bytes: Coeval[Array[Byte]] =
-    Coeval.evalOnce(block.bytes)
+    if (isLegacy) Coeval.evalOnce(this.protoBytes)
+    else vanillaBlock.bytes
 
   override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(
-    if (isLegacy) PBBlocks.vanilla(block, unsafe = true).right.get.bytesWithoutSignature()
+    if (isLegacy) vanillaBlock.bytesWithoutSignature()
     else block.headerBytes // Without txs
   )
 

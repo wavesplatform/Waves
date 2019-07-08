@@ -40,9 +40,11 @@ class PBTransactionAdapter(val transaction: PBCachedTransaction) extends Vanilla
   override val signatureValid: Coeval[Boolean] =
     Coeval.evalOnce((txBody.data.isGenesis || txBody.version > 1) || this.verifySignature())
 
+  def protoBytes: Array[Byte] = transaction.bytes
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     if (isLegacy) vanillaTx.bytes()
-    else transaction.bytes
+    else this.protoBytes
   )
 
   override val proofs: Proofs =
