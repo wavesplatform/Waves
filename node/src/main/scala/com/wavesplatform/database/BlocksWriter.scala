@@ -159,36 +159,31 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
             if (currentOffset <= endOffset) {
               val numsSet = nums.map(_._2.toInt).toSet
 
-              def readNums(): (Seq[(TxNum, PBSignedTransaction)], Int) = {
+              def readNums(): Seq[(TxNum, PBSignedTransaction)] = {
                 val headerSize = input.readInt()
-                input.skip(headerSize)
+                currentOffset += Ints.BYTES + input.skip(headerSize)
 
                 val txs = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
-                var allTxsSize = 0
                 val txCount = input.readInt()
+                currentOffset += Ints.BYTES
+
                 for (n <- 1 to txCount) yield {
                   val txSize = input.readInt()
+                  currentOffset += Ints.BYTES
 
                   if (numsSet.contains(n)) {
                     val txBytes = new Array[Byte](txSize)
-                    input.read(txBytes)
+                    currentOffset += input.read(txBytes)
                     txs += (TxNum @@ n.toShort -> transaction.PBSignedTransaction.parseFrom(txBytes))
                   } else {
-                    input.skip(txSize)
+                    currentOffset += input.skip(txSize)
                   }
-
-                  allTxsSize += Ints.BYTES + txSize
                 }
 
-                val size = Ints.BYTES + headerSize + Ints.BYTES + allTxsSize
-                (txs, size)
+                txs
               }
 
-              val (txs, size) = readNums()
-              currentOffset += size
-
-              txs
-                .map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
+              readNums().map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
             } else Nil
         }.toVector
       })

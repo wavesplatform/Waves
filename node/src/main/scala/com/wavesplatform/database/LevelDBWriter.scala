@@ -70,7 +70,7 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
+class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
       with ScorexLogging
       with Closeable {
@@ -82,8 +82,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
 
   import LevelDBWriter._
-
-  override lazy val dbContext = writableDB.createContext()
 
   private def readStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = CloseableIterator.defer(dbContext.readOnlyStream(f))
 
@@ -833,6 +831,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
     blocksWriter.getTransactionsByHN(height -> txNum)
       .headOption
+      .map(_._3)
       .getOrElse(throw new NoSuchElementException(s"No transaction at $height/$txNum"))
   }
 

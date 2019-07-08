@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
+import org.iq80.leveldb.DB
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -24,11 +25,12 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   import Caches._
 
   val dbSettings: DBSettings
-  protected val dbContext: DBContextHolder
+  protected val writableDB: DB
+  protected val dbContext: DBContextHolder = writableDB.createContext()
   protected val blocksWriter = new BlocksWriter(dbContext)
 
   @volatile
-  private var current: (Int, BigInt, Option[Block]) = (loadHeight(), loadScore(), loadLastBlock())
+  private var current: (Int, BigInt, Option[Block]) = dbContext.readOnly(_ => (loadHeight(), loadScore(), loadLastBlock()))
 
   protected def loadHeight(): Int
   override def height: Int = current._1
