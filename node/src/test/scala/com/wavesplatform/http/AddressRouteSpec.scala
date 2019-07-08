@@ -203,7 +203,7 @@ class AddressRouteSpec
       "ab1c", "1aB1cD", "A1BD0", "a110b", "123",
       " ab", "ab ", "a b\n", "ab1 \n\t", "\n\raB1\t", "\n  \r  \t\t",
       "!#$%&'()*+,", "!#$%&'()<*=>+,", "!", "<!@#qwe>", "\\", "\"\\", "qwe!",
-      "\b", "\0", "\b\b", "\bqweasd\0", "\0qweqwe")
+      "\b", "\u0000", "\b\b", "\bqweasd\u0000", "\u0000qweqwe")
 
     val testData: Map[String, String] =
       dataKeys

@@ -9,7 +9,7 @@ import scala.util.Random
 class AddressApiSuite extends BaseTransactionSuite {
 
   test("filter accounts data by regexp") {
-    val dataKeys         = List("1aB1cD!@#$", "\"\\", "\0qweqwe", "\t\r\n")
+    val dataKeys         = List("1aB1cD!@#$", "\"\\", "\u0000qweqwe", "\t\r\n")
     val regexps          = List("1aB1cD!@#$", "[a-zA-Z0-9!-/:-@\\\\]{0,15}", "\\s{0,}")
     val invalidRegexps   = List("[a-z", "[a-z]{0", "[a-z]{,5}")
     val data             = dataKeys.map(str => StringDataEntry(str, Random.nextString(16)))
