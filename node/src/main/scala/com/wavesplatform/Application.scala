@@ -232,13 +232,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     if (settings.restAPISettings.enable) {
+      //noinspection ScalaStyle
+      @inline def deprecated(r: ApiRoute) = if (settings.restAPISettings.enableDeprecatedRoutes) r else null
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater)(apiScheduler),
         TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time)(apiScheduler),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
-        PaymentApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time),
+        deprecated(PaymentApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time)),
         UtilsApiRoute(time, settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
         AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time)(apiScheduler),
@@ -260,15 +263,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           scoreStatsReporter,
           configRoot
         ),
-        WavesApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time),
+        deprecated(WavesApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time)),
         AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time)(apiScheduler),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        assets.AssetsBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)(apiScheduler),
+        deprecated(assets.AssetsBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)(apiScheduler)),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
-        LeaseBroadcastApiRoute(settings.restAPISettings, utxSynchronizer),
+        deprecated(LeaseBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)),
         AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
-        AliasBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)
-      )
+        deprecated(AliasBroadcastApiRoute(settings.restAPISettings, utxSynchronizer))
+      ).filter(_ != null)
 
       val apiTypes: Set[Class[_]] = Set(
         classOf[NodeApiRoute],

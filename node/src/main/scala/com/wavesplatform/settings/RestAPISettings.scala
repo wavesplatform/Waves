@@ -8,4 +8,5 @@ case class RestAPISettings(enable: Boolean,
                            apiKeyDifferentHost: Boolean,
                            transactionsByAddressLimit: Int,
                            distributionAddressLimit: Int,
-                           allowTxRebroadcasting: Boolean)
+                           allowTxRebroadcasting: Boolean,
+                           enableDeprecatedRoutes: Boolean)
