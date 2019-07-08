@@ -245,6 +245,6 @@ val AddressTransactionSeqNrPrefix: Short = 52
     Key("transaction-offset", bytes(123, id), read, write _ tupled)
   }
 
-  def transactionIdByHN(height: Height, txNum: TxNum): Key[TransactionId] =
-    Key("transaction-hn-by-id", hNum(123, height, txNum), bs => TransactionId @@ ByteStr(bs), (_: TransactionId).arr)
+  //  def transactionIdByHN(height: Height, txNum: TxNum): Key[TransactionId] =
+  //    Key("transaction-hn-by-id", hNum(123, height, txNum), bs => TransactionId @@ ByteStr(bs), (_: TransactionId).arr)
 }

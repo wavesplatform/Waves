@@ -70,10 +70,7 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB,
-                    spendableBalanceChanged: Observer[(Address, Asset)],
-                    val settings: BlockchainSettings,
-                    val dbSettings: DBSettings)
+class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
       with ScorexLogging
       with Closeable {
@@ -460,7 +457,7 @@ class LevelDBWriter(writableDB: DB,
             val (tx, num) = transactions(txId)
             (tx.id(), tx.builder.typeId, num)
           }
-          for ((id, _, num) <- txTypeNumSeq) rw.put(Keys.transactionIdByHN(Height @@ height, num), TransactionId @@ id)
+          // for ((id, _, num) <- txTypeNumSeq) rw.put(Keys.transactionIdByHN(Height @@ height, num), TransactionId @@ id)
           rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.map(v => (v._2, v._3)).sortBy(-_._2))))
           rw.put(kk, nextSeqNr)
         }
@@ -827,10 +824,16 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  private[this] def getTransactionByHN(height: Height, txNum: TxNum) = readOnly { db =>
-    val transactionId = db.get(Keys.transactionIdByHN(height, txNum))
-    val (_, _, tx) = blocksWriter.getTransaction(transactionId)
-    tx
+  private[this] def getTransactionByHN(height: Height, txNum: TxNum) = {
+    //    readOnly { db =>
+    //      val transactionId = db.get(Keys.transactionIdByHN(height, txNum))
+    //      val (_, _, tx) = blocksWriter.getTransaction(transactionId)
+    //      tx
+    //    }
+
+    blocksWriter.getTransactionsByHN(height -> txNum)
+      .headOption
+      .getOrElse(throw new NoSuchElementException(s"No transaction at $height/$txNum"))
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
@@ -994,7 +997,7 @@ class LevelDBWriter(writableDB: DB,
     Try(db.get(Keys.blockTransactionsFee(height))).toOption
   }
 
-  override def featureVotes(height: Int): Map[Short, Int] = {
+  override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
     settings.functionalitySettings
       .activationWindow(height)
       .flatMap { height =>

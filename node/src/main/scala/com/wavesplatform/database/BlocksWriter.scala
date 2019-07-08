@@ -8,7 +8,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.protobuf
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction
-import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state.{Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
@@ -139,6 +139,63 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         val (_, height, num) = optimisticRead(0)(_ => dbContext.db.get(Keys.transactionOffset(id)))
         (height, num)
       }(v => (v._1, v._2))
+
+  def getTransactionsByHN(hn: (Height, TxNum)*): Seq[(Height, TxNum, Transaction)] = {
+    val (inMemTxs, endOffset) = locked(_.readLock()) {
+      (this.transactions.values.toVector, this.lastOffset)
+    }
+
+    val fileTxs = dbContext.readOnly(db =>
+      optimisticRead(0L) { input =>
+        var currentOffset = 0L
+
+        val sorted = hn.groupBy(_._1).toSeq.sortBy(_._1)
+        sorted.flatMap {
+          case (height, nums) =>
+            val offset = db.get(Keys.blockOffset(height))
+            require(offset >= currentOffset)
+            currentOffset += input.skip(offset - currentOffset)
+
+            if (currentOffset <= endOffset) {
+              val numsSet = nums.map(_._2.toInt).toSet
+
+              def readNums(): (Seq[(TxNum, PBSignedTransaction)], Int) = {
+                val headerSize = input.readInt()
+                input.skip(headerSize)
+
+                val txs = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
+                var allTxsSize = 0
+                val txCount = input.readInt()
+                for (n <- 1 to txCount) yield {
+                  val txSize = input.readInt()
+
+                  if (numsSet.contains(n)) {
+                    val txBytes = new Array[Byte](txSize)
+                    input.read(txBytes)
+                    txs += (TxNum @@ n.toShort -> transaction.PBSignedTransaction.parseFrom(txBytes))
+                  } else {
+                    input.skip(txSize)
+                  }
+
+                  allTxsSize += Ints.BYTES + txSize
+                }
+
+                val size = Ints.BYTES + headerSize + Ints.BYTES + allTxsSize
+                (txs, size)
+              }
+
+              val (txs, size) = readNums()
+              currentOffset += size
+
+              txs
+                .map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
+            } else Nil
+        }.toVector
+      })
+
+    val hnSet = hn.toSet
+    fileTxs ++ inMemTxs.collect { case (h, n, tx) if hnSet.contains(h -> n) => (h, n, tx) }
+  }
 
   def getTransaction(id: TransactionId): (Height, TxNum, Transaction) =
     transactions.getOrElse(
