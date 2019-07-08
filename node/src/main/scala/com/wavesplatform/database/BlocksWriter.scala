@@ -142,7 +142,8 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
 
   def getTransactionsByHN(hn: (Height, TxNum)*): Seq[(Height, TxNum, Transaction)] = {
     val (inMemTxs, endOffset) = locked(_.readLock()) {
-      (this.transactions.values.toVector, this.lastOffset)
+      val heightNumSet = hn.toSet
+      (this.transactions.values.collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, tx) }.toVector.sortBy(v => (v._1, v._2)), this.lastOffset)
     }
 
     val fileTxs = dbContext.readOnly(db =>
@@ -188,8 +189,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         }.toVector
       })
 
-    val hnSet = hn.toSet
-    fileTxs ++ inMemTxs.collect { case (h, n, tx) if hnSet.contains(h -> n) => (h, n, tx) }
+    fileTxs ++ inMemTxs
   }
 
   def getTransaction(id: TransactionId): (Height, TxNum, Transaction) =
