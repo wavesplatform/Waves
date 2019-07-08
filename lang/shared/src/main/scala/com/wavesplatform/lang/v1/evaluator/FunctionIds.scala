@@ -15,8 +15,8 @@ object FunctionIds {
   val MOD_LONG: Short = 106
   val FRACTION: Short = 107
 
-  val POW: Short      = 108
-  val LOG: Short      = 109
+  val POW: Short = 108
+  val LOG: Short = 109
 
   val SIZE_BYTES: Short = 200
   val TAKE_BYTES: Short = 201
@@ -38,13 +38,15 @@ object FunctionIds {
 
   val CREATE_LIST: Short = 1100
 
-  val UTF8STRING: Short = 1200
-  val BININT: Short     = 1201
-  val BININT_OFF: Short = 1202
-  val INDEXOF: Short    = 1203
-  val INDEXOFN: Short   = 1204
-  val SPLIT: Short      = 1205
-  val PARSEINT: Short   = 1206
+  val UTF8STRING: Short   = 1200
+  val BININT: Short       = 1201
+  val BININT_OFF: Short   = 1202
+  val INDEXOF: Short      = 1203
+  val INDEXOFN: Short     = 1204
+  val SPLIT: Short        = 1205
+  val PARSEINT: Short     = 1206
+  val LASTINDEXOF: Short  = 1207
+  val LASTINDEXOFN: Short = 1208
 
   // Crypto
   val SIGVERIFY: Short = 500
@@ -81,5 +83,6 @@ object FunctionIds {
   val DATA_STRING_FROM_STATE: Short  = 1053
 
   val ADDRESSFROMRECIPIENT: Short = 1060
+  val ADDRESSTOSTRING: Short      = 1061
 
 }

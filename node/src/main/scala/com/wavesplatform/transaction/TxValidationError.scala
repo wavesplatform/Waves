@@ -3,7 +3,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.assets.exchange.Order
 
@@ -68,8 +67,8 @@ object TxValidationError {
     else {
       log
         .map {
-          case (name, Right(v: CaseObj)) => s"$name = ${v.prettyString(1)}"
-          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
+          case (name, Right(v)) => s"$name = ${v.prettyString(1)}"
+//          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
           case (name, l@Left(_))         => s"$name = $l"
         }
         .map("\t" + _)

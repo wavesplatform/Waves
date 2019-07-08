@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -60,15 +61,15 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("third", 41))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right((41, Vector(("first", 32), ("default", 20), ("third", 41))))
   }
 
   property("estimate contract script with context correctly") {
     val contract = DApp(
       ByteStr.empty,
       List(
-        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a"), CONST_STRING("b")))),
-        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c"), CONST_STRING("d"))))
+        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
+        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet())))
       ),
       List(
         CallableFunction(
@@ -112,15 +113,15 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("first", 68))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right((68, Vector(("first", 68), ("default", 30), ("third", 51))))
   }
 
   property("estimate contract script with context correctly 2") {
     val contract = DApp(
       ByteStr.empty,
       List(
-        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a"), CONST_STRING("b")))),
-        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c"), CONST_STRING("d"))))
+        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
+        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet())))
       ),
       List(
         CallableFunction(
@@ -164,6 +165,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("first", 68))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right((68, Vector(("first", 68), ("default", 30), ("second", 51))))
   }
 }

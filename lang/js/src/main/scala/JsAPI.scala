@@ -1,4 +1,5 @@
 import cats.kernel.Monoid
+import com.wavesplatform.lang.Version
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
@@ -120,12 +121,10 @@ object JsAPI {
       .toJSArray
 
   @JSExportTopLevel("contractLimits")
-  def contractLimits(ver: Int = 2): js.Dynamic = {
-    val version = DirectiveDictionary[StdLibVersion].idMap(ver)
+  def contractLimits(): js.Dynamic = {
     js.Dynamic.literal(
-      "MaxExprComplexity"          -> ContractLimits.MaxComplexityByVersion(version),
+      "MaxComplexityByVersion"     -> ((ver: Int) => ContractLimits.MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
-      "MaxContractComplexity"      -> ContractLimits.MaxComplexityByVersion(version),
       "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
       "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
@@ -179,11 +178,12 @@ object JsAPI {
                   err => {
                     js.Dynamic.literal("error" -> err)
                   }, {
-                    case (bytes, ast, complexity) =>
+                    case (bytes, ast, complexity, complexityByFunc) =>
                       js.Dynamic.literal(
-                        "result"     -> Global.toBuffer(bytes),
-                        "ast"        -> toJs(ast),
-                        "complexity" -> complexity
+                        "result"           -> Global.toBuffer(bytes),
+                        "ast"              -> toJs(ast),
+                        "complexity"       -> complexity,
+                        "complexityByFunc" -> complexityByFunc
                       )
                   }
                 )
@@ -206,4 +206,7 @@ object JsAPI {
       identity
     )
   }
+
+  @JSExportTopLevel("nodeVersion")
+  def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 }

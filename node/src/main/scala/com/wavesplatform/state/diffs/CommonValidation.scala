@@ -9,7 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.settings.{Constants, FunctionalitySettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
@@ -23,11 +23,12 @@ import com.wavesplatform.transaction.transfer._
 import scala.util.{Left, Right, Try}
 
 object CommonValidation {
+
   val ScriptExtraFee = 400000L
   val FeeUnit        = 100000
   val NFTMultiplier  = 0.001
 
-  val OldFeeConstants: Map[Byte, Long] = Map(
+  val FeeConstants: Map[Byte, Long] = Map(
     GenesisTransaction.typeId            -> 0,
     PaymentTransaction.typeId            -> 1,
     IssueTransaction.typeId              -> 1000,
@@ -46,12 +47,9 @@ object CommonValidation {
     smart.InvokeScriptTransaction.typeId -> 5
   )
 
-  val FlatFeeDefault = 2
-  val FlatFeeConstants: Map[Byte, Long] = Map(
-    IssueTransaction.typeId -> 10000L
-  ).withDefaultValue(FlatFeeDefault: Long)
-
-  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
+                                                          blockTime: Long,
+                                                          tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
@@ -100,7 +98,9 @@ object CommonValidation {
       }
     } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = tx match {
+  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
+                                             height: Int,
+                                             tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
@@ -216,150 +216,6 @@ object CommonValidation {
               .replaceAll("\r", "")))
       case _ => Right(tx)
     }
-
-  private[this] def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = {
-    if (blockchain.isFeatureActivated(BlockchainFeatures.FlatFee, height))
-      FlatFeeConstants
-        .get(tx.builder.typeId)
-        .map { baseFee =>
-          tx match {
-            case tx: MassTransferTransaction =>
-              baseFee + (tx.transfers.size + 1) / 2
-            case tx: DataTransaction =>
-              val base = tx.data.map(_.toBytes.length).sum
-              baseFee + base / 1024
-            case itx: IssueTransaction =>
-              lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
-              if (itx.isNFT && nftActivated) FlatFeeDefault else baseFee
-            case _ =>
-              baseFee
-          }
-        }
-        .toRight(UnsupportedTransactionType)
-    else
-      OldFeeConstants
-        .get(tx.builder.typeId)
-        .map { baseFee =>
-          tx match {
-            case tx: MassTransferTransaction =>
-              baseFee + (tx.transfers.size + 1) / 2
-            case tx: DataTransaction =>
-              val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
-              baseFee + (base.length - 1) / 1024
-            case itx: IssueTransaction =>
-              lazy val nftActivated = blockchain.activatedFeatures
-                .get(BlockchainFeatures.ReduceNFTFee.id)
-                .exists(_ <= height)
-
-              val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
-
-              (baseFee * multiplier).toLong
-            case _ => baseFee
-          }
-        }
-        .toRight(UnsupportedTransactionType)
-  }
-
-  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
-    type FeeInfo = (Option[(Asset, AssetDescription)], Long)
-
-    def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
-        // This could be true for private blockchains
-        feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
-      } else
-        for {
-          feeInUnits <- feeInUnits(blockchain, height, tx)
-          r <- txAsset match {
-            case Waves => Right((None, feeInUnits * FeeUnit))
-            case assetId @ IssuedAsset(_) =>
-              for {
-                assetInfo <- blockchain
-                  .assetDescription(assetId)
-                  .toRight(GenericError(s"Asset ${assetId.id.base58} does not exist, cannot be used to pay fees"))
-                wavesFee <- Either.cond(
-                  assetInfo.sponsorship > 0,
-                  feeInUnits * FeeUnit,
-                  GenericError(s"Asset ${assetId.id.base58} is not sponsored, cannot be used to pay fees")
-                )
-              } yield (Some((assetId, assetInfo)), wavesFee)
-          }
-        } yield r
-
-    val feeAmount = {
-      def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
-        def isSmartToken(input: FeeInfo): Boolean =
-          input._1
-            .map(_._1)
-            .flatMap {
-              case a @ IssuedAsset(_) => blockchain.assetDescription(a)
-              case Waves              => None
-            }
-            .exists(_.script.isDefined)
-
-        val (feeAssetInfo, feeAmount) = inputFee
-        val assetsCount = tx match {
-          case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
-          case _                       => tx.checkedAssets().count(blockchain.hasAssetScript)
-        }
-        if (isSmartToken(inputFee)) {
-          //Left(GenericError("Using smart asset for sponsorship is disabled."))
-          Right { (feeAssetInfo, feeAmount + ScriptExtraFee * (1 + assetsCount)) }
-        } else {
-          Right { (feeAssetInfo, feeAmount + ScriptExtraFee * assetsCount) }
-        }
-      }
-
-      def feeAfterSmartAccounts(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = Right {
-        def smartAccountScriptsCount: Int = tx match {
-          case tx: Transaction with Authorized => cond(blockchain.hasScript(tx.sender))(1, 0)
-          case _                               => 0
-        }
-
-        val extraFee                  = smartAccountScriptsCount * ScriptExtraFee
-        val (feeAssetInfo, feeAmount) = inputFee
-        (feeAssetInfo, feeAmount + extraFee)
-      }
-
-      val baseFeeAmount = feeAfterSponsorship(tx.assetFee._1)
-
-      if (blockchain.isFeatureActivated(BlockchainFeatures.FlatFee, height))
-        baseFeeAmount
-      else
-        baseFeeAmount
-          .flatMap(feeAfterSmartTokens)
-          .flatMap(feeAfterSmartAccounts)
-    }
-
-    feeAmount.map {
-      case (Some((assetId, assetInfo)), amountInWaves) => (assetId, Sponsorship.fromWaves(amountInWaves, assetInfo.sponsorship), amountInWaves)
-      case (None, amountInWaves)                       => (Waves, amountInWaves, amountInWaves)
-    }
-  }
-
-  def checkFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
-      for {
-        minAFee <- getMinFee(blockchain, height, tx)
-        minWaves   = minAFee._3
-        minFee     = minAFee._2
-        feeAssetId = minAFee._1
-        _ <- Either.cond(
-          minFee <= tx.assetFee._2,
-          (),
-          GenericError(
-            s"Fee for ${Constants.TransactionNames(tx.builder.typeId)} (${tx.assetFee._2} in ${feeAssetId.fold("WAVES")(_.id.base58)})" ++
-              " does not exceed minimal value of " ++
-              s"$minWaves WAVES${feeAssetId.fold("")(id => s" or $minFee ${id.id.base58}")}"
-          )
-        )
-      } yield ()
-    } else {
-      Either.cond(tx.assetFee._2 > 0 || !tx.isInstanceOf[Authorized], (), GenericError(s"Fee must be positive."))
-    }
-  }
-
-  def cond[A](c: Boolean)(a: A, b: A): A = if (c) a else b
 
   def validateOverflow(dataList: Traversable[Long], errMsg: String): Either[ValidationError, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))

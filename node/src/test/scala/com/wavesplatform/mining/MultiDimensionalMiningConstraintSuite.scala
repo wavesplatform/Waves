@@ -16,7 +16,7 @@ class MultiDimensionalMiningConstraintSuite
     with TransactionGen
     with NoShrink {
   "MultiDimensionalMiningConstraint" - {
-    "isEmpty" - {
+    "isFull" - {
       val emptyConstraintGen: Gen[MultiDimensionalMiningConstraint] = for {
         isLeft  <- Arbitrary.arbBool.arbitrary
         isRight <- Arbitrary.arbBool.arbitrary
@@ -25,9 +25,9 @@ class MultiDimensionalMiningConstraintSuite
         rightMaxSize <- if (isRight) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
       } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1), createConstConstraint(rightMaxSize, 1))
 
-      "should be true if one dimension is empty" in forAll(emptyConstraintGen) { constraint =>
-        constraint.isEmpty shouldBe true
-        constraint.isOverfilled shouldBe false
+      "should be true if one dimension is full" in forAll(emptyConstraintGen) { constraint =>
+        constraint shouldBe 'full
+        constraint should not be ('overfilled)
       }
 
       val nonEmptyConstraintGen: Gen[MultiDimensionalMiningConstraint] = for {
@@ -35,9 +35,9 @@ class MultiDimensionalMiningConstraintSuite
         rightMaxSize <- Gen.chooseNum(1, Int.MaxValue)
       } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1), createConstConstraint(rightMaxSize, 1))
 
-      "should be false is both of two dimensions are non-empty" in forAll(nonEmptyConstraintGen) { constraint =>
-        constraint.isEmpty shouldBe false
-        constraint.isOverfilled shouldBe false
+      "should be false is both of two dimensions are not full" in forAll(nonEmptyConstraintGen) { constraint =>
+        constraint should not be ('full)
+        constraint should not be ('overfilled)
       }
     }
 
@@ -58,12 +58,12 @@ class MultiDimensionalMiningConstraintSuite
       }
 
       "no overfill" in forAll(noOverfillGen) { updatedConstraint =>
-        updatedConstraint.isEmpty shouldBe false
-        updatedConstraint.isOverfilled shouldBe false
+        updatedConstraint should not be ('full)
+        updatedConstraint should not be ('overfilled)
 
         updatedConstraint.constraints.map { x =>
-          x.isEmpty shouldBe false
-          x.isOverfilled shouldBe false
+          x should not be ('full)
+          x should not be ('overfilled)
         }
       }
 
@@ -77,15 +77,15 @@ class MultiDimensionalMiningConstraintSuite
       }
 
       "first overfills" in forAll(firstOverfillsGen) { updatedConstraint =>
-        updatedConstraint.isEmpty shouldBe true
-        updatedConstraint.isOverfilled shouldBe true
+        updatedConstraint shouldBe 'full
+        updatedConstraint shouldBe 'overfilled
 
-        updatedConstraint.constraints.head.isEmpty shouldBe true
-        updatedConstraint.constraints.head.isOverfilled shouldBe true
+        updatedConstraint.constraints.head shouldBe 'full
+        updatedConstraint.constraints.head shouldBe 'overfilled
 
         updatedConstraint.constraints.tail.map { x =>
-          x.isEmpty shouldBe false
-          x.isOverfilled shouldBe false
+          x should not be ('full)
+          x should not be ('overfilled)
         }
       }
 
@@ -99,15 +99,15 @@ class MultiDimensionalMiningConstraintSuite
       }
 
       "tail overfills" in forAll(secondOverfillsGen) { updatedConstraint =>
-        updatedConstraint.isEmpty shouldBe true
-        updatedConstraint.isOverfilled shouldBe true
+        updatedConstraint shouldBe 'full
+        updatedConstraint shouldBe 'overfilled
 
-        updatedConstraint.constraints.head.isEmpty shouldBe false
-        updatedConstraint.constraints.head.isOverfilled shouldBe false
+        updatedConstraint.constraints.head should not be ('full)
+        updatedConstraint.constraints.head should not be ('overfilled)
 
         updatedConstraint.constraints.tail.map { x =>
-          x.isEmpty shouldBe true
-          x.isOverfilled shouldBe true
+          x shouldBe 'full
+          x shouldBe 'overfilled
         }
       }
 
@@ -120,12 +120,12 @@ class MultiDimensionalMiningConstraintSuite
       }
 
       "all overfills" in forAll(bothOverfillGen) { updatedConstraint =>
-        updatedConstraint.isEmpty shouldBe true
-        updatedConstraint.isOverfilled shouldBe true
+        updatedConstraint shouldBe 'full
+        updatedConstraint shouldBe 'overfilled
 
         updatedConstraint.constraints.map { x =>
-          x.isEmpty shouldBe true
-          x.isOverfilled shouldBe true
+          x shouldBe 'full
+          x shouldBe 'overfilled
         }
       }
     }

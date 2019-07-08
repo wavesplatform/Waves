@@ -112,5 +112,30 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           )
         )
       ))
+
+    "full contract with meta" in roundTrip(
+      DApp(
+        ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+        List(
+          LET("letName", CONST_BOOLEAN(true)),
+          FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
+        ),
+        List(
+          CallableFunction(
+            CallableAnnotation("whoooo"),
+            FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
+          ),
+          CallableFunction(
+            CallableAnnotation("whoooo"),
+            FUNC("default", List(), CONST_BOOLEAN(false))
+          )
+        ),
+        Some(
+          VerifierFunction(
+            VerifierAnnotation("hmmm"),
+            FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
+          )
+        )
+      ))
   }
 }

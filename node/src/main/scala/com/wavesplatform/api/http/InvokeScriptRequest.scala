@@ -32,13 +32,17 @@ object InvokeScriptRequest {
           }
         case JsDefined(JsString("string")) =>
           jv \ "value" match {
-            case JsDefined(JsString(n)) => JsSuccess(CONST_STRING(n))
+            case JsDefined(JsString(n)) => CONST_STRING(n).fold(JsError(_), JsSuccess(_))
             case _                      => JsError("value is missing or not an string")
           }
         case JsDefined(JsString("binary")) =>
           jv \ "value" match {
             case JsDefined(JsString(n)) =>
-              ByteStr.decodeBase64(n).fold(ex => JsError(ex.getMessage), bstr => JsSuccess(CONST_BYTESTR(bstr)))
+              ByteStr.decodeBase64(n)
+                .toEither
+                .leftMap(_.getMessage)
+                .flatMap(CONST_BYTESTR(_))
+                .fold(JsError(_), JsSuccess(_))
             case _ => JsError("value is missing or not an base64 encoded string")
           }
         case _ => JsError("type is missing")

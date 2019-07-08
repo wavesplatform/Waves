@@ -17,6 +17,7 @@ object Deser {
 
   def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
     val length = Shorts.fromByteArray(bytes.slice(position, position + 2))
+    require(0 <= length && length <= bytes.size, s"Invalid array size $length")
     (bytes.slice(position + 2, position + 2 + length), position + 2 + length)
   }
 
@@ -45,6 +46,7 @@ object Deser {
 
   def parseArrays(bytes: Array[Byte]): Seq[Array[Byte]] = {
     val length = Shorts.fromByteArray(bytes.slice(0, 2))
+    require(0 <= length && length <= bytes.size, s"Invalid array size $length")
     val r = (0 until length).foldLeft((Seq.empty[Array[Byte]], 2)) {
       case ((acc, pos), _) =>
         val (arr, nextPos) = parseArrayWithLength(bytes, pos)

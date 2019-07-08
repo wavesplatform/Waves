@@ -37,15 +37,7 @@ Create a Docker image before you run any test: `sbt node-it/docker`
   by changing `SBT_THREAD_NUMBER`
 * Run one test: `sbt node-it/testOnly *.TestClassName` or `node-it/testOnly full.package.TestClassName`
 
-## 5. Running DEX integration tests (optional)
-
-Create a Docker image before you run any test: `sbt dex-it/docker`
-
-* Run all tests: `SBT_THREAD_NUMBER=4 sbt dex-it/test` . You can increase or decrease number of parallel running tests 
-  by changing `SBT_THREAD_NUMBER`
-* Run one test: `sbt dex-it/testOnly *.TestClassName` or `dex-it/testOnly full.package.TestClassName`
-
-## 6. Building packages
+## 5. Building packages
 
 * ### Mainnet
 
@@ -59,7 +51,7 @@ sbt packageAll
 sbt -Dnetwork=testnet packageAll
 ```
 
-## 7. Installing DEB package
+## 6. Installing DEB package
 
 DEB package located in target folder. You can replace '\*' with actual package name:
 
@@ -67,9 +59,7 @@ DEB package located in target folder. You can replace '\*' with actual package n
 sudo dpkg -i node/target/*.deb
 ```
 
-*Note*: this build does not contain DEX.
-
-## 8. Running fat jar
+## 7. Running fat jar
 
 You can replace waves-all\*.jar with actual jar name \(it should have "all"-word\):
 
@@ -77,17 +67,13 @@ You can replace waves-all\*.jar with actual jar name \(it should have "all"-word
 java -jar node/target/waves-all*.jar path/to/config/file
 ```
 
-*Note*: this build does not contain DEX.
-
 **Note.** For OSX - homebrew is preferable choice. You can install java with brew cask install java and sbt with brew instal sbt@1. Build/Test steps are common for any OS \(but you should use ‘\' instead of '/' in windows\). {% endprettyhint %}
 
-## 9. Running an extension project locally during development
-
-For example we run `DEX`.
+## 8. Running an extension project locally during development
 
 ### SBT
 
-`sbt "dex/run /path/to/configuration"`
+`sbt "extension-module/run /path/to/configuration"`
 
 ### IntelliJ IDEA
 
@@ -97,7 +83,7 @@ For example we run `DEX`.
 
     * Main class: `com.wavesplatform.Application`
     * Program arguments: `/path/to/configuration`
-    * Use classpath of module: `dex`
+    * Use classpath of module: `extension-module`
 
 4. Click on `OK`
 5. Run this configuration

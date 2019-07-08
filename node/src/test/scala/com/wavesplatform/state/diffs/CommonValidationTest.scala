@@ -53,7 +53,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
-          f(CommonValidation.checkFee(blockchain, 1, transferTx))
+          f(FeeValidation(blockchain, 1, transferTx))
         }
     }
   }
@@ -76,7 +76,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
-          f(CommonValidation.checkFee(blockchain, 1, transferTx))
+          f(FeeValidation(blockchain, 1, transferTx))
         }
     }
   }
@@ -101,8 +101,8 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .selfSigned(
               AddressScheme.current.chainId,
               richAcc,
-              "test".getBytes(),
-              "desc".getBytes(),
+              "test".getBytes("UTF-8"),
+              "desc".getBytes("UTF-8"),
               Long.MaxValue,
               2,
               reissuable = false,
@@ -113,7 +113,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
         else
           IssueTransactionV1
-            .selfSigned(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
+            .selfSigned(richAcc, "test".getBytes("UTF-8"), "desc".getBytes("UTF-8"), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
             .explicitGet()
 
       val transferWavesTx = TransferTransactionV1
@@ -194,7 +194,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
 
-          f(CommonValidation.checkFee(blockchain, 1, transferTx))
+          f(FeeValidation(blockchain, 1, transferTx))
         }
     }
   }

@@ -4,13 +4,10 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
@@ -20,14 +17,24 @@ import scopt.OParser
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
+  private[wavesplatform] object Formats {
+    val Binary   = "BINARY"
+    val Protobuf = "PROTOBUF"
+    val Json     = "JSON"
+
+    def list         = Seq(Binary, Protobuf, Json)
+    def importerList = Seq(Binary, Protobuf)
+    def default      = Binary
+
+    def isSupported(f: String)           = list.contains(f.toUpperCase)
+    def isSupportedInImporter(f: String) = importerList.contains(f.toUpperCase)
+  }
+
   //noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFilename, outputFileNamePrefix, exportHeight, format) =>
-        val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(configFilename)))
-        AddressScheme.current = new AddressScheme {
-          override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-        }
+      case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
+        val settings = Application.loadApplicationConfig(Some(configFile))
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
@@ -46,7 +53,7 @@ object Exporter extends ScorexLogging {
             exportedBytes += IO.writeHeader(bos, format)
             (2 to height).foreach { h =>
               exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, blockchain, h)
-                                else IO.exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
+                                else IO.exportBlockToBinary(bos, blockchain, h, format == Formats.Binary))
               if (h % (height / 10) == 0)
                 log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
             }
@@ -113,7 +120,7 @@ object Exporter extends ScorexLogging {
   private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
                                                  outputFileNamePrefix: String = "blockchain",
                                                  exportHeight: Option[Int] = None,
-                                                 format: String = "BINARY_OLD")
+                                                 format: String = Formats.Binary)
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -125,20 +132,20 @@ object Exporter extends ScorexLogging {
       programName("waves export"),
       head("Waves Blockchain Exporter", Version.VersionString),
       opt[File]('c', "config")
-        .text("Config file name")
+        .text("Node config file path")
         .action((f, c) => c.copy(configFileName = f)),
-      opt[String]("output-prefix")
-        .abbr("op")
+      opt[String]('o', "output-prefix")
         .text("Output file name prefix")
         .action((p, c) => c.copy(outputFileNamePrefix = p)),
       opt[String]('f', "format")
         .text("Output file format")
-        .valueName("<BINARY|BINARY_OLD|JSON>")
+        .valueName(s"<${Formats.list.mkString("|")}> (default is ${Formats.default})")
         .action((f, c) => c.copy(format = f))
         .validate {
-          case f if Set("BINARY", "BINARY_OLD", "JSON").contains(f.toUpperCase) => success
-          case f                                                                => failure(s"Unsupported format: $f")
-        }
+          case f if Formats.isSupported(f.toUpperCase) => success
+          case f                                       => failure(s"Unsupported format: $f")
+        },
+      help("help").hidden()
     )
   }
 }

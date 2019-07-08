@@ -322,10 +322,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns an success if sigVerify return a success") {
-    val seed                    = "seed".getBytes()
+    val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    val bodyBytes = "message".getBytes()
+    val bodyBytes = "message".getBytes("UTF-8")
     val signature = Curve25519.sign(privateKey, bodyBytes)
 
     val r = sigVerifyTest(bodyBytes, publicKey, signature)
@@ -333,11 +333,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns correct context") {
-    val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes())
-    val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes())
-    val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes())
+    val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes("UTF-8"))
+    val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes("UTF-8"))
+    val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes("UTF-8"))
 
-    val bodyBytes = "message".getBytes()
+    val bodyBytes = "message".getBytes("UTF-8")
 
     val (log, result) = multiSig(
       bodyBytes,
@@ -356,11 +356,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns an error if sigVerify return an error") {
-    val seed           = "seed".getBytes()
+    val seed           = "seed".getBytes("UTF-8")
     val (_, publicKey) = Curve25519.createKeyPair(seed)
-    val bodyBytes      = "message".getBytes()
+    val bodyBytes      = "message".getBytes("UTF-8")
 
-    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes()))
+    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes("UTF-8")))
     r.isLeft shouldBe false
   }
 
@@ -372,7 +372,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("drop(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.dropBytes.header, List(CONST_BYTESTR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.dropBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.drop(number))
     }
@@ -381,7 +381,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("take(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTESTR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.take(number))
     }
@@ -390,7 +390,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("dropRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTESTR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.dropRight(number))
     }
@@ -399,7 +399,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("takeRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.takeRightBytes.header, List(CONST_BYTESTR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.takeRightBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.takeRight(number))
     }
@@ -413,7 +413,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("drop(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.drop(number))
     }
@@ -422,7 +422,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("take(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.take(number))
     }
@@ -431,7 +431,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("dropRight(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.dropRightString.header, List(CONST_STRING(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.dropRightString.header, List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.dropRight(number))
     }
@@ -440,7 +440,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("takeRight(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(PureContext.takeRightString.header, List(CONST_STRING(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.takeRightString.header, List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
         val actual = ev[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.takeRight(number))
     }
@@ -448,7 +448,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("size(String) works as the native one") {
     forAll(Arbitrary.arbString.arbitrary) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(CONST_STRING(xs)))
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(CONST_STRING(xs).explicitGet()))
       val actual = ev[EVALUATED](pureEvalContext, expr)
       actual shouldBe evaluated(xs.length)
     }
@@ -461,7 +461,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     } yield Base58.encode(xs)
 
     forAll(gen) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base58.tryDecodeWithLimit(xs).get))
     }
@@ -475,7 +475,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     } yield Base58.encode(xs)
 
     forAll(gen) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe Left("base58Decode input exceeds 100")
     }
@@ -488,7 +488,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     } yield Base64.encode(xs)
 
     forAll(gen) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs).explicitGet()))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
@@ -501,7 +501,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     } yield s"base64:${Base64.encode(xs)}"
 
     forAll(gen) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs).explicitGet()))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
@@ -514,7 +514,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     } yield xs
 
     forAll(gen) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE16), List(FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(xs)))))
+      val expr = FUNCTION_CALL(
+        FunctionHeader.Native(FROMBASE16),
+        List(
+          FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(xs).explicitGet()))
+        )
+      )
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(xs))
     }
@@ -532,7 +537,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { pkBytes =>
       val expr = FUNCTION_CALL(
         FunctionHeader.User("addressFromPublicKey"),
-        List(CONST_BYTESTR(ByteStr(pkBytes)))
+        List(CONST_BYTESTR(ByteStr(pkBytes)).explicitGet())
       )
 
       val actual = ev[CaseObj](ctx.evaluationContext, expr).map(_.fields("bytes"))
@@ -550,11 +555,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     forAll(gen) { addrStr =>
-      val expr                                   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val expr                                   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
       val actual                                 = ev[CaseObj](ctx.evaluationContext, expr)
       val a: Either[ExecutionError, EVALUATED]   = actual.map(_.fields("bytes"))
       val e: Either[String, Option[Array[Byte]]] = addressFromString(environment.chainId, addrStr)
-      a.explicitGet() shouldBe CONST_BYTESTR(ByteStr(e.explicitGet().get))
+      a shouldBe CONST_BYTESTR(ByteStr(e.explicitGet().get))
     }
   }
 
@@ -568,10 +573,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     forAll(gen) { addrStr =>
-      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
       val actual = ev[CaseObj](ctx.evaluationContext, expr)
       val e      = addressFromString(environment.chainId, addrStr).explicitGet().get
-      actual.map(_.fields("bytes")).explicitGet() shouldBe CONST_BYTESTR(ByteStr(e))
+      actual.map(_.fields("bytes")) shouldBe CONST_BYTESTR(ByteStr(e))
     }
   }
 
@@ -585,7 +590,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     forAll(gen) { addrStr =>
-      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
       actual shouldBe evaluated(unit)
     }
@@ -605,7 +610,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     forAll(gen) { addrStr =>
-      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
       actual shouldBe evaluated(unit)
     }
@@ -625,7 +630,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     forAll(gen) { addrStr =>
-      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
       actual shouldBe evaluated(unit)
     }
@@ -647,7 +652,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     } yield EnvironmentFunctions.AddressPrefix + Base58.encode(bytes.dropRight(EnvironmentFunctions.ChecksumLength) ++ wrongCheckSum)
 
     forAll(gen) { addrStr =>
-      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
       actual shouldBe evaluated(unit)
     }
@@ -759,7 +764,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("checking a hash of some message by crypto function invoking") {
     val bodyText      = "some text for test"
-    val bodyBytes     = bodyText.getBytes()
+    val bodyBytes     = bodyText.getBytes("UTF-8")
     val hashFunctions = Map(SHA256 -> Sha256, BLAKE256 -> Blake2b256, KECCAK256 -> Keccak256)
 
     for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteStr(funcClass.hash(bodyText)))
@@ -772,7 +777,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       context = context,
       expr = FUNCTION_CALL(
         function = FunctionHeader.Native(funcName),
-        args = List(CONST_BYTESTR(ByteStr(bodyBytes)))
+        args = List(CONST_BYTESTR(ByteStr(bodyBytes)).explicitGet())
       )
     ).map(_.bs)
   }
@@ -815,8 +820,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToString(toStringLong, CONST_LONG(n)) shouldBe evaluated(n.toString)
-      Try(evalToString(toStringLong, CONST_STRING(""))).isFailure shouldBe true
-      Try(evalToString(toStringBoolean, CONST_STRING(""))).isFailure shouldBe true
+      Try(evalToString(toStringLong, CONST_STRING("").explicitGet())).isFailure shouldBe true
+      Try(evalToString(toStringBoolean, CONST_STRING("").explicitGet())).isFailure shouldBe true
     }
   }
 
@@ -830,7 +835,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe evaluated(ByteStr(ByteBuffer.allocate(8).putLong(n).array))
-      evalToBytes(toBytesString, CONST_STRING(s)) shouldBe evaluated(ByteStr(s.getBytes("UTF-8")))
+      evalToBytes(toBytesString, CONST_STRING(s).explicitGet()) shouldBe evaluated(ByteStr(s.getBytes("UTF-8")))
     }
   }
 

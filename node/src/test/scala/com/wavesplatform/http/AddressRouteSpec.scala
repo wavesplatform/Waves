@@ -100,10 +100,10 @@ class AddressRouteSpec
           val resp      = responseAs[JsObject]
           val signature = Base58.tryDecodeWithLimit((resp \ "signature").as[String]).get
 
-          (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
+          (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
           (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)
 
-          crypto.verify(signature, message.getBytes, account.publicKey) shouldBe true
+          crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
         }
     }
 
@@ -115,7 +115,7 @@ class AddressRouteSpec
     forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) {
       case ((account, message), b58) =>
         val uri          = routePath(s"/$path/${account.address}")
-        val messageBytes = message.getBytes()
+        val messageBytes = message.getBytes("UTF-8")
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(
           "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
@@ -173,16 +173,21 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe 0
     }
 
-    val testContract = DApp(ByteStr.empty, List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    val contractWithMeta = DApp(
+      meta = ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+      decs = List(),
+      callableFuncs = List(),
+      verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
+    )
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, testContract).explicitGet()))
+      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AQAAAAZ2ZXJpZnkAAAAABiDCPeI="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAbVXg8N"
-      (response \ "scriptText").as[String] shouldBe "DApp(,List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAQBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
+      (response \ "scriptText").as[String] shouldBe "DApp(2VfUX,List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)

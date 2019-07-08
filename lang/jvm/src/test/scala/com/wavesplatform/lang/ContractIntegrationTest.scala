@@ -144,7 +144,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   def parseCompileAndEvaluate(script: String,
                               func: String,
-                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty))): Either[(ExecutionError, Log), ScriptResult] = {
+                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
+                             ): Either[(ExecutionError, Log), ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
 
@@ -222,7 +223,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       maybePayment = None,
       feeAssetId = None,
       funcName = Some("foo"),
-      funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes), CONST_STRING("ok"))
+      funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes).explicitGet(), CONST_STRING("ok").explicitGet())
     )
     parseCompileAndVerify(
       s"""
@@ -287,6 +288,74 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       List(
         (Recipient.Address(callerAddress), 1L, None),
         (Recipient.Address(callerAddress), 2L, None)
+      )
+    )
+  }
+
+  property("script result fields") {
+    parseCompileAndEvaluate(
+      """
+        | {-# STDLIB_VERSION 3       #-}
+        | {-# SCRIPT_TYPE    ACCOUNT #-}
+        | {-# CONTENT_TYPE   DAPP    #-}
+        |
+        | func scriptResult1(caller: Address) =
+        |     ScriptResult(
+        |       WriteSet(
+        |         [
+        |           DataEntry("a", 1),
+        |           DataEntry("b", 2)
+        |         ]
+        |       ),
+        |       TransferSet(
+        |         [
+        |           ScriptTransfer(caller, 1, unit),
+        |           ScriptTransfer(caller, 2, unit)
+        |         ]
+        |       )
+        |     )
+        |
+        | func scriptResult2(caller: Address) =
+        |     ScriptResult(
+        |       WriteSet(
+        |         [
+        |           DataEntry("c", 3),
+        |           DataEntry("d", 4)
+        |         ]
+        |       ),
+        |       TransferSet(
+        |         [
+        |           ScriptTransfer(caller, 3, unit),
+        |           ScriptTransfer(caller, 4, unit)
+        |         ]
+        |       )
+        |     )
+        |
+        | @Callable(i)
+        | func test() = {
+        |   let sr1 = scriptResult1(i.caller)
+        |   let sr2 = scriptResult2(i.caller)
+        |
+        |   let writes    = if (true)  then sr1.writeSet.data         else sr2.writeSet.data
+        |   let transfers = if (false) then sr1.transferSet.transfers else sr2.transferSet.transfers
+        |
+        |   ScriptResult(
+        |     WriteSet(writes),
+        |     TransferSet(transfers)
+        |   )
+        | }
+        |
+        """.stripMargin,
+      "test",
+      args = Nil
+    ).explicitGet() shouldBe ScriptResult(
+      List(
+        DataItem.Lng("a", 1),
+        DataItem.Lng("b", 2)
+      ),
+      List(
+        (Recipient.Address(callerAddress), 3, None),
+        (Recipient.Address(callerAddress), 4, None)
       )
     )
   }

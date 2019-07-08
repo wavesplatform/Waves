@@ -151,7 +151,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val proof    = ByteStr(secretText.getBytes())
+    val proof    = ByteStr(secretText.getBytes("UTF-8"))
     val sigAlice = ByteStr(crypto.sign(AlicesPK, unsigned.bodyBytes()))
     val signed   = unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
 

@@ -179,7 +179,7 @@ message SponsorFeeTransactionData {
 };
 
 message InvokeScriptTransactionData {
-    Recipient dApp = 1;
+    Recipient d_app = 1;
     bytes function_call = 2;
     repeated Amount payments = 3;
 }

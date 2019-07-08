@@ -23,7 +23,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
     import e.{index => i}
-    println(s"val code1 = new String(Array[Byte](${x.getBytes.mkString(",")}))")
+    println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
     println(s"""val code2 = "${escapedCode(x)}"""")
     println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
       .mkString("\n")}")
@@ -137,7 +137,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   property("valid non-empty base58 definition") {
-    parse("base58'bQbp'") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr("foo".getBytes)))
+    parse("base58'bQbp'") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr("foo".getBytes("UTF-8"))))
   }
 
   property("valid empty base58 definition") {
@@ -149,7 +149,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   property("valid non-empty base64 definition") {
-    parse("base64'TElLRQ=='") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr("LIKE".getBytes)))
+    parse("base64'TElLRQ=='") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr("LIKE".getBytes("UTF-8"))))
   }
 
   property("valid empty base64 definition") {
@@ -579,26 +579,26 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("crypto functions: sha256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
-    val encodedText = ScorexBase58.encode(text.getBytes)
+    val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
 
     parse(s"sha256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(Pos(0, 96), PART.VALID(Pos(0, 6), "sha256"), List(CONST_BYTESTR(Pos(7, 95), PART.VALID(Pos(15, 94), ByteStr(text.getBytes)))))
+      FUNCTION_CALL(Pos(0, 96), PART.VALID(Pos(0, 6), "sha256"), List(CONST_BYTESTR(Pos(7, 95), PART.VALID(Pos(15, 94), ByteStr(text.getBytes("UTF-8"))))))
   }
 
   property("crypto functions: blake2b256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
-    val encodedText = ScorexBase58.encode(text.getBytes)
+    val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
 
     parse(s"blake2b256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "blake2b256"), List(CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(text.getBytes)))))
+      FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "blake2b256"), List(CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(text.getBytes("UTF-8"))))))
   }
 
   property("crypto functions: keccak256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
-    val encodedText = ScorexBase58.encode(text.getBytes)
+    val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
 
     parse(s"keccak256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "keccak256"), List(CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(text.getBytes)))))
+      FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "keccak256"), List(CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(text.getBytes("UTF-8"))))))
   }
 
   property("should parse a binary operation without a second operand") {

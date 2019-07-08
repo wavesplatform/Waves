@@ -69,8 +69,8 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       .create(
         'T',
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        "Gigacoin".getBytes,
-        "Gigacoin".getBytes,
+        "Gigacoin".getBytes("UTF-8"),
+        "Gigacoin".getBytes("UTF-8"),
         10000000000L,
         8,
         true,
@@ -120,8 +120,8 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       .create(
         'T',
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        "Gigacoin".getBytes,
-        "Gigacoin".getBytes,
+        "Gigacoin".getBytes("UTF-8"),
+        "Gigacoin".getBytes("UTF-8"),
         10000000000L,
         8,
         true,

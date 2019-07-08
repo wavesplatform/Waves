@@ -25,7 +25,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       tx <- InvokeScriptTransaction.create(
         sender = publicKey,
         dappAddress = address,
-        fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param"), CONST_LONG(1)))),
+        fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
         p = List(Payment(1, Waves)),
         fee = 10000000,
         feeAssetId = Waves,
@@ -97,7 +97,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
   property("suitable TracedResult error json") {
     val vars = List(
       "amount"     -> Right(CONST_LONG(12345)),
-      "invocation" -> Right(CONST_STRING("str"))
+      "invocation" -> CONST_STRING("str")
     )
     val reason = "error reason"
 
