@@ -57,7 +57,7 @@ object TransactionDiffer extends ScorexLogging {
   }.leftMap(TransactionValidationError(_, tx))
 
   def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
-    stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
+    stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx matchData {
         case gtx: GenesisTransaction         => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction         => PaymentTransactionDiff(blockchain)(ptx)

@@ -101,8 +101,7 @@ object PBTransactionAdapter extends TransactionParser {
       }
   }
 
-  // TODO: Remove
-  def unwrap(tx: VanillaTransaction) = tx match {
+  def unwrap(tx: VanillaTransaction): VanillaTransaction = tx match {
     case a: PBTransactionAdapter => a.vanillaTx
     case _                       => tx
   }
