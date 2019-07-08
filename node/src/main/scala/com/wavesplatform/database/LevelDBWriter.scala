@@ -104,21 +104,23 @@ class LevelDBWriter(writableDB: DB,
 
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
-  override protected def loadLastBlock(): Option[Block] = {
-    val height = Height(writableDB.get(Keys.height))
+  override protected def loadLastBlock(): Option[Block] = readOnly { db =>
+    val height = Height(db.get(Keys.height))
     log.info(s"Last block is $height")
     loadBlock(height)
   }
 
-  override protected def loadScript(address: Address): Option[Script] =
+  override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
     addressId(address).fold(Option.empty[Script]) { addressId =>
       getAddressScript(addressId).map(_())
     }
+  }
 
-  override protected def hasScriptBytes(address: Address): Boolean =
+  override protected def hasScriptBytes(address: Address): Boolean = readOnly { db =>
     addressId(address).fold(false) { addressId =>
       getAddressScript(addressId).isDefined
     }
+  }
 
   private[this] def getAddressScript(address: Long): Option[() => Script] = readOnly { db =>
     db.lastValue(Keys.AddressScriptPrefix, AddressId.toBytes(address), this.height)
@@ -139,11 +141,12 @@ class LevelDBWriter(writableDB: DB,
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo =
+  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
     AccountDataInfo((for {
       key   <- accountDataKeys(address)
       value <- accountData(address, key)
     } yield key -> value).toMap)
+  }
 
   override def accountDataKeys(address: Address): Seq[String] = readOnly { db =>
     for {
