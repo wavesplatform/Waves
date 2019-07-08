@@ -23,8 +23,6 @@ case object EmptyBlockchain extends Blockchain {
 
   override def score: BigInt = 0
 
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = None
-
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = None
 
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = None

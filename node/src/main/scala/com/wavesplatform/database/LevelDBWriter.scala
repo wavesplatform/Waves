@@ -235,8 +235,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
   override protected def doAppend(block: Block,
                                   carry: Long,
                                   newAddresses: Map[Address, BigInt],
-                                  wavesBalances: Map[BigInt, Long],
-                                  assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
+                                  balances: Map[BigInt, Map[Asset, Long]],
                                   leaseBalances: Map[BigInt, LeaseBalance],
                                   addressTransactions: Map[AddressId, List[TransactionId]],
                                   leaseStates: Map[ByteStr, Boolean],
@@ -285,19 +284,6 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-    val miners: mutable.HashMap[Address, BalanceInfo] =
-      mutable.HashMap.empty[Address, BalanceInfo]
-
-    if (height > 1) {
-      rw.get(Keys.balancesInfoAtHeight(Height @@ (height - 1)))
-        .foreach { case (addr, balance) => miners.put(addr, balance) }
-    }
-
-    val requiredBalance = GeneratingBalanceProvider.minimalEffectiveBalance(height, activatedFeatures)
-    val requiredBlocks  = GeneratingBalanceProvider.minimalBlockInterval(height, activatedFeatures)
-
-    val newAddressIds = newAddresses.map { case (addr, addrId) => addrId -> addr }
-
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val kwbh = Keys.wavesBalanceHistory(addressId)
@@ -305,85 +291,36 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       if (wbh.isEmpty) {
         newAddressesForWaves += addressId
       }
-
-      val address = newAddressIds.getOrElse(addressId, rw.get(Keys.idToAddress(addressId)))
-
-      val knownMiner: Boolean      = miners.contains(address)
-      val haveEnoughWaves: Boolean = balance >= requiredBalance
-
-      lazy val miningBalance = {
-        val snapshots = {
-          Try {
-            rw.get(Keys.idToAddress(addressId))
-          }.toOption
-            .map { addr =>
-              balanceSnapshots(addr, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
-            }
-            .getOrElse(Seq(BalanceSnapshot(1, 0, 0, 0)))
-            .map(_.effectiveBalance)
-        }
-        (balance +: snapshots).min
-      }
-
-      val shouldBeAdded   = haveEnoughWaves
-      val shouldBeUpdated = knownMiner && haveEnoughWaves
-      val shouldBeRemoved = knownMiner && !haveEnoughWaves
-
-      if (shouldBeAdded || shouldBeUpdated) {
-        miners.update(address, BalanceInfo(balance, miningBalance))
-      } else if (shouldBeRemoved) {
-        miners.remove(address)
-      }
-
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
 
-    rw.put(Keys.balancesInfoAtHeight(Height @@ height), miners.toMap)
-
-    val expiredMiners = Keys.balancesInfoAtHeight(Height @@ threshold)
-
-    expiredKeys.append(expiredMiners.keyBytes)
-
     val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
 
-    if (newAddressesForWaves.nonEmpty) {
-      val newSeqNr = rw.get(Keys.addressesForWavesSeqNr) + 1
-      rw.put(Keys.addressesForWavesSeqNr, newSeqNr)
-      rw.put(Keys.addressesForWaves(newSeqNr), newAddressesForWaves)
+    for ((asset, newAddressIds) <- newAddressesForAssets) {
+      asset match {
+        case Waves =>
+          val newSeqNr = rw.get(Keys.addressesForWavesSeqNr) + 1
+          rw.put(Keys.addressesForWavesSeqNr, newSeqNr)
+          rw.put(Keys.addressesForWaves(newSeqNr), newAddressIds.toSeq)
+        case a: IssuedAsset =>
+          val seqNrKey  = Keys.addressesForAssetSeqNr(a)
+          val nextSeqNr = rw.get(seqNrKey) + 1
+          val key       = Keys.addressesForAsset(a, nextSeqNr)
+          rw.put(seqNrKey, nextSeqNr)
+          rw.put(key, newAddressIds.toSeq)
+      }
     }
 
+    val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
+    rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
+
+    // leases
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
       expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
-
-    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
-    for ((addressId, assets) <- assetBalances) {
-      val prevAssets   = rw.get(Keys.assetList(addressId))
-      val prevAssetSet = prevAssets.toSet
-      val newAssets    = assets.keys.filter(!prevAssetSet(_))
-      for (asset <- newAssets) {
-        newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
-      }
-      rw.put(Keys.assetList(addressId), newAssets.toList ++ prevAssets)
-      for ((assetId, balance) <- assets) {
-        rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
-        expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
-      }
-    }
-
-    for ((asset, newAddressIds) <- newAddressesForAsset) {
-      val seqNrKey  = Keys.addressesForAssetSeqNr(asset)
-      val nextSeqNr = rw.get(seqNrKey) + 1
-      val key       = Keys.addressesForAsset(asset, nextSeqNr)
-
-      rw.put(seqNrKey, nextSeqNr)
-      rw.put(key, newAddressIds.toSeq)
-    }
-
-    rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
     for ((orderId, volumeAndFee) <- filledQuantity) {
       rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)

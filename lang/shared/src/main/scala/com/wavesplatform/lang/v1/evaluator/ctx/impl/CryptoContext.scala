@@ -3,14 +3,13 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.CryptoContext.{sha3256, sha3384, sha3512}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
@@ -129,10 +128,10 @@ object CryptoContext {
         30,
         CHECK_MERKLE_PROOF,
         BOOLEAN,
-        "Check validity of merkle tree proof",
-        ("merkleRoot", BYTESTR, "root hash of merkle tree"),
+        "Check validity of Merkle tree proof",
+        ("merkleRoot", BYTESTR, "root hash of Merkle tree"),
         ("merkleProof", BYTESTR, "proof bytes"),
-        ("valueBytes", BYTESTR, "bytes of value to be prooven")
+        ("valueBytes", BYTESTR, "bytes of value that must be proven")
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
           Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
@@ -185,10 +184,10 @@ object CryptoContext {
       ("SHA256", ((sha256, "SHA256 digest algorithm"), digestAlgValue(sha256))),
       ("SHA384", ((sha384, "SHA384 digest algorithm"), digestAlgValue(sha384))),
       ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512))),
-      ("SHA3224", ((sha3224, "SHA3-256 digest algorithm"), digestAlgValue(sha3224))),
+      ("SHA3224", ((sha3224, "SHA3-224 digest algorithm"), digestAlgValue(sha3224))),
       ("SHA3256", ((sha3256, "SHA3-256 digest algorithm"), digestAlgValue(sha3256))),
-      ("SHA3384", ((sha3384, "SHA3-256 digest algorithm"), digestAlgValue(sha3384))),
-      ("SHA3512", ((sha3512, "SHA3-256 digest algorithm"), digestAlgValue(sha3512)))
+      ("SHA3384", ((sha3384, "SHA3-384 digest algorithm"), digestAlgValue(sha3384))),
+      ("SHA3512", ((sha3512, "SHA3-512 digest algorithm"), digestAlgValue(sha3512)))
     )
 
     val v3Functions =
