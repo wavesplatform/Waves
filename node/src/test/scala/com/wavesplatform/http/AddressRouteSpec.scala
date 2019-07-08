@@ -1,6 +1,8 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
+import java.net.{URLDecoder, URLEncoder}
+
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.state.ByteStr
@@ -197,16 +199,24 @@ class AddressRouteSpec
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val testData: Map[String, String] = (
-      (1 to 10).map(i => s"SomeKey#$i") ++
-        (1 to 10).map(i => s"OtherKey#$i")
-    ).map { k =>
-      k -> Random.nextString(16)
-    }.toMap
+    val dataKeys = List("abc", "aBcD", "ABD",
+      "ab1c", "1aB1cD", "A1BD0", "a110b", "123",
+      " ab", "ab ", "a b\n", "ab1 \n\t", "\n\raB1\t", "\n  \r  \t\t",
+      "!#$%&'()*+,", "!#$%&'()<*=>+,", "!", "<!@#qwe>", "\\", "\"\\", "qwe!",
+      "\b", "\0", "\b\b", "\bqweasd\0", "\0qweqwe")
+
+    val testData: Map[String, String] =
+      dataKeys
+        .map { k => k -> Random.nextString(16)}
+        .toMap
+
+    val regexps = List(/*"abc", "bca",*/
+      "[a-zA-Z]{1,}", "[a-z0-9]{0,4}", "[a-zA-Z0-9]{1,4}", "[a-z!-/]{2,}", "[!-/:-@]{0,}",
+      "\\w{0,}", "\\d{0,}", "[\\w\\d]{0,}", "\\s{0,}")
 
     (blockchain.accountDataKeys _)
       .when(allAccounts(1).toAddress)
-      .returning(testData.keys.toList)
+      .returning(dataKeys)
       .anyNumberOfTimes()
 
     testData.foreach {
@@ -218,24 +228,42 @@ class AddressRouteSpec
           .anyNumberOfTimes()
     }
 
-    val regex = """^Some.*$"""
+    for (regex <- regexps) {
+      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+        val kvs = responseAs[JsArray].value.map { json =>
+          ((json \ "key").as[String], (json \ "value").as[String])
+        }.toList.sortBy(_._1)
 
-    Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-      val kvs = responseAs[JsArray].value.map { json =>
-        ((json \ "key").as[String], (json \ "value").as[String])
-      }.toList
-
-      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
+        val regexPattern = regex.r.pattern
+        kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
+      }
     }
 
-    val urlEncRegex = """%5ESome.%2A%24"""
+    for (regex <- regexps.map(rgx => URLEncoder.encode(rgx, "UTF-8"))) {
+      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+        val kvs = responseAs[JsArray].value.map {
+          json => ((json \ "key").as[String], (json \ "value").as[String])
+        }.toList.sortBy(_._1)
 
-    Get(routePath(s"""/data/${allAddresses(1)}?matches=$urlEncRegex""")) ~> route ~> check {
-      val kvs = responseAs[JsArray].value.map { json =>
-        ((json \ "key").as[String], (json \ "value").as[String])
-      }.toList
+        val regexPattern = URLDecoder.decode(regex, "UTF-8").r.pattern
+        kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
+      }
+    }
 
-      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
+    val invalidRegexps = List("[a-z", "([a-z]{0}", "[a-z]{0", "[a-z]{,5}")
+    for (regex <- invalidRegexps) {
+      try {
+        Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+          responseAs[JsArray].value.map { json =>
+            ((json \ "key").as[String], (json \ "value").as[String])
+          }
+        }
+        fail("RegexCompiler didn't throw expected error")
+      } catch {
+        case err: Throwable => if (!err.getMessage.contains("Cannot compile regex")) {
+          throw err
+        }
+      }
     }
   }
 }

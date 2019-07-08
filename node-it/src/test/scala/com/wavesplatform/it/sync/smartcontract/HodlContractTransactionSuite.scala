@@ -112,7 +112,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     sender.waitForTransaction(invokeScriptId)
 
-    sender.getData(contract.address, caller.address) shouldBe IntegerDataEntry(caller.address, 1.5.waves)
+    sender.getDataByKey(contract.address, caller.address) shouldBe IntegerDataEntry(caller.address, 1.5.waves)
     val balanceAfter = sender.accountBalances(contract.address)._1
 
     (balanceAfter - balanceBefore) shouldBe 1.5.waves
@@ -148,7 +148,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val balanceAfter = sender.accountBalances(contract.address)._1
 
-    sender.getData(contract.address, caller.address) shouldBe IntegerDataEntry(caller.address, 0.01.waves)
+    sender.getDataByKey(contract.address, caller.address) shouldBe IntegerDataEntry(caller.address, 0.01.waves)
     (balanceAfter - balanceBefore) shouldBe -1.49.waves
 
     val stateChangesInfo = sender.debugStateChanges(invokeScriptId).stateChanges
