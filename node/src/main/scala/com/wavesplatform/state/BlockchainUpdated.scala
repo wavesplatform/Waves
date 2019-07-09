@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import cats.syntax.monoid._
-
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -11,7 +10,7 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset
 import monix.reactive.Observer
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.ListBuffer
 
 final case class StateUpdate(balances: Seq[(Address, Asset, Long)], leases: Seq[(Address, LeaseBalance)], dataEntries: Seq[(Address, DataEntry[_])]) {
   def isEmpty: Boolean = balances.isEmpty && leases.isEmpty && dataEntries.isEmpty
@@ -38,7 +37,7 @@ object BlockchainUpdateNotifier {
   private def stateUpdateFromDiff(blockchain: Blockchain, diff: Diff): StateUpdate = {
     val PortfolioUpdates(updatedBalances, updatedLeases) = DiffToStateApplier.portfolios(blockchain, diff)
 
-    val balances = ArrayBuffer.empty[(Address, Asset, Long)]
+    val balances = ListBuffer.empty[(Address, Asset, Long)]
     for ((address, assetMap) <- updatedBalances; (asset, balance) <- assetMap) balances += ((address, asset, balance))
 
     val dataEntries = diff.accountData.toSeq.flatMap {
@@ -52,7 +51,7 @@ object BlockchainUpdateNotifier {
     val DetailedDiff(parentDiff, txsDiffs) = diff
     val parentStateUpdate                  = stateUpdateFromDiff(blockchain, parentDiff)
 
-    val (txsStateUpdates, _) = txsDiffs.foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
+    val (txsStateUpdates, _) = txsDiffs.foldLeft((ListBuffer.empty[StateUpdate], parentDiff)) {
       case ((updates, accDiff), txDiff) =>
         (
           updates += stateUpdateFromDiff(CompositeBlockchain(blockchain, Some(accDiff)), txDiff),
