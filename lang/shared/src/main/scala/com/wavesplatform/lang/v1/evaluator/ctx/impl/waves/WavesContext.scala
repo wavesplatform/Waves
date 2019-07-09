@@ -319,10 +319,10 @@ object WavesContext {
           ))
     }
 
-    val heightCoeval:      Eval[Either[String, CONST_LONG]] = Eval.later(Right(CONST_LONG(env.height)))
-    val accountThisCoeval: Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.senderObject(env.tthis)))
-    val assetThisCoeval:   Eval[Either[String, CaseObj]]    = Eval.later(Right(buildAssetInfo(env.assetInfoById(env.tthis.bytes).get)))
-    val lastBlockCoeval:   Eval[Either[String, CaseObj]]    = Eval.later(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
+    val heightCoeval: Eval[Either[String, CONST_LONG]]   = Eval.later(Right(CONST_LONG(env.height)))
+    val accountThisCoeval: Eval[Either[String, CaseObj]] = Eval.later(Right(Bindings.senderObject(env.tthis)))
+    val assetThisCoeval: Eval[Either[String, CaseObj]]   = Eval.later(Right(buildAssetInfo(env.assetInfoById(env.tthis.bytes).get)))
+    val lastBlockCoeval: Eval[Either[String, CaseObj]]   = Eval.later(Right(Bindings.buildLastBlockInfo(env.lastBlockOpt().get)))
 
     val anyTransactionType =
       UNION(
@@ -331,12 +331,7 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.typeList)
-      NativeFunction("transactionById",
-                     100,
-                     GETTRANSACTIONBYID,
-                     returnType,
-                     "Lookup transaction",
-                     ("id", BYTESTR, "transaction Id")) {
+      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTESTR, "transaction Id")) {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled, version))
           Right(fromOptionCO(maybeDomainTx))
@@ -430,8 +425,8 @@ object WavesContext {
       case _                               => ???
     }
 
-    val sellOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Sell)))
-    val buyOrdTypeCoeval:  Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Buy)))
+    val sellOrdTypeCoeval: Eval[Either[String, CaseObj]] = Eval.always(Right(ordType(OrdType.Sell)))
+    val buyOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Buy)))
 
     val scriptInputType =
       if (isTokenContext)
@@ -443,34 +438,38 @@ object WavesContext {
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
     )
 
-    val txVar   = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+    val txVar = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
 
     lazy val accountThisVar = ("this", ((addressType, "Script address"), LazyVal(EitherT(accountThisCoeval))))
-    lazy val assetThisVar   = ("this", ((assetType,   "Asset info"),     LazyVal(EitherT(assetThisCoeval))))
+    lazy val assetThisVar   = ("this", ((assetType, "Asset info"), LazyVal(EitherT(assetThisCoeval))))
     lazy val thisVar = ds.scriptType match {
       case Account => accountThisVar
       case Asset   => assetThisVar
     }
 
+    val v1vars = Map(txVar)
+    val v2vars = v1vars ++ Map(
+      ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+      ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
+    )
+    val v3vars = {
+      val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
+        ("Sell", ((sellType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+        ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
+        ("lastBlock", ((blockInfo, "Last block info"), LazyVal(EitherT(lastBlockCoeval))))
+      )
+      val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
+      (v3Part1 ++ v3Part2)
+    }
+
     val vars = Map(
-      1 -> Map(txVar),
-      2 -> Map(
-        ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-        ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
-        txVar
-      ),
-      3 -> {
-        val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
-          ("Sell", ((sellType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-          ("Buy", ((buyType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
-          ("lastBlock", ((blockInfo, "Last block info"), LazyVal(EitherT(lastBlockCoeval))))
-        )
-        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
-        (v3Part1 ++ v3Part2)
-      }
+      V1 -> v1vars,
+      V2 -> v2vars,
+      V3 -> v3vars,
+      V4 -> v3vars
     )
 
-    lazy val functions = Array(
+    lazy val commonFunctions = Array(
       txHeightByIdF,
       getIntegerFromStateF,
       getBooleanFromStateF,
@@ -491,36 +490,58 @@ object WavesContext {
       wavesBalanceF
     )
 
-    val types = buildWavesTypes(proofsEnabled, version)
+    lazy val v3Functions: List[BaseFunction] = List(
+      getIntegerFromStateF,
+      getBooleanFromStateF,
+      getBinaryFromStateF,
+      getStringFromStateF,
+      getIntegerFromArrayF,
+      getBooleanFromArrayF,
+      getBinaryFromArrayF,
+      getStringFromArrayF,
+      getIntegerByIndexF,
+      getBooleanByIndexF,
+      getBinaryByIndexF,
+      getStringByIndexF,
+      addressFromStringF
+    ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF, stringFromAddressF)
+
+    lazy val v4Functions: List[BaseFunction] = List.empty[BaseFunction]
+
+    val functions = Map[StdLibVersion, List[BaseFunction]](
+      V1 -> List(txByIdF),
+      V2 -> List(txByIdF),
+      V3 -> v3Functions,
+      V4 -> (v3Functions ++ v4Functions)
+    )
+
+    val commonTypes: List[FINAL] = buildWavesTypes(proofsEnabled, version).toList
+    val v3types: List[CASETYPEREF] = List(
+      writeSetType,
+      paymentType,
+      scriptTransfer,
+      scriptTransferSetType,
+      scriptResultType,
+      invocationType,
+      assetType,
+      blockInfo
+    )
+    val v4types: List[CASETYPEREF] = List.empty[CASETYPEREF]
+
+    val types = Map[StdLibVersion, List[CASETYPEREF]](
+      V1 -> List.empty,
+      V2 -> List.empty,
+      V3 -> v3types,
+      V4 -> (v3types ++ v4types),
+    )
 
     CTX(
-      types ++ (if (version == V3) {
-                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType, assetType, blockInfo)
-                } else List.empty),
-      commonVars ++ vars(version.id),
-      functions ++ (
-        version match {
-          case V1 | V2 => List(txByIdF)
-          case V3 =>
-            List(
-              getIntegerFromStateF,
-              getBooleanFromStateF,
-              getBinaryFromStateF,
-              getStringFromStateF,
-              getIntegerFromArrayF,
-              getBooleanFromArrayF,
-              getBinaryFromArrayF,
-              getStringFromArrayF,
-              getIntegerByIndexF,
-              getBooleanByIndexF,
-              getBinaryByIndexF,
-              getStringByIndexF,
-              addressFromStringF
-            ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF, stringFromAddressF)
-        }
-      )
+      commonTypes ++ types(version),
+      commonVars ++ vars(version),
+      commonFunctions ++ functions(version)
     )
   }
 
   val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)), Some("VerifierInput"))
+
 }
