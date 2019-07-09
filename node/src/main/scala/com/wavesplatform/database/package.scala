@@ -20,8 +20,8 @@ import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
 import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 package object database {
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
@@ -51,7 +51,7 @@ package object database {
   implicit class ByteArrayDataInputExt(val input: ByteArrayDataInput) extends AnyVal {
     def readBigInt(): BigInt = {
       val len = input.readByte()
-      val b   = new Array[Byte](len)
+      val b = new Array[Byte](len)
       input.readFully(b)
       BigInt(b)
     }
@@ -59,7 +59,7 @@ package object database {
     def readScriptOption(): Option[Script] = {
       if (input.readBoolean()) {
         val len = input.readShort()
-        val b   = new Array[Byte](len)
+        val b = new Array[Byte](len)
         input.readFully(b)
         Some(ScriptReader.fromBytes(b).explicitGet())
       } else None
@@ -75,7 +75,8 @@ package object database {
       ByteStr(readBytes(len))
     }
 
-    def readSignature: ByteStr   = readByteStr(SignatureLength)
+    def readSignature: ByteStr = readByteStr(SignatureLength)
+
     def readPublicKey: PublicKey = PublicKey(readBytes(KeyLength))
   }
 
@@ -89,12 +90,12 @@ package object database {
   }
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
-    val b   = ByteBuffer.wrap(d)
+    val b = ByteBuffer.wrap(d)
     val ids = List.newBuilder[ByteStr]
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {
-        case crypto.DigestSize      => new Array[Byte](crypto.DigestSize)
+        case crypto.DigestSize => new Array[Byte](crypto.DigestSize)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
       b.get(buffer)
@@ -109,9 +110,9 @@ package object database {
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
           b.put(id.arr.length match {
-              case crypto.DigestSize      => crypto.DigestSize.toByte
-              case crypto.SignatureLength => crypto.SignatureLength.toByte
-            })
+            case crypto.DigestSize => crypto.DigestSize.toByte
+            case crypto.SignatureLength => crypto.SignatureLength.toByte
+          })
             .put(id.arr)
       }
       .array()
@@ -173,7 +174,7 @@ package object database {
   }
 
   def readTransactionIds(data: Array[Byte]): Seq[(Int, ByteStr)] = Option(data).fold(Seq.empty[(Int, ByteStr)]) { d =>
-    val b   = ByteBuffer.wrap(d)
+    val b = ByteBuffer.wrap(d)
     val ids = Seq.newBuilder[(Int, ByteStr)]
     while (b.hasRemaining) {
       ids += b.get.toInt -> {
@@ -186,7 +187,7 @@ package object database {
   }
 
   def writeTransactionIds(ids: Seq[(Int, ByteStr)]): Array[Byte] = {
-    val size   = ids.foldLeft(0) { case (prev, (_, id)) => prev + 2 + id.arr.length }
+    val size = ids.foldLeft(0) { case (prev, (_, id)) => prev + 2 + id.arr.length }
     val buffer = ByteBuffer.allocate(size)
     for ((typeId, id) <- ids) {
       buffer.put(typeId.toByte).put(id.arr.length.toByte).put(id.arr)
@@ -195,7 +196,7 @@ package object database {
   }
 
   def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
-    val b        = ByteBuffer.wrap(data)
+    val b = ByteBuffer.wrap(data)
     val features = Map.newBuilder[Short, Int]
     while (b.hasRemaining) {
       features += b.getShort -> b.getInt
@@ -224,9 +225,9 @@ package object database {
   }
 
   def readAssetInfo(data: Array[Byte]): AssetInfo = {
-    val ndi     = newDataInput(data)
+    val ndi = newDataInput(data)
     val reissue = ndi.readBoolean()
-    val volume  = ndi.readBigInt()
+    val volume = ndi.readBigInt()
     AssetInfo(reissue, volume)
   }
 
@@ -268,38 +269,38 @@ package object database {
 
     val size = ndi.readInt()
 
-    val version    = ndi.readByte()
-    val timestamp  = ndi.readLong()
-    val reference  = ndi.readSignature
+    val version = ndi.readByte()
+    val timestamp = ndi.readLong()
+    val reference = ndi.readSignature
     val baseTarget = ndi.readLong()
-    val genSig     = ndi.readByteStr(Block.GeneratorSignatureLength)
+    val genSig = ndi.readByteStr(Block.GeneratorSignatureLength)
     val transactionCount = {
       if (version == 1 || version == 2) ndi.readByte()
       else ndi.readInt()
     }
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-    val generator         = ndi.readPublicKey
-    val signature         = ndi.readSignature
+    val featureVotes = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val generator = ndi.readPublicKey
+    val signature = ndi.readSignature
 
     val header = new BlockHeader(timestamp,
-                                 version,
-                                 reference,
-                                 SignerData(generator, signature),
-                                 NxtLikeConsensusBlockData(baseTarget, genSig),
-                                 transactionCount,
-                                 featureVotes)
+      version,
+      reference,
+      SignerData(generator, signature),
+      NxtLikeConsensusBlockData(baseTarget, genSig),
+      transactionCount,
+      featureVotes)
 
     (header, size)
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
-    val ndi          = newDataInput(bs)
-    val height       = Height(ndi.readInt())
+    val ndi = newDataInput(bs)
+    val height = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
 
     (height, List.fill(numSeqLength) {
-      val tp  = ndi.readByte()
+      val tp = ndi.readByte()
       val num = TxNum(ndi.readShort())
       (tp, num)
     })
@@ -307,10 +308,10 @@ package object database {
 
   def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
     val (height, numSeq) = v
-    val numSeqLength     = numSeq.length
+    val numSeqLength = numSeq.length
 
     val outputLength = 4 + 4 + numSeqLength * (4 + 1)
-    val ndo          = newDataOutput(outputLength)
+    val ndo = newDataOutput(outputLength)
 
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
@@ -325,7 +326,7 @@ package object database {
 
   def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = {
     val ndi = newDataInput(bs)
-    val h   = Height(ndi.readInt())
+    val h = Height(ndi.readInt())
     val num = TxNum(ndi.readShort())
 
     (h, num)
@@ -383,16 +384,17 @@ package object database {
     }
 
     //noinspection ScalaStyle
-    def close(): Unit = {
+    def close(successful: Boolean = true): Unit = {
       if (isClosed) return
 
       counter -= 1
-      if (counter == 0) {
-        Option(rw).foreach(rw => db.write(rw.batch))
+      if (counter == 0 || !successful) {
+        if (successful) Option(rw).foreach(rw => db.write(rw.batch))
         Option(snapshotV).foreach(_.close())
         ro = null
         rw = null
         snapshotV = null
+        counter = 0
       }
     }
 
@@ -409,7 +411,7 @@ package object database {
 
     override def incCounter(): Unit = synchronized(super.incCounter())
 
-    override def close(): Unit = synchronized(super.close())
+    override def close(successful: Boolean): Unit = synchronized(super.close(successful))
 
     override def isClosed: Boolean = synchronized(super.isClosed)
   }
@@ -433,18 +435,26 @@ package object database {
 
     def withContext[T](f: LocalDBContext => T): T = {
       val context = openContext()
-      try {
-        f(context)
-      } finally {
-        val err = Try(context.close()).failed
-        if (context.isClosed) tlContexts.remove()
-        err.foreach(throw _)
+      val result = Try(f(context))
+
+      val closeErr = Try(context.close(successful = result.isSuccess)).failed
+      if (context.isClosed) tlContexts.remove()
+
+      result match {
+        case Success(value) =>
+          closeErr.map(new RuntimeException("LevelDB close exception", _)).foreach(throw _)
+          value
+
+        case Failure(exception) =>
+          throw new IOException("LevelDB operation exception", exception)
       }
     }
   }
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
+
     import com.wavesplatform.crypto.DigestSize
+
     def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
       val id = ByteStr(new Array[Byte](length))
       Array.copy(e.getKey, offset, id.arr, 0, length)
@@ -549,4 +559,5 @@ package object database {
       }
     }
   }
+
 }

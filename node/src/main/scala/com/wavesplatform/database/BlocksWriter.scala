@@ -148,45 +148,49 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
     }
 
     val fileTxs = dbContext.readOnlyStream(db =>
-      optimisticRead(0L) { input =>
+      unlockedRead(0L, close = false) { input =>
         var currentOffset = 0L
 
         val sorted = hn.groupBy(_._1).toSeq.sortBy(_._1)
-        sorted.iterator.flatMap {
+        val iterator = sorted.iterator.flatMap {
           case (height, nums) =>
-            val offset = db.get(Keys.blockOffset(height))
+            Try(db.get(Keys.blockOffset(height))) match {
+              case Success(offset) if offset >= currentOffset && offset <= endOffset =>
+                currentOffset += input.skip(offset - currentOffset)
+                val numsSet = nums.map(_._2.toInt).toSet
 
-            if (currentOffset <= endOffset) {
-              currentOffset += input.skip(offset - currentOffset)
-              val numsSet = nums.map(_._2.toInt).toSet
+                def readNums(): Seq[(TxNum, PBSignedTransaction)] = {
+                  val headerSize = input.readInt()
+                  currentOffset += Ints.BYTES + input.skip(headerSize)
 
-              def readNums(): Seq[(TxNum, PBSignedTransaction)] = {
-                val headerSize = input.readInt()
-                currentOffset += Ints.BYTES + input.skip(headerSize)
-
-                val txs     = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
-                val txCount = input.readInt()
-                currentOffset += Ints.BYTES
-
-                for (n <- 0 until txCount) yield {
-                  val txSize = input.readInt()
+                  val txs = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
+                  val txCount = input.readInt()
                   currentOffset += Ints.BYTES
 
-                  if (numsSet.contains(n)) {
-                    val txBytes = new Array[Byte](txSize)
-                    currentOffset += input.read(txBytes)
-                    txs += (TxNum @@ n.toShort -> transaction.PBSignedTransaction.parseFrom(txBytes))
-                  } else {
-                    currentOffset += input.skip(txSize)
+                  for (n <- 0 until txCount) yield {
+                    val txSize = input.readInt()
+                    currentOffset += Ints.BYTES
+
+                    if (numsSet.contains(n)) {
+                      val txBytes = new Array[Byte](txSize)
+                      currentOffset += input.read(txBytes)
+                      txs += (TxNum @@ n.toShort -> transaction.PBSignedTransaction.parseFrom(txBytes))
+                    } else {
+                      currentOffset += input.skip(txSize)
+                    }
                   }
+
+                  txs
                 }
 
-                txs
-              }
+                readNums().map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
 
-              readNums().map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
-            } else Nil
+              case _ =>
+                Nil
+            }
         }
+
+        CloseableIterator(iterator, () => input.close())
     })
 
     fileTxs ++ inMemTxs
