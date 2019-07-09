@@ -252,17 +252,8 @@ class AddressRouteSpec
 
     val invalidRegexps = List("[a-z", "([a-z]{0}", "[a-z]{0", "[a-z]{,5}")
     for (regex <- invalidRegexps) {
-      try {
-        Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-          responseAs[JsArray].value.map { json =>
-            ((json \ "key").as[String], (json \ "value").as[String])
-          }
-        }
-        fail("RegexCompiler didn't throw expected error")
-      } catch {
-        case err: Throwable => if (!err.getMessage.contains("Cannot compile regex")) {
-          throw err
-        }
+      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+        responseAs[String] should include("Cannot compile regex")
       }
     }
   }
