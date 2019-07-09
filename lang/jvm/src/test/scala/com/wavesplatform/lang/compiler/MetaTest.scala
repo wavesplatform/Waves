@@ -5,25 +5,30 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Single}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, RecKeyValue, Single}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, DApp, V3}
+import com.wavesplatform.lang.directives.values.{Account, V3, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
+import com.wavesplatform.lang.v1.compiler.Terms.{FUNC, REF}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+import scala.collection.immutable.{ListMap, Map}
+
+class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with Inside {
   property("meta with union type parameters") {
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(V3, Account, DApp).explicitGet(),
+          DirectiveSet(V3, Account, DAppType).explicitGet(),
           Common.emptyBlockchainEnvironment()
         )
         .compilerContext
@@ -60,32 +65,30 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     val meta = DAppMeta(
       version = 1,
       List(
-        CallableFuncSignature("foo", ByteString.copyFrom(Array[Byte](15, 1, 9, 9, 14, 3))),
-        CallableFuncSignature("bar", ByteString.copyFrom(Array[Byte](5))),
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](15, 1, 9, 9, 14, 3))),
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](5))),
       )
     )
-    val expectedResult = Right(meta)
-    compiler.ContractCompiler(ctx, expr).map(_.meta) shouldBe expectedResult
+    compiler.ContractCompiler(ctx, expr).map(_.meta) shouldBe Right(meta)
 
-    MetaMapper.dicFromProto(meta) shouldBe Right(
-      Dic(Map("callableFuncTypes" ->
-        Chain(List(
-          Dic(Map(
-            "name" -> Single("foo"),
-            "types" -> Chain(List(
-              Single("Boolean|Int|String"),
-              Single("Int"),
-              Single("Int|String"),
-              Single("Int|String"),
-              Single("Boolean|String"),
-              Single("ByteVector|Int")
-            ))
+    val callables = List(
+      CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
+      CallableFunction(CallableAnnotation("invocation"), FUNC("bar", List("a"), REF("")))
+    )
+    val dApp = DApp(meta, Nil, callables, None)
+    MetaMapper.dicFromProto(dApp) shouldBe Right(
+      Dic(Map(
+        "callableFuncTypes" -> Chain(List(
+          Dic(ListMap(
+            "a" -> Single("Boolean|Int|String"),
+            "b" -> Single("Int"),
+            "c" -> Single("Int|String"),
+            "d" -> Single("Int|String"),
+            "e" -> Single("Boolean|String"),
+            "f" -> Single("ByteVector|Int")
           )),
           Dic(Map(
-            "name" -> Single("bar"),
-            "types" -> Chain(List(
-              Single("Boolean|Int")
-            ))
+            "a" -> Single("Boolean|Int")
           ))
         ))
       ))

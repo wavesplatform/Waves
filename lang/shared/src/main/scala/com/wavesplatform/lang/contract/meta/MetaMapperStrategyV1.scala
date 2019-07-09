@@ -1,26 +1,26 @@
 package com.wavesplatform.lang.contract.meta
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.lang.v1.compiler.Types
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, FINAL, LONG, REAL, STRING, UNION}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import cats.implicits._
+import com.wavesplatform.lang.contract.DApp
+
+import scala.collection.immutable.ListMap
 
 private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
-  type FuncArgType = (String, List[FINAL])
-
-  def toProto(funcTypes: List[FuncArgType]): Either[String, DAppMeta] =
+  def toProto(funcTypes: List[List[FINAL]]): Either[String, DAppMeta] =
     funcTypes
-      .traverse { case (funcName, types) => funcToProto(funcName, types) }
+      .traverse(funcToProto)
       .map(DAppMeta(1, _))
 
-  private def funcToProto(funcName: String, types: List[Types.FINAL]): Either[String, CallableFuncSignature] =
+  private def funcToProto(types: List[FINAL]): Either[String, CallableFuncSignature] =
     types
       .traverse(mapType)
       .map(_.toArray)
       .map(ByteString.copyFrom)
-      .map(CallableFuncSignature(funcName, _))
+      .map(CallableFuncSignature(_))
 
   private def mapType(t: FINAL): Either[String, Byte] = {
     val result = t match {
@@ -39,15 +39,12 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
       case argType => Left(s"Unexpected callable func arg type: $argType")
     }
 
-  def fromProto(meta: DAppMeta): Either[String, List[FuncArgType]] =
+  def fromProto(meta: DAppMeta): Either[String, List[List[FINAL]]] =
     meta.funcs.toList.traverse(protoToFunc)
 
-  private def protoToFunc(funcs: CallableFuncSignature): Either[String, FuncArgType] = {
-    val CallableFuncSignature(name, types) = funcs
-    types.toByteArray.toList
+  private def protoToFunc(funcs: CallableFuncSignature): Either[String, List[FINAL]] =
+    funcs.types.toByteArray.toList
       .traverse(buildType)
-      .map((name, _))
-  }
 
   private def buildType(b: Byte): Either[String, FINAL] = {
     if (b > 15 || b < 1) {
@@ -78,15 +75,15 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
     else None
   }
 
-  override def textMap(data: List[FuncArgType]): Dic = {
-    val funcTypesJson = data.map { case (name, types) =>
+  override def textMap(data: List[List[FINAL]], dapp: DApp): Dic = {
+    val argsWithTypes = (data zip dapp.callableFuncs.map(_.u.args))
+      .map { case (types, args) => args zip types }
+
+    val funcTypesJson = argsWithTypes.map(typedArgs =>
       Dic(
-        Map(
-          "name"  -> Single(name),
-          "types" -> Chain(types.map(_.name).map(Single))
-        )
+        ListMap(typedArgs : _*).mapValues(t => Single(t.name))
       )
-    }
+    )
     Dic(Map("callableFuncTypes" -> Chain(funcTypesJson)))
   }
 }

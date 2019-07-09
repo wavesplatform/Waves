@@ -129,7 +129,7 @@ object ContractCompiler {
       callableFuncsWithParams = l.filter(_._1.isInstanceOf[CallableFunction])
       callableFuncs = callableFuncsWithParams.map(_._1.asInstanceOf[CallableFunction])
       callableFuncsTypeInfo = callableFuncsWithParams.map {
-        case (f, typedParams) => (f.u.name, typedParams.map(_._2))
+        case (f, typedParams) => typedParams.map(_._2)
       }
       meta <- MetaMapper.toProto(V1)(callableFuncsTypeInfo)
         .leftMap(Generic(contract.position.start, contract.position.start, _))

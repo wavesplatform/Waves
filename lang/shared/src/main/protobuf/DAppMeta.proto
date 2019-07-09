@@ -8,7 +8,6 @@ message DAppMeta {
     repeated CallableFuncSignature funcs = 2;
 
     message CallableFuncSignature {
-        string name = 1;
-        bytes types = 2;
+        bytes types = 1;
     }
 }

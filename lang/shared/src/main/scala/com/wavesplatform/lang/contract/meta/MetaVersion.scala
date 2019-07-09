@@ -10,6 +10,6 @@ sealed trait MetaVersion {
 
 object V1 extends MetaVersion {
   override type Self = V1.type
-  override type Data = List[(String, List[FINAL])]
+  override type Data = List[List[FINAL]]
   override val strategy = MetaMapperStrategyV1
 }

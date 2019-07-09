@@ -117,21 +117,23 @@ trait BaseGlobal {
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)
 
-  def decompile(compiledCode: String): Either[ScriptParseError, String] = {
-    Script.fromBase64String(compiledCode, checkComplexity = false).right.map { script =>
-      val (scriptText, _) = Script.decompile(script)
-      scriptText
-    }
-  }
+  def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
+    for {
+      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      meta   <- scriptMeta(script)
+    } yield (Script.decompile(script)._1, meta)
 
-  def scriptMeta(code: String): Either[ScriptParseError, Dic] = {
-    val script = Script.fromBase64String(code.trim, checkComplexity = false)
+  def scriptMeta(compiledCode: String): Either[ScriptParseError, Dic] =
+    for {
+      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      meta   <- scriptMeta(script)
+    } yield meta
+
+  def scriptMeta(script: Script): Either[ScriptParseError, Dic] =
     script match {
-      case Right(ContractScriptImpl(_, dApp, _)) => MetaMapper.dicFromProto(dApp.meta).leftMap(ScriptParseError)
-      case Right(_)                              => Right(Dic(Map()))
-      case Left(err)                             => err.asLeft[Dic]
+      case ContractScriptImpl(_, dApp, _) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
+      case _                              => Right(Dic(Map()))
     }
-  }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
 

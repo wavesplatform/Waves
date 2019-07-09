@@ -199,25 +199,16 @@ object JsAPI {
   }
 
   @JSExportTopLevel("decompile")
-  def decompile(input: String): js.Dynamic = {
-    val decompiled = Global.decompile(input).right.map { scriptText =>
-      js.Dynamic.literal("result" -> scriptText)
-    }
-    decompiled.fold(
-      err => js.Dynamic.literal("error" -> err.m),
-      identity
-    )
-  }
-
-  @JSExportTopLevel("nodeVersion")
-  def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
-
-  @JSExportTopLevel("meta")
-  def meta(input: String): js.Dynamic =
-    Global.scriptMeta(input)
+  def decompile(input: String): js.Dynamic =
+    Global.decompile(input)
       .fold(
         err => js.Dynamic.literal("error" -> err.m),
-        metaConverter.foldRoot
+        { case (scriptText, meta) =>
+          jObj(
+            "result" -> scriptText,
+            "meta"   -> metaConverter.foldRoot(meta)
+          )
+        }
       )
 
   lazy val metaConverter: RecKeyValueFolder[Any, js.Object with js.Dynamic] =
@@ -226,4 +217,8 @@ object JsAPI {
       _.toJSArray,
       js.Dynamic.literal.applyDynamic("apply")(_: _*)
     )
+
+  @JSExportTopLevel("nodeVersion")
+  def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
+
 }

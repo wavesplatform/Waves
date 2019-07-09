@@ -66,8 +66,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         DAppMeta(
           version = 1,
           List(
-            CallableFuncSignature("foo", ByteString.copyFrom(Array[Byte](2))),
-            CallableFuncSignature("default", ByteString.EMPTY)
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte](2))),
+            CallableFuncSignature(ByteString.EMPTY)
           )
         ),
         List.empty,
@@ -149,7 +149,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         DAppMeta(
           version = 1,
           List(
-            CallableFuncSignature("default", ByteString.EMPTY)
+            CallableFuncSignature(ByteString.EMPTY)
           )
         ),
         List.empty,

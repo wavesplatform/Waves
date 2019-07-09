@@ -107,9 +107,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       DAppMeta(
         version = 1,
         List(
-          CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](1, 2, 4, 8))),
-          CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](8, 4, 2, 1))),
-          CallableFuncSignature("func3", ByteString.EMPTY)
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 4, 8))),
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](8, 4, 2, 1))),
+          CallableFuncSignature(ByteString.EMPTY)
         )
       ),
       List(
@@ -118,11 +118,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       ),
       List(
         CallableFunction(
-          CallableAnnotation("whoooo"),
-          FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
+          CallableAnnotation("func1"),
+          FUNC("anotherFunc", List("a", "b", "c", "d"), CONST_BOOLEAN(true))
         ),
         CallableFunction(
-          CallableAnnotation("whoooo"),
+          CallableAnnotation("func2"),
+          FUNC("default", List("x", "y", "z", "w"), CONST_BOOLEAN(false))
+        ),
+        CallableFunction(
+          CallableAnnotation("func3"),
           FUNC("default", List(), CONST_BOOLEAN(false))
         )
       ),
@@ -138,9 +142,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       json.toString shouldBe
         """{"callableFuncTypes":[
-          |{"name":"func1","types":["Int","ByteVector","Boolean","String"]},
-          |{"name":"func2","types":["String","Boolean","ByteVector","Int"]},
-          |{"name":"func3","types":[]}
+          |{"a":"Int","b":"ByteVector","c":"Boolean","d":"String"},
+          |{"x":"String","y":"Boolean","z":"ByteVector","w":"Int"},
+          |{}
           |]}
           |"""
           .stripMargin

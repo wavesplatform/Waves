@@ -120,9 +120,9 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
         DAppMeta(
           version = 1,
           List(
-            CallableFuncSignature("func1", ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
-            CallableFuncSignature("func2", ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
-            CallableFuncSignature("func3", ByteString.EMPTY)
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte](0, 1, 2, 3))),
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte](3, 2, 1, 0))),
+            CallableFuncSignature(ByteString.EMPTY)
           )
         ),
         List(
