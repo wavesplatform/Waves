@@ -798,12 +798,11 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
               case None => Nil
             })
 
-        takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
-          .map {
-            case (height, _, txNum) =>
-              val tx = getTransactionByHN(height, txNum)
-              (height, txNum, tx)
-          }
+        val hns = takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
+          .map { case (height, _, txNum) => (height, txNum) }
+          .toVector
+
+        blocksWriter.getTransactionsByHN(hns: _*)
       } else {
         def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
           case None => txNums
@@ -830,6 +829,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     //    }
 
     blocksWriter.getTransactionsByHN(height -> txNum)
+      .toStream
       .headOption
       .map(_._3)
       .getOrElse(throw new NoSuchElementException(s"No transaction at $height/$txNum"))

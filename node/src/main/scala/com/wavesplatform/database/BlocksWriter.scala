@@ -140,24 +140,24 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         (height, num)
       }(v => (v._1, v._2))
 
-  def getTransactionsByHN(hn: (Height, TxNum)*): Seq[(Height, TxNum, Transaction)] = {
+  def getTransactionsByHN(hn: (Height, TxNum)*): CloseableIterator[(Height, TxNum, Transaction)] = {
     val (inMemTxs, endOffset) = locked(_.readLock()) {
       val heightNumSet = hn.toSet
-      (this.transactions.values.collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, tx) }.toVector.sortBy(v => (v._1, v._2)), this.lastOffset)
+      (this.transactions.values.collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, tx) }.toVector.sortBy(v => (v._1, v._2)),
+        this.lastOffset)
     }
 
-    val fileTxs = dbContext.readOnly(db =>
+    val fileTxs = dbContext.readOnlyStream(db =>
       optimisticRead(0L) { input =>
         var currentOffset = 0L
 
         val sorted = hn.groupBy(_._1).toSeq.sortBy(_._1)
-        sorted.flatMap {
+        sorted.iterator.flatMap {
           case (height, nums) =>
             val offset = db.get(Keys.blockOffset(height))
-            require(offset >= currentOffset)
-            currentOffset += input.skip(offset - currentOffset)
 
             if (currentOffset <= endOffset) {
+              currentOffset += input.skip(offset - currentOffset)
               val numsSet = nums.map(_._2.toInt).toSet
 
               def readNums(): Seq[(TxNum, PBSignedTransaction)] = {
@@ -168,7 +168,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
                 val txCount = input.readInt()
                 currentOffset += Ints.BYTES
 
-                for (n <- 1 to txCount) yield {
+                for (n <- 0 until txCount) yield {
                   val txSize = input.readInt()
                   currentOffset += Ints.BYTES
 
@@ -186,7 +186,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
 
               readNums().map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
             } else Nil
-        }.toVector
+        }
       })
 
     fileTxs ++ inMemTxs

@@ -58,7 +58,7 @@ object AssetTransactionsDiff {
           .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
           .getOrElse(Nil)
 
-        val result = burns.collectFirst { case (_, btx: BurnTransaction) if btx.asset == btx.asset => btx }
+        val result = burns.collectFirst { case (_, btx: BurnTransaction) if btx.asset == tx.asset => btx }
         result.isDefined
       }
 

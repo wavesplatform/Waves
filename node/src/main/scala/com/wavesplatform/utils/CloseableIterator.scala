@@ -50,13 +50,16 @@ sealed trait CloseableIterator[+A] extends Iterator[A] with Closeable {
     } finally this.close()
   }
 
-  def ++[NewT >: A](c: => CloseableIterator[NewT]): CloseableIterator[NewT] = {
-    lazy val right = c
+  override def ++[B >: A](that: => GenTraversableOnce[B]): CloseableIterator[B] = {
+    lazy val right = that
 
     CloseableIterator(
       super.++(right), { () =>
         this.close()
-        right.close()
+        right match {
+          case c: Closeable => c.close()
+          case _ => // Ignore
+        }
       }
     )
   }
