@@ -24,7 +24,7 @@ import scala.util.{Failure, Success, Try}
 // TODO: refactor, implement rollback
 private[database] final class BlocksWriter(dbContext: DBContextHolder) extends Closeable with ScorexLogging {
   private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
-  private[this] val flushMinSize: Long = (sys.runtime.maxMemory() / 100) max (1 * 1024 * 1024)
+  private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 20) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
   private[this] val blocks       = TrieMap.empty[Height, Block]
@@ -50,7 +50,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   sys.addShutdownHook(this.close())
 
   private[this] def readBlockFrom(input: DataInputStream, withTxs: Boolean): (Block, Int) = {
-    val headerSize = input.readInt()
+    val headerSize  = input.readInt()
     val headerBytes = new Array[Byte](headerSize)
     input.read(headerBytes)
 
@@ -58,7 +58,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
     val transactions = if (withTxs) {
       val txCount = input.readInt()
       for (_ <- 1 to txCount) yield {
-        val txSize = input.readInt()
+        val txSize  = input.readInt()
         val txBytes = new Array[Byte](txSize)
         input.read(txBytes)
         allTxsSize += Ints.BYTES + txSize
@@ -72,7 +72,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
 
     import com.wavesplatform.common.utils._
     val block = PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet()
-    val size = Ints.BYTES + headerBytes.length + Ints.BYTES + allTxsSize
+    val size  = Ints.BYTES + headerBytes.length + Ints.BYTES + allTxsSize
     (block, size)
   }
 
@@ -98,7 +98,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         def createIter(offset: Long): Iterator[Block] = {
           if (offset <= endOffset) Try(readBlockFrom(input, withTxs = true)) match {
             case Success((block, size)) => Iterator.single(block) ++ createIter(offset + size)
-            case Failure(err) => throw new IOException("Failed to create blocks iterator", err)
+            case Failure(err)           => throw new IOException("Failed to create blocks iterator", err)
           } else Iterator.empty
         }
 
@@ -124,7 +124,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
 
       blocks.remove(h) match {
         case Some(block) => this.transactions --= block.transactionData.map(tx => TransactionId(tx.id()))
-        case None => // Ignore
+        case None        => // Ignore
       }
     }
 
@@ -144,7 +144,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
     val (inMemTxs, endOffset) = locked(_.readLock()) {
       val heightNumSet = hn.toSet
       (this.transactions.values.collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, tx) }.toVector.sortBy(v => (v._1, v._2)),
-        this.lastOffset)
+       this.lastOffset)
     }
 
     val fileTxs = dbContext.readOnlyStream(db =>
@@ -164,7 +164,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
                 val headerSize = input.readInt()
                 currentOffset += Ints.BYTES + input.skip(headerSize)
 
-                val txs = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
+                val txs     = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
                 val txCount = input.readInt()
                 currentOffset += Ints.BYTES
 
@@ -187,7 +187,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
               readNums().map { case (num, tx) => (height, num, PBTransactions.vanilla(tx, unsafe = true).right.get) }
             } else Nil
         }
-      })
+    })
 
     fileTxs ++ inMemTxs
   }
