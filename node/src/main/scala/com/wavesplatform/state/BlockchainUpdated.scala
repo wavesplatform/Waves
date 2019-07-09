@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import cats.syntax.monoid._
+
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -50,8 +52,12 @@ object BlockchainUpdateNotifier {
     val DetailedDiff(parentDiff, txsDiffs) = diff
     val parentStateUpdate                  = stateUpdateFromDiff(blockchain, parentDiff)
 
-    val (txsStateUpdates, _) = txsDiffs.foldLeft((Seq.empty[StateUpdate], CompositeBlockchain(blockchain, Some(parentDiff)))) {
-      case ((updates, bc), txDiff) => (updates :+ stateUpdateFromDiff(bc, txDiff), CompositeBlockchain(bc, Some(txDiff)))
+    val (txsStateUpdates, _) = txsDiffs.foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
+      case ((updates, accDiff), txDiff) =>
+        (
+          updates += stateUpdateFromDiff(CompositeBlockchain(blockchain, Some(accDiff)), txDiff),
+          accDiff.combine(txDiff)
+        )
     }
 
     val txIds = txsDiffs.flatMap(txDiff => txDiff.transactions.keys.toSeq)
