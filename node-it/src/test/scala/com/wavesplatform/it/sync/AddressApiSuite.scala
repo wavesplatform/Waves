@@ -12,7 +12,7 @@ class AddressApiSuite extends BaseTransactionSuite {
 
   test("filter accounts data by regexp") {
     val dataKeys         = List("1aB1cD!@#$", "\"\\", "\u0000qweqwe", "\t\r\n", "reeeee", "rerere", "rerrre", "rre", "eeeee")
-    val regexps          = List("1aB1cD!%40%23%24", "%5Ba-zA-Z0-9!-%2F%3A-%40%5C%5C%5C%5C%5D%7B0%2C15%7D", "%5Cs%7B0%2C%7D", "re%2B", "re*re", "r%3Feeeee")
+    val regexps          = List("1aB1cD!%40%23%24", "%5Ba-zA-Z0-9!-%2F%3A-%40%5C%5C%5C%5C%5D%7B0%2C15%7D", "%5Cs%7B0%2C%7D", "re%2B", "re*re", "r%3Feeeee", "%5B%5Ct%5Cr%5Cn%5D")
     val invalidRegexps   = List("%5Ba-z", "%5Ba-z%5D%7B0", "%5Ba-z%5D%7B%2C5%7D")
     val data             = dataKeys.map(str => StringDataEntry(str, Random.nextString(16)))
     val transferFee      = calcDataFee(data)

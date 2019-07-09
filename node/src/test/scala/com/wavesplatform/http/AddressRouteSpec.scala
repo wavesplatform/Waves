@@ -199,8 +199,8 @@ class AddressRouteSpec
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val dataKeys = List("abc", "aBcD", "ABD",
-      "ab1c", "1aB1cD", "A1BD0", "a110b", "123",
+    val dataKeys = List("abc", "aBcD", "ABD", "ac",
+      "ab1c", "1aB1cD", "A1BD0", "a110b", "123", "reeee",
       " ab", "ab ", "a b\n", "ab1 \n\t", "\n\raB1\t", "\n  \r  \t\t",
       "!#$%&'()*+,", "!#$%&'()<*=>+,", "!", "<!@#qwe>", "\\", "\"\\", "qwe!",
       "\b", "\u0000", "\b\b", "\bqweasd\u0000", "\u0000qweqwe")
@@ -211,8 +211,8 @@ class AddressRouteSpec
         .toMap
 
     val regexps = List(/*"abc", "bca",*/
-      "[a-zA-Z]{1,}", "[a-z0-9]{0,4}", "[a-zA-Z0-9]{1,4}", "[a-z!-/]{2,}", "[!-/:-@]{0,}",
-      "\\w{0,}", "\\d{0,}", "[\\w\\d]{0,}", "\\s{0,}")
+      "[a-zA-Z]{1,}", "[a-z0-9]{0,4}", "[a-zA-Z0-9]{1,4}", "[a-z!-/]{2,}", "[!-/:-@]{0,}", "re*", "re.ee",
+      "\\w{0,}", "\\d{0,}", "[\\w\\d]{0,}", "\\s{0,}", "^1aB1cD$", "(a|b)c")
 
     (blockchain.accountDataKeys _)
       .when(allAccounts(1).toAddress)
