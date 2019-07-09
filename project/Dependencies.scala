@@ -155,22 +155,21 @@ object Dependencies {
   )
 
   private[this] val protoSchemesLib =
-    "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT"
-
+    "com.wavesplatform" % "waves-node-proto" % "1.0.0-SNAPSHOT" classifier ("proto")
   lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       // "com.google.protobuf" % "protobuf-java" % "3.4.0",
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
-      "com.thesamet.scalapb" %% "scalapb-json4s"   % "0.7.0",
-      protoSchemesLib % "protobuf"
+      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0",
+      protoSchemesLib        % "protobuf"
     )
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
+    "io.grpc"              % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
-    protoSchemesLib % "protobuf"
+    protoSchemesLib        % "protobuf"
   )
 }
