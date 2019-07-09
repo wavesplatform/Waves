@@ -9,10 +9,9 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.{Block, BlockHeader, SignerData}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
@@ -281,29 +280,8 @@ package object database {
   def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int) = {
     val ndi = newDataInput(bs)
 
-    val size = ndi.readInt()
-
-    val version    = ndi.readByte()
-    val timestamp  = ndi.readLong()
-    val reference  = ndi.readSignature
-    val baseTarget = ndi.readLong()
-    val genSig     = ndi.readByteStr(Block.GeneratorSignatureLength)
-    val transactionCount = {
-      if (version == 1 || version == 2) ndi.readByte()
-      else ndi.readInt()
-    }
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-    val generator         = ndi.readPublicKey
-    val signature         = ndi.readSignature
-
-    val header = new BlockHeader(timestamp,
-                                 version,
-                                 reference,
-                                 SignerData(generator, signature),
-                                 NxtLikeConsensusBlockData(baseTarget, genSig),
-                                 transactionCount,
-                                 featureVotes)
+    val size   = ndi.readInt()
+    val header = BlockHeader.unsafeParseHeader(bs.drop(4))
 
     (header, size)
   }

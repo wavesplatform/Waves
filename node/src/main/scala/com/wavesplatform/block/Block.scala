@@ -3,6 +3,7 @@ package com.wavesplatform.block
 import java.nio.ByteBuffer
 
 import cats._
+import com.google.common.io.ByteStreams
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.fields.FeaturesBlockField
@@ -47,6 +48,44 @@ class BlockHeader(val timestamp: Long,
 }
 
 object BlockHeader extends ScorexLogging {
+  def unsafeParseHeader(bytes: Array[Byte]): BlockHeader = {
+    val ndi = ByteStreams.newDataInput(bytes)
+
+    val version   = ndi.readByte()
+    val timestamp = ndi.readLong()
+
+    val referenceArr = new Array[Byte](SignatureLength)
+    ndi.readFully(referenceArr)
+
+    val baseTarget = ndi.readLong()
+
+    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    ndi.readFully(genSig)
+
+    val transactionCount = {
+      if (version == 1 || version == 2) ndi.readByte()
+      else ndi.readInt()
+    }
+    val featureVotesCount = ndi.readInt()
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+
+    val generator = new Array[Byte](KeyLength)
+    ndi.readFully(generator)
+
+    val signature = new Array[Byte](SignatureLength)
+    ndi.readFully(signature)
+
+    new BlockHeader(
+      timestamp,
+      version,
+      referenceArr,
+      SignerData(PublicKey(ByteStr(generator)), signature),
+      NxtLikeConsensusBlockData(baseTarget, genSig),
+      transactionCount,
+      featureVotes
+    )
+  }
+
   def parseBytes(bytes: Array[Byte]): Try[(BlockHeader, Array[Byte])] =
     Try {
 

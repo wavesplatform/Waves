@@ -425,6 +425,26 @@ object WavesContext {
       case _                               => ???
     }
 
+    val blockHeaderFromBytesF: BaseFunction =
+      NativeFunction(
+        "blockHeaderFromBytes",
+        100,
+        BLOCKHEADER_FROM_BYTES,
+        UNION.create(UNIT :: blockHeader :: Nil),
+        "parse block header from bytes",
+        ("blockHeaderBytes", BYTESTR, "block header bytes")
+      ) {
+        case CONST_BYTESTR(headerBytes) :: Nil =>
+          val maybeHeaderObj =
+            env
+              .blockHeaderParser(headerBytes)
+              .map(Bindings.blockHeaderObject)
+
+          fromOptionCO(maybeHeaderObj).asRight[String]
+
+        case _ => ???
+      }
+
     val sellOrdTypeCoeval: Eval[Either[String, CaseObj]] = Eval.always(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Eval[Either[String, CaseObj]]  = Eval.always(Right(ordType(OrdType.Buy)))
 
@@ -506,7 +526,9 @@ object WavesContext {
       addressFromStringF
     ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF, stringFromAddressF)
 
-    lazy val v4Functions: List[BaseFunction] = List.empty[BaseFunction]
+    lazy val v4Functions: List[BaseFunction] = List(
+      blockHeaderFromBytesF
+    )
 
     val functions = Map[StdLibVersion, List[BaseFunction]](
       V1 -> List(txByIdF),
@@ -526,7 +548,7 @@ object WavesContext {
       assetType,
       blockInfo
     )
-    val v4types: List[CASETYPEREF] = List.empty[CASETYPEREF]
+    val v4types: List[CASETYPEREF] = List(blockHeader)
 
     val types = Map[StdLibVersion, List[CASETYPEREF]](
       V1 -> List.empty,
