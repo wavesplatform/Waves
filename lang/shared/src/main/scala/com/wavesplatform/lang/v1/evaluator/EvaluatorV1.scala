@@ -27,7 +27,7 @@ object EvaluatorV1 {
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[EVALUATED] = {
     val funcHeader = FunctionHeader.User(func.name)
-    val function   = UserFunction(func.name, 0, null, s"user defined function '${func.name}'", func.args.map(n => (n, null, n)): _*)(func.body)
+    val function   = UserFunction(func.name, 0, null, func.args.map(n => (n, null)): _*)(func.body)
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       result <- local {

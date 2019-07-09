@@ -1,3 +1,5 @@
+package com.wavesplatform.utils
+
 import cats.kernel.Monoid
 import com.github.mustachejava._
 import com.wavesplatform.common.utils.EitherExt2
@@ -10,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.util.{DocSource}
 
 import scala.collection.JavaConverters._
 
@@ -18,7 +21,11 @@ object DocExport {
     if (args.size != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
-      val version = DirectiveDictionary[StdLibVersion].idMap(args(1).toInt)
+      val versionStr  = args(1)
+      val docTemplate = args(2)
+      val outputFile  = args(3)
+
+      val version = DirectiveDictionary[StdLibVersion].idMap(versionStr.toInt)
       val wavesContext = WavesContext.build(
         DirectiveSet(version, Account, DApp).explicitGet(),
         new Environment {
@@ -76,7 +83,7 @@ object DocExport {
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 
       case class VarDoc(name: String, `type`: TypeDoc, doc: String)
-      def getVarsDoc() = fullContext.vars.map(v => VarDoc(v._1, typeRepr(v._2._1._1)(), v._2._1._2))
+      def getVarsDoc() = fullContext.vars.map(v => VarDoc(v._1, typeRepr(v._2._1)(), DocSource.getVar(v._1).doc))
 
       case class FuncDoc(name: String, `type`: TypeDoc, doc: String, params: java.util.List[VarDoc], cost: String)
 
@@ -90,19 +97,21 @@ object DocExport {
         case t                                => new TypeDoc { val name: String = t.toString; override val isComplex: Boolean = true }
       }
 
-      def getFunctionnsDoc() =
+      def getFunctionsDoc() =
         fullContext.functions
           .map(
-            f =>
+            f => {
+              val data = DocSource.getFunc(f.name, f.signature.args.map(_._2.toString).toList)
               FuncDoc(
                 f.name,
                 extType(f.signature.result),
-                f.docString,
-                ((f.argsDoc zip f.signature.args) map { arg =>
-                  VarDoc(arg._1._1, extType(arg._2._2), arg._1._2)
-                }).toList.asJava,
+                data.doc,
+                ((f.args, f.signature.args, data.paramsDoc).zipped.toList
+                  map { arg => VarDoc(arg._1, extType(arg._2._2), arg._3)}
+                ).asJava,
                 f.costByLibVersion(version).toString
-            ))
+              )
+            })
 
       case class TransactionDoc(name: String, fields: java.util.List[TransactionField])
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
@@ -162,8 +171,8 @@ object DocExport {
                      specials: java.util.List[Special])
 
       val mf      = new DefaultMustacheFactory()
-      val doc     = mf.compile(args(2))
-      val output  = new java.io.FileWriter(args(3)) //new java.io.StringWriter
+      val doc     = mf.compile(docTemplate)
+      val output  = new java.io.FileWriter(outputFile) //new java.io.StringWriter
       val (t, f)  = transactionDocs(transactionsType)
       val commons = transactionDocs(transactionsType, commonFields)
       val transactionClasses = Seq(
@@ -177,7 +186,7 @@ object DocExport {
         Doc(
           getTypes().asJava,
           getVarsDoc().toList.asJava,
-          getFunctionnsDoc().toList.asJava,
+          getFunctionsDoc().toList.asJava,
           t.asJava,
           f.asJava,
           CaseDoc(commons._1.asJava, commons._2.asJava),

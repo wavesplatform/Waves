@@ -25,7 +25,7 @@ object CompilerContext {
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  type VariableTypes = Map[String, (FINAL, String)]
+  type VariableTypes = Map[String, FINAL]
   type FunctionTypes = Map[String, List[FunctionTypeSignature]]
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)
@@ -38,6 +38,6 @@ object CompilerContext {
   }
 
   val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> 'predefTypes
-  val vars: Lens[CompilerContext, VariableTypes]             = lens[CompilerContext] >> 'varDefs
-  val functions: Lens[CompilerContext, FunctionTypes]        = lens[CompilerContext] >> 'functionDefs
+  val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> 'varDefs
+  val functions: Lens[CompilerContext, FunctionTypes]  = lens[CompilerContext] >> 'functionDefs
 }

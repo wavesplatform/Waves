@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import com.wavesplatform.util.DocSource
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -103,21 +104,24 @@ object JsAPI {
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).vars
-      .map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1._1), "doc" -> v._2._1._2))
+      .map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1), "doc" -> DocSource.getVar(v._1).doc))
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
-      .map(f =>
+      .map(f => {
+        val funcSource = DocSource.getFunc(f.name, f.args.toList)
         js.Dynamic.literal(
-          "name"       -> f.name,
-          "doc"        -> f.docString,
+          "name" -> f.name,
+          "doc" -> funcSource.doc,
           "resultType" -> typeRepr(f.signature.result),
-          "args" -> ((f.argsDoc zip f.signature.args) map { arg =>
-            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._1._2)
-          }).toJSArray
-      ))
+          "args" -> (f.args, f.signature.args, funcSource.paramsDoc).zipped.toList
+            .map { arg =>
+              js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
+            }.toJSArray
+        )
+      })
       .toJSArray
 
   @JSExportTopLevel("contractLimits")
