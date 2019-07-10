@@ -43,20 +43,17 @@ object Tasks {
         .values
         .reduce((d1, d2) => DocSourceData(d1.vars ::: d2.vars, d1.funcs ::: d2.funcs))
 
-      (bySingleName(vars), byNameAndParams(funcs))
+      (
+        toMapChecked(vars, (v: VarSourceData) => v.name),
+        toMapChecked(funcs, (f: FuncSourceData) => (f.name, f.params))
+      )
     }
 
-    def bySingleName(vars: List[VarSourceData]): Map[String, VarSourceData] =
-      vars
-        .groupBy(_.name)
-        .ensuring(_.forall { case (_, v) => v.size == 1 }, "Duplicate var detected")
-        .mapValues(_.head)
-
-    def byNameAndParams(funcs: List[FuncSourceData]): Map[(String, List[String]), FuncSourceData] =
-      funcs
+    def toMapChecked[K, V](list: List[V], key: V => K): Map[K, V] =
+      list
         .distinct
-        .groupBy(f => (f.name, f.params))
-        .ensuring(_.forall { case (_, v) => if (v.size == 1) true else { println(v); false } }, "Duplicate func detected")
+        .groupBy(key)
+        .ensuring(_.forall { case (_, v) => if (v.size == 1) true else { println(v); false } }, "Duplicate detected")
         .mapValues(_.head)
 
     val (varData, funcData) = readDocData()
@@ -83,12 +80,7 @@ object Tasks {
 
     val rawDocFile = sourceManaged.value / "com" / "wavesplatform" / "DocSource.scala"
 
-    IO.write(
-      rawDocFile,
-      sourceStr
-    )
+    IO.write(rawDocFile, sourceStr)
     Seq(rawDocFile)
   }
-
-
 }

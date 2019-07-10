@@ -101,7 +101,7 @@ object DocExport {
         fullContext.functions
           .map(
             f => {
-              val (funcDoc, paramsDoc) = DocSource.funcData(f.name, f.signature.args.map(_._2.toString).toList)
+              val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList))
               FuncDoc(
                 f.name,
                 extType(f.signature.result),
