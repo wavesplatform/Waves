@@ -48,7 +48,29 @@ class BlockHeader(val timestamp: Long,
 }
 
 object BlockHeader extends ScorexLogging {
-  def unsafeParseHeader(bytes: Array[Byte]): BlockHeader = {
+  def writeHeaderOnly(bh: BlockHeader): Array[Byte] = {
+    val ndo = ByteStreams.newDataOutput()
+
+    ndo.writeByte(bh.version)
+    ndo.writeLong(bh.timestamp)
+    ndo.write(bh.reference)
+    ndo.writeLong(bh.consensusData.baseTarget)
+    ndo.write(bh.consensusData.generationSignature)
+
+    if (bh.version == 1 | bh.version == 2)
+      ndo.writeByte(bh.transactionCount)
+    else
+      ndo.writeInt(bh.transactionCount)
+
+    ndo.writeInt(bh.featureVotes.size)
+    bh.featureVotes.foreach(s => ndo.writeShort(s))
+    ndo.write(bh.signerData.generator)
+    ndo.write(bh.signerData.signature)
+
+    ndo.toByteArray
+  }
+
+  def readHeaderOnly(bytes: Array[Byte]): BlockHeader = {
     val ndi = ByteStreams.newDataInput(bytes)
 
     val version   = ndi.readByte()

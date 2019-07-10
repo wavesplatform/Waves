@@ -120,6 +120,7 @@ object CommonValidation {
         case V1 | V2 if sc.containsBlockV2.value => ab
         case V1 | V2                             => Right(tx)
         case V3                                  => ab
+        case V4                                  => activationBarrier(BlockchainFeatures.DummyFeature)
       }
 
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {

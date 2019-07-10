@@ -15,7 +15,6 @@ object Types {
       "timestamp"                      -> LONG,
       "version"                        -> LONG,
       "reference"                      -> BYTESTR,
-      "reference"                      -> BYTESTR,
       "generator"                      -> BYTESTR,
       "generatorPublicKey"             -> BYTESTR,
       "signature"                      -> BYTESTR,

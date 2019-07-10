@@ -129,7 +129,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
 
   override def blockHeaderParser(bytes: Array[Byte]): Option[domain.BlockHeader] =
     Try {
-      val header = BlockHeader.unsafeParseHeader(bytes)
+      val header = BlockHeader.readHeaderOnly(bytes)
 
       domain.BlockHeader(
         header.timestamp,

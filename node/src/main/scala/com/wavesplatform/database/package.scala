@@ -257,22 +257,7 @@ package object database {
     val ndo = newDataOutput()
 
     ndo.writeInt(size)
-
-    ndo.writeByte(bh.version)
-    ndo.writeLong(bh.timestamp)
-    ndo.writeByteStr(bh.reference)
-    ndo.writeLong(bh.consensusData.baseTarget)
-    ndo.writeByteStr(bh.consensusData.generationSignature)
-
-    if (bh.version == 1 | bh.version == 2)
-      ndo.writeByte(bh.transactionCount)
-    else
-      ndo.writeInt(bh.transactionCount)
-
-    ndo.writeInt(bh.featureVotes.size)
-    bh.featureVotes.foreach(s => ndo.writeShort(s))
-    ndo.write(bh.signerData.generator)
-    ndo.writeByteStr(bh.signerData.signature)
+    ndo.write(BlockHeader.writeHeaderOnly(bh))
 
     ndo.toByteArray
   }
@@ -281,7 +266,7 @@ package object database {
     val ndi = newDataInput(bs)
 
     val size   = ndi.readInt()
-    val header = BlockHeader.unsafeParseHeader(bs.drop(4))
+    val header = BlockHeader.readHeaderOnly(bs.drop(4))
 
     (header, size)
   }
