@@ -13,7 +13,7 @@ package object db extends ScorexLogging {
     val options = new Options()
       .createIfMissing(true)
       .paranoidChecks(true)
-      .compressionType(CompressionType.NONE)
+      .compressionType(CompressionType.SNAPPY)
 
     if (recreate) {
       LevelDBFactory.factory.destroy(file, options)
