@@ -1,5 +1,7 @@
 package com.wavesplatform.api.common
-import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist, CustomValidationError}
+
+import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr

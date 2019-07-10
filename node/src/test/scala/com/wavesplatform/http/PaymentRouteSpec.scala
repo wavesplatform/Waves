@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.{ApiKeyNotValid, PaymentApiRoute}
+import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.PaymentApiRoute
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
