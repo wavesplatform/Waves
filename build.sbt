@@ -150,9 +150,10 @@ packageAll := Def
   .sequential(
     root / cleanAll,
     Def.task {
-      (node /  assembly).value
+      (node / assembly).value
       (node / Debian / packageBin).value
-    (`grpc-server` /Universal / packageZipTarball).value
+      (`grpc-server` / Universal / packageZipTarball).value
+      (`grpc-server` / Debian / packageBin).value
     }
   )
   .value

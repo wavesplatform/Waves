@@ -22,7 +22,7 @@ target
 
 # local settings
 localsettings.json
-local.conf
+*local.conf
 waves_logback.xml
 
 # Text files
