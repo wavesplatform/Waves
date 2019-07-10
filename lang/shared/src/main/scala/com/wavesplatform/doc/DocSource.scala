@@ -1,4 +1,4 @@
-package com.wavesplatform.util
+package com.wavesplatform.doc
 
 import java.io.File
 
@@ -6,13 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
-object DocSource {
-  private lazy val filename = "lang/doc-data.json"
-
-  private lazy val mapper = new ObjectMapper() with ScalaObjectMapper
+class DocSource(filename: String) {
+  private val mapper = new ObjectMapper() with ScalaObjectMapper
   mapper.registerModule(DefaultScalaModule)
 
-  private lazy val (varData, funcData) = readDocData()
+  private val (varData, funcData) = readDocData()
 
   private def readDocData(): (Map[String, VarSourceData], Map[(String, List[String]), FuncSourceData]) = {
     val DocSourceData(vars, funcs) = mapper.readValue[Map[String, DocSourceData]](new File(filename))

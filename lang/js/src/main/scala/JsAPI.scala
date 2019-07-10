@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.util.DocSource
+import com.wavesplatform.doc.{DocSource, DocSourceFactory}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -101,17 +101,19 @@ object JsAPI {
       .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v)))
       .toJSArray
 
+  private val docSource = DocSourceFactory.instance
+
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).vars
-      .map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1), "doc" -> DocSource.getVar(v._1).doc))
+      .map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1), "doc" -> docSource.getVar(v._1).doc))
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
       .map(f => {
-        val funcSource = DocSource.getFunc(f.name, f.args.toList)
+        val funcSource = docSource.getFunc(f.name, f.args.toList)
         js.Dynamic.literal(
           "name" -> f.name,
           "doc" -> funcSource.doc,

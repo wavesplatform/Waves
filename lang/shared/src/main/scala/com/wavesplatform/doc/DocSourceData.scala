@@ -1,4 +1,4 @@
-package com.wavesplatform.util
+package com.wavesplatform.doc
 
 case class DocSourceData(vars: List[VarSourceData], funcs: List[FuncSourceData])
 
