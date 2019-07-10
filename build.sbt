@@ -6,6 +6,11 @@
    2. You've checked "Make project before run"
  */
 
+import java.io.File
+
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -50,6 +55,60 @@ lazy val versionSourceTask = (path: String) => Def.task {
 
 lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += versionSourceTask(path)))
 
+lazy val docSourceTask = Def.task {
+  val mapper = new ObjectMapper() with ScalaObjectMapper
+  mapper.registerModule(DefaultScalaModule)
+
+  def readDocData(): (Map[String, VarSourceData], Map[(String, List[String]), FuncSourceData]) = {
+    val DocSourceData(vars, funcs) = mapper.readValue[Map[String, DocSourceData]](new File("lang/doc-data.json"))
+      .values
+      .reduce((d1, d2) => DocSourceData(d1.vars ::: d2.vars, d1.funcs ::: d2.funcs))
+
+    (bySingleName(vars), byNameAndParams(funcs))
+  }
+
+  def bySingleName(vars: List[VarSourceData]): Map[String, VarSourceData] =
+    vars
+      .groupBy(_.name)
+      .ensuring(_.forall { case (_, v) => v.size == 1 }, "Duplicate var detected")
+      .mapValues(_.head)
+
+  def byNameAndParams(funcs: List[FuncSourceData]): Map[(String, List[String]), FuncSourceData] =
+    funcs
+      .distinct
+      .groupBy(f => (f.name, f.params))
+      .ensuring(_.forall { case (_, v) => if (v.size == 1) true else { println(v); false } }, "Duplicate func detected")
+      .mapValues(_.head)
+
+  val (varData, funcData) = readDocData()
+
+  val varDataStr = varData
+    .map { case (k, v) => s"""	"$k" -> "${v.doc}"""" }
+    .mkString("Map(\n", ",\n", "\n)")
+
+  val funcDataStr = funcData
+    .map { case (k, v) => s"""	("${v.name}", ${v.params.map("\"" + _ + "\"").mkString("List(", ", ", ")")}) -> ("${v.doc}", ${v.paramsDoc.map("\"" + _ + "\"").mkString("List(", ", ", ")")})""" }
+    .mkString("Map(\n", ",\n", "\n)")
+
+  val sourceStr =
+    s"""
+       | package com.wavesplatform
+       |
+       | object DocSource {
+       |   val varData  = $varDataStr
+       |   val funcData = $funcDataStr
+       | }
+     """.stripMargin
+
+  val rawDocFile = sourceManaged.value / "com" / "wavesplatform" / "DocSource.scala"
+
+  IO.write(
+    rawDocFile,
+    sourceStr
+  )
+  Seq(rawDocFile)
+}
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
@@ -60,7 +119,8 @@ lazy val lang =
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
+      resolvers += Resolver.sbtPluginRepo("releases"),
+      inConfig(Compile)(Seq(sourceGenerators += docSourceTask))
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 

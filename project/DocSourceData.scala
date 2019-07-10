@@ -1,5 +1,3 @@
-package com.wavesplatform.doc
-
 case class DocSourceData(vars: List[VarSourceData], funcs: List[FuncSourceData])
 
 case class VarSourceData(name: String, doc: String)

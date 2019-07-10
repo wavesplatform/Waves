@@ -3,6 +3,7 @@ package com.wavesplatform.utils
 import cats.kernel.Monoid
 import com.github.mustachejava._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.DocSource
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
@@ -12,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.doc.DocSourceFactory
 
 import scala.collection.JavaConverters._
 
@@ -82,10 +82,8 @@ object DocExport {
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 
-      val docSource = DocSourceFactory.instance
-
       case class VarDoc(name: String, `type`: TypeDoc, doc: String)
-      def getVarsDoc() = fullContext.vars.map(v => VarDoc(v._1, typeRepr(v._2._1)(), docSource.getVar(v._1).doc))
+      def getVarsDoc() = fullContext.vars.map(v => VarDoc(v._1, typeRepr(v._2._1)(), DocSource.varData(v._1)))
 
       case class FuncDoc(name: String, `type`: TypeDoc, doc: String, params: java.util.List[VarDoc], cost: String)
 
@@ -103,12 +101,12 @@ object DocExport {
         fullContext.functions
           .map(
             f => {
-              val data = docSource.getFunc(f.name, f.signature.args.map(_._2.toString).toList)
+              val (funcDoc, paramsDoc) = DocSource.funcData(f.name, f.signature.args.map(_._2.toString).toList)
               FuncDoc(
                 f.name,
                 extType(f.signature.result),
-                data.doc,
-                ((f.args, f.signature.args, data.paramsDoc).zipped.toList
+                funcDoc,
+                ((f.args, f.signature.args, paramsDoc).zipped.toList
                   map { arg => VarDoc(arg._1, extType(arg._2._2), arg._3)}
                 ).asJava,
                 f.costByLibVersion(version).toString
