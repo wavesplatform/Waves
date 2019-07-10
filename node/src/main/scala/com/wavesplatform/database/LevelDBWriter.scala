@@ -626,6 +626,30 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     asset
   }
 
+  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
+    val txId = TransactionId(id)
+
+    for {
+      (height, num) <- db.get(Keys.transactionHNById(txId))
+      txBytes       <- db.get(Keys.transactionBytesAt(height, num))
+      result <- {
+        val isTransfer = Try {
+          txBytes.head == TransferTransaction.typeId ||
+          txBytes(1) == TransferTransaction.typeId
+        }.getOrElse(false)
+
+        if (isTransfer)
+          TransactionParsers
+            .parseBytes(txBytes)
+            .collect {
+              case ttx: TransferTransaction => (height, ttx)
+            }
+            .toOption
+        else None
+      }
+    } yield result
+  }
+
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
