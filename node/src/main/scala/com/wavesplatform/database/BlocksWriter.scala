@@ -252,6 +252,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         this.transactions --= txsToRemove
     }
     log.warn("Flushing blocks3")
+    System.gc()
   }
 
   def close(): Unit = synchronized {
