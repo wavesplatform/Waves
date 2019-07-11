@@ -41,6 +41,11 @@ pipeline {
                 }
             }
         }
+        stage('Docker cleanup') {
+            steps {
+                sh "docker system prune -af --volumes"
+            }
+        }
     }
     post {
         always {
