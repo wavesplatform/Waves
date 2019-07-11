@@ -86,7 +86,7 @@ object DocExport {
       def getVarsDoc() = fullContext.vars.map(v => VarDoc(
         v._1,
         typeRepr(v._2._1)(),
-        DocSource.varData(v._1, version.value.asInstanceOf[Int])
+        DocSource.varData((v._1, version.value.asInstanceOf[Int]))
       ))
 
       case class FuncDoc(name: String, `type`: TypeDoc, doc: String, params: java.util.List[VarDoc], cost: String)
