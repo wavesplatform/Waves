@@ -5,10 +5,12 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils._
 import com.wavesplatform.protobuf
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.transaction
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, VanillaTransaction}
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.{Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
@@ -27,19 +29,20 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   private[this] val flushMinSize: Long = (sys.runtime.maxMemory() / 50) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
-  private[this] val blocks       = TrieMap.empty[Height, Block]
-  private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, Transaction)]
+  private[this] val blocks = TrieMap.empty[Height, PBBlock]
+  private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, PBSignedTransaction)]
 
   private[this] val rwLock = new ReentrantReadWriteLock()
-  @volatile private[this] var lastOffset = Try(dbContext.readOnly { db =>
-    val h = db.get(Keys.height)
-    db.get(Keys.blockOffset(h))
-  }).getOrElse(0L)
-  private[this] var closed = false
 
-  @noinline
-  private[this] def calculateFlushableBlocksSize(): Long =
-    blocks.valuesIterator.map(_.bytes().length.toLong).sum
+  @volatile
+  private[this] var lastOffset =
+    Try(dbContext.readOnly { db =>
+      val h = db.get(Keys.height)
+      db.get(Keys.blockOffset(h))
+    }).getOrElse(0L)
+
+  @volatile
+  private[this] var closed = false
 
   // Init
   scheduler.scheduleWithFixedDelay(flushDelay, flushDelay) {
@@ -50,7 +53,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   }
   sys.addShutdownHook(this.close())
 
-  private[this] def readBlockFrom(input: DataInputStream, withTxs: Boolean): (Block, Int) = {
+  private[this] def readBlockFrom(input: DataInputStream, withTxs: Boolean): (PBBlock, Int) = {
     val headerSize  = input.readInt()
     val headerBytes = new Array[Byte](headerSize)
     input.read(headerBytes)
@@ -71,21 +74,23 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
       .parseFrom(headerBytes)
       .withTransactions(transactions)
 
-    import com.wavesplatform.common.utils._
-    val block = PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet()
-    val size  = Ints.BYTES + headerBytes.length + Ints.BYTES + allTxsSize
-    (block, size)
+    val size = Ints.BYTES + headerBytes.length + Ints.BYTES + allTxsSize
+    (protoBlock, size)
   }
 
-  private[this] def readBlockAt(offset: Long, withTxs: Boolean): (Block, Int) = {
+  private[this] def readBlockAt(offset: Long, withTxs: Boolean): (PBBlock, Int) = {
     optimisticRead(offset)(readBlockFrom(_, withTxs))
   }
 
   def writeBlock(height: Height, block: Block): Unit = {
     // No lock
     require(!closed, "Already closed")
-    for ((tx, num) <- block.transactionData.zipWithIndex) transactions(TransactionId(tx.id())) = (height, TxNum @@ num.toShort, tx)
-    blocks(height) = block
+
+    val protoBlock = PBBlocks.protobuf(block)
+    for (((tx, vtx), num) <- protoBlock.transactions.zip(block.transactionData).zipWithIndex)
+      transactions(TransactionId(vtx.id())) = (height, TxNum @@ num.toShort, tx)
+
+    blocks(height) = protoBlock
   }
 
   // Not really safe
@@ -96,7 +101,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
       }
 
       unlockedRead(startOffset, close = false) { input =>
-        def createIter(offset: Long): Iterator[Block] = {
+        def createIter(offset: Long): Iterator[PBBlock] = {
           if (offset <= endOffset) Try(readBlockFrom(input, withTxs = true)) match {
             case Success((block, size)) => Iterator.single(block) ++ createIter(offset + size)
             case Failure(err)           => throw new IOException("Failed to create blocks iterator", err)
@@ -106,7 +111,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         CloseableIterator(
           createIter(startOffset) ++ inMemBlocks,
           () => input.close()
-        )
+        ).map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
       }
 
     case Failure(_) =>
@@ -123,15 +128,16 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         rw.delete(Keys.blockOffset(h))
       }
 
-      blocks.remove(h) match {
-        case Some(block) => this.transactions --= block.transactionData.map(tx => TransactionId(tx.id()))
-        case None        => // Ignore
-      }
+      blocks.remove(h)
+      transactions --= transactions.filter(_._2._1 == h).keys
     }
 
   // TODO: Get block raw bytes etc
-  def getBlock(height: Height, withTxs: Boolean = false): Block =
-    blocks.getOrElse(height, readBlockAt(dbContext.db.get(Keys.blockOffset(height)), withTxs)._1)
+  def getBlock(height: Height, withTxs: Boolean = false): Block = {
+    val protoBlock = blocks
+      .getOrElse(height, readBlockAt(dbContext.db.get(Keys.blockOffset(height)), withTxs)._1)
+    PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet()
+  }
 
   def getTransactionHN(id: TransactionId): (Height, TxNum) = // No lock
     transactions
@@ -144,7 +150,10 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   def getTransactionsByHN(hn: (Height, TxNum)*): CloseableIterator[(Height, TxNum, Transaction)] = {
     val (inMemTxs, endOffset) = locked(_.readLock()) {
       val heightNumSet = hn.toSet
-      (this.transactions.values.collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, tx) }.toVector.sortBy(v => (v._1, v._2)),
+      (this.transactions.values
+        .collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, toTransaction(tx)) }
+        .toVector
+        .sortBy(v => (v._1, v._2)),
        this.lastOffset)
     }
 
@@ -198,20 +207,20 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   }
 
   def getTransaction(id: TransactionId): (Height, TxNum, Transaction) =
-    transactions.getOrElse(
-      id, {
+    transactions
+      .get(id)
+      .map { case (h, n, tx) => (h, n, toTransaction(tx)) }
+      .getOrElse {
         val optimisticOffset = Try(dbContext.db.get(Keys.transactionOffset(id)))
         optimisticRead(optimisticOffset.get._1) { input =>
           val txSize  = input.readInt()
           val txBytes = new Array[Byte](txSize)
           input.read(txBytes)
 
-          import com.wavesplatform.common.utils._
           val (_, height, num) = optimisticOffset.getOrElse(dbContext.db.get(Keys.transactionOffset(id)))
-          (height, num, PBTransactions.vanilla(transaction.PBSignedTransaction.parseFrom(txBytes), unsafe = true).explicitGet())
+          (height, num, toTransaction(txBytes))
         }
       }
-    )
 
   @noinline
   private[this] def flushBlocks(): Unit = {
@@ -226,18 +235,20 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         val txsToRemove    = new ArrayBuffer[TransactionId]()
 
         dbContext.readWrite(rw =>
-          for ((height, block) <- blocks.toSeq.sortBy(_._1); headerBytes = PBBlocks.protobuf(block.copy(transactionData = Nil)).toByteArray) {
+          for ((height, protoBlock) <- blocks.toSeq.sortBy(_._1)) {
             this.lastOffset = currentOffset
 
+            val headerBytes = PBUtils.encodeDeterministic(protoBlock.withTransactions(Nil))
             output.writeInt(headerBytes.length)
             output.write(headerBytes)
             rw.put(Keys.blockOffset(height), currentOffset)
             currentOffset += Ints.BYTES + headerBytes.length
 
-            output.writeInt(block.transactionData.length)
+            val transactions = protoBlock.transactions
+            output.writeInt(transactions.length)
             currentOffset += Ints.BYTES
-            for ((tx, num) <- block.transactionData.zipWithIndex; txBytes = PBTransactions.protobuf(tx).toByteArray;
-                 transactionId = TransactionId(tx.id())) {
+            for ((tx, num) <- transactions.zipWithIndex; vtx <- PBTransactions.vanilla(tx, unsafe = true); txBytes = PBUtils.encodeDeterministic(tx);
+                 transactionId = TransactionId(vtx.id())) {
               output.writeInt(txBytes.length)
               output.write(txBytes)
               /* if (tx.isInstanceOf[TransferTransaction]) */
@@ -327,4 +338,16 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
       unlockedRead(offsetV)(f)
     } catch { case NonFatal(_) => lockedRead(offset)(f) }
   }
+
+  @inline
+  private[this] def calculateFlushableBlocksSize(): Long =
+    blocks.valuesIterator.map(_.serializedSize.toLong).sum
+
+  private[this] def toTransaction(tx: PBSignedTransaction): VanillaTransaction = {
+    import com.wavesplatform.common.utils._
+    PBTransactions.vanilla(tx, unsafe = true).explicitGet()
+  }
+
+  private[this] def toTransaction(tx: Array[Byte]): VanillaTransaction =
+    toTransaction(PBSignedTransaction.parseFrom(tx))
 }
