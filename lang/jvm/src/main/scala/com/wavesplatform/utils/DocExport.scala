@@ -83,7 +83,11 @@ object DocExport {
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 
       case class VarDoc(name: String, `type`: TypeDoc, doc: String)
-      def getVarsDoc() = fullContext.vars.map(v => VarDoc(v._1, typeRepr(v._2._1)(), DocSource.varData(v._1)))
+      def getVarsDoc() = fullContext.vars.map(v => VarDoc(
+        v._1,
+        typeRepr(v._2._1)(),
+        DocSource.varData(v._1, version.value.asInstanceOf[Int])
+      ))
 
       case class FuncDoc(name: String, `type`: TypeDoc, doc: String, params: java.util.List[VarDoc], cost: String)
 
@@ -101,7 +105,11 @@ object DocExport {
         fullContext.functions
           .map(
             f => {
-              val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList))
+              val (funcDoc, paramsDoc) = DocSource.funcData((
+                f.name,
+                f.signature.args.map(_._2.toString).toList,
+                version.value.asInstanceOf[Int]
+              ))
               FuncDoc(
                 f.name,
                 extType(f.signature.result),

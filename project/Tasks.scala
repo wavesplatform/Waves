@@ -38,11 +38,8 @@ object Tasks {
     val mapper = new ObjectMapper() with ScalaObjectMapper
     mapper.registerModule(DefaultScalaModule)
 
-    def readDocData(): (Map[String, VarSourceData], Map[(String, List[String]), FuncSourceData]) = {
-      val DocSourceData(vars, funcs) = mapper.readValue[Map[String, DocSourceData]](new File("lang/doc-data.json"))
-        .values
-        .reduce((d1, d2) => DocSourceData(d1.vars ::: d2.vars, d1.funcs ::: d2.funcs))
-
+    def readDocData(ver: Int): (Map[String, VarSourceData], Map[(String, List[String]), FuncSourceData]) = {
+      val DocSourceData(vars, funcs) = mapper.readValue[DocSourceData](new File(s"lang/doc-data-v$ver.json"))
       (
         toMapChecked(vars, (v: VarSourceData) => v.name),
         toMapChecked(funcs, (f: FuncSourceData) => (f.name, f.params))
@@ -56,27 +53,41 @@ object Tasks {
         .ensuring(_.forall { case (_, v) => if (v.size == 1) true else { println(v); false } }, "Duplicate detected")
         .mapValues(_.head)
 
-    val (varData, funcData) = readDocData()
-
-    val varDataStr = varData
-      .map { case (k, v) => s"""	("$k", "${v.doc}")""" }
-      .mkString("Map(\n", ",\n", "\n)")
-
     def listStr(l: List[String]) = l.map("\"" + _ + "\"").mkString("List(", ", ", ")")
 
-    val funcDataStr = funcData
-      .map { case (k, v) => s"""	(("${v.name}", ${listStr(v.params)}), ("${v.doc}", ${listStr(v.paramsDoc)}))""" }
-      .mkString("Map(\n", ",\n", "\n)")
+    val (varData, funcData) =
+      Seq(1, 2, 3)
+        .map { ver =>
+          val (varData, funcData) = readDocData(ver)
+
+          val varDataStr = varData
+            .map { case (k, v) => s"""	(("$k", $ver), "${v.doc}")""" }
+            .mkString("Map(\n", ",\n", "\n)")
+
+          val funcDataStr = funcData
+            .map { case (k, v) => s"""	(("${v.name}", ${listStr(v.params)}, $ver), ("${v.doc}", ${listStr(v.paramsDoc)}))""" }
+            .mkString("Map(\n", ",\n", "\n)")
+
+          (varDataStr, funcDataStr)
+        }
+        .reduce { (a, b) =>
+          val (v1, f1) = a
+          val (v2, f2) = b
+          (
+            v1 + " ++ " + v2,
+            f1 + " ++ " + f2,
+          )
+        }
 
     val sourceStr =
       s"""
          | package com.wavesplatform
          |
          | object DocSource {
-         |   val varData  = $varDataStr
-         |   val funcData = $funcDataStr
+         |   val varData  = $varData
+         |   val funcData = $funcData
          | }
-     """.stripMargin
+      """.stripMargin
 
     val rawDocFile = sourceManaged.value / "com" / "wavesplatform" / "DocSource.scala"
 

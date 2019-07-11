@@ -19,18 +19,18 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
         val cryptoCtx = CryptoContext.build(Global, v)
         val wavesCtx = WavesContext.build(directives(v).explicitGet(), Common.emptyBlockchainEnvironment())
         val pureCtx = PureContext.build(Global, v)
-        cryptoCtx |+| wavesCtx |+| pureCtx
+        (cryptoCtx |+| wavesCtx |+| pureCtx, v)
       })
-      .flatMap(ctx => {
+      .flatMap { case (ctx, ver) =>
         val vars = ctx.vars.keys
-          .map(DocSource.varData.get)
+          .map(k => DocSource.varData.get((k, ver.value.asInstanceOf[Int])))
 
         val funcs = ctx.functions
           .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
-          .map(DocSource.funcData.get)
+          .map(k => DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])))
 
         vars ++ funcs
-      })
+      }
       .toList
       .sequence shouldBe defined
   }
