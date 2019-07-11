@@ -266,7 +266,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         removed
     }
     log.warn("Flushing blocks3")
-    System.gc()
+    // System.gc()
 
     log.info(f"${removed.toDouble / 1024 / 1024}%.2f Mb of blocks flushed")
     val size = calculateFlushableBlocksSize()
