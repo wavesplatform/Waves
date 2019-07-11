@@ -3,16 +3,8 @@ name := "grpc-server"
 libraryDependencies ++= Dependencies.grpc
 
 inConfig(Compile)(Seq(
-  PB.unpackDependencies := {
-    val deps = PB.unpackDependencies.value
-    val waves = PB.externalIncludePath.value / "waves"
-    val grpc = PB.externalIncludePath.value / "waves" / "grpc"
-    val targetGrpc = target.value / "protobuf" / "waves" / "grpc"
-    IO.move(grpc, targetGrpc)
-    // IO.delete(waves)
-    deps.copy(files = deps.files.filter(_.exists()))
-  },
-  PB.protoSources += target.value / "protobuf",
+  PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
+  includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.endsWith("waves/node/grpc")),
   PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
 ))
 

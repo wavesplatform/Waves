@@ -18,15 +18,8 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
-    PB.unpackDependencies := {
-      val deps = PB.unpackDependencies.value
-      val waves = PB.externalIncludePath.value / "waves"
-      val targetWaves = target.value / "protobuf" / "waves"
-      IO.move(waves, targetWaves)
-      IO.delete(targetWaves / "grpc")
-      deps.copy(files = deps.files.filter(_.exists()))
-    },
-    PB.protoSources += target.value / "protobuf",
+    PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
+    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.endsWith("waves/node")),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
