@@ -17,7 +17,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
-import com.wavesplatform.utils.CloseableIterator
+import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
 import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
 import scala.util.control.NonFatal
@@ -343,7 +343,7 @@ package object database {
     ndo.toByteArray
   }
 
-  private[database] class LocalDBContext(val db: DB) {
+  private[database] class LocalDBContext(val db: DB) extends ScorexLogging {
     private[this] var counter = 0
     private[this] var snapshotV: Snapshot = _
     private[this] var rw: RW = _
@@ -400,6 +400,13 @@ package object database {
 
     def isClosed: Boolean =
       counter <= 0
+
+    //noinspection ScalaStyle
+    override def finalize(): Unit = {
+      this.close(false)
+      log.warn(s"DB context leaked: ${Integer.toHexString(System.identityHashCode(this))}")
+      super.finalize()
+    }
   }
 
   private[database] class SynchronizedDBContext(db: DB) extends LocalDBContext(db) {
