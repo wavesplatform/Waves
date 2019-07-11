@@ -37,11 +37,12 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   }).getOrElse(0L)
   private[this] var closed = false
 
+  @noinline
+  private[this] def calculateFlushableBlocksSize(): Long =
+    blocks.valuesIterator.map(_.bytes().length.toLong).sum
+
   // Init
   scheduler.scheduleWithFixedDelay(flushDelay, flushDelay) {
-    @noinline
-    def calculateFlushableBlocksSize(): Long =
-      blocks.valuesIterator.map(_.bytes().length.toLong).sum
 
     val blocksSize = calculateFlushableBlocksSize()
     // log.info(s"Blocks size is ${blocksSize / 1024 / 1024} mb")
@@ -216,7 +217,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   private[this] def flushBlocks(): Unit = {
     log.warn("Flushing blocks1")
 
-    lockedWrite {
+    val removed = lockedWrite {
       case (offset, output) =>
         var currentOffset = offset
         log.warn("Flushing blocks2")
@@ -248,11 +249,17 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
             // log.info(s"block at $height is $block, offset is $offset")
         })
 
+        val removed = calculateFlushableBlocksSize()
         this.blocks --= blocksToRemove
         this.transactions --= txsToRemove
+        removed
     }
     log.warn("Flushing blocks3")
     System.gc()
+
+    log.info(f"${removed.toDouble / 1024 / 1024}%.2f Mb of blocks flushed")
+    val size = calculateFlushableBlocksSize()
+    if (size > 0) log.warn(f"${size.toDouble / 1024 / 1024}%.2f MB of blocks retained after flush")
   }
 
   def close(): Unit = synchronized {

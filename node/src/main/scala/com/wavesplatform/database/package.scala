@@ -343,6 +343,7 @@ package object database {
     ndo.toByteArray
   }
 
+  //noinspection ScalaStyle
   private[database] class LocalDBContext(val db: DB) extends ScorexLogging {
     private[this] var counter = 0
     private[this] var snapshotV: Snapshot = _
@@ -383,7 +384,6 @@ package object database {
       counter += 1
     }
 
-    //noinspection ScalaStyle
     def close(successful: Boolean = true): Unit = {
       if (isClosed) return
 
@@ -401,10 +401,11 @@ package object database {
     def isClosed: Boolean =
       counter <= 0
 
-    //noinspection ScalaStyle
     override def finalize(): Unit = {
-      this.close(false)
-      log.warn(s"DB context leaked: ${Integer.toHexString(System.identityHashCode(this))}")
+      if (!this.isClosed) {
+        this.close(false)
+        log.warn(s"DB context leaked: ${Integer.toHexString(System.identityHashCode(this))}")
+      }
       super.finalize()
     }
   }
