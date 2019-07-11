@@ -26,7 +26,7 @@ import scala.util.{Failure, Success, Try}
 // TODO: refactor, implement rollback
 private[database] final class BlocksWriter(dbContext: DBContextHolder) extends Closeable with ScorexLogging {
   private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
-  private[this] val flushMinSize: Long = (sys.runtime.maxMemory() / 50) max (1 * 1024 * 1024)
+  private[this] val flushMinSize: Long = (sys.runtime.maxMemory() / 20) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
   private[this] val blocks = TrieMap.empty[Height, PBBlock]
@@ -334,7 +334,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   private[this] def optimisticRead[T](offset: => Long)(f: DataInputStream => T): T = {
     try {
       val offsetV = offset
-      require(offsetV < this.lastOffset)
+      require(offsetV <= this.lastOffset)
       unlockedRead(offsetV)(f)
     } catch { case NonFatal(_) => lockedRead(offset)(f) }
   }
