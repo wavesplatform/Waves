@@ -71,6 +71,14 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       .id
 
     secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 1L)
+
+    secondNode.transfer(secondNode.address, firstAddress, 1, 1.waves / 1000, Some(nftIssueTxId), None, waitForTx = true)
+
+    secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 0L)
+    secondNode.assertAssetBalance(firstAddress, nftIssueTxId, 1L)
+
+    secondNode.nftAssetsBalance(firstAddress, 10).map(id => id.assetId).size shouldBe 1
+    secondNode.nftAssetsBalance(secondNode.address, 10).map(id => id.assetId).size shouldBe 0
   }
 
   test("Can't issue reissuable NFT") {
