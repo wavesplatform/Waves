@@ -314,10 +314,21 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   @noinline
   private[this] def unlockedRead[T](offset: Long, close: Boolean = true)(f: DataInputStream => T): T = {
     val fs = fileChannelRead()
-    fs.skip(offset).ensuring(_ == offset)
-    val ds = new DataInputStream(fs)
-    try f(ds)
-    finally if (close) ds.close()
+    val result = Try {
+      fs.skip(offset).ensuring(_ == offset)
+      val ds = new DataInputStream(fs)
+      (ds, f(ds))
+    }
+
+    if (result.isFailure || close) result match {
+      case Success((ds, _)) =>
+        ds.close()
+
+      case Failure(_) =>
+        fs.close()
+    }
+
+    result.map(_._2).get
   }
 
   @noinline
