@@ -62,11 +62,11 @@ trait Blockchain {
                           fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]] = {
     def createTransactionsList(): Seq[(Height, Transaction)] = concurrent.blocking {
       addressTransactions(address, TransactionParsers.forTypeSet(types), None)
-        .take(count)
         .closeAfter(_.toVector)
         .reverse
         .dropWhile(v => fromId.nonEmpty && !fromId.contains(v._2.id()))
         .dropWhile(v => fromId.contains(v._2.id()))
+        .take(count)
     }
 
     fromId match {
