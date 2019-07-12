@@ -11,6 +11,7 @@ import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.transaction
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, VanillaTransaction}
 import com.wavesplatform.protobuf.utils.PBUtils
+import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.{Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
@@ -24,7 +25,8 @@ import scala.util.{Failure, Success, Try}
 
 //noinspection ScalaStyle
 // TODO: refactor, implement rollback
-private[database] final class BlocksWriter(dbContext: DBContextHolder) extends Closeable with ScorexLogging {
+private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSettings: DBSettings) extends Closeable with ScorexLogging {
+  private[this] val blocksFilePath             = new File(s"${dbSettings.directory}/blocks")
   private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
   private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 100) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
@@ -116,7 +118,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
         }
 
       case Failure(_) =>
-       CloseableIterator.fromIterator(inMemBlocks.iterator)
+        CloseableIterator.fromIterator(inMemBlocks.iterator)
     }
 
     protoBlocks.map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
@@ -302,13 +304,12 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   }
 
   private[this] def fileChannelWrite() = {
-    new FileOutputStream("blocks", true)
+    new FileOutputStream(blocksFilePath, true)
   }
 
   private[this] def fileChannelRead() = {
-    val f = new File("blocks")
-    if (!f.exists()) f.createNewFile()
-    new FileInputStream(f)
+    if (!blocksFilePath.exists()) blocksFilePath.createNewFile()
+    new FileInputStream(blocksFilePath)
   }
 
   @noinline

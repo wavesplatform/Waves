@@ -27,7 +27,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   val dbSettings: DBSettings
   protected val writableDB: DB
   protected val dbContext: DBContextHolder = writableDB.createContext()
-  protected val blocksWriter = new BlocksWriter(dbContext)
+  protected val blocksWriter = new BlocksWriter(dbContext, dbSettings)
 
   @volatile
   private var current: (Int, BigInt, Option[Block]) = dbContext.readOnly(_ => (loadHeight(), loadScore(), loadLastBlock()))
