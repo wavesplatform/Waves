@@ -26,10 +26,10 @@ import scala.util.{Failure, Success, Try}
 // TODO: refactor, implement rollback
 private[database] final class BlocksWriter(dbContext: DBContextHolder) extends Closeable with ScorexLogging {
   private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
-  private[this] val flushMinSize: Long = (sys.runtime.maxMemory() / 100) max (1 * 1024 * 1024)
+  private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 100) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
-  private[this] val blocks = TrieMap.empty[Height, PBBlock]
+  private[this] val blocks       = TrieMap.empty[Height, PBBlock]
   private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, PBSignedTransaction)]
 
   private[this] val rwLock = new ReentrantReadWriteLock()
@@ -151,9 +151,9 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
     val (inMemTxs, endOffset) = locked(_.readLock()) {
       val heightNumSet = hn.toSet
       (this.transactions.values
-        .collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, toTransaction(tx)) }
-        .toVector
-        .sortBy(v => (v._1, v._2)),
+         .collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, toTransaction(tx)) }
+         .toVector
+         .sortBy(v => (v._1, v._2)),
        this.lastOffset)
     }
 
@@ -173,7 +173,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
                   val headerSize = input.readInt()
                   currentOffset += Ints.BYTES + input.skip(headerSize)
 
-                  val txs = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
+                  val txs     = new ArrayBuffer[(TxNum, PBSignedTransaction)](numsSet.size)
                   val txCount = input.readInt()
                   currentOffset += Ints.BYTES
 
