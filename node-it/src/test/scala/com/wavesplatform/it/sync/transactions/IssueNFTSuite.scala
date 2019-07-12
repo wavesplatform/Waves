@@ -74,6 +74,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
     secondNode.transfer(secondNode.address, firstAddress, 1, 1.waves / 1000, Some(nftIssueTxId), None, waitForTx = true)
 
+    //check balances after transfer
     secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 0L)
     secondNode.assertAssetBalance(firstAddress, nftIssueTxId, 1L)
 
