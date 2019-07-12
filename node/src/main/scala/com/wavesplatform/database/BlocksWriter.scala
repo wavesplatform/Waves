@@ -101,7 +101,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
       (this.blocks.toVector.sortBy(_._1).map(_._2), this.lastOffset)
     }
 
-    val protoBlocks = Try(dbContext.db.get(Keys.blockOffset(1))) match {
+    val protoBlocks = Try(dbContext.readOnly(_.get(Keys.blockOffset(1)))) match {
       case Success(startOffset) =>
         unlockedRead(startOffset, close = false) { input =>
           def createIter(offset: Long): Iterator[PBBlock] = {
@@ -141,7 +141,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
   // TODO: Get block raw bytes etc
   def getBlock(height: Height, withTxs: Boolean = false): Block = {
     val protoBlock = blocks
-      .getOrElse(height, readBlockAt(dbContext.db.get(Keys.blockOffset(height)), withTxs)._1)
+      .getOrElse(height, readBlockAt(dbContext.readOnly(_.get(Keys.blockOffset(height))), withTxs)._1)
     PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet()
   }
 
@@ -149,7 +149,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
     transactions
       .get(id)
       .fold {
-        val (_, height, num) = optimisticRead(0)(_ => dbContext.db.get(Keys.transactionOffset(id)))
+        val (_, height, num) = optimisticRead(0)(_ => dbContext.readOnly(_.get(Keys.transactionOffset(id))))
         (height, num)
       }(v => (v._1, v._2))
 
@@ -217,13 +217,13 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
       .get(id)
       .map { case (h, n, tx) => (h, n, toTransaction(tx)) }
       .getOrElse {
-        val optimisticOffset = Try(dbContext.db.get(Keys.transactionOffset(id)))
+        val optimisticOffset = Try(dbContext.readOnly(_.get(Keys.transactionOffset(id))))
         optimisticRead(optimisticOffset.get._1) { input =>
           val txSize  = input.readInt()
           val txBytes = new Array[Byte](txSize)
           input.read(txBytes)
 
-          val (_, height, num) = optimisticOffset.getOrElse(dbContext.db.get(Keys.transactionOffset(id)))
+          val (_, height, num) = optimisticOffset.getOrElse(dbContext.readOnly(_.get(Keys.transactionOffset(id))))
           (height, num, toTransaction(txBytes))
         }
       }
