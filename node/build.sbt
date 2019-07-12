@@ -19,7 +19,7 @@ coverageExcludedPackages := ""
 inConfig(Compile)(
   Seq(
     PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
-    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.endsWith("waves/node")),
+    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.endsWith("waves")),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
