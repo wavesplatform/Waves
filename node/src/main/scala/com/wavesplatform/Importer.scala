@@ -75,7 +75,7 @@ object Importer extends ScorexLogging {
                 if (s2 == len) {
                   if (blocksToSkip > 0) {
                     blocksToSkip -= 1
-                    if (blocksToSkip % 100000 == 0) log.info(s"Skipped $blocksToSkip blocks")
+                    if (blocksToSkip > 0 && blocksToSkip % 100000 == 0) log.info(s"Skipping $blocksToSkip blocks")
                   } else {
                     val Right(block) =
                       if (format == Formats.Binary) Block.parseBytes(buffer).toEither

@@ -5,6 +5,7 @@ import java.io.IOException
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
+import scala.ref.WeakReference
 import scala.util.{Failure, Success, Try}
 
 //noinspection ScalaStyle
@@ -51,15 +52,26 @@ private[database] class LocalDBContext(val db: DB) extends ScorexLogging {
   def close(successful: Boolean = true): Unit = {
     if (isClosed) return
 
+    var error = Option.empty[Throwable]
+    def tryDo(f: => Unit): Unit = {
+      val t = Try(f)
+      if (t.isFailure && error.isEmpty) error = Some(t.failed.get)
+    }
+
     counter -= 1
     if (counter == 0 || !successful) {
-      if (successful) Option(rw).foreach(rw => db.write(rw.batch))
-      Option(snapshotV).foreach(_.close())
+      if (successful) Option(rw).foreach { rw =>
+        tryDo(db.write(rw.batch))
+        tryDo(rw.batch.close())
+      }
+      tryDo(Option(snapshotV).foreach(_.close()))
       ro = null
       rw = null
       snapshotV = null
       counter = 0
     }
+
+    error.foreach(throw _)
   }
 
   def isClosed: Boolean =
@@ -70,6 +82,7 @@ private[database] class LocalDBContext(val db: DB) extends ScorexLogging {
       this.close(false)
       log.warn(s"DB context leaked: ${Integer.toHexString(System.identityHashCode(this))}")
     }
+    if (snapshotV != null) log.warn("Snapshot leaked")
     super.finalize()
   }
 }
@@ -89,15 +102,16 @@ private[database] class SynchronizedDBContext(db: DB) extends LocalDBContext(db)
 }
 
 private[database] final class DBContextHolder(val db: DB) {
-  private[this] val tlContexts = new ThreadLocal[LocalDBContext]
+  private[this] val tlContexts = new ThreadLocal[WeakReference[LocalDBContext]]
 
   def openContext(): LocalDBContext = {
-    val context = Option(tlContexts.get()) match {
+    val context = Option(tlContexts.get()).flatMap(_.get) match {
       case Some(localContext) =>
         localContext
+
       case None =>
         val context = new LocalDBContext(db)
-        tlContexts.set(context)
+        tlContexts.set(WeakReference(context))
         context
     }
 
