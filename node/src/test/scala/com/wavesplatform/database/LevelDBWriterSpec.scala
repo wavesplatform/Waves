@@ -4,14 +4,14 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.WithDBSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -25,7 +25,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.util.Random
 
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with WithDBSettings with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)

@@ -10,7 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.WithDBSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.BlockWithMaxBaseTargetTest.Env
@@ -33,7 +33,7 @@ import org.scalatest.{FreeSpec, Matchers, PrivateMethodTester}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with PrivateMethodTester with DBCacheSettings {
+class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with PrivateMethodTester with WithDBSettings {
 
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {

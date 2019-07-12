@@ -79,8 +79,8 @@ package object state {
 
     CloseableIterator
       .seq(
-        withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
-        b.addressTransactions(address, types, fromId)
+        b.addressTransactions(address, types, fromId),
+        withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2))
       )
   }
 

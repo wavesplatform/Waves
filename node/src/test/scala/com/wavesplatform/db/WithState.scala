@@ -14,12 +14,12 @@ import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.subjects.Subject
 import org.scalatest.Suite
 
-trait WithState extends DBCacheSettings {
+trait WithState extends WithDBSettings {
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
   protected def withState[A](fs: FunctionalitySettings)(f: LevelDBWriter => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)
-    try f(new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings))
+    try f(new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings.copy(directory = path.toAbsolutePath.toString)))
     finally {
       db.close()
       TestHelpers.deleteRecursively(path)

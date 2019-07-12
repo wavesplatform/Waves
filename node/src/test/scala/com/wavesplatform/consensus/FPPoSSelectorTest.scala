@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.WithDBSettings
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
@@ -22,7 +22,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.concurrent.duration._
 import scala.util.Random
 
-class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
+class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with WithDBSettings {
 
   import FPPoSSelectorTest._
 

@@ -304,11 +304,18 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
   }
 
   private[this] def fileChannelWrite() = {
+    if (!blocksFilePath.exists()) {
+      blocksFilePath.getAbsoluteFile.getParentFile.mkdirs()
+      blocksFilePath.createNewFile()
+    }
     new FileOutputStream(blocksFilePath, true)
   }
 
   private[this] def fileChannelRead() = {
-    if (!blocksFilePath.exists()) blocksFilePath.createNewFile()
+    if (!blocksFilePath.exists()) {
+      blocksFilePath.getAbsoluteFile.getParentFile.mkdirs()
+      blocksFilePath.createNewFile()
+    }
     new FileInputStream(blocksFilePath)
   }
 

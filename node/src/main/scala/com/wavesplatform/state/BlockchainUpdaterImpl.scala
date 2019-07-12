@@ -487,7 +487,7 @@ with Closeable {
       val fromNg = ngState
         .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { ng =>
           ng.bestLiquidDiff
-            .reverseIterator(_.transactions)
+            .iterator(_.transactions)
             .map {
               case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
             }

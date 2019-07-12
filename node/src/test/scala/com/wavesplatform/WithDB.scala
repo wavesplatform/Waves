@@ -13,7 +13,7 @@ import org.scalatest.{BeforeAndAfterEach, TestSuite}
 trait WithDB extends BeforeAndAfterEach {
   this: TestSuite =>
 
-  private val path                  = Files.createTempDirectory("lvl").toAbsolutePath
+  protected val dbPath              = Files.createTempDirectory("lvl").toAbsolutePath
   private var currentDBInstance: DB = _
 
   def db: DB = currentDBInstance
@@ -21,7 +21,7 @@ trait WithDB extends BeforeAndAfterEach {
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
 
   override def beforeEach(): Unit = {
-    currentDBInstance = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
+    currentDBInstance = LevelDBFactory.factory.open(dbPath.toFile, new Options().createIfMissing(true))
     super.beforeEach()
   }
 
@@ -30,6 +30,6 @@ trait WithDB extends BeforeAndAfterEach {
       super.afterEach()
       db.close()
     } finally {
-      TestHelpers.deleteRecursively(path)
+      TestHelpers.deleteRecursively(dbPath)
     }
 }

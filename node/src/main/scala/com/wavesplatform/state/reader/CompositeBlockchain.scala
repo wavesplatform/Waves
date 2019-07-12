@@ -109,7 +109,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff],
     val fromDiff = maybeDiff
       .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { diff =>
         diff
-          .reverseIterator(_.transactions)
+          .iterator(_.transactions)
           .map {
             case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
           }
