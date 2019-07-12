@@ -357,11 +357,16 @@ package object database {
     def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = {
       val ctx = new SynchronizedDBContext(ch.db)
       ctx.incCounter()
-      val iterator = f(ctx.readOnlyDB())
-      CloseableIterator(iterator, { () =>
-        iterator.close()
-        ctx.close()
-      })
+      try {
+        val iterator = f(ctx.readOnlyDB())
+        CloseableIterator(iterator, { () =>
+          iterator.close()
+          ctx.close()
+        })
+      } catch { case NonFatal(exc) =>
+        ctx.close(successful = false)
+        throw exc
+      }
     }
 
     def readOnly[A](f: ReadOnlyDB => A): A =

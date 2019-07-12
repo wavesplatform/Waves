@@ -23,8 +23,8 @@ object Dependencies {
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
+  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect", "1.2.0")
   private val catsCore   = catsModule("core")
@@ -95,7 +95,7 @@ object Dependencies {
       machinist.exclude("org.scala-js", "scalajs-library_2.12"),
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
-      "ch.obermuhlner" % "big-math" % "2.1.0",
+      "ch.obermuhlner"       % "big-math" % "2.1.0",
       "org.scorexfoundation" %% "scrypto" % "2.0.4",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")

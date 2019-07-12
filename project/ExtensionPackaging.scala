@@ -40,6 +40,10 @@ object ExtensionPackaging extends AutoPlugin {
       } else Seq.empty
     },
     classpath := makeRelativeClasspathNames(classpathOrdering.value),
+    libraryDependencies ++= Seq(
+      // Dependencies.logback % Runtime,
+      Dependencies.janino  % Runtime,
+    )
   )
 
   private def makeRelativeClasspathNames(mappings: Seq[(File, String)]): Seq[String] =
