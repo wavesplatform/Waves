@@ -156,76 +156,11 @@ object Keys {
   def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, addressId, height), readStrings, writeStrings)
 
-//  val BlockHeaderPrefix: Short = 50
-//
-//  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int)]] =
-//    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
-//
-//  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
-//    Key.opt(
-//      "block-header-bytes-at-height",
-//      h(BlockHeaderPrefix, height),
-//      _.drop(4),
-//      _ => throw new Exception("Key \"block-header-bytes-at-height\" - is read only!")
-//    )
-//
-//  val TransactionInfoPrefix: Short = 51
-//  def transactionAt(height: Height, n: TxNum): Key[Option[Transaction]] =
-//    Key.opt[Transaction](
-//      "nth-transaction-info-at-height",
-//      hNum(TransactionInfoPrefix, height, n),
-//      data => TransactionParsers.parseBytes(data).get,
-//      _.bytes()
-//    )
-//
-//  def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =
-//    Key.opt(
-//      "nth-transaction-info-bytes-at-height",
-//      hNum(TransactionInfoPrefix, height, n),
-//      identity,
-//      identity
-//    )
-//
-val AddressTransactionSeqNrPrefix: Short = 52
-
-  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
-    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, AddressId.toBytes(addressId))
-
-  val AddressTransactionHNPrefix: Short = 53
-
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
-    Key.opt(
-      "address-transaction-height-type-and-nums",
-      hBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
-      readTransactionHNSeqAndType,
-      writeTransactionHNSeqAndType
-    )
-//
-//  val TransactionHeightNumByIdPrefix: Short = 54
-//  def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
-//    Key.opt(
-//      "transaction-height-and-nums-by-id",
-//      bytes(TransactionHeightNumByIdPrefix, txId.arr),
-//      readTransactionHN,
-//      writeTransactionHN
-//    )
-
-  val BlockTransactionsFeePrefix: Short = 55
-  def blockTransactionsFee(height: Int): Key[Long] =
-    Key(
-      "block-transactions-fee",
-      h(BlockTransactionsFeePrefix, height),
-      Longs.fromByteArray,
-      Longs.toByteArray
-    )
-
-  val InvokeScriptResultPrefix: Short = 56
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
-    Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
-
+  val BlockOffsetPrefix: Short = 50
   def blockOffset(height: Int): Key[Long] =
-    Key("block-offset", h(132, height), Longs.fromByteArray, Longs.toByteArray)
+    Key("block-offset", h(BlockOffsetPrefix, height), Longs.fromByteArray, Longs.toByteArray)
 
+  val TxOffsetPrefix: Short = 51
   def transactionOffset(id: TransactionId): Key[(Long, Height, TxNum)] = {
     def read(bs: Array[Byte]): (Long, Height, TxNum) = {
       val bb = ByteBuffer.wrap(bs)
@@ -242,9 +177,34 @@ val AddressTransactionSeqNrPrefix: Short = 52
       bb.putShort(txNum)
       bb.array()
     }
-    Key("transaction-offset", bytes(123, id), read, write _ tupled)
+    Key("transaction-offset", bytes(TxOffsetPrefix, id), read, write _ tupled)
   }
 
-  //  def transactionIdByHN(height: Height, txNum: TxNum): Key[TransactionId] =
-  //    Key("transaction-hn-by-id", hNum(123, height, txNum), bs => TransactionId @@ ByteStr(bs), (_: TransactionId).arr)
+val AddressTransactionSeqNrPrefix: Short = 52
+
+  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
+    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, AddressId.toBytes(addressId))
+
+  val AddressTransactionHNPrefix: Short = 53
+
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
+    Key.opt(
+      "address-transaction-height-type-and-nums",
+      hBytes(AddressTransactionHNPrefix, AddressId.toBytes(addressId), seqNr),
+      readTransactionHNSeqAndType,
+      writeTransactionHNSeqAndType
+    )
+
+  val BlockTransactionsFeePrefix: Short = 55
+  def blockTransactionsFee(height: Int): Key[Long] =
+    Key(
+      "block-transactions-fee",
+      h(BlockTransactionsFeePrefix, height),
+      Longs.fromByteArray,
+      Longs.toByteArray
+    )
+
+  val InvokeScriptResultPrefix: Short = 56
+  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
+    Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 }

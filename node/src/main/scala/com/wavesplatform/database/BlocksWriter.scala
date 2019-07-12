@@ -94,28 +94,32 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder) extends C
   }
 
   // Not really safe
-  def blocksIterator(): CloseableIterator[Block] = Try(dbContext.db.get(Keys.blockOffset(1))) match {
-    case Success(startOffset) =>
-      val (inMemBlocks, endOffset) = locked(_.readLock()) {
-        (this.blocks.toVector.sortBy(_._1).map(_._2), this.lastOffset)
-      }
+  def blocksIterator(): CloseableIterator[Block] = {
+    val (inMemBlocks, endOffset) = locked(_.readLock()) {
+      (this.blocks.toVector.sortBy(_._1).map(_._2), this.lastOffset)
+    }
 
-      unlockedRead(startOffset, close = false) { input =>
-        def createIter(offset: Long): Iterator[PBBlock] = {
-          if (offset <= endOffset) Try(readBlockFrom(input, withTxs = true)) match {
-            case Success((block, size)) => Iterator.single(block) ++ createIter(offset + size)
-            case Failure(err)           => throw new IOException("Failed to create blocks iterator", err)
-          } else Iterator.empty
+    val protoBlocks = Try(dbContext.db.get(Keys.blockOffset(1))) match {
+      case Success(startOffset) =>
+        unlockedRead(startOffset, close = false) { input =>
+          def createIter(offset: Long): Iterator[PBBlock] = {
+            if (offset <= endOffset) Try(readBlockFrom(input, withTxs = true)) match {
+              case Success((block, size)) => Iterator.single(block) ++ createIter(offset + size)
+              case Failure(err)           => throw new IOException("Failed to create blocks iterator", err)
+            } else Iterator.empty
+          }
+
+          CloseableIterator(
+            createIter(startOffset) ++ inMemBlocks,
+            () => input.close()
+          )
         }
 
-        CloseableIterator(
-          createIter(startOffset) ++ inMemBlocks,
-          () => input.close()
-        ).map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
-      }
+      case Failure(_) =>
+       CloseableIterator.fromIterator(inMemBlocks.iterator)
+    }
 
-    case Failure(_) =>
-      Iterator.empty
+    protoBlocks.map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
   }
 
   def deleteBlock(h: Height): Unit =

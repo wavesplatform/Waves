@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Alias
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{CloseableIterator, Paged, ScorexLogging}
@@ -105,13 +105,13 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     loadBlock(height)
   }
 
-  override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
+  override protected def loadScript(address: Address): Option[Script] = readOnly { _ =>
     addressId(address).fold(Option.empty[Script]) { addressId =>
       getAddressScript(addressId).map(_())
     }
   }
 
-  override protected def hasScriptBytes(address: Address): Boolean = readOnly { db =>
+  override protected def hasScriptBytes(address: Address): Boolean = readOnly { _ =>
     addressId(address).fold(false) { addressId =>
       getAddressScript(addressId).isDefined
     }
@@ -136,7 +136,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
+  override def accountData(address: Address): AccountDataInfo = readOnly { _ =>
     AccountDataInfo((for {
       key   <- accountDataKeys(address)
       value <- accountData(address, key)
@@ -812,7 +812,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
               .dropWhile { case (streamHeight, streamNum, _) => streamNum >= filterNum && streamHeight >= filterHeight }
         }
 
-        transactionsIterator(types.toVector, reverse = true)
+        transactionsIterator(types.toVector)
           .transform(takeAfter(_, maybeAfter))
       }
 
@@ -912,14 +912,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   }
 
   override def allActiveLeases: CloseableIterator[LeaseTransaction] = readStream { db =>
-    db.iterateOverStream(123.toShort).flatMap { kv =>
-      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
-
-      if (loadLeaseStatus(db, txId)) {
-        Try(blocksWriter.getTransaction(txId)).toOption
-          .collect { case (_, _, lt: LeaseTransaction) => lt }
-      } else None
-    }
+    val txs = transactionsIterator(Seq(LeaseTransactionV1, LeaseTransactionV2))
+    txs.collect { case (_, _, tx: LeaseTransaction) if loadLeaseStatus(db, tx.id()) => tx }
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
@@ -996,7 +990,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     Try(db.get(Keys.blockTransactionsFee(height))).toOption
   }
 
-  override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
+  override def featureVotes(height: Int): Map[Short, Int] = readOnly { _ =>
     settings.functionalitySettings
       .activationWindow(height)
       .flatMap { height =>
@@ -1126,7 +1120,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     writableDB.close()
   }
 
-  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, TxNum, Transaction)] = {
+  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser]): CloseableIterator[(Height, TxNum, Transaction)] = {
     val codeSet = ofTypes.map(_.typeId).toSet
     for {
       //            height  <- (1 to this.height).iterator
