@@ -34,7 +34,7 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
-import scala.util.{Success, Try}
+import scala.util.Try
 
 object LevelDBWriter {
 
@@ -70,9 +70,11 @@ object LevelDBWriter {
       } yield db.get(valueKey(lastChange))
   }
 
+  implicit def toAddressTransactionsProvider(ldb: LevelDBWriter): AddressTransactionsProvider =
+    new LevelDBWriterAddressTransactionsProvider(ldb)
 }
 
-class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
+class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
@@ -695,50 +697,18 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
   }
 
-  override def addressTransactionsIterator(address: Address,
-                                   types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = readStream { db =>
-    val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
-    db.get(Keys.addressId(address)).fold(CloseableIterator.empty[(Height, Transaction)]) { id =>
-      val heightAndTxs: CloseableIterator[(Height, TxNum, Transaction)] = if (dbSettings.storeTransactionsByAddress) {
-        def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
-          if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 
-        def takeAfter(txNums: Iterator[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]) =
-          maybeAfter match {
-            case None => txNums
-            case Some((filterHeight, filterNum)) =>
-              txNums
-                .dropWhile { case (streamHeight, _, _) => streamHeight > filterHeight }
-                .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterNum && streamHeight >= filterHeight }
-          }
 
-        val addressId = AddressId(id)
-        val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toIterator
-          .flatMap(seqNr =>
-            db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
-              case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
-              case None                   => Nil
-          })
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] = {
+    def createTransactionsList(): Seq[(Height, Transaction)] =
+      this.addressTransactionsIterator(address, TransactionParsers.forTypeSet(types), fromId)
+        .take(count)
+        .closeAfter(_.toVector)
 
-        CloseableIterator.fromIterator(takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter))
-          .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
-      } else {
-        def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
-          case None => txNums
-          case Some((filterHeight, filterNum)) =>
-            txNums
-              .dropWhile { case (streamHeight, _, _) => streamHeight > filterHeight }
-              .dropWhile { case (streamHeight, streamNum, _) => streamNum >= filterNum && streamHeight >= filterHeight }
-        }
-
-        transactionsIterator(types.toVector, reverse = true)
-          .transform(takeAfter(_, maybeAfter))
-      }
-
-      heightAndTxs
-        .transform(_.map { case (height, _, tx) => (height, tx) })
+    fromId match {
+      case Some(id) => transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())
+      case None     => Right(createTransactionsList())
     }
   }
 
@@ -1086,43 +1056,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
-  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, TxNum, Transaction)] =
-    readStream { db =>
-      val baseIterator: CloseableIterator[(Height, TxNum)] =
-        if (reverse) {
-          for {
-            height  <- CloseableIterator.fromIterator((this.height to 0 by -1).iterator)
-            (bh, _) <- this.blockHeaderAndSize(height).iterator
-            txNum   <- bh.transactionCount to 0 by -1
-          } yield (Height(height), TxNum(txNum.toShort))
-        } else {
-          db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix)
-            .transform(_.map { kv =>
-              val heightNumBytes = kv.getValue
 
-              val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-              val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
-
-              (height, txNum)
-            })
-        }
-
-      baseIterator
-        .transform(_.flatMap {
-          case (height, txNum) =>
-            db.get(Keys.transactionBytesAt(height, txNum))
-              .flatMap { txBytes =>
-                if (ofTypes.isEmpty)
-                  TransactionParsers.parseBytes(txBytes).toOption
-                else {
-                  ofTypes.iterator
-                    .map(_.parseBytes(txBytes))
-                    .collectFirst { case Success(tx) => tx }
-                }
-              }
-              .map((height, txNum, _))
-        })
-    }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

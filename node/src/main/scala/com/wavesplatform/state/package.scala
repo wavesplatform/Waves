@@ -6,12 +6,12 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.database.AddressTransactionsProvider
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.{CloseableIterator, Paged}
 import play.api.libs.json._
 import supertagged.TaggedType
@@ -80,7 +80,7 @@ package object state {
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  private[state] def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(address: Address,
+  private[state] def addressTransactionsFromDiff(b: AddressTransactionsProvider, d: Option[Diff])(address: Address,
                                                                                  types: Set[TransactionParser],
                                                                                  fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
@@ -169,16 +169,9 @@ package object state {
 
     def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
-        .collectAddressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None) {
+        .addressTransactions(address, Set(CreateAliasTransaction.typeId), Int.MaxValue, None).map(_.collect {
           case (_, a: CreateAliasTransaction) => a.alias
-        }
-
-    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
-      blockchain
-        .collectAddressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None) {
-          case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
-            (height, leaseTransaction)
-        }
+        }).getOrElse(Nil)
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain

@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser, TransactionParsers}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.CloseableIterator
 import monix.reactive.Observable
 
@@ -67,37 +67,10 @@ trait Blockchain {
       .take(count)
       .closeAfter(_.toVector)
 
-  private[state] def addressTransactionsIterator(address: Address,
-                                                 types: Set[TransactionParser],
-                                                 fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
-    CloseableIterator.empty // Fix stub[Blockchain] in tests
-
-  def addressTransactionsObs(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] =
-    Observable.defer {
-      val iterator = addressTransactionsIterator(address, types, fromId)
-      Observable.fromIterator(iterator, () => iterator.close())
-    }
-
-  def collectAddressTransactions[T](address: Address, types: Set[TransactionParser], fromId: Option[ByteStr], count: Int = Int.MaxValue)(
-      pf: PartialFunction[(Height, Transaction), T]): Seq[T] = {
-    addressTransactionsIterator(address, types, fromId)
-      .collect { case heightAndTx if pf.isDefinedAt(heightAndTx) => pf(heightAndTx) }
-      .closeAfter(_.toVector)
-  }
-
-  // Compatibility
   def addressTransactions(address: Address,
                           types: Set[Transaction.Type],
                           count: Int,
-                          fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]] = {
-    def createTransactionsList(): Seq[(Height, Transaction)] =
-      collectAddressTransactions(address, TransactionParsers.forTypeSet(types), fromId, count) { case tx => tx }
-
-    fromId match {
-      case Some(id) => transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())
-      case None     => Right(createTransactionsList())
-    }
-  }
+                          fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]]
 
   def containsTransaction(tx: Transaction): Boolean
 
