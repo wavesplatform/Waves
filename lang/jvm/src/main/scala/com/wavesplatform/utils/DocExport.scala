@@ -1,5 +1,8 @@
 package com.wavesplatform.utils
 
+import java.io.FileWriter
+import java.nio.file.{Files, Paths}
+
 import cats.kernel.Monoid
 import com.github.mustachejava._
 import com.wavesplatform.common.utils.EitherExt2
@@ -18,12 +21,14 @@ import scala.collection.JavaConverters._
 
 object DocExport {
   def main(args: Array[String]) {
-    if (args.size != 4 || args(0) != "--gen-doc") {
-      System.err.println("Expected args: --gen-doc <version> <template> <output>")
+    if (args.size != 5 || args(0) != "--gen-doc") {
+      System.err.println("Expected args: --gen-doc <version> <template> <output> <func V3 template>")
     } else {
       val versionStr  = args(1)
       val docTemplate = args(2)
       val outputFile  = args(3)
+
+      val funcV3Template  = args(4)
 
       val version = DirectiveDictionary[StdLibVersion].idMap(versionStr.toInt)
       val wavesContext = WavesContext.build(
@@ -47,6 +52,7 @@ object DocExport {
 
       val cryptoContext = CryptoContext.build(Global, version)
 
+
       abstract class TypeDoc {
         val name: String
         val isUnion: Boolean   = false
@@ -56,14 +62,17 @@ object DocExport {
         val isComplex: Boolean = false
         val needLink: Boolean  = false
         def noLink: Boolean    = !needLink
+
+        val verticalLineSymbol = "&#124;"
+        lazy val mdName: String = name.replace("|", verticalLineSymbol)
       }
       case class Field(name: String, `type`: TypeDoc)
       case class UnionDoc(override val name: String, union: java.util.List[TypeDoc]) extends TypeDoc { override val isUnion: Boolean = true }
       case class objDoc(override val name: String, fields: java.util.List[Field]) extends TypeDoc {
         override val isObj: Boolean = true; override val needLink: Boolean = true
       }
-      case class ListOf(param: TypeDoc)   extends TypeDoc { override val name: String = "LIST"; val hasParam: Boolean   = true }
-      case class OptionOf(param: TypeDoc) extends TypeDoc { override val name: String = "OPTION"; val hasParam: Boolean = true }
+      case class ListOf(param: TypeDoc)   extends TypeDoc { override val name: String = s"List[${param.name}]"; val hasParam: Boolean   = true }
+      case class OptionOf(param: TypeDoc) extends TypeDoc { override val name: String = s"${param.name}|Unit"; val hasParam: Boolean = true }
       case class nativeTypeDoc(override val name: String) extends TypeDoc {
         override val isNative: Boolean = true; override val needLink: Boolean = true
       }
@@ -82,7 +91,9 @@ object DocExport {
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 
-      case class VarDoc(name: String, `type`: TypeDoc, doc: String)
+      case class VarDoc(private val nameRaw: String, `type`: TypeDoc, doc: String) {
+        val name = nameRaw.replace("@", "")
+      }
       def getVarsDoc() = fullContext.vars.map(v => VarDoc(
         v._1,
         typeRepr(v._2._1)(),
@@ -91,13 +102,26 @@ object DocExport {
 
       case class FuncDoc(name: String, `type`: TypeDoc, doc: String, params: java.util.List[VarDoc], cost: String)
 
+      case class FuncDocV3Out(funcDoc: FuncDoc, index: Int) {
+        val name   = funcDoc.name
+        val `type` = funcDoc.`type`
+        val doc    = funcDoc.doc
+        val params = funcDoc.params
+        val cost   = funcDoc.cost
+        val paramTypes    = params.asScala.map(p => p.`type`.mdName).mkString(", ")
+        val paramArgTypes = params.asScala.map(p => s"${p.name}: ${p.`type`.name}").mkString(", ")
+        val anchor = name + params.asScala.map(_.`type`.mdName).mkString
+      }
+
+      case class CategorizedFuncsDoc(funcs: java.util.List[FuncDocV3Out], category: String)
+
       def extType(t: TYPE): TypeDoc = t match {
         case t: FINAL                         => typeRepr(t)()
         case TYPEPARAM(char: Byte)            => new TypeDoc { val name: String = char.toChar.toString; override val isComplex: Boolean = true }
         case PARAMETERIZEDLIST(l)             => ListOf(extType(l))
         case PARAMETERIZEDUNION(Seq(UNIT, l)) => OptionOf(extType(l))
         case PARAMETERIZEDUNION(Seq(l, UNIT)) => OptionOf(extType(l))
-        case PARAMETERIZEDUNION(l)            => UnionDoc("", l.map(t => extType(t)).asJava)
+        case PARAMETERIZEDUNION(l)            => UnionDoc(t.toString, l.map(t => extType(t)).asJava)
         case t                                => new TypeDoc { val name: String = t.toString; override val isComplex: Boolean = true }
       }
 
@@ -105,11 +129,11 @@ object DocExport {
         fullContext.functions
           .map(
             f => {
-              val (funcDoc, paramsDoc) = DocSource.funcData((
+              val (funcDoc, paramsDoc) = DocSource.funcData.getOrElse((
                 f.name,
                 f.signature.args.map(_._2.toString).toList,
                 version.value.asInstanceOf[Int]
-              ))
+              ), ("doc not found", Nil)) //!!!!!
               FuncDoc(
                 f.name,
                 extType(f.signature.result),
@@ -118,6 +142,29 @@ object DocExport {
                   map { arg => VarDoc(arg._1, extType(arg._2._2), arg._3)}
                 ).asJava,
                 f.costByLibVersion(version).toString
+              )
+            })
+
+      def getFunctionsDocV3() =
+        fullContext.functions
+          .map(
+            f => {
+              val (funcDoc, paramsDoc, category) = DocSource.categorizedfuncData.getOrElse((
+                f.name,
+                f.signature.args.map(_._2.toString).toList,
+                version.value.asInstanceOf[Int]
+              ), ("doc not found", Nil, "category not found")) //!!!!!
+              (
+                FuncDoc(
+                  f.name,
+                  extType(f.signature.result),
+                  funcDoc,
+                  ((f.args, f.signature.args, paramsDoc).zipped.toList
+                    map { arg => VarDoc(arg._1, extType(arg._2._2), arg._3) }
+                    ).asJava,
+                  f.costByLibVersion(version).toString
+                ),
+                category
               )
             })
 
@@ -202,6 +249,25 @@ object DocExport {
             :+ Special("Other", caseDoc(transactionDocs(fullContext.types.filter(v => otherTransactions(v.name)), otherFields)))).asJava
         )
       )
+      if (version == V3) {
+        val funcDoc = mf.compile(funcV3Template)
+        val path = Paths.get("target/funcs")
+        Files.createDirectories(path)
+
+        getFunctionsDocV3()
+          .groupBy(_._2)
+          .foreach { case (category, funcs) =>
+            val writer = new FileWriter(path.resolve(category + ".md").toFile)
+            funcDoc.execute(
+              writer,
+              CategorizedFuncsDoc(
+                funcs.zipWithIndex.map { case ((func, _), index) => FuncDocV3Out(func, index + 1) }.toList.asJava,
+                category.replace("-", " ").capitalize
+              )
+            )
+            writer.close()
+          }
+      }
       out.flush()
       out.close()
     }
