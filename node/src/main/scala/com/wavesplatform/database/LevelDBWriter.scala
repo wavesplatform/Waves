@@ -365,6 +365,9 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       }
     }
 
+    val expiredMiners = Keys.balancesInfoAtHeight(Height @@ balanceThreshold)
+    expiredKeys.append(expiredMiners.keyBytes)
+
     rw.put(Keys.balancesInfoAtHeight(Height @@ height), miners.toMap)
 
     for ((asset, newAddressIds) <- newAddressesForAssets) {
