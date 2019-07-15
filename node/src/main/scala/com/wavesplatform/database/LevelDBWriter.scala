@@ -350,19 +350,6 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
       }
 
       @noinline
-      def writeWavesBalances(): Unit = {
-        val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
-          val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
-          rw.put(Keys.wavesBalance(addressId)(height), balance)
-          expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
-          addressId
-        }
-
-        val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
-        rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
-      }
-
-      @noinline
       private[this] def getHNForAsset(assetId: IssuedAsset) = {
         lazy val maybeHNFromState = assetDescriptionCache.get(assetId).map(_._2)
         lazy val maybeHNFromNewTransactions = transactions
@@ -374,12 +361,25 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
       }
 
       @noinline
-      def writeAssetBalances(): Unit = {
-        for ((addressId, assets) <- assetBalances; (assetId, balance) <- assets; (h, n) <- getHNForAsset(assetId)) {
-          rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
-          rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
-          expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, h, n), threshold, Keys.assetBalance(addressId, h, n))
+      def writeWavesAndAssetBalances(): Unit = {
+        val updatedBalanceAddresses = for ((addressId, assets) <- balances; (assetId, balance) <- assets) yield assetId match {
+          case Waves =>
+            val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
+            rw.put(Keys.wavesBalance(addressId)(height), balance)
+            expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
+            Some(addressId)
+
+          case assetId @ IssuedAsset(_) =>
+            for ((h, n) <- getHNForAsset(assetId)) {
+              rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
+              rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
+              expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, h, n), threshold, Keys.assetBalance(addressId, h, n))
+            }
+            None
         }
+
+        val changedAddresses = (addressTransactions.keys ++ updatedBalanceAddresses.flatten).toSeq.distinct
+        rw.put(Keys.changedAddresses(height), changedAddresses)
       }
 
       @noinline
@@ -526,9 +526,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
       def writeAllEntities(): Unit = {
         writeNewBlock()
         writeNewAddresses()
-        writeWavesBalances()
         writeAssets()
-        writeAssetBalances()
+        writeWavesAndAssetBalances()
         writeVolumeAndFee()
         writeLeaseBalances()
         writeScripts()
