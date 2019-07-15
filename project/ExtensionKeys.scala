@@ -18,5 +18,5 @@ trait ExtensionKeys {
 
   val nodePackageName = settingKey[String]("Node deb package name")
   
-  val extensionClass = settingKey[Option[String]]("Extension class")
+  val extensionClasses = settingKey[Seq[String]]("Extension class")
 }

@@ -4,7 +4,7 @@ name := "blockchain-updates"
 
 libraryDependencies += Dependencies.kafka
 
-extensionClass := Some("com.wavesplatform.events.BlockchainUpdates")
+extensionClasses += "com.wavesplatform.events.BlockchainUpdates"
 
 inConfig(Compile)(
   Seq(
