@@ -42,6 +42,7 @@ object ExtensionPackaging extends AutoPlugin {
         jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
       },
       classpathOrdering ++= excludeProvidedArtifacts((Runtime / dependencyClasspath).value, findProvidedArtifacts.value),
+      extensionClass := None,
       Universal / mappings ++= classpathOrdering.value ++ {
         val baseConfigName = s"${name.value}-${network.value}.conf"
         val localFile      = (Compile / baseDirectory).value / baseConfigName
@@ -64,7 +65,15 @@ object ExtensionPackaging extends AutoPlugin {
           s"""#!/bin/sh
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
-      )
+      ),
+      libraryDependencies ++= Seq(
+        Dependencies.logback % Runtime,
+        Dependencies.janino  % Runtime,
+      ),
+      javaOptions in run ++= (extensionClass.value match {
+        case Some(extension) => Seq(s"-Dwaves.extensions.0=$extension")
+        case None => Nil
+      })
     ) ++ nameFix ++ inScope(Global)(nameFix)
 
   private def nameFix = Seq(
