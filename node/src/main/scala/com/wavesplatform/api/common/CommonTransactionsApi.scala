@@ -15,8 +15,8 @@ import monix.reactive.Observable
 private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, broadcast: (VanillaTransaction, Boolean) => Unit) {
 
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = {
-    val iterator = blockchain.addressTransactions(address, Set.empty, fromId)
-    Observable.fromIterator(iterator, () => iterator.close())
+    val seq = blockchain.addressTransactions(address, Set.empty, Int.MaxValue, fromId) // FIXME fix tests instead
+    Observable.fromIterable(seq.getOrElse(Nil))
   }
 
   def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] = {
