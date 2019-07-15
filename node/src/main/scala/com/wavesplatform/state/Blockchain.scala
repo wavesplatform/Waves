@@ -108,7 +108,7 @@ trait Blockchain {
   // the following methods are used exclusively by patches
   def allActiveLeases: CloseableIterator[LeaseTransaction]
 
-  def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance]
+  def balanceProof(address: Address, height: Height): Option[ProvenBalance]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

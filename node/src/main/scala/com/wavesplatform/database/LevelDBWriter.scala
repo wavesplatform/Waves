@@ -1193,7 +1193,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     txs.toList
   }
 
-  override def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance] = readOnly { db =>
+  override def balanceProof(address: Address, height: Height): Option[ProvenBalance] = readOnly { db =>
     val miners                                 = db.get(Keys.balancesInfoAtHeight(height))
     lazy val (regularBalances, miningBalances) = splitBalances(miners)
 

@@ -721,7 +721,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     }
   }
 
-  override def proofForBalanceOnHeight(address: Address, height: Height): Option[ProvenBalance] = blockchain.proofForBalanceOnHeight(address, height)
+  override def balanceProof(address: Address, height: Height): Option[ProvenBalance] = blockchain.balanceProof(address, height)
 
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")

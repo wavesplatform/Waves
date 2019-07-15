@@ -84,7 +84,7 @@ class CommonAccountApi(blockchain: Blockchain) {
 
   def balanceProof(address: Address, height: Int): Either[ValidationError, ProvenBalance] = {
     blockchain
-      .proofForBalanceOnHeight(address, Height @@ height)
+      .balanceProof(address, Height @@ height)
       .toRight(GenericError(s"Can't proove ${address.stringRepr} balance on height - $height"))
   }
 }
