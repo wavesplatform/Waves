@@ -31,7 +31,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val (balance1, eff1) = miner.accountBalances(firstAddress)
 
     val data = List(BooleanDataEntry("bool", false))
-    assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 + 1), "negative waves balance")
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 + 1), "Accounts balance errors")
     nodes.waitForHeightArise()
     miner.assertBalances(firstAddress, balance1, eff1)
 
@@ -39,7 +39,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
-    assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "Accounts balance errors")
     nodes.waitForHeightArise()
     miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leaseAmount - minFee)
   }
@@ -235,7 +235,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), TooBig)
     assertBadRequestAndResponse(sender.putData(firstAddress, List(IntegerDataEntry("", 4)), 100000), "Empty key found")
     assertBadRequestAndResponse(sender.putData(firstAddress, List(IntegerDataEntry("abc", 4), IntegerDataEntry("abc", 5)), 100000),
-                                "Duplicate keys found")
+                                "Duplicated keys found")
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, 1.waves), TooBig)

@@ -115,7 +115,7 @@ object Terms {
   object CONST_STRING {
     def apply(s: String): Either[ExecutionError, CONST_STRING] =
       Either.cond(
-        s.getBytes.length <= DATA_TX_BYTES_MAX,
+        s.getBytes("UTF-8").length <= DATA_TX_BYTES_MAX,
         new CONST_STRING(s),
         s"String exceeds $DATA_TX_BYTES_MAX bytes"
       )

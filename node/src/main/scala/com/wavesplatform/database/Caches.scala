@@ -10,8 +10,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
+import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
@@ -44,14 +45,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def lastBlock: Option[Block] = current._3
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = {
-    val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
-      Some(c._2)
-    } else {
-      loadScoreOf(blockId)
-    }
-  }
 
   def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
@@ -205,8 +198,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def doAppend(block: Block,
                          carry: Long,
                          newAddresses: Map[Address, AddressId],
-                         wavesBalances: Map[AddressId, Long],
-                         assetBalances: Map[AddressId, Map[IssuedAsset, Long]],
+                         balances: Map[AddressId, Map[Asset, Long]],
                          leaseBalances: Map[AddressId, LeaseBalance],
                          addressTransactions: Map[AddressId, List[TransactionId]],
                          leaseStates: Map[ByteStr, Boolean],
@@ -240,40 +232,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     log.trace(s"CACHE newAddressIds = $newAddressIds")
     log.trace(s"CACHE lastAddressId = $lastAddressId")
 
-    val wavesBalances        = Map.newBuilder[AddressId, Long]
-    val assetBalances        = Map.newBuilder[AddressId, Map[IssuedAsset, Long]]
-    val leaseBalances        = Map.newBuilder[AddressId, LeaseBalance]
-    val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
-    val newPortfolios        = Seq.newBuilder[Address]
-    val newBalances          = Map.newBuilder[(Address, Asset), java.lang.Long]
+    val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
-    for ((address, portfolioDiff) <- diff.portfolios) {
-      val aid = addressId(address)
-      if (portfolioDiff.balance != 0) {
-        val wbalance = portfolioDiff.balance + balance(address, Waves)
-        wavesBalances += aid            -> wbalance
-        newBalances += (address, Waves) -> wbalance
-      }
+    val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
 
-      if (portfolioDiff.lease != LeaseBalance.empty) {
-        val lease = leaseBalance(address).combine(portfolioDiff.lease)
-        leaseBalances += aid            -> lease
-        updatedLeaseBalances += address -> lease
-      }
-
-      if (portfolioDiff.assets.nonEmpty) {
-        val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield {
-          val abalance = v + balance(address, k)
-          newBalances += (address, k) -> abalance
-          k                           -> abalance
-        }
-        if (newAssetBalances.nonEmpty) {
-          assetBalances += aid -> newAssetBalances
-        }
-      }
-
-      newPortfolios += address
-    }
+    val newPortfolios = diff.portfolios.keys.toSet
 
     val newFills = for {
       (orderId, fillInfo) <- diff.orderFills
@@ -308,9 +271,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       block,
       carryFee,
       newAddressIds,
-      wavesBalances.result(),
-      assetBalances.result(),
-      leaseBalances.result(),
+      updatedBalances.map { case (a, v) => addressId(a) -> v },
+      leaseBalances,
       addressTransactions,
       diff.leaseState,
       diff.issuedAssets,
@@ -326,10 +288,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
-    balancesCache.putAll(newBalances.result().asJava)
-    for (address <- newPortfolios.result()) portfolioCache.invalidate(address)
-    for (asset   <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) discardAssetDescription(asset)
-    leaseBalanceCache.putAll(updatedLeaseBalances.result().asJava)
+    for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
+    for (address                 <- newPortfolios) portfolioCache.invalidate(address)
+    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) discardAssetDescription(id)
+    leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)

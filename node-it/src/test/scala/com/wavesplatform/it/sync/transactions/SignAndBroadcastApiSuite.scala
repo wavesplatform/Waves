@@ -56,8 +56,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
 
     val obsoleteTx =
       Json.obj("type" -> GenesisTransaction.typeId, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000)
-    assertSignBadJson(obsoleteTx, "UnsupportedTransactionType")
-    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "UnsupportedTransactionType")
+    assertSignBadJson(obsoleteTx, "Unsupported transaction type")
+    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "Unsupported transaction type")
 
     val bigBaseTx =
       Json.obj("type"       -> TransferTransaction.typeId,
@@ -127,7 +127,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     for (j <- List(jsonV1, jsonV2)) {
       assertBroadcastBadJson(j - "type", "failed to parse json message")
       assertBroadcastBadJson(j - "type" + ("type" -> Json.toJson(88)), "Bad transaction type")
-      assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Invalid chain id")
+      assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Wrong chain-id")
       assertBroadcastBadJson(j - "alias", "failed to parse json message")
     }
   }
@@ -170,7 +170,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
           "recipient"  -> secondAddress,
           "assetId"    -> issueId,
           "amount"     -> 1.waves,
-          "attachment" -> Base58.encode("asset transfer".getBytes)
+          "attachment" -> Base58.encode("asset transfer".getBytes("UTF-8"))
         ),
         usesProofs = isProof,
         version = v
@@ -186,7 +186,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
           "sender"     -> firstAddress,
           "recipient"  -> secondAddress,
           "amount"     -> transferAmount,
-          "attachment" -> Base58.encode("falafel".getBytes)
+          "attachment" -> Base58.encode("falafel".getBytes("UTF-8"))
         ),
         usesProofs = Option(v).nonEmpty,
         version = v
@@ -201,7 +201,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
         "version"    -> 1,
         "sender"     -> firstAddress,
         "transfers"  -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
-        "attachment" -> Base58.encode("masspay".getBytes)
+        "attachment" -> Base58.encode("masspay".getBytes("UTF-8"))
       ),
       usesProofs = true,
       version = 1

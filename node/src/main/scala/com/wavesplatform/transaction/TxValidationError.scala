@@ -3,7 +3,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.assets.exchange.Order
 
@@ -70,7 +69,7 @@ object TxValidationError {
         .map {
           case (name, Right(v)) => s"$name = ${v.prettyString(1)}"
 //          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
-          case (name, l@Left(_))         => s"$name = $l"
+          case (name, l @ Left(_)) => s"$name = $l"
         }
         .map("\t" + _)
         .mkString("\n", "\n", "\n")
@@ -78,5 +77,33 @@ object TxValidationError {
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
+  }
+
+  case object EmptyDataKey extends ValidationError {
+    override def toString: String = "Empty key found"
+  }
+
+  case object DuplicatedDataKeys extends ValidationError {
+    override def toString: String = s"Duplicated keys found"
+  }
+
+  case class WrongChain(expected: Byte, provided: Byte) extends ValidationError {
+    override def toString: String = s"Wrong chain-id. Expected - $expected, provided - $provided"
+  }
+
+  case class UnsupportedTypeAndVersion(typeId: Byte, version: Int) extends ValidationError {
+    override def toString: String = s"Bad transaction type ($typeId) and version ($version)"
+  }
+
+  case class UsupportedProofVersion(version: Int, supported: List[Int]) extends ValidationError {
+    override def toString: String = s"Unsupported proofs version - $version. Expected one of ${supported.mkString("[", ", ", "]")}"
+  }
+
+  case class TooManyProofs(max: Int, actual: Int) extends ValidationError {
+    override def toString: String = s"Too many proofs ($actual), only $max allowed"
+  }
+
+  case class ToBigProof(max: Int, actual: Int) extends ValidationError {
+    override def toString: String = s"Too large proof ($actual), must be max $max bytes" 
   }
 }

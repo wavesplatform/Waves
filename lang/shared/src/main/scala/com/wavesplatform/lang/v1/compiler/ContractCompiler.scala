@@ -89,7 +89,7 @@ object ContractCompiler {
       _    <- validateAnnotatedFuncsArgTypes(ctx, contract)
       funcNameWithWrongSize = contract.fs
         .map(af => Expressions.PART.toOption[String](af.name))
-        .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes().size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
+        .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes("UTF-8").size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
         .map(_.get)
       _ <- Either
         .cond(

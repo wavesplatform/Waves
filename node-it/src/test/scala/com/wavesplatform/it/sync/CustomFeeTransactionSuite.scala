@@ -77,8 +77,8 @@ object CustomFeeTransactionSuite {
   val assetTx = IssueTransactionV1
     .selfSigned(
       sender = pk,
-      name = "asset".getBytes(),
-      description = "asset description".getBytes(),
+      name = "asset".getBytes("UTF-8"),
+      description = "asset description".getBytes("UTF-8"),
       quantity = defaultAssetQuantity,
       decimals = 2,
       reissuable = false,

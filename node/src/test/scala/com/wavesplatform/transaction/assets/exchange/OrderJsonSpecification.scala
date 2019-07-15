@@ -14,7 +14,7 @@ import play.api.libs.json._
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Read Order from json") {
-    val keyPair   = KeyPair("123".getBytes)
+    val keyPair   = KeyPair("123".getBytes("UTF-8"))
     val pubKeyStr = Base58.encode(keyPair.publicKey)
 
     val json = Json.parse(s"""
@@ -154,16 +154,16 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order with empty assetId") {
-    val pk        = KeyPair("123".getBytes)
+    val pk        = KeyPair("123".getBytes("UTF-8"))
     val pubKeyStr = Base58.encode(pk.publicKey)
 
-    val json = Json.parse(s"""
+    def mkJson(priceAsset: String): String = s"""
         {
           "senderPublicKey": "$pubKeyStr",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
            "assetPair": {
              "amountAsset": "",
-             "priceAsset": ""
+             "priceAsset": $priceAsset
            },
           "orderType": "sell",
           "amount": 0,
@@ -172,16 +172,24 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"
-        } """)
+        } """
 
-    json.validate[Order] match {
-      case e: JsError =>
-        fail("Error: " + JsError.toJson(e).toString())
-      case s: JsSuccess[Order] =>
-        val o = s.get
-        o.assetPair.amountAsset shouldBe Waves
-        o.assetPair.priceAsset shouldBe Waves
+    val jsons = Seq(""" "" """, "null", """ "WAVES" """).map { x =>
+      x -> mkJson(x)
+    }
 
+    jsons.foreach {
+      case (priceAssetStr, rawJson) =>
+        withClue(priceAssetStr) {
+          Json.parse(rawJson).validate[Order] match {
+            case e: JsError =>
+              fail("Error: " + JsError.toJson(e).toString())
+            case s: JsSuccess[Order] =>
+              val o = s.get
+              o.assetPair.amountAsset shouldBe Waves
+              o.assetPair.priceAsset shouldBe Waves
+          }
+        }
     }
   }
 }

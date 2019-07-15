@@ -49,9 +49,9 @@ object PureContext {
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction =
-    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited bytes vectors concatenation", "prefix", "suffix", 10) {
+    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited byte vectors concatenation", "prefix", "suffix", 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        CONST_BYTESTR(a ++ b).filterOrElse(_.bs.length <= MaxBytesResult, "ByteStr is too large")
+        CONST_BYTESTR(a ++ b).filterOrElse(_.bs.length <= MaxBytesResult, "ByteVector is too large")
       case _ => ???
     }
   lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer greater or equal comparison", "term", "term")(_ >= _)
@@ -172,7 +172,7 @@ object PureContext {
 
   lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteVector", BYTESTR, "vector")) {
     case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
-    case xs                       => notImplemented("size(byte[])", xs)
+    case xs                       => notImplemented("size(byteVector: ByteVector)", xs)
   }
 
   lazy val toBytesBoolean: BaseFunction =
@@ -195,7 +195,7 @@ object PureContext {
 
   lazy val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "String size in characters", ("xs", STRING, "string")) {
     case CONST_STRING(bv) :: Nil => Right(CONST_LONG(bv.length.toLong))
-    case xs                      => notImplemented("size(String)", xs)
+    case xs                      => notImplemented("size(xs: String)", xs)
   }
 
   lazy val toStringBoolean: BaseFunction =
@@ -211,15 +211,15 @@ object PureContext {
   }
 
   lazy val takeBytes: BaseFunction =
-    NativeFunction("take", 1, TAKE_BYTES, BYTESTR, "Take firsts bytes subvector", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
+    NativeFunction("take", 1, TAKE_BYTES, BYTESTR, "Take first bytes subvector", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number))
-      case xs                                             => notImplemented("take(xs: byte[], number: Long)", xs)
+      case xs                                             => notImplemented("take(xs: ByteVector, number: Int)", xs)
     }
 
   lazy val dropBytes: BaseFunction =
-    NativeFunction("drop", 1, DROP_BYTES, BYTESTR, "Skip firsts bytes", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
+    NativeFunction("drop", 1, DROP_BYTES, BYTESTR, "Skip first bytes", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number))
-      case xs                                             => notImplemented("drop(xs: byte[], number: Long)", xs)
+      case xs                                             => notImplemented("drop(xs: ByteVector, number: Int)", xs)
     }
 
   lazy val dropRightBytes: BaseFunction =
@@ -261,7 +261,7 @@ object PureContext {
   lazy val takeString: BaseFunction =
     NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size in characters")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.take(trimLongToInt(number)))
-      case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
+      case xs                                            => notImplemented("take(xs: String, number: Int)", xs)
     }
 
   lazy val listConstructor: NativeFunction =
@@ -281,7 +281,7 @@ object PureContext {
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remove string prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(trimLongToInt(number)))
-      case xs                                            => notImplemented("drop(xs: String, number: Long)", xs)
+      case xs                                            => notImplemented("drop(xs: String, number: Int)", xs)
     }
 
   lazy val takeRightString: BaseFunction =
@@ -332,7 +332,7 @@ object PureContext {
             case _: MalformedInputException => "Input contents invalid UTF8 sequence"
             case e => e.toString
           }
-      case xs                      => notImplemented("toUtf8String(u: byte[])", xs)
+      case xs                      => notImplemented("toUtf8String(u: ByteVector)", xs)
     }
 
   lazy val toLong: BaseFunction =
@@ -341,7 +341,7 @@ object PureContext {
         case _:BufferUnderflowException => "Buffer underflow"
         case e => e.toString
       }
-      case xs                      => notImplemented("toInt(u: byte[])", xs)
+      case xs                      => notImplemented("toInt(u: ByteVector)", xs)
     }
 
   lazy val toLongOffset: BaseFunction =
@@ -354,7 +354,7 @@ object PureContext {
       } else {
         Left("IndexOutOfBounds")
       }
-      case xs                      => notImplemented("toInt(u: byte[], off: int)", xs)
+      case xs                      => notImplemented("toInt(u: ByteVector, off: Int)", xs)
     }
 
   lazy val indexOf: BaseFunction =
@@ -367,7 +367,7 @@ object PureContext {
            unit
          }
       })
-      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+      case xs                      => notImplemented("indexOf(str: String, substr: String)", xs)
     }
 
   lazy val indexOfN: BaseFunction =
@@ -382,7 +382,7 @@ object PureContext {
       } else {
         unit
       } )
-      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+      case xs                      => notImplemented("indexOf(str: String, substr: String, offset: Int)", xs)
     }
 
   lazy val lastIndexOf: BaseFunction =
@@ -403,7 +403,7 @@ object PureContext {
            unit
          }
       })
-      case xs                      => notImplemented("lastIndexOf(STRING, STRING)", xs)
+      case xs                      => notImplemented("lastIndexOf(str: String, substr: String)", xs)
     }
 
   lazy val lastIndexOfWithOffset: BaseFunction =
@@ -417,17 +417,19 @@ object PureContext {
       ("substr", STRING, "String for searching"),
       ("offset", LONG,   "The index to start the search from")
     ) {
-      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right( if(off >= 0 && off <= m.length) {
-         val i = m.lastIndexOf(sub, off.toInt)
-         if( i != -1 ) {
-           CONST_LONG(i.toLong)
-         } else {
-           unit
-         }
-      } else {
-        unit
-      } )
-      case xs                      => notImplemented("lastIndexOf(STRING, STRING)", xs)
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right(
+        if(off >= 0) {
+          val offset = Math.min(off, Int.MaxValue.toLong).toInt
+          val i = m.lastIndexOf(sub, offset)
+          if( i != -1 ) {
+            CONST_LONG(i.toLong)
+          } else {
+            unit
+          }
+        } else {
+          unit
+        } )
+      case xs                      => notImplemented("lastIndexOf(str: String, substr: String, offset: Int)", xs)
     }
 
   lazy val splitStr: BaseFunction =
@@ -436,7 +438,7 @@ object PureContext {
         split(str, sep)
           .traverse(CONST_STRING(_))
           .map(s => ARR(s.toIndexedSeq))
-      case xs => notImplemented("split(STRING, STRING)", xs)
+      case xs => notImplemented("split(str: String, separator: String)", xs)
     }
 
   private def split(str: String, sep: String) =
@@ -465,7 +467,7 @@ object PureContext {
   lazy val parseInt: BaseFunction =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
       case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).orElse(Success(unit)).toEither.left.map(_.toString)
-      case xs                      => notImplemented("parseInt(STRING)", xs)
+      case xs                      => notImplemented("parseInt(str: String)", xs)
     }
 
   lazy val parseIntVal: BaseFunction =
@@ -659,12 +661,12 @@ object PureContext {
           } else {
             math.pow(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
           }
-        case xs                      => notImplemented("pow(Int, Int, Int, Int, Int, Rounds)", xs)
+        case xs                      => notImplemented("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
       }
 
     val log: BaseFunction =
       NativeFunction("log", 100, LOG, LONG, "Math log",
-          ("value", LONG, "value"), ("ep", LONG, "value decimal"),
+          ("exponent", LONG, "value"), ("ep", LONG, "value decimal"),
           ("base", LONG, "bases value"), ("bp", LONG, "bases decimal"),
           ("rp", LONG, "results decimal"),
           ("round", rounds, "round method")
@@ -682,7 +684,7 @@ object PureContext {
           } else {
             math.log(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
           }
-        case xs                      => notImplemented("log(Int, Int, Int, Int, Int, Rounds)", xs)
+        case xs                      => notImplemented("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
       }
 
 

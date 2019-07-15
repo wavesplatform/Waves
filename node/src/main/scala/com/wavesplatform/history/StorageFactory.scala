@@ -5,19 +5,23 @@ import java.io.Closeable
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater}
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
+import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, BlockchainUpdated}
 
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 5
 
-  def apply(settings: WavesSettings, db: DB, time: Time, spendableBalanceChanged: Observer[(Address, Asset)]): BlockchainUpdater with NG with Closeable = {
+  def apply(settings: WavesSettings,
+            db: DB,
+            time: Time,
+            spendableBalanceChanged: Observer[(Address, Asset)],
+            blockchainUpdated: Observer[BlockchainUpdated]): BlockchainUpdater with NG with Closeable = {
     checkVersion(db)
     val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings)
-    new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time) with Closeable {
+    new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdated)  with Closeable {
       override def close(): Unit = {
         super.close()
         levelDBWriter.close()

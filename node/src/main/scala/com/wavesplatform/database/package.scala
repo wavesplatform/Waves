@@ -392,7 +392,8 @@ package object database {
 
     def readWrite[A](f: RW => A): A = createContext().readWrite(f)
 
-    def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
+    def get[A](key: Key[A]): A    = key.parse(db.get(key.keyBytes))
+    def has(key: Key[_]): Boolean = db.get(key.keyBytes) != null
 
     def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)

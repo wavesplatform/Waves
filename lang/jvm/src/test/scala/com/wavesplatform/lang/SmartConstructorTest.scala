@@ -22,7 +22,7 @@ class SmartConstructorTest extends PropSpec with Matchers with Inside {
     inside(CONST_STRING(allowedString)) {
       case Right(CONST_STRING(str)) =>
         str shouldBe allowedString
-        str.getBytes.length shouldBe dataTxBytesMax
+        str.getBytes("UTF-8").length shouldBe dataTxBytesMax
     }
 
     val illegalString = "ё" * (dataTxBytesMax / 2 + 1)

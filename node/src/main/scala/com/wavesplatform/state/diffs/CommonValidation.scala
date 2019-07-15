@@ -47,9 +47,7 @@ object CommonValidation {
     smart.InvokeScriptTransaction.typeId -> 5
   )
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          blockTime: Long,
-                                                          tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
@@ -98,8 +96,7 @@ object CommonValidation {
       }
     } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             tx: T): Either[ValidationError, T] = tx match {
+  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
@@ -110,7 +107,7 @@ object CommonValidation {
 
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
-        blockchain.isFeatureActivated(b, blockchain.height - 1),
+        blockchain.isFeatureActivated(b, blockchain.height),
         tx,
         TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )

@@ -61,6 +61,11 @@ object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
 }
 
+case class NFTAssetInfo(assetId: String, reissuable: Boolean, quantity: Long, decimals: Byte)
+object NFTAssetInfo {
+  implicit val nftAssetInfo: Format[NFTAssetInfo] = Json.format
+}
+
 case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
 object FullAssetsInfo {
   implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
@@ -248,7 +253,9 @@ object AssetDecimalsInfo {
   implicit val assetDecimalsInfoResponseFormat: Format[AssetDecimalsInfo] = Json.format
 }
 
-case class MarketData(amountAssetName: String,
+case class MarketData(amountAsset: String,
+                      amountAssetName: String,
+                      priceAsset: String,
                       priceAssetName: String,
                       created: Long,
                       amountAssetInfo: Option[AssetDecimalsInfo],

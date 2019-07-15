@@ -361,6 +361,12 @@ object AsyncHttpApi extends Assertions {
     def assetsBalance(address: String): Future[FullAssetsInfo] =
       get(s"/assets/balance/$address").as[FullAssetsInfo]
 
+    def nftAssetsBalance(address: String, limit: Int): Future[Seq[NFTAssetInfo]] =
+      get(s"/assets/nft/$address/limit/$limit").as[Seq[NFTAssetInfo]]
+
+    def nftAssetsBalance(address: String, limit: Int, after: String): Future[Seq[NFTAssetInfo]] =
+      get(s"/assets/nft/$address/limit/${limit}?after=$after").as[Seq[NFTAssetInfo]]
+
     def assetsDetails(assetId: String, fullInfo: Boolean = false): Future[AssetInfo] =
       get(s"/assets/details/$assetId?full=$fullInfo").as[AssetInfo]
 

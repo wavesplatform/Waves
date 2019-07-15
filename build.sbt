@@ -22,13 +22,40 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
+lazy val versionSourceTask = (path: String) => Def.task {
+  // WARNING!!!
+  // Please, update the fallback version every major and minor releases.
+  // This version is used then building from sources without Git repository
+  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+  val FallbackVersion = (1, 0, 1)
+
+  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
+  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
+  val (major, minor, patch) = version.value match {
+    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+    case _                            => FallbackVersion
+  }
+  IO.write(
+    versionFile,
+    s"""package $path
+       |
+       |object Version {
+       |  val VersionString = "${version.value}"
+       |  val VersionTuple = ($major, $minor, $patch)
+       |}
+       |""".stripMargin
+  )
+  Seq(versionFile)
+}
+
+lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += versionSourceTask(path)))
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
-      version := "1.0.0",
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
@@ -37,7 +64,7 @@ lazy val lang =
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
-lazy val langJS  = lang.js
+lazy val langJS  = lang.js.settings(versionSourceSetting("com.wavesplatform.lang"))
 lazy val langJVM = lang.jvm
 
 lazy val node = project
@@ -45,6 +72,7 @@ lazy val node = project
     commonJVM % "compile;test->test",
     langJVM   % "compile;test->test"
   )
+  .settings(versionSourceSetting("com.wavesplatform"))
 
 lazy val `grpc-server` = project
   .dependsOn(node % "compile;test->test;runtime->provided")
@@ -59,19 +87,7 @@ lazy val benchmark = project
     langJVM % "compile;test->test"
   )
 
-lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
-
-lazy val `dex-it` = project
-  .dependsOn(
-    dex,
-    `node-it` % "compile;test->test"
-  )
-
-lazy val `dex-generator` = project.dependsOn(
-  dex,
-  `node-it` % "compile->test", // Without this IDEA doesn't find classes
-  `dex-it`  % "compile->test"
-)
+lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
 
 lazy val it = project
   .settings(
@@ -79,9 +95,8 @@ lazy val it = project
     Test / test := Def
       .sequential(
         root / packageAll,
-        `dex-it` / Docker / docker,
-        `node-it` / Test / test,
-        `dex-it` / Test / test
+        `node-it` / Docker / docker,
+        `node-it` / Test / test
       )
       .value
   )
@@ -95,10 +110,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    dex,
-    `dex-it`,
-    `dex-generator`
+    benchmark
   )
 
 inScope(Global)(
@@ -168,7 +180,6 @@ packageAll := Def
     Def.task {
       (node /  assembly).value
       (node / Debian / packageBin).value
-      (dex / Universal / packageZipTarball).value
     (`grpc-server` /Universal / packageZipTarball).value
     }
   )
@@ -179,10 +190,10 @@ checkPRRaw := {
   try {
     cleanAll.value // Hack to run clean before all tasks
   } finally {
-    test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
+    test.all(ScopeFilter(inProjects(commonJVM, langJVM, node), inConfigurations(Test))).value
     (commonJS / Compile / fastOptJS).value
     (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark), inConfigurations(Test))).value
   }
 }
 

@@ -126,7 +126,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
     val utxPoolStub = new UtxPool {

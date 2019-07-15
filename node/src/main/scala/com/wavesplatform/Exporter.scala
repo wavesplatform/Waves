@@ -13,7 +13,11 @@ import com.wavesplatform.utils._
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 import scopt.OParser
+import kamon.Kamon
+import com.wavesplatform.metrics.Metrics
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
@@ -34,11 +38,13 @@ object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
+        implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.LogExceptionsToStandardErr
+
         val settings = Application.loadApplicationConfig(Some(configFile))
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
+        val blockchain       = StorageFactory(settings, db, time, Observer.empty, Observer.empty)
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
@@ -66,6 +72,8 @@ object Exporter extends ScorexLogging {
         }
 
         time.close()
+        Await.ready(Kamon.stopAllReporters(), 20.seconds)
+        Metrics.shutdown()
     }
   }
 

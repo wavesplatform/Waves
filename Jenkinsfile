@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'buildagent'
+        label 'wavesnode'
     }
     environment {
         // Define sbt path
@@ -39,6 +39,11 @@ pipeline {
                         sh "tar zcf node.logs.tar.gz * || true"
                     }
                 }
+            }
+        }
+        stage('Docker cleanup') {
+            steps {
+                sh "docker system prune -af --volumes"
             }
         }
     }

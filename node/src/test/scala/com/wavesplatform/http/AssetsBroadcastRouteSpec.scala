@@ -58,7 +58,7 @@ class AssetsBroadcastRouteSpec
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { t: Transaction =>
-          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(CustomValidationError("foo"), t))
         }
       }
     }
@@ -169,7 +169,7 @@ class AssetsBroadcastRouteSpec
 
     val route = AssetsBroadcastApiRoute(restAPISettings, alwaysApproveUtx, alwaysSendAllChannels).route
 
-    val seed               = "seed".getBytes()
+    val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
