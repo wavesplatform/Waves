@@ -8,7 +8,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -357,26 +357,26 @@ package object database {
     ndo.toByteArray
   }
 
-  def readBalanceInfo(bs: Array[Byte]): Map[Address, BalanceInfo] = {
+  def readBalanceInfo(bs: Array[Byte]): Map[AddressId, BalanceInfo] = {
     val ndi        = newDataInput(bs)
     val entryCount = ndi.readInt()
 
     (0 until entryCount).map { _ =>
-      val addr          = ndi.readByteStr(Address.AddressLength)
+      val addressId     = ndi.readBigInt()
       val currBalance   = ndi.readLong()
       val miningBalance = ndi.readLong()
 
-      Address.createUnsafe(addr) -> BalanceInfo(currBalance, miningBalance)
+      AddressId(addressId) -> BalanceInfo(currBalance, miningBalance)
     }.toMap
   }
 
-  def writeBalanceInfo(v: Map[Address, BalanceInfo]): Array[Byte] = {
+  def writeBalanceInfo(v: Map[AddressId, BalanceInfo]): Array[Byte] = {
     val ndo = newDataOutput()
 
     ndo.writeInt(v.size)
     v.foreach {
-      case (addr, balance) =>
-        ndo.writeByteStr(addr.bytes)
+      case (addressId, balance) =>
+        ndo.writeBigInt(addressId)
         ndo.writeLong(balance.regularBalance)
         ndo.writeLong(balance.miningBalance)
     }

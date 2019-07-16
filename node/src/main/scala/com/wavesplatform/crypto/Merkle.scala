@@ -57,9 +57,8 @@ object Merkle {
   type BalanceTree = BalanceTree.Type
 
   def mkBalanceTree(bs: List[(Address, Long)]): BalanceTree = {
-
     val elements =
-      bs.sortBy(_._2)
+      bs.sortBy(_._1)
         .map(tup => LeafData @@ balanceToBytes(tup))
 
     BalanceTree @@ MerkleTree[Digest32](elements)(FastHash)

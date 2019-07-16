@@ -13,7 +13,7 @@ import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
-  lazy val address: String = bytes.toString
+  lazy val address: String    = bytes.toString
   lazy val stringRepr: String = address
 }
 
@@ -108,6 +108,10 @@ object Address extends ScorexLogging {
     Writes(addr => JsString(addr.stringRepr))
   )
 
+  implicit val addressOrdering: Ordering[Address] = Ordering
+    .by[Address, BigInt] { addr =>
+      BigInt(addr.bytes)
+    }
   @inline
   private[this] def scheme: AddressScheme = AddressScheme.current
 

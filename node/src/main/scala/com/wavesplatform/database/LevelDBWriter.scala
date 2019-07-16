@@ -291,14 +291,14 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     val requiredBalance = GeneratingBalanceProvider.minimalEffectiveBalance(height, activatedFeatures)
     val requiredBlocks  = GeneratingBalanceProvider.minimalBlockInterval(height, activatedFeatures)
 
-    val newAddressIds                                 = newAddresses.map { case (addr, addrId) => addrId -> addr }
-    val miners: mutable.HashMap[Address, BalanceInfo] = mutable.HashMap.empty[Address, BalanceInfo]
+    val miners: mutable.HashMap[AddressId, BalanceInfo] = mutable.HashMap.empty[AddressId, BalanceInfo]
 
-    log.trace(s"HEIGHT: $height MINERS: ${miners.mkString(",")}")
-
-    if (height > 1) {
+    if (height > 1 && dbSettings.storeMinersBalanceInfo) {
       rw.get(Keys.balancesInfoAtHeight(Height @@ (height - 1)))
-        .foreach { case (addr, balance) => miners.put(addr, balance) }
+        .foreach {
+          case (addr, balance) =>
+            miners.put(addr, balance)
+        }
     }
 
     def addNewAddressForAsset(asset: Asset, addressId: BigInt): Unit =
@@ -321,34 +321,35 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
             rw.put(Keys.wavesBalance(addressId)(height), balance)
             expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
 
-            val address = newAddressIds.getOrElse(addressId, rw.get(Keys.idToAddress(addressId)))
+            if (dbSettings.storeMinersBalanceInfo) {
+              val knownMiner: Boolean      = miners.contains(AddressId @@ addressId)
+              val haveEnoughWaves: Boolean = balance >= requiredBalance
 
-            val knownMiner: Boolean      = miners.contains(address)
-            val haveEnoughWaves: Boolean = balance >= requiredBalance
-
-            lazy val miningBalance = {
-              val snapshots = {
-                Try {
-                  rw.get(Keys.idToAddress(addressId))
-                }.toOption
-                  .map { addr =>
-                    balanceSnapshots(addr, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
-                  }
-                  .getOrElse(Seq(BalanceSnapshot(1, 0, 0, 0)))
-                  .map(_.effectiveBalance)
+              lazy val miningBalance = {
+                val snapshots = {
+                  Try {
+                    rw.get(Keys.idToAddress(addressId))
+                  }.toOption
+                    .map { addr =>
+                      balanceSnapshots(addr, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
+                    }
+                    .getOrElse(Seq(BalanceSnapshot(1, 0, 0, 0)))
+                    .map(_.effectiveBalance)
+                }
+                (balance +: snapshots).min
               }
-              (balance +: snapshots).min
+
+              val shouldBeAdded   = haveEnoughWaves
+              val shouldBeUpdated = knownMiner && haveEnoughWaves
+              val shouldBeRemoved = knownMiner && !haveEnoughWaves
+
+              if (shouldBeAdded || shouldBeUpdated) {
+                miners.update(AddressId @@ addressId, BalanceInfo(balance, miningBalance))
+              } else if (shouldBeRemoved) {
+                miners.remove(AddressId @@ addressId)
+              }
             }
 
-            val shouldBeAdded   = haveEnoughWaves
-            val shouldBeUpdated = knownMiner && haveEnoughWaves
-            val shouldBeRemoved = knownMiner && !haveEnoughWaves
-
-            if (shouldBeAdded || shouldBeUpdated) {
-              miners.update(address, BalanceInfo(balance, miningBalance))
-            } else if (shouldBeRemoved) {
-              miners.remove(address)
-            }
           }
           case a: IssuedAsset =>
             if (!prevAssetsSet.contains(a)) {
@@ -1193,23 +1194,28 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     txs.toList
   }
 
-  override def balanceProof(address: Address, height: Height): Option[ProvenBalance] = readOnly { db =>
-    val miners                                 = db.get(Keys.balancesInfoAtHeight(height))
-    lazy val (regularBalances, miningBalances) = splitBalances(miners)
+  override def balanceProof(address: Address, height: Height): Option[ProvenBalance] =
+    if (dbSettings.storeMinersBalanceInfo) readOnly { db =>
+      val miners = db.get(Keys.balancesInfoAtHeight(height))
 
-    for {
-      balanceInfo <- miners.get(address)
-      miningTree  = Merkle.mkBalanceTree(miningBalances)
-      regularTree = Merkle.mkBalanceTree(regularBalances)
-      proofForMiningBalance  <- miningTree.getProofForBalance((address, balanceInfo.miningBalance))
-      proofForRegularBalance <- regularTree.getProofForBalance((address, balanceInfo.regularBalance))
-    } yield ProvenBalance(address, proofForMiningBalance, proofForRegularBalance, balanceInfo)
-  }
+      lazy val (regularBalances, miningBalances) = splitBalances(db, miners)
 
-  private def splitBalances(miners: Map[Address, BalanceInfo]): (List[(Address, Long)], List[(Address, Long)]) = {
-    (miners foldLeft ((List.empty[(Address, Long)], List.empty[(Address, Long)]))) {
-      case ((regularAcc, miningAcc), (addr, BalanceInfo(regularBalance, miningBalance))) =>
-        ((addr, regularBalance) :: regularAcc, (addr, miningBalance) :: miningAcc)
+      lazy val miningTree  = Merkle.mkBalanceTree(miningBalances)
+      lazy val regularTree = Merkle.mkBalanceTree(regularBalances)
+
+      for {
+        addressId              <- db.get(Keys.addressId(address))
+        balanceInfo            <- miners.get(AddressId @@ addressId)
+        proofForMiningBalance  <- miningTree.getProofForBalance((address, balanceInfo.miningBalance))
+        proofForRegularBalance <- regularTree.getProofForBalance((address, balanceInfo.regularBalance))
+      } yield ProvenBalance(address, proofForMiningBalance, proofForRegularBalance, balanceInfo)
+    } else None
+
+  private def splitBalances(db: ReadOnlyDB, miners: Map[AddressId, BalanceInfo]): (List[(Address, Long)], List[(Address, Long)]) =
+    miners.foldLeft((List.empty[(Address, Long)], List.empty[(Address, Long)])) {
+      case ((rb, mb), (addressId, BalanceInfo(regular, mining))) =>
+        val address = db.get(Keys.idToAddress(addressId))
+
+        ((address -> regular) :: rb, (address -> mining) :: mb)
     }
-  }
 }
