@@ -23,7 +23,7 @@ object Dependencies {
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect", "1.2.0")
