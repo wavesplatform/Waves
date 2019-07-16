@@ -17,7 +17,7 @@ import play.api.libs.json._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler) extends ApiRoute with WithSettings {
+case class  BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler) extends ApiRoute with WithSettings {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
   private[this] val commonApi           = new CommonBlocksApi(blockchain)
 
@@ -39,7 +39,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
         val result = for {
           address <- Address.fromString(address)
-          pairs     = commonApi.blocksRange(start, end).filter(_._1.signerData.generator.address == address)
+          pairs     = commonApi.blocksRange(start, end).filter(_._1.signerData.generator.toAddress == address)
           jsonPairs = pairs.map(pair => pair._1.json().addBlockFields(pair._2))
           result    = jsonPairs.toListL.map(JsArray(_))
         } yield result.runAsync
