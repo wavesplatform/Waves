@@ -137,8 +137,10 @@ object Tasks {
          | package com.wavesplatform
          |
          | object DocSource {
+         |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
+         |
          |   lazy val varData  = $vars ++ $varsV3
-         |   lazy val funcData = $funcs ++ categorizedfuncData.mapValues(v => (v._1, v._2))
+         |   lazy val funcData = $funcs ++ categorizedfuncData.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2))
          |   lazy val categorizedfuncData = $funcsV3
          | }
       """.stripMargin
