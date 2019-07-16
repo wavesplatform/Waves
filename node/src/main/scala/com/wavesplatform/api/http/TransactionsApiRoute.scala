@@ -254,7 +254,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         .take(limit)
         .toListL
         .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
-        .runAsync
+        .runToFuture
     }
 
     for {

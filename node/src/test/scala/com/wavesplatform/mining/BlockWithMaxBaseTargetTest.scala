@@ -97,7 +97,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           })
 
           val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, settings, scheduler)(lastBlock)
-          Await.result(blockAppendTask.runAsync(scheduler), Duration.Inf)
+          Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
 
           signal.tryAcquire(10, TimeUnit.SECONDS)
 

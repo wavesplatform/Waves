@@ -70,7 +70,7 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
       .filter(_.flatten.nonEmpty)
       .foreachL(_ => allChannels.flush())
 
-    Task.parZip2(produceTask, consumeTask).map(_ => ())
+    Task.parMap2(produceTask, consumeTask)((_, _) => ())
   }
 
   private[this] def start(txSource: Observable[BroadcastRequest], blockSource: Observable[_]): CancelableFuture[Unit] = {

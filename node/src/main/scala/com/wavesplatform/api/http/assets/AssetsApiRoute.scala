@@ -206,7 +206,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         .map(_.json())
         .toListL
         .map(lst => JsArray(lst))
-        .runAsync
+        .runAsyncLogErr
     }
 
     complete(response)

@@ -40,7 +40,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)(imp
           pairs     = commonApi.blocksRange(start, end).filter(_._1.signerData.generator.address == address)
           jsonPairs = pairs.map(pair => pair._1.json().addBlockFields(pair._2))
           result    = jsonPairs.toListL.map(JsArray(_))
-        } yield result.runAsync
+        } yield result.runToFuture
 
         complete(result)
       } else {
@@ -179,7 +179,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)(imp
           .map { case (bh, size, height) => BlockHeader.json(bh, size).addBlockFields(height) }
       }
 
-      complete(blocks.toListL.map(JsArray(_)).runAsync)
+      complete(blocks.toListL.map(JsArray(_)).runToFuture)
     } else {
       complete(TooBigArrayAllocation)
     }

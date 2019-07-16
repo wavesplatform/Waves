@@ -1,5 +1,6 @@
 package com.wavesplatform.api.common
 
+import cats.effect.Resource
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -11,6 +12,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import monix.eval.Task
 import monix.reactive.Observable
 
 import scala.concurrent.Future
@@ -18,8 +20,12 @@ import scala.concurrent.Future
 private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer) {
 
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = {
-    val iterator = blockchain.addressTransactions(address, Set.empty, fromId)
-    Observable.fromIterator(iterator, () => iterator.close())
+    val resource = Resource(Task {
+      val iterator = blockchain.addressTransactions(address, Set.empty, fromId)
+      (iterator: Iterator[(Height, VanillaTransaction)], Task(iterator.close()))
+    })
+
+    Observable.fromIterator(resource)
   }
 
   def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] = {

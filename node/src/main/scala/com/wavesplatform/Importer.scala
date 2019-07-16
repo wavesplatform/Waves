@@ -81,7 +81,7 @@ object Importer extends ScorexLogging {
                       else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
-                      Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
+                      Await.result(extAppender.apply(block).runAsyncLogErr, Duration.Inf) match {
                         case Left(ve) =>
                           log.error(s"Error appending block: $ve")
                           quit = true
