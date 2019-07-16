@@ -4,21 +4,17 @@ import java.io._
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observer
+import monix.reactive.subjects.PublishSubject
 import scopt.OParser
 
 import scala.concurrent.Await
@@ -33,18 +29,6 @@ object Importer extends ScorexLogging {
         val settings = Application.loadApplicationConfig(Some(configFile))
 
         implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
-        val utxPoolStub: UtxPool = new UtxPool {
-          override def putIfNew(tx: Transaction, b: Boolean)                 = ???
-          override def removeAll(txs: Traversable[Transaction]): Unit        = {}
-          override def spendableBalance(addr: Address, assetId: Asset): Long = ???
-          override def pessimisticPortfolio(addr: Address): Portfolio        = ???
-          override def all                                                   = ???
-          override def size                                                  = ???
-          override def transactionById(transactionId: ByteStr)               = ???
-          override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
-                                       maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
-          override def close(): Unit                                                                                = {}
-        }
 
         val time = new NTP(settings.ntpServer)
         log.info(s"Loading file '$blockchainFile'")
@@ -54,7 +38,8 @@ object Importer extends ScorexLogging {
             val db                = openDB(settings.dbSettings.directory)
             val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
-            val extAppender       = BlockAppender(blockchainUpdater, time, utxPoolStub, pos, settings, scheduler, verifyTransactions) _
+            val ups               = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
+            val extAppender       = BlockAppender(blockchainUpdater, time, ups, pos, scheduler, verifyTransactions) _
             checkGenesis(settings, blockchainUpdater)
             val bis           = new BufferedInputStream(inputStream)
             var quit          = false

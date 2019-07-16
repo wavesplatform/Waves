@@ -9,13 +9,12 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
-import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 
@@ -35,7 +34,6 @@ package object appender extends ScorexLogging {
       ch: Channel,
       peerDatabase: PeerDatabase,
       miner: Miner,
-      allChannels: ChannelGroup,
       start: => String,
       success: => String,
       errorPrefix: String)(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
@@ -54,29 +52,27 @@ package object appender extends ScorexLogging {
   }
 
   private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
-                                    utxStorage: UtxPool,
+                                    utxStorage: UtxPoolImpl,
                                     pos: PoSSelector,
                                     time: Time,
-                                    settings: WavesSettings,
                                     verify: Boolean)(block: Block): Either[ValidationError, Option[Int]] = {
     val append: Block => Either[ValidationError, Option[Int]] =
-      if (verify) appendBlock(blockchainUpdater, utxStorage, pos, time, settings)
-      else appendBlock(blockchainUpdater, utxStorage, false)
+      if (verify) validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)
+      else appendBlock(blockchainUpdater, utxStorage, verify = false)
     append(block)
   }
 
-  private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
-                                    utxStorage: UtxPool,
-                                    pos: PoSSelector,
-                                    time: Time,
-                                    settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
+  private[appender] def validateAndAppendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
+                                               utxStorage: UtxPoolImpl,
+                                               pos: PoSSelector,
+                                               time: Time)(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
         !blockchainUpdater.hasScript(block.sender),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      _ <- blockConsensusValidation(blockchainUpdater, settings, pos, time.correctedTime(), block) { (height, parent) =>
+      _ <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
         val balance = blockchainUpdater.generatingBalance(block.sender, parent)
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
@@ -87,38 +83,40 @@ package object appender extends ScorexLogging {
       baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block)
     } yield baseHeight
 
-  private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, verify: Boolean)(
+  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
       block: Block): Either[ValidationError, Option[Int]] =
     metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
-        metrics.utxDiscardedPut.measure(discarded.foreach(utxStorage.putIfNew(_, verify = false)))
+        metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded, verify = false))
         blockchainUpdater.height
       }
     }
 
-  private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSSelector, currentTs: Long, block: Block)(
+  private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
       genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, Unit] =
     metrics.blockConsensusValidation
       .measureSuccessful {
 
         val blockTime = block.timestamp
 
-    for {
-      height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-      parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
-      grandParent = blockchain.parentHeader(parent, 2)
-      effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
-      _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
-      _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
-      _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-      _                <- pos.validateGeneratorSignature(height, block)
-      _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
-    } yield ()
-  }.left.map {
-    case GenericError(x) => GenericError(s"Block $block is invalid: $x")
-    case x               => x
-  }
+        for {
+          height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
+          parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+          grandParent = blockchain.parentHeader(parent, 2)
+          effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
+          _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
+          _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
+          _                <- pos.validateBaseTarget(height, block, parent, grandParent)
+          _                <- pos.validateGeneratorSignature(height, block)
+          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
+        } yield ()
+      }
+      .left
+      .map {
+        case GenericError(x) => GenericError(s"Block $block is invalid: $x")
+        case x               => x
+      }
 
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either

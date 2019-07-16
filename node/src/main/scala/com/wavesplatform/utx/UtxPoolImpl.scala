@@ -24,7 +24,6 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
@@ -53,7 +52,7 @@ class UtxPoolImpl(time: Time,
     else putNewTx(tx, verify)
   }
 
-  protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -171,13 +170,6 @@ class UtxPoolImpl(time: Time,
     isNew
   }
 
-  override def spendableBalance(addr: Address, assetId: Asset): Long =
-    blockchain.balance(addr, assetId) -
-      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
-      pessimisticPortfolios
-        .getAggregated(addr)
-        .spendableBalanceOf(assetId)
-
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
@@ -255,12 +247,12 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[UtxPoolImpl] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  private[this] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
-  val cleanupTask: Task[Unit] = Task
-    .eval[Unit](packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf))
-    .onErrorRecover { case t => log.error("Error cleaning up UTX pool", t) }
-    .executeOn(scheduler)
+  def addAndCleanup(transactions: Seq[Transaction], verify: Boolean = true): Unit = scheduler.executeAsync { () =>
+    transactions.foreach(putIfNew(_, verify))
+    packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+  }
 
   override def close(): Unit = {
     scheduler.shutdown()
