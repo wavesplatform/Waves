@@ -10,6 +10,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import cats.instances.all._
+import cats.syntax.option._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -44,7 +45,7 @@ import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import monix.execution.Scheduler._
-import monix.execution.schedulers.SchedulerService
+import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
@@ -315,7 +316,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       spendableBalanceChanged.onComplete()
       utx.close()
 
-      shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
+      shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes.some)
 
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
@@ -334,11 +335,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Stopping network services")
       network.shutdown()
 
+      shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader", 1.minute.some)
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
-      shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
-      shutdownAndWait(appenderScheduler, "Appender", 5.minutes)
+      shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some, tryForce = false)
 
       log.info("Closing storage")
       db.close()
@@ -347,16 +348,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Shutdown complete")
     }
 
-  private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: FiniteDuration = 1.minute): Unit = {
+  private def shutdownAndWait(scheduler: SchedulerService,
+                              name: String,
+                              timeout: Option[FiniteDuration] = none,
+                              tryForce: Boolean = true): Unit = {
     log.debug(s"Shutting down $name")
-    scheduler.shutdown()
-    val r = Await.result(scheduler.awaitTermination(timeout, global), 2 * timeout)
-    if (r)
-      log.info(s"$name was shutdown successfully")
-    else
-      log.warn(s"Failed to shutdown $name properly during timeout")
+    scheduler match {
+      case es: ExecutorScheduler if tryForce => es.executor.shutdownNow()
+      case s                                 => s.shutdown()
+    }
+    timeout.foreach { to =>
+      val r = Await.result(scheduler.awaitTermination(to, global), 2 * to)
+      if (r)
+        log.info(s"$name was shutdown successfully")
+      else
+        log.warn(s"Failed to shutdown $name properly during timeout")
+    }
   }
-
 }
 
 object Application {
