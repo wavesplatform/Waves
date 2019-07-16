@@ -124,18 +124,16 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
     protoBlocks.map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
   }
 
-  def deleteBlock(h: Height): Unit =
+  def deleteBlock(h: Height, transactions: Seq[TransactionId]): Unit =
     lockedWrite { (_, _) =>
       dbContext.readWrite { rw =>
-        Try(getBlock(h, withTxs = true))
-          .fold(_ => Nil, _.transactionData)
-          .foreach(tx => rw.delete(Keys.transactionOffset(TransactionId @@ tx.id())))
-
+        blocks.remove(h)
         rw.delete(Keys.blockOffset(h))
+        for (transactionId <- transactions) {
+          this.transactions -= transactionId
+          rw.delete(Keys.transactionOffset(transactionId))
+        }
       }
-
-      blocks.remove(h)
-      transactions --= transactions.filter(_._2._1 == h).keys
     }
 
   // TODO: Get block raw bytes etc
@@ -219,11 +217,10 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
       .getOrElse {
         val optimisticOffset = Try(dbContext.readOnly(_.get(Keys.transactionOffset(id))))
         optimisticRead(optimisticOffset.get._1) { input =>
-          val txSize  = input.readInt()
-          val txBytes = new Array[Byte](txSize)
-          input.read(txBytes)
-
           val (_, height, num) = optimisticOffset.getOrElse(dbContext.readOnly(_.get(Keys.transactionOffset(id))))
+          val txSize           = input.readInt()
+          val txBytes          = new Array[Byte](txSize)
+          input.read(txBytes)
           (height, num, toTransaction(txBytes))
         }
       }

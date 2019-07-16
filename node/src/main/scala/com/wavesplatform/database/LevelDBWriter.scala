@@ -678,7 +678,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
               }
           }
 
-          blocksWriter.deleteBlock(Height @@ currentHeight)
+          blocksWriter.deleteBlock(Height @@ currentHeight, transactions.map { case (_, tx) => TransactionId @@ tx.id() })
+
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -732,11 +733,11 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     asset
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
-
-  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = {
+    val tr =  Try(blocksWriter.getTransaction(TransactionId(id)))
+    tr.failed.foreach(log.error("Error getting tx by id", _))
     for {
-      (height, _, tx) <- Try(blocksWriter.getTransaction(TransactionId(id))).toOption
+      (height, _, tx) <- tr.toOption
     } yield (height, tx)
   }
 
@@ -754,13 +755,13 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
       .reverseIterator
 
     val issueTxStream = assetIdStream
-      .flatMap(ia => transactionInfo(ia.id, db).map(_._2))
+      .flatMap(ia => transactionInfo(ia.id).map(_._2))
       .collect {
         case itx: IssueTransaction if itx.isNFT => itx
       }
 
     from
-      .flatMap(ia => transactionInfo(ia.id, db))
+      .flatMap(ia => transactionInfo(ia.id))
       .fold(issueTxStream) {
         case (_, afterTx) =>
           issueTxStream
@@ -842,7 +843,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
-    transactionInfo(leaseId, db) match {
+    transactionInfo(leaseId) match {
       case Some((h, lt: LeaseTransaction)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None

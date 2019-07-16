@@ -455,7 +455,7 @@ object SyncHttpApi extends Assertions {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
-    private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 80 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
     def height(implicit pos: Position): Seq[Int] =

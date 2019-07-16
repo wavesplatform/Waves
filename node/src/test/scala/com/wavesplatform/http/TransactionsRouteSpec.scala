@@ -271,6 +271,7 @@ class TransactionsRouteSpec
         Gen.const({
           val b = mock[Blockchain]
           (b.addressTransactions(_: Address, _: Set[TransactionParser], _: Option[ByteStr])).expects(*, *, *).returning(CloseableIterator.empty).anyNumberOfTimes()
+          (b.addressTransactions(_: Address, _: Set[Byte], _: Int, _: Option[ByteStr])).expects(*, *, *, *).returning(Right(Nil)).anyNumberOfTimes()
           TransactionsApiRoute(restAPISettings, wallet, b, utx, allChannels, new TestTime).route
         })
 

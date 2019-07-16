@@ -16,7 +16,7 @@ private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, w
 
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = {
     val seq = blockchain.addressTransactions(address, Set.empty, Int.MaxValue, fromId) // FIXME fix tests instead
-    Observable.fromIterable(seq.getOrElse(Nil))
+    Observable.fromIterable(seq.fold(_ => Nil, _.toVector))
   }
 
   def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] = {
