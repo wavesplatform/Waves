@@ -4,9 +4,11 @@ import java.nio.file.{Files, Paths}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import org.hjson.JsonValue
 import sbt.{Def, IO}
 import sbt._
 import sbt.Keys.{sourceManaged, version}
+
 import scala.collection.JavaConverters._
 
 object Tasks {
@@ -110,14 +112,19 @@ object Tasks {
         funcs,
         f => (f._1.name, f._1.params),
         f => Seq(str(f._1.name), listStr(f._1.params.map(str)), ver),
-        f => Seq(str(f._1.doc), listStr(f._1.paramsDoc.map(str)), str(f._2))
+        f => Seq(
+          str(f._1.doc.replace("\n", "\\n")),
+          listStr(f._1.paramsDoc.map(str).map(_.replace("\n", "\\n"))),
+          str(f._2)
+        )
       )
 
     def readV3Data(): (String, String) = {
       val ver = "3"
       val funcs = for {
         path  <- Files.list(Paths.get("lang/doc/v3/funcs")).iterator.asScala
-        funcs <- mapper.readValue[Map[String, List[FuncSourceData]]](path.toFile).head._2
+        json  = JsonValue.readHjson(Files.newBufferedReader(path)).asObject().toString
+        funcs <- mapper.readValue[Map[String, List[FuncSourceData]]](json).head._2
         category = path.getName(path.getNameCount - 1).toString.split('.').head
       } yield (funcs, category)
 

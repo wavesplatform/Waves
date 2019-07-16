@@ -2,12 +2,12 @@
 
 |#|Name|Description|Complexity|
 | :--- | :--- | :--- | :--- |
-{{#funcs}}|{{index}}|[{{name}}({{{paramTypes}}}): {{#type}}{{{mdName}}}{{/type}}](#{{anchor}})|{{doc}}|{{cost}}|
+{{#funcs}}|{{index}}|[{{name}}({{{paramTypes}}}): {{#type}}{{{mdName}}}{{/type}}](#{{anchor}})|{{{doc}}}|{{cost}}|
 {{/funcs}}
 {{#funcs}}
 
 ## {{name}}({{{paramTypes}}}): {{#type}}{{{mdName}}}{{/type}}<a id = "{{anchor}}"></a>
-{{doc}}
+{{{doc}}}
 
 ``` ride
 {{name}}({{{paramArgTypes}}}): {{#type}}{{name}}{{/type}}
@@ -17,6 +17,6 @@
 {{#params}}
 
 #### `{{name}}`: {{#type}}{{{mdName}}}{{/type}}
-{{doc}}
+{{{doc}}}
 {{/params}}
 {{/funcs}}

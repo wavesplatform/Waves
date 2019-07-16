@@ -1,0 +1,16 @@
+{
+  funcs: [
+    {
+      name: "throw"
+      params: [ ]
+      doc: "Raises an exception."
+      paramsDoc: [ ]
+    }
+    {
+      name: "throw"
+      params: [ "String" ]
+      doc: "Raises an exception with a message."
+      paramsDoc: [ "The exception message." ]
+    }
+  ]
+}

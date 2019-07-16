@@ -26,11 +26,11 @@ object DocExportV3 {
               (f.args, f.signature.args, paramsDoc)
                 .zipped
                 .toList
-                .map { arg => VarDoc(arg._1, TypeDoc(arg._2._2), arg._3) }
+                .map { arg => VarDoc(arg._1, TypeDoc(arg._2._2), arg._3.replace("\n", "<br>")) }
                 .asJava
 
             val cost = f.costByLibVersion(V3).toString
-            val funcDoc = FuncDoc(f.name, TypeDoc(f.signature.result), doc, varDocs, cost)
+            val funcDoc = FuncDoc(f.name, TypeDoc(f.signature.result), doc.replace("\n", "<br>"), varDocs, cost)
             (funcDoc, category)
           }
         )
