@@ -561,7 +561,6 @@ object PBTransactions {
 
   def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
     val pbTx = tx match {
-      // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(PBRecipients.create(recipient).getAddress, amount)
         PBTransactions.create(sender = PublicKey(Array.emptyByteArray),
@@ -637,11 +636,11 @@ object PBTransactions {
 
       case vt.assets.SetAssetScriptTransaction(chainId, sender, assetId, script, fee, timestamp, proofs) =>
         val data = SetAssetScriptTransactionData(assetId.id, script.map(s => PBScript(s.bytes())))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SetAssetScript(data))
+        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, 1, proofs, Data.SetAssetScript(data))
 
       case vt.smart.SetScriptTransaction(chainId, sender, script, fee, timestamp, proofs) =>
         val data = SetScriptTransactionData(script.map(s => PBScript(s.bytes())))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SetScript(data))
+        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, 1, proofs, Data.SetScript(data))
 
       case tx @ vt.lease.LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature) =>
         val data = LeaseTransactionData(Some(recipient), amount)
@@ -665,15 +664,15 @@ object PBTransactions {
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
           attachment: ByteStr
         )
-        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.MassTransfer(data))
+        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 1, proofs, Data.MassTransfer(data))
 
       case tx @ vt.DataTransaction(sender, data, fee, timestamp, proofs) =>
         val txData = DataTransactionData(data.map(toPBDataEntry))
-        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.DataTransaction(txData))
+        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 1, proofs, Data.DataTransaction(txData))
 
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
         val data = SponsorFeeTransactionData(Some(AssetAmount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
-        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SponsorFee(data))
+        PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 1, proofs, Data.SponsorFee(data))
 
       case vt.smart.InvokeScriptTransaction(chainId, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
         import com.wavesplatform.lang.v1.Serde
@@ -684,7 +683,7 @@ object PBTransactions {
           ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
           payment.map(p => (p.assetId, p.amount): Amount)
         )
-        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
+        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 1, proofs, Data.InvokeScript(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
