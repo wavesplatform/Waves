@@ -12,29 +12,20 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
+import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
+import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{Observable, OverflowStrategy}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])
+class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])(
+    implicit val scheduler: Scheduler = Scheduler.global)
     extends ScorexLogging {
 
-  private[this] lazy val _scheduler = Scheduler.forkJoin(settings.parallelism, settings.maxThreads, "utx-pool-sync")
-
-  implicit def scheduler: Scheduler = _scheduler
-
   private[this] lazy val txSource = ConcurrentSubject.publishToOne[BroadcastRequest]
-  private[this] var future: CancelableFuture[Unit] = _
 
-  def start(): Unit = synchronized {
-    if (future == null) {
-      future = start(txSource, blockSource)
-      sys.addShutdownHook(future.cancel())
-    }
-  }
+  start(txSource, blockSource)
 
   //noinspection ScalaStyle
   def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] = {
@@ -49,29 +40,37 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
   }
 
   private[this] def putAndBroadcastTask(source: Observable[BroadcastRequest]): Task[Unit] = {
-    source
-      .whileBusyBuffer(OverflowStrategy.DropOldAndSignal(settings.maxQueueSize, { dropped =>
-        log.warn(s"UTX queue overflow: $dropped transactions dropped")
-        None
-      }))
-      .mapParallelUnordered(settings.parallelism) {
-        case BroadcastRequest(transaction, sender, promise, forceBroadcast) =>
-          Task {
-            val value = concurrent.blocking(utx.putIfNew(transaction))
-            promise.trySuccess(value)
+    val queue = AsyncQueue.bounded[BroadcastRequest](settings.maxQueueSize)
 
-            value.resultE.toOption.filter(_ || forceBroadcast).map { _ =>
-              log.trace(s"Broadcasting ${transaction.id()} to ${allChannels.size()} peers except $sender")
-              allChannels.write(transaction, (_: Channel) != sender)
+    val produceTask = source.foreachL { req =>
+      if (!queue.tryOffer(req))
+        req.promise.tryFailure(new RuntimeException("UTX queue overflow"))
+    }
+
+    val consumeTask = Observable
+      .repeatEval(queue.poll())
+      .mapParallelUnordered(settings.parallelism) { futureReq =>
+        Task.fromFuture(futureReq).flatMap {
+          case BroadcastRequest(transaction, sender, promise, forceBroadcast) =>
+            Task {
+              val value = concurrent.blocking(utx.putIfNew(transaction))
+              promise.trySuccess(value)
+
+              value.resultE.toOption.filter(_ || forceBroadcast).map { _ =>
+                log.trace(s"Broadcasting ${transaction.id()} to ${allChannels.size()} peers except $sender")
+                allChannels.write(transaction, (_: Channel) != sender)
+              }
+            }.onErrorHandle { error =>
+              promise.tryFailure(error)
+              None
             }
-          }.onErrorHandle { error =>
-            promise.tryFailure(error)
-            None
-          }
+        }
       }
       .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
       .filter(_.flatten.nonEmpty)
       .foreachL(_ => allChannels.flush())
+
+    Task.parZip2(produceTask, consumeTask).map(_ => ())
   }
 
   private[this] def start(txSource: Observable[BroadcastRequest], blockSource: Observable[_]): CancelableFuture[Unit] = {
@@ -100,7 +99,7 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
     val synchronizerFuture = putAndBroadcastTask(newTxSource).runAsyncLogErr
 
     synchronizerFuture.onComplete {
-      case Success(_) => log.info("UtxPoolSynschronizer stops")
+      case Success(_)     => log.info("UtxPoolSynschronizer stops")
       case Failure(error) => log.error("Error in utx pool synchronizer", error)
     }
 
