@@ -187,18 +187,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     utxSynchronizer.publishTransactions(transactions)
 
     val microBlockSink = microblockDatas
-      .mapTask(scala.Function.tupled(processMicroBlock))
+      .mapEval(scala.Function.tupled(processMicroBlock))
 
     val blockSink = newBlocks
-      .mapTask(scala.Function.tupled(processBlock))
+      .mapEval(scala.Function.tupled(processBlock))
 
-    Observable.merge(microBlockSink, blockSink).subscribe()
+    Observable(microBlockSink, blockSink).merge.subscribe()
 
     lastBlockInfo
       .map(_.height)
       .distinctUntilChanged
       .whileBusyDropEvents
-      .doOnNextTask(_ => utxStorage.cleanupTask)
+      .doOnNext(_ => utxStorage.cleanupTask)
       .subscribe()
 
     miner.scheduleMining()
