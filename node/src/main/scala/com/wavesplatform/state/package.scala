@@ -5,8 +5,8 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -50,11 +50,25 @@ package object state {
         }
     }
 
+    def nftFromBlockchain: CloseableIterator[IssueTransaction] =
+      b.nftList(address, after)
+        .filterNot { itx =>
+          val asset = IssuedAsset(itx.assetId())
+
+          val balanceFromDiff = for {
+            diff      <- d
+            portfolio <- diff.portfolios.get(address)
+            balance   <- portfolio.assets.get(asset)
+          } yield balance
+
+          balanceFromDiff.exists(_ < 0)
+        }
+
     d.fold(b.nftList(address, after)) { d =>
       after match {
-        case None                                         => nftFromDiff(d, after) ++ b.nftList(address, after)
-        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ b.nftList(address, None)
-        case _                                            => b.nftList(address, after)
+        case None                                         => nftFromDiff(d, after) ++ nftFromBlockchain
+        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ nftFromBlockchain
+        case _                                            => nftFromBlockchain
       }
     }
   }
