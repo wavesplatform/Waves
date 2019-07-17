@@ -671,7 +671,10 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
       .fold(CloseableIterator.empty[IssuedAsset]) { id =>
         val addressId = AddressId @@ id
 
-        val iter = db.get(Keys.assetList(addressId)).iterator
+        val iter = db
+          .get(Keys.assetList(addressId))
+          .iterator
+          .filter(balance(address, _) > 0)
 
         CloseableIterator(iter, () => CloseableIterator.close(iter))
       }
