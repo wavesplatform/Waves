@@ -1,7 +1,8 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
-import com.wavesplatform.api.http.{ApiKeyNotValid, WalletApiRoute}
+import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.WalletApiRoute
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.ApiMarshallers._
 import play.api.libs.json.JsObject

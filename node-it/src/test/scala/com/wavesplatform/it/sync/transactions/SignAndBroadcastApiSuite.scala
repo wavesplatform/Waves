@@ -43,8 +43,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   test("/transactions/sign should handle erroneous input") {
-    def assertSignBadJson(json: JsObject, expectedMessage: String): scalatest.Assertion =
-      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage)
+    def assertSignBadJson(json: JsObject, expectedMessage: String, code: Int = 400): scalatest.Assertion =
+      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage, code)
 
     for (v <- supportedVersions) {
       val json = Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
@@ -56,8 +56,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
 
     val obsoleteTx =
       Json.obj("type" -> GenesisTransaction.typeId, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000)
-    assertSignBadJson(obsoleteTx, "UnsupportedTransactionType")
-    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "UnsupportedTransactionType")
+    assertSignBadJson(obsoleteTx, "transaction type not supported", 501)
+    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "transaction type not supported", 501)
 
     val bigBaseTx =
       Json.obj("type"       -> TransferTransaction.typeId,
