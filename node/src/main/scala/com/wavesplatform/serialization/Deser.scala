@@ -19,7 +19,7 @@ object Deser {
     val from   = position + 2
     val length = Shorts.fromByteArray(bytes.slice(position, from))
     val to     = from + length
-    require(length >= 0, s"Array length should be positive, but $length found")
+    require(length >= 0, s"Array length should be non-negative, but $length found")
     require(bytes.length >= to, s"Array length = ${bytes.length} less than slice end point index = $to")
     (bytes.slice(from, to), to)
   }
@@ -49,7 +49,7 @@ object Deser {
 
   def parseArrays(bytes: Array[Byte]): Seq[Array[Byte]] = {
     val arraysCount = Shorts.fromByteArray(bytes.slice(0, 2))
-    require(arraysCount >= 0, s"Arrays count should be positive, but $arraysCount found")
+    require(arraysCount >= 0, s"Arrays count should be non-negative, but $arraysCount found")
     require(
       arraysCount <= (bytes.length - 2) / 2,
       s"Bytes with length = ${bytes.length - 2} can't contain $arraysCount array(s)"

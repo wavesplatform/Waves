@@ -18,7 +18,7 @@ class DeserTest extends PropSpec with Matchers {
 
   property("negative arrays count") {
     checkDeserError(
-      "Arrays count should be positive, but -2 found",
+      "Arrays count should be non-negative, but -2 found",
       Array(-1, -2, 1, 2, 3, 4)
     )
   }
@@ -32,7 +32,7 @@ class DeserTest extends PropSpec with Matchers {
 
   property("negative array length") {
     checkDeserError(
-      "Array length should be positive, but -3 found",
+      "Array length should be non-negative, but -3 found",
       Array(0, 2, 0, 2, 1, 2, -1, -3, 1, 2)
     )
   }
