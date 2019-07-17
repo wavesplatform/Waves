@@ -195,8 +195,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           |{-# CONTENT_TYPE DAPP #-}
           |
           |@Callable(xx)
-          |func $funcName(amount: Int) = {
-          |    if (amount + 1 != 0) then throw() else throw()
+          |func $funcName(str: String, num: Int) = {
+          |    if (parseInt(str) == num) then throw() else throw()
           |}
           |
           |@Verifier(txx)
@@ -315,7 +315,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(
         FunctionHeader.User(funcBinding),
-        List.fill(invocationParamsCount)(CONST_STRING("Not-a-Number").explicitGet())
+        List.fill(invocationParamsCount)(FALSE)
       )
       ci = InvokeScriptTransaction
         .selfSigned(
@@ -1021,11 +1021,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   property("argument passed to callable function has wrong type") {
     forAll(for {
-      r <- simplePreconditionsAndSetContract()
+      r <- simplePreconditionsAndSetContract(invocationParamsCount = 2)
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("Passed argument with wrong type")
+          _ should produce("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
         }
     }
   }
@@ -1076,7 +1076,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   property("Function call args count should be equal @Callable func one") {
     forAll(for {
-      invocationArgsCount <- Gen.oneOf(0, 2)
+      invocationArgsCount <- Gen.oneOf(0, 3)
       r                   <- simplePreconditionsAndSetContract(invocationParamsCount = invocationArgsCount)
     } yield (r._1, r._2, r._3, invocationArgsCount)) {
       case (genesis, setScript, ci, count) =>
