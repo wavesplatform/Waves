@@ -23,6 +23,7 @@ import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, Generi
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
@@ -456,6 +457,17 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     val lease   = blockchain.leaseBalance(a)
     val balance = blockchain.balance(a)
     Portfolio(balance, lease, Map.empty).combine(diffPf)
+  }
+
+  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
+    ngState
+      .fold(Diff.empty)(_.bestLiquidDiff)
+      .transactions
+      .get(id)
+      .collect {
+        case (h, tx: TransferTransaction, _) => (h, tx)
+      }
+      .orElse(blockchain.transferById(id))
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {

@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 
 case object EmptyBlockchain extends Blockchain {
@@ -55,6 +56,8 @@ case object EmptyBlockchain extends Blockchain {
   override def featureVotes(height: Int): Map[Short, Int] = Map.empty
 
   override def portfolio(a: Address): Portfolio = Portfolio.empty
+
+  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = None
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = None
 
