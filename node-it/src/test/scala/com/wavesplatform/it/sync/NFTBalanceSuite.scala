@@ -120,10 +120,14 @@ class NFTBalanceSuite
         .explicitGet()
 
       val assertion = for {
-        tx   <- node.signedBroadcast(transfer.json())
-        _    <- node.waitForTransaction(tx.id)
-        nfts <- getNFTPage(node, issuer.address, 1000, None)
-      } yield nfts shouldNot contain(randomTokenToTransfer.id.base58)
+        tx         <- node.signedBroadcast(transfer.json())
+        _          <- node.waitForTransaction(tx.id)
+        issuerNFTs <- getNFTPage(node, issuer.address, 1000, None)
+        otherNFTs  <- getNFTPage(node, other.address, 1000, None)
+      } yield {
+        issuerNFTs shouldNot contain(randomTokenToTransfer.id.base58)
+        otherNFTs should contain(randomTokenToTransfer.id.base58)
+      }
 
       Await.result(assertion, 10.seconds)
     }

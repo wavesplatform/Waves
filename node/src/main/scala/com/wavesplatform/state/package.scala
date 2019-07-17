@@ -23,6 +23,17 @@ package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   def nftListFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
+
+    def nonZeroBalance(asset: IssuedAsset): Boolean = {
+      val balanceFromDiff = for {
+        diff      <- d
+        portfolio <- diff.portfolios.get(address)
+        balance   <- portfolio.assets.get(asset)
+      } yield balance
+
+      !balanceFromDiff.exists(_ < 0)
+    }
+
     def transactionFromDiff(d: Diff, id: ByteStr): Option[Transaction] = {
       d.transactions.get(id).map(_._2)
     }
@@ -32,6 +43,7 @@ package object state {
         .get(address)
         .toIterator
         .flatMap(_.assets.keysIterator)
+
     }
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Iterator[IssueTransaction] = {
@@ -41,27 +53,22 @@ package object state {
             .dropWhile(_ != after)
             .drop(1)
         }
+        .filter(nonZeroBalance)
         .map { asset =>
           transactionFromDiff(diff, asset.id)
             .orElse(b.transactionInfo(asset.id).map(_._2))
         }
         .collect {
-          case itx: IssueTransaction if itx.isNFT => itx
+          case Some(itx: IssueTransaction) if itx.isNFT => itx
         }
     }
 
     def nftFromBlockchain: CloseableIterator[IssueTransaction] =
       b.nftList(address, after)
-        .filterNot { itx =>
+        .filter { itx =>
           val asset = IssuedAsset(itx.assetId())
 
-          val balanceFromDiff = for {
-            diff      <- d
-            portfolio <- diff.portfolios.get(address)
-            balance   <- portfolio.assets.get(asset)
-          } yield balance
-
-          balanceFromDiff.exists(_ < 0)
+          nonZeroBalance(asset)
         }
 
     d.fold(b.nftList(address, after)) { d =>
