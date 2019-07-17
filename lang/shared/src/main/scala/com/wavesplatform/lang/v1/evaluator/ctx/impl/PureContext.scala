@@ -49,9 +49,9 @@ object PureContext {
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction =
-    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited bytes vectors concatenation", "prefix", "suffix", 10) {
+    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited byte vectors concatenation", "prefix", "suffix", 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        CONST_BYTESTR(a ++ b).filterOrElse(_.bs.length <= MaxBytesResult, "ByteStr is too large")
+        CONST_BYTESTR(a ++ b).filterOrElse(_.bs.length <= MaxBytesResult, "ByteVector is too large")
       case _ => ???
     }
   lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer greater or equal comparison", "term", "term")(_ >= _)
@@ -211,13 +211,13 @@ object PureContext {
   }
 
   lazy val takeBytes: BaseFunction =
-    NativeFunction("take", 1, TAKE_BYTES, BYTESTR, "Take firsts bytes subvector", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
+    NativeFunction("take", 1, TAKE_BYTES, BYTESTR, "Take first bytes subvector", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number))
       case xs                                             => notImplemented("take(xs: ByteVector, number: Int)", xs)
     }
 
   lazy val dropBytes: BaseFunction =
-    NativeFunction("drop", 1, DROP_BYTES, BYTESTR, "Skip firsts bytes", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
+    NativeFunction("drop", 1, DROP_BYTES, BYTESTR, "Skip first bytes", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number))
       case xs                                             => notImplemented("drop(xs: ByteVector, number: Int)", xs)
     }

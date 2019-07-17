@@ -92,8 +92,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       waitForTx = true
     )
 
-    sender.getData(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
-    sender.getData(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+    sender.getDataByKey(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getDataByKey(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
   }
 
   test("contract caller invokes a default function on a contract") {
@@ -107,8 +107,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       fee = 1.waves,
       waitForTx = true
     )
-    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "b")
-    sender.getData(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
+    sender.getDataByKey(contract.address, "a") shouldBe StringDataEntry("a", "b")
+    sender.getDataByKey(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
   }
 
   test("verifier works") {
@@ -130,6 +130,6 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
+    sender.getDataByKey(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
   }
 }

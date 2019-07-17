@@ -22,31 +22,41 @@ object Merkle {
   }
 
   private def parseProof(proofBytes: Array[Byte], valueBytes: Array[Byte]): Option[MerkleProof[Digest32]] =
-    Try {
+    parseMerkleProofLevels(proofBytes).map { data =>
       MerkleProof[Digest32](
         LeafData @@ valueBytes,
-        parseMerkleProofLevels(proofBytes)
+        data
       )(blakeCH)
     }.toOption
 
-  def parseMerkleProofLevels(arr: Array[Byte]): List[(Digest, Side)] = {
-    def parseHashAndSide(arr: Array[Byte]): (Side, Digest, Array[Byte]) = {
+  def parseMerkleProofLevels(arr: Array[Byte]): Either[String, List[(Digest, Side)]] = {
+    def parseHashAndSide(arr: Array[Byte]): Either[String, (Side, Digest, Array[Byte])] = {
       val side =
         if (arr(0) == MerkleProof.LeftSide) MerkleProof.LeftSide
         else MerkleProof.RightSide
-      val hashLen = arr(1).toInt
-      val hash    = Digest32 @@ arr.slice(2, 2 + hashLen)
-      (side, hash, arr.drop(2 + hashLen))
+      val hashLen   = arr(1).toInt
+      lazy val hash = Digest32 @@ arr.slice(2, 2 + hashLen)
+
+      Either
+        .cond(
+          hashLen >= 0,
+          (side, hash, arr.drop(2 + hashLen)),
+          s"Invalid proof hash length: $hashLen"
+        )
     }
 
-    def parseLevels(arr: Array[Byte], acc: List[(Digest, Side)]): List[(Digest, Side)] = {
+    def parseLevels(arr: Array[Byte], acc: List[(Digest, Side)]): Either[String, List[(Digest, Side)]] = {
       if (arr.nonEmpty) {
-        val (side, hash, rest) = parseHashAndSide(arr)
-        parseLevels(rest, (hash, side) :: acc)
-      } else acc.reverse
+        parseHashAndSide(arr)
+          .flatMap {
+            case (side, hash, rest) =>
+              parseLevels(rest, (hash, side) :: acc)
+          }
+      } else Right(acc.reverse)
     }
 
-    parseLevels(arr, Nil)
+    Try(parseLevels(arr, Nil))
+      .getOrElse(Left("Can't parse proof bytes"))
   }
 
   private val blakeCH: CryptographicHash[Digest32] =

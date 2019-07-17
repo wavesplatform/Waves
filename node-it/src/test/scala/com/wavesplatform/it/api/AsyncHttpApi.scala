@@ -361,6 +361,12 @@ object AsyncHttpApi extends Assertions {
     def assetsBalance(address: String): Future[FullAssetsInfo] =
       get(s"/assets/balance/$address").as[FullAssetsInfo]
 
+    def nftAssetsBalance(address: String, limit: Int): Future[Seq[NFTAssetInfo]] =
+      get(s"/assets/nft/$address/limit/$limit").as[Seq[NFTAssetInfo]]
+
+    def nftAssetsBalance(address: String, limit: Int, after: String): Future[Seq[NFTAssetInfo]] =
+      get(s"/assets/nft/$address/limit/${limit}?after=$after").as[Seq[NFTAssetInfo]]
+
     def assetsDetails(assetId: String, fullInfo: Boolean = false): Future[AssetInfo] =
       get(s"/assets/details/$assetId?full=$fullInfo").as[AssetInfo]
 
@@ -403,7 +409,9 @@ object AsyncHttpApi extends Assertions {
 
     def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
 
-    def getData(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
+    def getData(address: String, regexp: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address?matches=$regexp").as[List[DataEntry[_]]]
+
+    def getDataByKey(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 

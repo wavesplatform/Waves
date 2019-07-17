@@ -4,9 +4,8 @@ import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.LevelDBWriter
@@ -18,9 +17,9 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TransactionGen, WithDB}
 import io.netty.channel.group.DefaultChannelGroup
@@ -96,7 +95,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, settings, scheduler)(lastBlock)
+          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock)
           Await.result(blockAppendTask.runAsync(scheduler), Duration.Inf)
 
           signal.tryAcquire(10, TimeUnit.SECONDS)
@@ -129,17 +128,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
-    val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction, b: Boolean)                   = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-      override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
-      override def pessimisticPortfolio(addr: Address): Portfolio          = ???
-      override def all                                                     = ???
-      override def size                                                    = ???
-      override def transactionById(transactionId: ByteStr)                 = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
-      override def close(): Unit                                           = {}
-    }
+    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {
@@ -180,7 +169,7 @@ object BlockWithMaxBaseTargetTest {
   final case class Env(settings: WavesSettings,
                        pos: PoSSelector,
                        bcu: BlockchainUpdater with NG,
-                       utxPool: UtxPool,
+                       utxPool: UtxPoolImpl,
                        schedulerService: SchedulerService,
                        miner: KeyPair,
                        lastBlock: Block)

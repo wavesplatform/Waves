@@ -122,10 +122,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       else Miner.Disabled
 
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, settings, allChannels, peerDatabase, miner, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, miner, appenderScheduler) _
 
     val processFork =
-      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, settings, knownInvalidBlocks, peerDatabase, miner, allChannels, appenderScheduler) _
+      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, miner, appenderScheduler) _
     val processMicroBlock =
       MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
@@ -160,7 +160,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject,
       scoreObserverScheduler
     )
-    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(
+    val (microblockData, mbSyncCacheSizes) = MicroBlockSynchronizer(
       settings.synchronizationSettings.microBlockSynchronizer,
       peerDatabase,
       lastBlockInfo.map(_.id),
@@ -188,20 +188,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                               transactions,
                               blockchainUpdater.lastBlockInfo)
 
-    val microBlockSink = microblockDatas
+    val microBlockSink = microblockData
       .mapTask(scala.Function.tupled(processMicroBlock))
 
     val blockSink = newBlocks
       .mapTask(scala.Function.tupled(processBlock))
 
     Observable.merge(microBlockSink, blockSink).subscribe()
-
-    lastBlockInfo
-      .map(_.height)
-      .distinctUntilChanged
-      .whileBusyDropEvents
-      .doOnNextTask(_ => utxStorage.cleanupTask)
-      .subscribe()
 
     miner.scheduleMining()
 

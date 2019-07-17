@@ -7,12 +7,11 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
 import com.wavesplatform.transaction.BlockchainUpdater
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -24,15 +23,14 @@ import scala.util.Right
 object BlockAppender extends ScorexLogging {
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
-            utxStorage: UtxPool,
+            utxStorage: UtxPoolImpl,
             pos: PoSSelector,
-            settings: WavesSettings,
             scheduler: Scheduler,
             verify: Boolean = true)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       metrics.blockProcessingTimeStats.measureSuccessful {
         if (blockchainUpdater.isLastBlockId(newBlock.reference))
-          appendBlock(blockchainUpdater, utxStorage, pos, time, settings, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+          appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
         else if (blockchainUpdater.contains(newBlock.uniqueId) || blockchainUpdater.isLastBlockId(newBlock.uniqueId))
           Right(None)
         else
@@ -42,9 +40,8 @@ object BlockAppender extends ScorexLogging {
 
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
-            utxStorage: UtxPool,
+            utxStorage: UtxPoolImpl,
             pos: PoSSelector,
-            settings: WavesSettings,
             allChannels: ChannelGroup,
             peerDatabase: PeerDatabase,
             miner: Miner,
@@ -54,7 +51,7 @@ object BlockAppender extends ScorexLogging {
 
     (for {
       _                <- EitherT(Task(metrics.blockSignaturesValidation.measureSuccessful(newBlock.signaturesValid())))
-      validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, settings, scheduler)(newBlock))
+      validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) => // block already appended
       case Right(Some(_)) =>

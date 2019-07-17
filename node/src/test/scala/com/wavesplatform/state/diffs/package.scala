@@ -53,7 +53,7 @@ package object diffs extends WithState with Matchers {
     }
 
     val BlockDiffer.Result(diff, fees, totalFee, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val cb              = CompositeBlockchain.composite(state, Some(diff))
+    val cb              = CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 
     state.append(diff, fees, totalFee, block)

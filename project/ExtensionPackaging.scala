@@ -1,5 +1,6 @@
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
+import com.typesafe.sbt.SbtNativePackager.autoImport.{maintainer, packageDescription, packageSummary}
 import com.typesafe.sbt.packager.Compat._
 import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging.autoImport.maintainerScriptsAppend
@@ -46,7 +47,7 @@ object ExtensionPackaging extends AutoPlugin {
         val baseConfigName = s"${name.value}-${network.value}.conf"
         val localFile      = (Compile / baseDirectory).value / baseConfigName
         if (localFile.exists()) {
-          val artifactPath = "doc/dex.conf.sample"
+          val artifactPath = s"doc/${name.value}.conf.sample"
           Seq(localFile -> artifactPath)
         } else Seq.empty
       },
@@ -65,8 +66,15 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       )
-    ) ++ nameFix ++ inScope(Global)(nameFix)
+    ) ++ nameFix ++ inScope(Global)(nameFix) ++ maintainerFix
 
+  private def maintainerFix = inConfig(Linux)(
+    Seq(
+      maintainer := "wavesplatform.com",
+      packageSummary := s"Waves node ${name.value}${network.value.packageSuffix} extension",
+      packageDescription := s"Waves node ${name.value}${network.value.packageSuffix} extension"
+    ))
+  
   private def nameFix = Seq(
     packageName := s"${name.value}${network.value.packageSuffix}",
     normalizedName := s"${name.value}${network.value.packageSuffix}"

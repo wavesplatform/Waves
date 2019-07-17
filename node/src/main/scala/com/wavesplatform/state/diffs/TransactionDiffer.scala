@@ -25,7 +25,8 @@ object TransactionDiffer extends ScorexLogging {
 
   def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int, verify: Boolean = true)(
       blockchain: Blockchain,
-      tx: Transaction): TracedResult[ValidationError, Diff] = {
+      tx: Transaction
+  ): TracedResult[ValidationError, Diff] = {
     val func =
       if (verify) verified(prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight) _
       else unverified(currentBlockTimestamp, currentBlockHeight) _
@@ -34,7 +35,8 @@ object TransactionDiffer extends ScorexLogging {
 
   def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(
       blockchain: Blockchain,
-      tx: Transaction): TracedResult[ValidationError, Diff] = {
+      tx: Transaction
+  ): TracedResult[ValidationError, Diff] = {
     for {
       _ <- Verifier(blockchain, currentBlockHeight)(tx)
       _ <- TracedResult(
@@ -46,9 +48,10 @@ object TransactionDiffer extends ScorexLogging {
               _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
               _ <- CommonValidation.disallowDuplicateIds(blockchain, currentBlockHeight, tx)
               _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTimestamp, tx)
-              _ <- CommonValidation.checkFee(blockchain, currentBlockHeight, tx)
+              _ <- FeeValidation(blockchain, currentBlockHeight, tx)
             } yield ()
-          })
+          }
+      )
       diff <- unverified(currentBlockTimestamp, currentBlockHeight)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
         .measureForType(tx.builder.typeId) {
@@ -57,12 +60,15 @@ object TransactionDiffer extends ScorexLogging {
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
-  def unverified(currentBlockTimestamp: Long, currentBlockHeight: Int)(blockchain: Blockchain,
-                                                                       tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def unverified(
+      currentBlockTimestamp: Long,
+      currentBlockHeight: Int
+  )(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx match {
-        case gtx: GenesisTransaction         => GenesisTransactionDiff(currentBlockHeight)(gtx)
-        case ptx: PaymentTransaction         => PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
+        case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
+        case ptx: PaymentTransaction =>
+          PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
         case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain, currentBlockHeight)(itx)
         case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockHeight, currentBlockTimestamp)(rtx)
         case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)
