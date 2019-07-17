@@ -62,7 +62,7 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       |
       |let bytes = base64'${Base64.encode(BlockHeader.writeHeaderOnly(header))}'
       |
-      |match blockHeaderFromBytes(bytes) {
+      |match parseBlockHeader(bytes) {
       |  case header: BlockHeader =>
       |    header.timestamp == ${header.timestamp} &&
       |      header.version == ${header.version} &&

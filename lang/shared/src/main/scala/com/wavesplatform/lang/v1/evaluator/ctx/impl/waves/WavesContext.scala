@@ -425,9 +425,9 @@ object WavesContext {
       case _                               => ???
     }
 
-    val blockHeaderFromBytesF: BaseFunction =
+    val parseBlockHeaderF: BaseFunction =
       NativeFunction(
-        "blockHeaderFromBytes",
+        "parseBlockHeader",
         100,
         BLOCKHEADER_FROM_BYTES,
         UNION.create(UNIT :: blockHeader :: Nil),
@@ -527,7 +527,7 @@ object WavesContext {
     ).map(withExtract) ::: List(assetInfoF, blockInfoByHeightF, transferTxByIdF, stringFromAddressF)
 
     lazy val v4Functions: List[BaseFunction] = List(
-      blockHeaderFromBytesF
+      parseBlockHeaderF
     )
 
     val functions = Map[StdLibVersion, List[BaseFunction]](
