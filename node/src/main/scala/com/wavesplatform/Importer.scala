@@ -44,12 +44,19 @@ object Importer extends ScorexLogging {
             val bis           = new BufferedInputStream(inputStream)
             var quit          = false
             val lenBytes      = new Array[Byte](Ints.BYTES)
-            val start         = System.currentTimeMillis()
+            val start         = System.nanoTime()
             var counter       = 0
-            var blocksToSkip  = blockchainUpdater.height - 1
-            val blocksToApply = importHeight - blockchainUpdater.height + 1
+            val startHeight = blockchainUpdater.height
+            var blocksToSkip  = startHeight - 1
+            val blocksToApply = importHeight - startHeight + 1
 
-            println(s"Skipping $blocksToSkip block(s)")
+            log.info(s"Skipping $blocksToSkip block(s)")
+
+            sys.addShutdownHook {
+              import scala.concurrent.duration._
+              val millis = (System.nanoTime() - start).nanos.toMillis
+              log.info(s"Imported $counter block(s) from ${startHeight} to ${startHeight + counter} in ${humanReadableDuration(millis)}")
+            }
 
             while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
@@ -76,18 +83,16 @@ object Importer extends ScorexLogging {
                     }
                   }
                 } else {
-                  println(s"$s2 != expected $len")
+                  log.debug(s"$s2 != expected $len")
                   quit = true
                 }
               } else {
-                println(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
+                log.debug(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
                 quit = true
               }
             }
             bis.close()
             inputStream.close()
-            val duration = System.currentTimeMillis() - start
-            log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
 
           case Failure(error) =>
             log.error(s"Failed to open file '$blockchainFile", error)
