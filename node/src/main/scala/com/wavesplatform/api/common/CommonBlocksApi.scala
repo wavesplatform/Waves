@@ -1,5 +1,7 @@
 package com.wavesplatform.api.common
-import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist, CustomValidationError}
+
+import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -8,9 +10,9 @@ import com.wavesplatform.state.Blockchain
 import monix.reactive.Observable
 
 private[api] class CommonBlocksApi(blockchain: Blockchain) {
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
-    def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
+  private[this] def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
 
+  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
     Observable
       .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
       .map(height => (blockchain.blockAt(height), height))
@@ -51,7 +53,7 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
 
   def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockHeader, Int, Int)] = {
     Observable
-      .fromIterable(fromHeight to toHeight)
+      .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
       .map(height => (height, blockchain.blockHeaderAndSize(height)))
       .collect { case (height, Some((header, size))) => (header, size, height) }
   }

@@ -23,9 +23,10 @@ import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, Generi
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time)
@@ -54,8 +55,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   private var ngState: Option[NgState]              = Option.empty
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
 
-  private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
-  private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
+  private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
+
+  private def publishLastBlockInfo(): Unit =
+    for (id <- lastBlockId; ts <- ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)) {
+      val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
+      internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
+    }
+
+  publishLastBlockInfo()
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
@@ -63,18 +71,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
   }
 
-  override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
-  lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
-
-  private def blockchainReady: Boolean = {
-    val lastBlock = ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp).get
-    lastBlock + maxBlockReadinessAge > time.correctedTime()
-  }
-
-  // Store last block information in a cache
-  lastBlockId.foreach { id =>
-    internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
-  }
+  override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
@@ -219,7 +216,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
               notifyChangedSpendable(prevNgState, ngState)
-              lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
+              publishLastBlockInfo()
 
               if ((block.timestamp > time
                     .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
@@ -247,7 +244,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, blockchainReady))
+    publishLastBlockInfo()
     result
   }
 
@@ -309,7 +306,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
   def shutdown(): Unit = {
     internalLastBlockInfo.onComplete()
-    service.shutdown()
   }
 
   private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
@@ -461,6 +457,17 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     val lease   = blockchain.leaseBalance(a)
     val balance = blockchain.balance(a)
     Portfolio(balance, lease, Map.empty).combine(diffPf)
+  }
+
+  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
+    ngState
+      .fold(Diff.empty)(_.bestLiquidDiff)
+      .transactions
+      .get(id)
+      .collect {
+        case (h, tx: TransferTransaction, _) => (h, tx)
+      }
+      .orElse(blockchain.transferById(id))
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {

@@ -13,6 +13,7 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
+  def chainByte: Option[Byte] = None
 
   override def toString: String = json().toString
 
