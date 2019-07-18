@@ -375,8 +375,8 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
     }
 
-    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
-      sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime, retryInterval: FiniteDuration = 5.seconds): Int =
+      sync(async(n).waitForHeight(expectedHeight, retryInterval), requestAwaitTime)
 
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))

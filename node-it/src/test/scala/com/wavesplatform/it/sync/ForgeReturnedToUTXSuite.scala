@@ -1,11 +1,13 @@
 package com.wavesplatform.it.sync
 
+import cats.kernel.Comparison.GreaterThan
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
@@ -18,43 +20,42 @@ class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with Node
   private def miner = nodes.head
   private def last  = nodes.last
 
-  test("dependent trasactions can be applied if both returned to UTX") {
 
-    val (balance1, eff1)   = miner.accountBalances(miner.address)
+  test("dependent trasactions can be added to UTX if first mined and returned to UTX") {
+
     val currentMinerHeight = miner.height
 
-    val assetId = last.issue(last.address, "asset", "descr", issueAmount, 0, false, issueFee, 2, waitForTx = true).id
+    //asset tx should be mined in first microblock as as new keyblock mined, others microblocks should not be applied due to big microblockInterval
+    val assetId = last.issue(last.address, "asset", "descr", issueAmount, 0, reissuable = false, issueFee, waitForTx = true).id
+    val issueAssetInitialHeight: Int = last.transactionInfo(assetId).height
 
-    miner.waitForHeight(currentMinerHeight + 1)
-    val timeToWait = microblockInterval.seconds + 1.second
-    val firstTxId = last.transfer(last.address, miner.address, 1L, minFee, Some(assetId), None, 2, waitForTx = true).id
-    val secondTxId = miner.transfer(miner.address, last.address, 1L, minFee, Some(assetId), None, 2, waitForTx = true).id
+    //all microblocks should returned to utx, assetId should be returned to UTX and no any microblocks will be mined on this height
+    //so trasfer tx will stay in utx until new keyblock mined
+    val transferTx = last.transfer(last.address, miner.address, 1L, minFee, Some(assetId), None, waitForTx = true).id
 
-    val firstTxHeight  = last.transactionInfo(firstTxId).height
-    val secondTxHeight = last.transactionInfo(secondTxId).height
+    val issueAssetHeight = last.transactionInfo(assetId).height
+    val transferTxHeight  = last.transactionInfo(transferTx).height
 
-    secondTxHeight shouldBe firstTxHeight
-
-    miner.waitForHeight(currentMinerHeight + 2)
-    miner.waitForTransaction((firstTxId))
-    miner.waitForTransaction(secondTxId)
-
-    last.transactionInfo(firstTxId).height shouldBe firstTxHeight + 1
-    last.transactionInfo(secondTxId).height shouldBe secondTxHeight + 1
+    //trasfer tx and issue asset tx should be placed in the same microblock
+    transferTxHeight shouldBe issueAssetHeight
+    transferTxHeight shouldNot be(issueAssetInitialHeight)
 
   }
 
 }
 
+
+
 object ForgeReturnedToUTXSuite {
   import com.wavesplatform.it.NodeConfigs._
 
-  val microblockInterval  = 3
+  //microblock interval should be greater than avarage block interval
+  val microblockInterval  = 60
   private val minerConfig = ConfigFactory.parseString(s"""
                                                          |waves {
                                                          |  miner {
                                                          |    micro-block-interval = ${microblockInterval}s
-                                                         |    min-micro-block-age = 17s
+                                                         |    min-micro-block-age = 60s
                                                          |  }
                                                          |  blockchain.custom.genesis {
                                                          |     average-block-delay = 20s
