@@ -31,8 +31,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.BlockchainUpdated
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -423,7 +422,7 @@ object Application {
     args.headOption.getOrElse("") match {
       case "export"                 => Exporter.main(args.tail)
       case "import"                 => Importer.main(args.tail)
-//      case "explore"                => Explorer.main(args.tail)
+      case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
       case _                        => startNode(args.headOption)
@@ -444,7 +443,7 @@ object Application {
     val isMetricsStarted = Metrics.start(settings.metrics, time)
 
     RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
-      import actorSystem.dispatcher
+
       isMetricsStarted.foreach { started =>
         if (started) {
           import settings.synchronizationSettings.microBlockSynchronizer
