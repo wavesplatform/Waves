@@ -15,6 +15,8 @@ trait UtxPool extends AutoCloseable {
 
   def removeAll(txs: Traversable[Transaction]): Unit
 
+  def spendableBalance(addr: Address, assetId: Asset): Long
+
   def pessimisticPortfolio(addr: Address): Portfolio
 
   def all: Seq[Transaction]

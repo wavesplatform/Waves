@@ -170,6 +170,13 @@ class UtxPoolImpl(time: Time,
     isNew
   }
 
+  override def spendableBalance(addr: Address, assetId: Asset): Long =
+    blockchain.balance(addr, assetId) -
+      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
+      pessimisticPortfolios
+        .getAggregated(addr)
+        .spendableBalanceOf(assetId)
+
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
