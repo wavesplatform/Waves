@@ -32,15 +32,17 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
   def status: Route = (get & path("status")) {
     val height = blockchain.height
 
+    val featureIds = blockchain.featureVotes(height).keySet ++
+      blockchain.approvedFeatures.keySet ++
+      BlockchainFeatures.implemented
+
     complete(
       Json.toJson(ActivationStatus(
         height,
         blockchain.settings.functionalitySettings.activationWindowSize(height),
         blockchain.settings.functionalitySettings.blocksForFeatureActivation(height),
         blockchain.settings.functionalitySettings.activationWindow(height).last,
-        (blockchain.featureVotes(height).keySet ++
-          blockchain.approvedFeatures.keySet ++
-          BlockchainFeatures.implemented).toSeq.sorted.map(id => {
+        featureIds.toSeq.sorted.map { id =>
           val status = blockchain.featureStatus(id, height)
           FeatureActivationStatus(
             id,
@@ -54,7 +56,7 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
             blockchain.featureActivationHeight(id),
             if (status == BlockchainFeatureStatus.Undefined) blockchain.featureVotes(height).get(id).orElse(Some(0)) else None
           )
-        })
+        }
       )))
   }
 }

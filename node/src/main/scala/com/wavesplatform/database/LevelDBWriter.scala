@@ -323,7 +323,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
 
     object writes {
       @noinline
-      def writeNewBlock(): Unit = {
+      def writeNewHeight(): Unit = {
         rw.put(Keys.height, height)
 
         val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
@@ -331,7 +331,6 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
           rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
         }
         // rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
-        blocksWriter.writeBlock(Height @@ height, block)
         rw.put(Keys.heightOf(block.uniqueId), Some(height))
         rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
       }
@@ -524,7 +523,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
 
       @noinline
       def writeAllEntities(): Unit = {
-        writeNewBlock()
+        writeNewHeight()
+        writeFeatures()
         writeNewAddresses()
         writeAssets()
         writeWavesAndAssetBalances()
@@ -533,7 +533,6 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
         writeScripts()
         writeDataEntries()
         writeAliases()
-        writeFeatures()
         writeSponsorship()
         writeFee()
         writeInvokeScriptResults()
@@ -544,9 +543,10 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
 
     writes.writeAllEntities()
 
-    if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
+    if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height))
       DisableHijackedAliases(rw, blocksWriter)
-    }
+
+    blocksWriter.writeBlock(Height @@ height, block)
   }
 
   private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
@@ -734,10 +734,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = {
-    val tr =  Try(blocksWriter.getTransaction(TransactionId(id)))
-    tr.failed.foreach(log.error("Error getting tx by id", _))
     for {
-      (height, _, tx) <- tr.toOption
+      (height, _, tx) <- Try(blocksWriter.getTransaction(TransactionId(id))).toOption
     } yield (height, tx)
   }
 
@@ -929,8 +927,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   }
 
   override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
-    Try(blocksWriter.getBlock(Height @@ height)).toOption
-      .map(_ -> 1234) // TODO store block size
+    Try(blocksWriter.getBlock(Height @@ height)).toOption.map(_ -> 1234) // TODO store block size
   }
 
   override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
@@ -960,7 +957,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     val currentHeight = db.get(Keys.height)
 
     (currentHeight until (currentHeight - howMany).max(0) by -1).iterator
-      .map(loadBlockHeaderAndSize)
+      .map(blockHeaderAndSize)
       .collect {
         case Some((header, _)) => header.signerData.signature
       }
@@ -970,7 +967,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readOnly { db =>
     db.get(Keys.heightOf(parentSignature)).map { parentHeight =>
       (parentHeight + 1 to (parentHeight + howMany))
-        .map(loadBlockHeaderAndSize)
+        .map(blockHeaderAndSize)
         .collect {
           case Some((header, _)) => header.signerData.signature
         }
@@ -981,7 +978,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      (block, _) <- loadBlockHeaderAndSize(height)
+      (block, _) <- blockHeaderAndSize(height)
     } yield block
   }
 
@@ -989,7 +986,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     Try(db.get(Keys.blockTransactionsFee(height))).toOption
   }
 
-  override def featureVotes(height: Int): Map[Short, Int] = readOnly { _ =>
+  override def featureVotes(height: Int): Map[Short, Int] = {
     settings.functionalitySettings
       .activationWindow(height)
       .flatMap { height =>
@@ -1132,10 +1129,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   }
 
   private[database] def loadBlock(height: Height): Option[Block] = {
-    val tr = Try(blocksWriter.getBlock(height, withTxs = true))
-    // tr.failed.foreach(log.error(s"Error loading block at $height", _))
-    // tr.foreach(block => log.warn(s"Loaded block at $height is $block"))
-    tr.toOption
+    Try(blocksWriter.getBlock(height, withTxs = true)).toOption
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] =
