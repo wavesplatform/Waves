@@ -6,8 +6,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
-import com.wavesplatform.database.AddressTransactionsProvider
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -22,7 +22,7 @@ import scala.util.Try
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
-  private[state] def nftListFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
+  private[state] def nftListFromDiff(b: Blockchain, bd: Distributions, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
 
     def nonZeroBalance(asset: IssuedAsset): Boolean = {
       val balanceFromDiff = for {
@@ -70,19 +70,19 @@ package object state {
           nonZeroBalance(asset)
         }
 
-    d.fold(b.nftIterator(address, after)) { d =>
+    d.fold(bd.nftIterator(address, after)) { d =>
       after match {
-        case None => CloseableIterator.seq(nftFromDiff(d, after), b.nftIterator(address, after))
-        case Some(asset) if d.issuedAssets contains asset => CloseableIterator.seq(nftFromDiff(d, after), b.nftIterator(address, None))
-        case _ => b.nftIterator(address, after)
+        case None => CloseableIterator.seq(nftFromDiff(d, after), bd.nftIterator(address, after))
+        case Some(asset) if d.issuedAssets contains asset => CloseableIterator.seq(nftFromDiff(d, after), bd.nftIterator(address, None))
+        case _ => bd.nftIterator(address, after)
       }
     }
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  private[state] def addressTransactionsFromDiff(b: AddressTransactionsProvider, d: Option[Diff])(address: Address,
-                                                                                 types: Set[TransactionParser],
-                                                                                 fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+  private[state] def addressTransactionsFromDiff(b: AddressTransactions, d: Option[Diff])(address: Address,
+                                                                                          types: Set[TransactionParser],
+                                                                                          fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
     def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
       d.transactions.values.toSeq.reverseIterator

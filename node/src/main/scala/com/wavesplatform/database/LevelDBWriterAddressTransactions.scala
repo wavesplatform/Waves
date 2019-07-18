@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.{Transaction, TransactionParser, TransactionParsers}
@@ -10,7 +11,7 @@ import com.wavesplatform.utils.CloseableIterator
 
 import scala.util.Success
 
-private[database] final class LevelDBWriterAddressTransactionsProvider(levelDBWriter: LevelDBWriter) extends AddressTransactionsProvider {
+private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: LevelDBWriter) extends AddressTransactions {
   import levelDBWriter.{dbSettings, writableDB}
 
   override def addressTransactionsIterator(address: Address,

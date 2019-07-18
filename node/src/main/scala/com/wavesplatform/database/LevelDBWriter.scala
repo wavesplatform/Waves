@@ -12,10 +12,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{CloseableIterator, Paged, ScorexLogging}
+import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
@@ -70,8 +70,11 @@ object LevelDBWriter {
       } yield db.get(valueKey(lastChange))
   }
 
-  implicit def toAddressTransactionsProvider(ldb: LevelDBWriter): AddressTransactionsProvider =
-    new LevelDBWriterAddressTransactionsProvider(ldb)
+  implicit def implicitAddressTransactions(ldb: LevelDBWriter): AddressTransactions =
+    new LevelDBWriterAddressTransactions(ldb)
+
+  implicit def implicitDistributions(ldb: LevelDBWriter): Distributions =
+    new LevelDBDistributions(ldb)
 }
 
 class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
@@ -85,11 +88,11 @@ class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
-  private def readStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = CloseableIterator.defer(writableDB.readOnlyStream(f))
+  private[database] def readStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = CloseableIterator.defer(writableDB.readOnlyStream(f))
 
-  private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
+  private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
+  private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
 
@@ -168,35 +171,11 @@ class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: 
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
 
-  private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
+  private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
     db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
     loadLeaseBalance(db, addressId),
     Map.empty
   )
-
-  private def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      asset <- db.get(Keys.assetList(addressId))
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
-  )
-
-  private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      issuedAsset <- db.get(Keys.assetList(addressId))
-      asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
-      }
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
-  )
-
-  override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    val excludeNFT = this.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
-
-    addressId(address).fold(Portfolio.empty) { addressId =>
-      if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)
-      else loadFullPortfolio(db, addressId)
-    }
-  }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
     transactionInfo(asset.id, db) match {
@@ -667,50 +646,8 @@ class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: 
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
 
-  override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
-    val assetIdStream: CloseableIterator[IssuedAsset] = db
-      .get(Keys.addressId(address))
-      .fold(CloseableIterator.empty[IssuedAsset]) { id =>
-        val addressId = AddressId @@ id
-
-        val iter = db
-          .get(Keys.assetList(addressId))
-          .iterator
-          .filter(balance(address, _) > 0)
-
-        CloseableIterator(iter, () => CloseableIterator.close(iter))
-      }
-
-    val issueTxStream = assetIdStream
-      .flatMap(ia => transactionInfo(ia.id, db).map(_._2))
-      .collect {
-        case itx: IssueTransaction if itx.isNFT => itx
-      }
-
-    from
-      .flatMap(ia => transactionInfo(ia.id, db))
-      .fold(issueTxStream) {
-        case (_, afterTx) =>
-          issueTxStream
-            .dropWhile(_.id() != afterTx.id())
-            .drop(1)
-      }
-  }
-
-
-
-
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] = {
-    def createTransactionsList(): Seq[(Height, Transaction)] =
-      this.addressTransactionsIterator(address, TransactionParsers.forTypeSet(types), fromId)
-        .take(count)
-        .closeAfter(_.toVector)
-
-    fromId match {
-      case Some(id) => transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())
-      case None     => Right(createTransactionsList())
-    }
-  }
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] =
+    AddressTransactions.createList(this, this)(address, types, count, fromId)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
     if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
@@ -955,96 +892,6 @@ class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: 
       }
       .groupBy(identity)
       .mapValues(_.size)
-  }
-
-  override def assetDistribution(asset: IssuedAsset): AssetDistribution = readOnly { db =>
-    val dst = (for {
-      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(asset))).par
-      addressId <- db.get(Keys.addressesForAsset(asset, seqNr)).par
-      actualHeight <- db
-        .get(Keys.assetBalanceHistory(addressId, asset))
-        .filterNot(_ > height)
-        .headOption
-      balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
-
-    AssetDistribution(dst)
-  }
-
-  override def assetDistributionAtHeight(asset: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
-    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
-
-    lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
-
-    def takeAfter(s: Seq[BigInt], a: Option[BigInt]): Seq[BigInt] = {
-      a match {
-        case None    => s
-        case Some(v) => s.dropWhile(_ != v).drop(1)
-      }
-    }
-
-    lazy val addressIds: Seq[BigInt] = {
-      val all = for {
-        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(asset))
-        addressId <- db
-          .get(Keys.addressesForAsset(asset, seqNr))
-      } yield addressId
-
-      takeAfter(all, maybeAddressId)
-    }
-
-    lazy val distribution: Stream[(Address, Long)] =
-      for {
-        addressId <- addressIds.toStream
-        history = db.get(Keys.assetBalanceHistory(addressId, asset))
-        actualHeight <- history.filterNot(_ > height).headOption
-        balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-        if balance > 0
-      } yield db.get(Keys.idToAddress(addressId)) -> balance
-
-    lazy val page: AssetDistributionPage = {
-      val dst = distribution.take(count + 1)
-
-      val hasNext = dst.length > count
-      val items   = if (hasNext) dst.init else dst
-      val lastKey = items.lastOption.map(_._1)
-
-      val result: Paged[Address, AssetDistribution] =
-        Paged(hasNext, lastKey, AssetDistribution(items.toMap))
-
-      AssetDistributionPage(result)
-    }
-
-    Either
-      .cond(
-        height > canGetAfterHeight,
-        page,
-        GenericError(s"Cannot get asset distribution at height less than ${canGetAfterHeight + 1}")
-      )
-  }
-
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
-    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
-
-    def createMap() =
-      (for {
-        seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-        addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-        history = db.get(Keys.wavesBalanceHistory(addressId))
-        actualHeight <- history.partition(_ > height)._2.headOption
-        balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
-        if balance > 0
-      } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
-
-    Either.cond(
-      height > canGetAfterHeight,
-      createMap(),
-      GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
-    )
   }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =

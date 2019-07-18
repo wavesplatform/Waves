@@ -8,7 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{AddressTransactionsProvider, LevelDBWriter}
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -17,8 +17,10 @@ import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -452,11 +454,6 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
       blockchain.blockHeaderAndSize(height)
   }
 
-  override def portfolio(a: Address): Portfolio = readLock {
-    val p = ngState.fold(Portfolio.empty)(_.bestLiquidDiff.portfolios.getOrElse(a, Portfolio.empty))
-    blockchain.portfolio(a).combine(p)
-  }
-
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
     val diffPf  = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
     val lease   = blockchain.leaseBalance(a)
@@ -483,11 +480,6 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
       .map(t => (t._1, t._2))
       .orElse(blockchain.transactionInfo(id))
   }
-
-  override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
-    readLock {
-      nftListFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, from)
-    }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {
     ngState.fold(blockchain.containsTransaction(tx)) { ng =>
@@ -596,40 +588,6 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
-  private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] = readLock {
-    ngState
-      .fold(Map.empty[Address, Long]) { ng =>
-        for {
-          (address, p) <- ng.bestLiquidDiff.portfolios
-          if pred(p)
-        } yield address -> f(address)
-      }
-  }
-
-  override def assetDistribution(assetId: IssuedAsset): AssetDistribution = readLock {
-    val fromInner = blockchain.assetDistribution(assetId)
-    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, assetId)))
-
-    fromInner |+| fromNg
-  }
-
-  override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readLock {
-    blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
-  }
-
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readLock {
-    ngState.fold(blockchain.wavesDistribution(height)) { _ =>
-      val innerDistribution = blockchain.wavesDistribution(height)
-      if (height < this.height) innerDistribution
-      else {
-        innerDistribution.map(_ ++ changedBalances(_.balance != 0, balance(_)))
-      }
-    }
-  }
-
   override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
     ngState.fold(blockchain.collectActiveLeases(pf)) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
@@ -699,6 +657,13 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
+  override def addressTransactions(address: Address,
+                                   types: Set[Type],
+                                   count: Int,
+                                   fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] =
+    AddressTransactions.createList(this, this)(address, types, count, fromId)
+
+  //noinspection ScalaStyle
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
@@ -715,6 +680,63 @@ object BlockchainUpdaterImpl extends ScorexLogging {
       b1.reference == b2.reference &&
       b1.timestamp == b2.timestamp
 
-  implicit def toAddressTransactionsProvider(bu: BlockchainUpdaterImpl): AddressTransactionsProvider =
-    new BlockchainUpdaterImplAddressTransactionsProvider(bu.blockchain, () => bu.readLock(bu.ngStateValue.map(_.bestLiquidDiff)))
+  implicit def implicitAddressTransactions(bu: BlockchainUpdaterImpl): AddressTransactions =
+    new CompositeAddressTransactions(bu.blockchain, () => bu.readLock(bu.ngStateValue.map(_.bestLiquidDiff)))
+
+  implicit def implicitDistributions(bu: BlockchainUpdaterImpl): Distributions =
+    new CompositeDistributions(bu, bu.blockchain, () => bu.readLock(bu.ngStateValue.map(_.bestLiquidDiff)))
+
+  private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, getDiff: () => Option[Diff])
+    extends AddressTransactions {
+    override def addressTransactionsIterator(address: Address,
+                                             types: Set[TransactionParser],
+                                             fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+      addressTransactionsFromDiff(baseProvider, getDiff())(address, types, fromId)
+    }
+  }
+
+  private[state] final class CompositeDistributions(blockchain: Blockchain, baseProvider: Distributions, getDiff: () => Option[Diff])
+    extends Distributions {
+    override def portfolio(a: Address): Portfolio = {
+      val p = getDiff().fold(Portfolio.empty)(_.portfolios.getOrElse(a, Portfolio.empty))
+      baseProvider.portfolio(a).combine(p)
+    }
+
+    override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
+      nftListFromDiff(blockchain, baseProvider, getDiff())(address, from)
+
+    override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {
+      val fromInner = baseProvider.assetDistribution(assetId)
+      val fromNg = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, blockchain.balance(_, assetId)))
+
+      fromInner |+| fromNg
+    }
+
+    override def assetDistributionAtHeight(assetId: IssuedAsset,
+                                           height: Int,
+                                           count: Int,
+                                           fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
+      baseProvider.assetDistributionAtHeight(assetId, height, count, fromAddress)
+    }
+
+    override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = {
+      getDiff().fold(baseProvider.wavesDistribution(height)) { _ =>
+        val innerDistribution = baseProvider.wavesDistribution(height)
+        if (height < blockchain.height) innerDistribution
+        else {
+          innerDistribution.map(_ ++ changedBalances(_.balance != 0, blockchain.balance(_)))
+        }
+      }
+    }
+
+    private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] = {
+      getDiff()
+        .fold(Map.empty[Address, Long]) { diff =>
+          for {
+            (address, p) <- diff.portfolios
+            if pred(p)
+          } yield address -> f(address)
+        }
+    }
+  }
 }

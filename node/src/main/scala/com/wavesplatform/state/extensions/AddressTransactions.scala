@@ -1,20 +1,33 @@
-package com.wavesplatform.database
+package com.wavesplatform.state.extensions
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.{Transaction, TransactionParser}
+import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.transaction.{Transaction, TransactionParser, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
 import monix.reactive.Observable
 
-trait AddressTransactionsProvider {
+trait AddressTransactions {
   def addressTransactionsIterator(address: Address,
                                   types: Set[TransactionParser],
                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)]
 }
 
-object AddressTransactionsProvider {
-  implicit class AddressTransactionsProviderExt(p: AddressTransactionsProvider) {
+object AddressTransactions {
+  def createList(b: Blockchain, at: AddressTransactions)(address: Address, types: Set[Transaction.Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] = {
+    def createTransactionsList(): Seq[(Height, Transaction)] =
+      at.addressTransactionsIterator(address, TransactionParsers.forTypeSet(types), fromId)
+        .take(count)
+        .closeAfter(_.toVector)
+
+    fromId match {
+      case Some(id) => b.transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())
+      case None => Right(createTransactionsList())
+    }
+  }
+
+  implicit class AddressTransactionsProviderExt(p: AddressTransactions) {
     def addressTransactionsObs(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] =
       Observable.defer {
         val iterator = p.addressTransactionsIterator(address, types, fromId)
