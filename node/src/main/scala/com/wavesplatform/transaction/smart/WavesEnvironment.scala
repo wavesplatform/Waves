@@ -11,7 +11,6 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
@@ -37,10 +36,8 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
-      .transactionInfo(ByteStr(id))
-      .map(_._2)
-      .filter(_.isInstanceOf[TransferTransaction])
-      .map(t => RealTransactionWrapper.mapTransferTx(t.asInstanceOf[TransferTransaction]))
+      .transferById(id)
+      .map(t => RealTransactionWrapper.mapTransferTx(t._2))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {

@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.marshalling.{Marshaller, PredefinedToEntityMarshallers, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
-import akka.http.scaladsl.model.{MediaTypes, StatusCode, StatusCodes}
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
@@ -33,10 +33,12 @@ trait ApiMarshallers {
 
   implicit lazy val tracedResultMarshaller: ToResponseMarshaller[TracedResult[ApiError, Transaction]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
-      .compose(ae => (
-        ae.resultE.fold(_.code, _ => StatusCodes.OK),
-        ae.json
-      ))
+      .compose(
+        ae =>
+          (
+            ae.resultE.fold(_.code, _ => StatusCodes.OK),
+            ae.json
+        ))
 
   private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
