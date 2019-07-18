@@ -21,10 +21,9 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
 
@@ -247,7 +246,7 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[this] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  private[this] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   def addAndCleanup(transactions: Seq[Transaction], verify: Boolean = true): Unit = scheduler.executeAsync { () =>
     transactions.foreach(putIfNew(_, verify))
