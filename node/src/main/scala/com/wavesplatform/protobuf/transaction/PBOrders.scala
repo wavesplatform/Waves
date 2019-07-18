@@ -1,9 +1,9 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
+import com.wavesplatform.transaction.assets.exchange.OrderV1
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
@@ -25,7 +25,8 @@ object PBOrders {
       order.expiration,
       order.getMatcherFee.longAmount,
       order.proofs.map(_.toByteArray: ByteStr),
-      if (version == 0) order.version.toByte else version.toByte
+      if (version == 0) order.version.toByte else version.toByte,
+      Asset.fromProtoId(order.getMatcherFee.getAssetId)
     )
   }
 
@@ -34,14 +35,9 @@ object PBOrders {
     case _           => ???
   }
 
-  def vanillaV2(order: PBOrder): OrderV2 = vanilla(order, 2) match {
-    case v1: OrderV2 => v1
-    case _           => ???
-  }
-
   def protobuf(order: VanillaOrder): PBOrder = {
     PBOrder(
-      chainId = 0,
+      AddressScheme.current.chainId,
       ByteString.copyFrom(order.senderPublicKey),
       ByteString.copyFrom(order.matcherPublicKey),
       Some(PBOrder.AssetPair(Some(order.assetPair.amountAsset.protoId), Some(order.assetPair.priceAsset.protoId))),
