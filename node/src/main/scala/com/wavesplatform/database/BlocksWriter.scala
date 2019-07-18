@@ -286,11 +286,11 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
       this.closed = true
       scheduler.shutdown()
       scheduler.awaitTermination(5 minutes)
-      while (blocks.nonEmpty) {
+      Try(while (blocks.nonEmpty) {
         val flushingLastHeight = blocks.keys.max
         log.warn(s"Last height is $flushingLastHeight")
         flushBlocks()
-      }
+      })
     }
   }
 

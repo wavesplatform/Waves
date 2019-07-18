@@ -219,7 +219,7 @@ class LevelDBWriter(override val writableDB: DB,
   }
 
   @noinline
-  private[this] def loadTransactionHN(id: TransactionId): Option[(Height, TxNum)] =
+  def loadTransactionHN(id: TransactionId): Option[(Height, TxNum)] =
     Try(blocksWriter.getTransactionHN(id)).toOption
 
   override protected def loadAssetHN(asset: IssuedAsset): Option[(Height, TxNum)] =
