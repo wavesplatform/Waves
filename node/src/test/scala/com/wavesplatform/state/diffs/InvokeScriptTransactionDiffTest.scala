@@ -1081,7 +1081,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (r._1, r._2, r._3, invocationArgsCount)) {
       case (genesis, setScript, ci, count) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce(s"takes 1 args but $count were(was) given")
+          _ should produce(s"takes 2 args but $count were(was) given")
         }
     }
   }
