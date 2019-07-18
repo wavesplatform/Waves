@@ -36,7 +36,7 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
 import scala.util.Try
 
-object LevelDBWriter {
+object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distributions.Prov[LevelDBWriter] {
 
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
@@ -70,14 +70,14 @@ object LevelDBWriter {
       } yield db.get(valueKey(lastChange))
   }
 
-  implicit def implicitAddressTransactions(ldb: LevelDBWriter): AddressTransactions =
+  def addressTransactions(ldb: LevelDBWriter): AddressTransactions =
     new LevelDBWriterAddressTransactions(ldb)
 
-  implicit def implicitDistributions(ldb: LevelDBWriter): Distributions =
+  def distributions(ldb: LevelDBWriter): Distributions =
     new LevelDBDistributions(ldb)
 }
 
-class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
+class LevelDBWriter(private[database] val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
@@ -647,7 +647,7 @@ class LevelDBWriter(private[state] val writableDB: DB, spendableBalanceChanged: 
   }
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] =
-    AddressTransactions.createList(this, this)(address, types, count, fromId)
+    AddressTransactions.createListEither(this, this)(address, types, count, fromId)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
     if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))

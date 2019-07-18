@@ -15,7 +15,18 @@ trait AddressTransactions {
 }
 
 object AddressTransactions {
-  def createList(b: Blockchain, at: AddressTransactions)(address: Address, types: Set[Transaction.Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] = {
+  def apply[T](value: T)(implicit ev: T => AddressTransactions): AddressTransactions = value
+
+  trait Prov[T] {
+    def addressTransactions(value: T): AddressTransactions
+  }
+
+  case object Empty extends AddressTransactions {
+    override def addressTransactionsIterator(address: Address, types: Set[TransactionParser], fromId: Option[BlockId]): CloseableIterator[(Height, Transaction)] =
+      CloseableIterator.empty
+  }
+
+  def createListEither(b: Blockchain, at: AddressTransactions)(address: Address, types: Set[Transaction.Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] = {
     def createTransactionsList(): Seq[(Height, Transaction)] =
       at.addressTransactionsIterator(address, TransactionParsers.forTypeSet(types), fromId)
         .take(count)

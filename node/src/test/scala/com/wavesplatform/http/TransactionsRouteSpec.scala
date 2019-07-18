@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
@@ -15,13 +15,11 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TransactionParser
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import io.netty.channel.group.ChannelGroup
 import monix.execution.Scheduler
-import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -271,7 +269,6 @@ class TransactionsRouteSpec
       def routeGen: Gen[Route] =
         Gen.const({
           val b = mock[Blockchain]
-          (b.addressTransactionsObs(_: Address, _: Set[TransactionParser], _: Option[ByteStr])).expects(*, *, *).returning(Observable.empty).anyNumberOfTimes()
           TransactionsApiRoute(restAPISettings, wallet, b, utx, allChannels, new TestTime).route
         })
 

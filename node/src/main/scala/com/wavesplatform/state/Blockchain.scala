@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state.extensions.{AddressTransactions, BlockchainExtensions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -90,4 +91,10 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
+}
+
+object Blockchain extends BlockchainExtensions {
+  override implicit def addressTransactions(value: Blockchain): AddressTransactions = super.addressTransactions(value)
+
+  override implicit def distributions(value: Blockchain): Distributions = super.distributions(value)
 }

@@ -24,6 +24,7 @@ import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -502,7 +503,7 @@ class UtxPoolSpecification
 
       "takes into account unconfirmed transactions" in forAll(withValidPayments) {
         case (sender, state, utxPool, _, _) =>
-          val basePortfolio = state.portfolio(sender)
+          val basePortfolio = Distributions(state).portfolio(sender)
           val baseAssetIds  = basePortfolio.assetIds
 
           val pessimisticAssetIds = {

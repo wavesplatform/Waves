@@ -77,8 +77,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     val (asset, height, limit, maybeAfter) = params
 
     val distributionTask = Task.eval(
-      blockchain
-        .assetDistributionAtHeight(asset, height, limit, maybeAfter)
+      blockchain.assetDistributionAtHeight(asset, height, limit, maybeAfter)
     )
 
     distributionTask.map {
