@@ -6,7 +6,7 @@ import com.google.common.primitives.Shorts
 import com.wavesplatform.account.Alias
 import com.wavesplatform.database.{BlocksWriter, Keys, RW}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
+import com.wavesplatform.transaction.CreateAliasTransaction
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -18,8 +18,8 @@ object DisableHijackedAliases extends ScorexLogging {
     val height  = Height(rw.get(Keys.height))
 
     for (h <- 1 until height) {
-      val header = bw.getBlock(Height @@ h, withTxs = true)
-      for (tx <- header.transactionData) tx match {
+      val block = bw.getBlock(Height @@ h, withTxs = true)
+      for (tx <- block.transactionData) tx match {
         case cat: CreateAliasTransaction =>
           aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
 

@@ -38,17 +38,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 
 object LevelDBWriter {
-
-  /** {{{
-    * ([10, 7, 4], 5, 11) => [10, 7, 4]
-    * ([10, 7], 5, 11) => [10, 7, 1]
-    * }}}
-    */
-  private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = { // TODO: Remove if not used
-    val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
-    c1 :+ c2.headOption.getOrElse(1)
-  }
-
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
       for {
@@ -68,12 +57,53 @@ object LevelDBWriter {
       } yield db.get(valueKey(lastChange))
   }
 
+  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
+
+    /**
+      * Fixed implementation where
+      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
+      */
+    @tailrec
+    def recMergeFixed(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
+      buf += wh -> lh
+      if (wt.isEmpty && lt.isEmpty) {
+        buf
+      } else if (wt.isEmpty) {
+        recMergeFixed(wh, wt, lt.head, lt.tail, buf)
+      } else if (lt.isEmpty) {
+        recMergeFixed(wt.head, wt.tail, lh, lt, buf)
+      } else {
+        if (wh == lh) {
+          recMergeFixed(wt.head, wt.tail, lt.head, lt.tail, buf)
+        } else if (wh > lh) {
+          recMergeFixed(wt.head, wt.tail, lh, lt, buf)
+        } else {
+          recMergeFixed(wh, wt, lt.head, lt.tail, buf)
+        }
+      }
+    }
+
+    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
+  }
+
+  /** {{{
+    * ([10, 7, 4], 5, 11) => [10, 7, 4]
+    * ([10, 7], 5, 11) => [10, 7, 1]
+    * }}}
+    */
+  private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
+    val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
+    c1 :+ c2.headOption.getOrElse(1)
+  }
 }
 
-class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
+class LevelDBWriter(override val writableDB: DB,
+                    spendableBalanceChanged: Observer[(Address, Asset)],
+                    val settings: BlockchainSettings,
+                    val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
-      with ScorexLogging
-      with Closeable {
+    with ScorexLogging
+    with Closeable {
 
   // Only for tests
   def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
@@ -125,13 +155,14 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   override protected def loadAssetScript(asset: IssuedAsset): Option[Script] =
     getAssetScript(asset)
 
-  override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean =
-    getAssetScript(asset).isDefined
+  private[this] def loadAssetScriptByHN(issueH: Height, issueN: TxNum): Option[Script] = readOnly { db =>
+    readLastValue(db)(Keys.AssetScriptPrefix, Keys.heightWithNum(issueH, issueN), ScriptReader.fromBytes(_).explicitGet())
+  }
 
   private[this] def getAssetScript(asset: IssuedAsset): Option[Script] =
     for {
-      (desc, _) <- assetDescriptionCache.get(asset)
-      script    <- desc.script
+      (h, n) <- getAssetHNOption(asset)
+      script <- loadAssetScriptByHN(h, n)
     } yield script
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
@@ -225,7 +256,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val (txH, txN)    = Keys.parseHeightNum(bs)
-      val tx = getTransactionByHN(txH, txN)
+      val tx            = getTransactionByHN(txH, txN)
       map + (IssuedAsset(tx.id()) -> Longs.fromByteArray(e.getValue))
     })
   )
@@ -234,10 +265,10 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).closeAfter(_.foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
       val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
       val (txH, txN)    = Keys.parseHeightNum(bs)
-      val tx = getTransactionByHN(txH, txN)
+      val tx            = getTransactionByHN(txH, txN)
       val isNFT = tx match {
         case it: IssueTransaction => it.isNFT
-        case _ => false
+        case _                    => false
       }
       if (isNFT) map else map + (IssuedAsset(tx.id()) -> Longs.fromByteArray(e.getValue))
     })
@@ -262,7 +293,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
         val sponsorship = readLastValue(db)(Keys.SponsorshipPrefix, Keys.heightWithNum(h, n), readSponsorship)
           .fold(0L)(_.minFee)
 
-        val script      = readLastValue(db)(Keys.AssetScriptPrefix, Keys.heightWithNum(h, n), ScriptReader.fromBytes(_).toOption).flatten
+        val script      = assetScriptCache.get(asset, () => loadAssetScriptByHN(h, n))
         val description = AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship)
         (description, (h, n))
     }
@@ -361,21 +392,23 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
 
       @noinline
       def writeWavesAndAssetBalances(): Unit = {
-        val updatedBalanceAddresses = for ((addressId, assets) <- balances; (assetId, balance) <- assets) yield assetId match {
-          case Waves =>
-            val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
-            rw.put(Keys.wavesBalance(addressId)(height), balance)
-            expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
-            Some(addressId)
+        val updatedBalanceAddresses = for ((addressId, assets) <- balances; (assetId, balance) <- assets)
+          yield
+            assetId match {
+              case Waves =>
+                val wavesBalanceHistory = Keys.wavesBalanceHistory(addressId)
+                rw.put(Keys.wavesBalance(addressId)(height), balance)
+                expiredKeys ++= updateHistory(rw, rw.get(wavesBalanceHistory), wavesBalanceHistory, balanceThreshold, Keys.wavesBalance(addressId))
+                Some(addressId)
 
-          case assetId @ IssuedAsset(_) =>
-            for ((h, n) <- getHNForAsset(assetId)) {
-              rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
-              rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
-              expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, h, n), threshold, Keys.assetBalance(addressId, h, n))
+              case assetId @ IssuedAsset(_) =>
+                for ((h, n) <- getHNForAsset(assetId)) {
+                  rw.put(Keys.addressesForAsset(h, n, addressId), addressId)
+                  rw.put(Keys.assetBalance(addressId, h, n)(height), balance)
+                  expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, h, n), threshold, Keys.assetBalance(addressId, h, n))
+                }
+                None
             }
-            None
-        }
 
         val changedAddresses = (addressTransactions.keys ++ updatedBalanceAddresses.flatten).toSeq.distinct
         rw.put(Keys.changedAddresses(height), changedAddresses)
@@ -433,7 +466,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
               // _             = deleteOldKeys(Keys.DataPrefix, dataKeySuffix)(Keys.data(addressId, key))
               if isNew
             } yield key
-            ).toSeq
+          ).toSeq
 
           if (newKeys.nonEmpty) {
             val chunkCountKey = Keys.dataKeyChunkCount(addressId)
@@ -447,7 +480,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
       @noinline
       def writeTransactionsByAddress(): Unit = {
         if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
-          val kk = Keys.addressTransactionSeqNr(addressId)
+          val kk        = Keys.addressTransactionSeqNr(addressId)
           val nextSeqNr = rw.get(kk) + 1
           val txTypeNumSeq = txIds.map { txId =>
             val (tx, num) = transactions(txId)
@@ -552,8 +585,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     db.iterateOverStream(KeyHelpers.addr(Keys.AssetBalancePrefix, addressId))
       .map { e =>
         val (_, _, hn, height) = Keys.parseAddressBytesHeight(e.getKey)
-        val (issueH, issueN) = Keys.parseHeightNum(hn)
-        val tx = getTransactionByHN(issueH, issueN)
+        val (issueH, issueN)   = Keys.parseHeightNum(hn)
+        val tx                 = getTransactionByHN(issueH, issueN)
         (IssuedAsset(tx.id()), height) -> Longs.fromByteArray(e.getValue)
       }
   }
@@ -617,7 +650,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
 
             if (dbSettings.storeTransactionsByAddress) {
               val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
-              val txSeqNr = rw.get(kTxSeqNr)
+              val txSeqNr  = rw.get(kTxSeqNr)
               val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
 
               rw.get(kTxHNSeq)
@@ -791,12 +824,10 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
           .flatMap(seqNr =>
             db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
               case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
-              case None => Nil
-            })
+              case None                   => Nil
+          })
 
-        val hns = takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
-          .map { case (height, _, txNum) => (height, txNum) }
-          .toVector
+        val hns = takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter).map { case (height, _, txNum) => (height, txNum) }.toVector
 
         blocksWriter.getTransactionsByHN(hns: _*)
       } else {
@@ -824,7 +855,8 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     //      tx
     //    }
 
-    blocksWriter.getTransactionsByHN(height -> txNum)
+    blocksWriter
+      .getTransactionsByHN(height -> txNum)
       .toStream
       .headOption
       .map(_._3)
@@ -875,38 +907,6 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     }
   }
 
-  /**
-    * @todo move this method to `object LevelDBWriter` once SmartAccountTrading is activated
-    */
-  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
-
-    /**
-      * Fixed implementation where
-      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
-      */
-    @tailrec
-    def recMergeFixed(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
-      buf += wh -> lh
-      if (wt.isEmpty && lt.isEmpty) {
-        buf
-      } else if (wt.isEmpty) {
-        recMergeFixed(wh, wt, lt.head, lt.tail, buf)
-      } else if (lt.isEmpty) {
-        recMergeFixed(wt.head, wt.tail, lh, lt, buf)
-      } else {
-        if (wh == lh) {
-          recMergeFixed(wt.head, wt.tail, lt.head, lt.tail, buf)
-        } else if (wh > lh) {
-          recMergeFixed(wt.head, wt.tail, lh, lt, buf)
-        } else {
-          recMergeFixed(wh, wt, lt.head, lt.tail, buf)
-        }
-      }
-    }
-
-    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
-  }
-
   override def allActiveLeases: CloseableIterator[LeaseTransaction] = readStream { db =>
     val txs = transactionsIterator(Seq(LeaseTransactionV1, LeaseTransactionV2))
     txs.collect { case (_, _, tx: LeaseTransaction) if loadLeaseStatus(db, tx.id()) => tx }
@@ -926,7 +926,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   }
 
   override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
-    Try(blocksWriter.getBlock(Height @@ height)).toOption.map(_ -> 1234) // TODO store block size
+    Try(blocksWriter.getBlockWithSize(Height @@ height)).toOption
   }
 
   override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {

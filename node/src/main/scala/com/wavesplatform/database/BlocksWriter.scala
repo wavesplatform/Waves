@@ -24,14 +24,13 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 //noinspection ScalaStyle
-// TODO: refactor, implement rollback
 private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSettings: DBSettings) extends Closeable with ScorexLogging {
   private[this] val blocksFilePath             = new File(s"${dbSettings.directory}/blocks")
   private[this] val flushDelay: FiniteDuration = 3 seconds // TODO: add force flush delay
   private[this] val flushMinSize: Long         = (sys.runtime.maxMemory() / 100) max (1 * 1024 * 1024)
   private[this] val scheduler                  = Scheduler.singleThread("blocks-writer", daemonic = false)
 
-  private[this] val blocks       = TrieMap.empty[Height, PBBlock]
+  private[this] val blocks       = TrieMap.empty[Height, (PBBlock, Int)]
   private[this] val transactions = TrieMap.empty[TransactionId, (Height, TxNum, PBSignedTransaction)]
 
   private[this] val rwLock = new ReentrantReadWriteLock()
@@ -55,7 +54,8 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
   }
   sys.addShutdownHook(this.close())
 
-  private[this] def readBlockFrom(input: DataInputStream, withTxs: Boolean): (PBBlock, Int) = {
+  private[this] def readBlockFrom(input: DataInputStream, withTxs: Boolean): (PBBlock, Int, Int) = {
+    val canonicalBlockSize = input.readInt()
     val headerSize  = input.readInt()
     val headerBytes = new Array[Byte](headerSize)
     input.read(headerBytes)
@@ -77,11 +77,12 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
       .withTransactions(transactions)
 
     val size = Ints.BYTES + headerBytes.length + Ints.BYTES + allTxsSize
-    (protoBlock, size)
+    (protoBlock, canonicalBlockSize, size)
   }
 
   private[this] def readBlockAt(offset: => Long, withTxs: Boolean): (PBBlock, Int) = {
-    optimisticRead(offset)(readBlockFrom(_, withTxs))
+    val (block, size, _) = optimisticRead(offset)(readBlockFrom(_, withTxs))
+    (block, size)
   }
 
   def writeBlock(height: Height, block: Block): Unit = {
@@ -89,7 +90,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
     require(!closed, "Already closed")
 
     val protoBlock = PBBlocks.protobuf(block)
-    blocks(height) = protoBlock
+    blocks(height) = (protoBlock, block.bytes().length)
 
     for (((tx, vtx), num) <- protoBlock.transactions.zip(block.transactionData).zipWithIndex)
       transactions(TransactionId(vtx.id())) = (height, TxNum @@ num.toShort, tx)
@@ -98,7 +99,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
   // Not really safe
   def blocksIterator(): CloseableIterator[Block] = {
     val (inMemBlocks, endOffset) = locked(_.readLock()) {
-      (this.blocks.toVector.sortBy(_._1).map(_._2), this.lastOffset)
+      (this.blocks.toVector.sortBy(_._1).map(_._2._1), this.lastOffset)
     }
 
     val protoBlocks = Try(dbContext.db.get(Keys.blockOffset(1))) match {
@@ -106,7 +107,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
         unlockedRead(startOffset, close = false) { input =>
           def createIter(offset: Long): Iterator[PBBlock] = {
             if (offset <= endOffset) Try(readBlockFrom(input, withTxs = true)) match {
-              case Success((block, size)) => Iterator.single(block) ++ createIter(offset + size)
+              case Success((block, _, size)) => Iterator.single(block) ++ createIter(offset + size)
               case Failure(err)           => throw new IOException("Failed to create blocks iterator", err)
             } else Iterator.empty
           }
@@ -137,9 +138,12 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
     }
 
   // TODO: Get block raw bytes etc
-  def getBlock(height: Height, withTxs: Boolean = false): Block = {
-    val protoBlock = blocks.getOrElse(height, readBlockAt(dbContext.db.get(Keys.blockOffset(height)), withTxs)._1)
-    PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet()
+  def getBlock(height: Height, withTxs: Boolean = false): Block =
+    getBlockWithSize(height, withTxs)._1
+
+  def getBlockWithSize(height: Height, withTxs: Boolean = false): (Block, Int) = {
+    val (protoBlock, size) = blocks.getOrElse(height, readBlockAt(dbContext.db.get(Keys.blockOffset(height)), withTxs))
+    (PBBlocks.vanilla(protoBlock, unsafe = true).explicitGet(), size)
   }
 
   def getTransactionHN(id: TransactionId): (Height, TxNum) = // No lock
@@ -173,6 +177,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
                 val numsSet = nums.map(_._2.toInt).toSet
 
                 def readNums(): Seq[(TxNum, PBSignedTransaction)] = {
+                  currentOffset += input.skip(Ints.BYTES) // Block size
                   val headerSize = input.readInt()
                   currentOffset += Ints.BYTES + input.skip(headerSize)
 
@@ -237,14 +242,15 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
         val txsToRemove    = new ArrayBuffer[TransactionId]()
 
         dbContext.readWrite(rw =>
-          for ((height, protoBlock) <- blocks.toSeq.sortBy(_._1)) {
+          for ((height, (protoBlock, blockSize)) <- blocks.toSeq.sortBy(_._1)) {
             this.lastOffset = currentOffset
 
             val headerBytes = PBUtils.encodeDeterministic(protoBlock.withTransactions(Nil))
+            output.writeInt(blockSize)
             output.writeInt(headerBytes.length)
             output.write(headerBytes)
             rw.put(Keys.blockOffset(height), currentOffset)
-            currentOffset += Ints.BYTES + headerBytes.length
+            currentOffset += Ints.BYTES + Ints.BYTES + headerBytes.length
 
             val transactions = protoBlock.transactions
             output.writeInt(transactions.length)
@@ -360,7 +366,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
 
   @inline
   private[this] def calculateFlushableBlocksSize(): Long =
-    blocks.valuesIterator.map(_.serializedSize.toLong).sum
+    blocks.valuesIterator.map(_._1.serializedSize.toLong).sum
 
   private[this] def toTransaction(tx: PBSignedTransaction): VanillaTransaction = {
     import com.wavesplatform.common.utils._

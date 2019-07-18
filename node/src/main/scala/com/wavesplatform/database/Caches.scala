@@ -165,17 +165,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[Script]] = cache(dbSettings.maxCacheSize, loadAssetScript)
+  protected val assetScriptCache: LoadingCache[IssuedAsset, Option[Script]] = cache(dbSettings.maxCacheSize, loadAssetScript)
   protected def loadAssetScript(asset: IssuedAsset): Option[Script]
-  protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
+
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
 
   override def assetScript(asset: IssuedAsset): Option[Script] = assetScriptCache.get(asset)
-  override def hasAssetScript(asset: IssuedAsset): Boolean =
-    assetScriptCache.getIfPresent(asset) match {
-      case null => hasAssetScriptBytes(asset)
-      case x    => x.nonEmpty
-    }
+  override def hasAssetScript(asset: IssuedAsset): Boolean = assetScriptCache.get(asset).nonEmpty
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): AddressId
