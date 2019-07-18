@@ -542,11 +542,10 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     }
 
     writes.writeAllEntities()
+    blocksWriter.writeBlock(Height @@ height, block)
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height))
       DisableHijackedAliases(rw, blocksWriter)
-
-    blocksWriter.writeBlock(Height @@ height, block)
   }
 
   private[this] def assetBalanceIterator(db: ReadOnlyDB, addressId: Long) = {
@@ -957,7 +956,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     val currentHeight = db.get(Keys.height)
 
     (currentHeight until (currentHeight - howMany).max(0) by -1).iterator
-      .map(blockHeaderAndSize)
+      .map(loadBlockHeaderAndSize)
       .collect {
         case Some((header, _)) => header.signerData.signature
       }
@@ -967,7 +966,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readOnly { db =>
     db.get(Keys.heightOf(parentSignature)).map { parentHeight =>
       (parentHeight + 1 to (parentHeight + howMany))
-        .map(blockHeaderAndSize)
+        .map(loadBlockHeaderAndSize)
         .collect {
           case Some((header, _)) => header.signerData.signature
         }
@@ -978,7 +977,7 @@ class LevelDBWriter(override val writableDB: DB, spendableBalanceChanged: Observ
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      (block, _) <- blockHeaderAndSize(height)
+      (block, _) <- loadBlockHeaderAndSize(height)
     } yield block
   }
 
