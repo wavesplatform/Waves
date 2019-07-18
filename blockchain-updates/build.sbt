@@ -4,6 +4,8 @@ name := "blockchain-updates"
 
 libraryDependencies += Dependencies.kafka
 
+extensionClasses += "com.wavesplatform.events.BlockchainUpdates"
+
 inConfig(Compile)(
   Seq(
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
