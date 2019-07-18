@@ -21,10 +21,10 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
 
@@ -52,7 +52,7 @@ class UtxPoolImpl(time: Time,
     else putNewTx(tx, verify)
   }
 
-  protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -141,7 +141,7 @@ class UtxPoolImpl(time: Time,
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
     tracedIsNew.resultE match {
       case Left(err)    => log.debug(s"UTX putIfNew(${tx.id()}) failed with $err")
-      case Right(isNew)  => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
     }
     tracedIsNew
   }
@@ -157,7 +157,7 @@ class UtxPoolImpl(time: Time,
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
       .map { diff =>
         pessimisticPortfolios.add(tx.id(), diff); true
       }
@@ -170,13 +170,6 @@ class UtxPoolImpl(time: Time,
     isNew
   }
 
-  override def spendableBalance(addr: Address, assetId: Asset): Long =
-    blockchain.balance(addr, assetId) -
-      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
-      pessimisticPortfolios
-        .getAggregated(addr)
-        .spendableBalanceOf(assetId)
-
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
@@ -187,7 +180,7 @@ class UtxPoolImpl(time: Time,
 
   override def packUnconfirmed(initialConstraint: MultiDimensionalMiningConstraint,
                                maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()) _
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, totalIterations) = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
@@ -239,6 +232,7 @@ class UtxPoolImpl(time: Time,
     def isExpired(transaction: Transaction): Boolean = {
       (time.correctedTime() - transaction.timestamp) > ExpirationTime
     }
+
     def isScripted(transaction: Transaction): Boolean = {
       transaction match {
         case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)
@@ -253,12 +247,12 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[UtxPoolImpl] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
+  private[this] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
-  val cleanupTask: Task[Unit] = Task
-    .eval[Unit](packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf))
-    .onErrorRecover { case t => log.error("Error cleaning up UTX pool", t) }
-    .executeOn(scheduler)
+  def addAndCleanup(transactions: Seq[Transaction], verify: Boolean = true): Unit = scheduler.executeAsync { () =>
+    transactions.foreach(putIfNew(_, verify))
+    packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+  }
 
   override def close(): Unit = {
     scheduler.shutdown()

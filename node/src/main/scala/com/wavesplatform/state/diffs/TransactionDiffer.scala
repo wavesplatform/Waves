@@ -23,58 +23,66 @@ object TransactionDiffer extends ScorexLogging {
     override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${tx.toPrettyString})"
   }
 
-  def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
+  def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int, verify: Boolean = true)(
       blockchain: Blockchain,
-      tx: Transaction): TracedResult[ValidationError, Diff] = {
+      tx: Transaction
+  ): TracedResult[ValidationError, Diff] = {
     val func =
-      if (verify) verified(prevBlockTimestamp, currentBlockTimestamp) _
-      else unverified(currentBlockTimestamp) _
+      if (verify) verified(prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight) _
+      else unverified(currentBlockTimestamp, currentBlockHeight) _
     func(blockchain, tx)
   }
 
-  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long)(blockchain: Blockchain,
-                                                                              tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(
+      blockchain: Blockchain,
+      tx: Transaction
+  ): TracedResult[ValidationError, Diff] = {
     for {
-      _ <- Verifier(blockchain)(tx)
+      _ <- Verifier(blockchain, currentBlockHeight)(tx)
       _ <- TracedResult(
         stats.commonValidation
           .measureForType(tx.builder.typeId) {
             for {
               _ <- CommonValidation.disallowTxFromFuture(blockchain.settings.functionalitySettings, currentBlockTimestamp, tx)
               _ <- CommonValidation.disallowTxFromPast(blockchain.settings.functionalitySettings, prevBlockTimestamp, tx)
-              _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)
-              _ <- CommonValidation.disallowDuplicateIds(blockchain, tx)
+              _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
+              _ <- CommonValidation.disallowDuplicateIds(blockchain, currentBlockHeight, tx)
               _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTimestamp, tx)
-              _ <- CommonValidation.checkFee(blockchain, tx)
+              _ <- FeeValidation(blockchain, currentBlockHeight, tx)
             } yield ()
-          })
-      diff <- unverified(currentBlockTimestamp)(blockchain, tx)
+          }
+      )
+      diff <- unverified(currentBlockTimestamp, currentBlockHeight)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
         .measureForType(tx.builder.typeId) {
-          BalanceDiffValidation(blockchain, blockchain.settings.functionalitySettings)(diff)
+          BalanceDiffValidation(blockchain, currentBlockHeight, blockchain.settings.functionalitySettings)(diff)
         }
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
-  def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def unverified(
+      currentBlockTimestamp: Long,
+      currentBlockHeight: Int
+  )(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx match {
-        case gtx: GenesisTransaction         => GenesisTransactionDiff(blockchain.height)(gtx)
-        case ptx: PaymentTransaction         => PaymentTransactionDiff(blockchain)(ptx)
-        case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain)(itx)
-        case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
-        case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain)(btx)
-        case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockTimestamp)(ttx)
-        case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp)(mtx)
-        case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain)(ltx)
-        case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp)(ltx)
-        case etx: ExchangeTransaction        => ExchangeTransactionDiff(blockchain)(etx)
-        case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain)(atx)
-        case dtx: DataTransaction            => DataTransactionDiff(blockchain)(dtx)
-        case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx)
-        case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTimestamp)(sstx)
-        case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockTimestamp)(stx)
-        case ci: InvokeScriptTransaction     => InvokeScriptTransactionDiff.apply(blockchain)(ci)
+        case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
+        case ptx: PaymentTransaction =>
+          PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
+        case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain, currentBlockHeight)(itx)
+        case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockHeight, currentBlockTimestamp)(rtx)
+        case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)
+        case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockHeight, currentBlockTimestamp)(ttx)
+        case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp, currentBlockHeight)(mtx)
+        case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain, currentBlockHeight)(ltx)
+        case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp, currentBlockHeight)(ltx)
+        case etx: ExchangeTransaction        => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
+        case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain, currentBlockHeight)(atx)
+        case dtx: DataTransaction            => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
+        case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain, currentBlockHeight)(sstx)
+        case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockHeight, currentBlockTimestamp)(sstx)
+        case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockHeight, currentBlockTimestamp)(stx)
+        case ci: InvokeScriptTransaction     => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
         case _                               => Left(UnsupportedTransactionType)
       }
     }

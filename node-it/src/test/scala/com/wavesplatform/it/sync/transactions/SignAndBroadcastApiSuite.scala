@@ -43,8 +43,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   test("/transactions/sign should handle erroneous input") {
-    def assertSignBadJson(json: JsObject, expectedMessage: String): scalatest.Assertion =
-      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage)
+    def assertSignBadJson(json: JsObject, expectedMessage: String, code: Int = 400): scalatest.Assertion =
+      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage, code)
 
     for (v <- supportedVersions) {
       val json = Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
@@ -56,8 +56,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
 
     val obsoleteTx =
       Json.obj("type" -> GenesisTransaction.typeId, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000)
-    assertSignBadJson(obsoleteTx, "Unsupported transaction type")
-    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "Unsupported transaction type")
+    assertSignBadJson(obsoleteTx, "transaction type not supported", 501)
+    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "transaction type not supported", 501)
 
     val bigBaseTx =
       Json.obj("type"       -> TransferTransaction.typeId,
@@ -127,7 +127,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     for (j <- List(jsonV1, jsonV2)) {
       assertBroadcastBadJson(j - "type", "failed to parse json message")
       assertBroadcastBadJson(j - "type" + ("type" -> Json.toJson(88)), "Bad transaction type")
-      assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Wrong chain-id")
+      assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Invalid chain id")
       assertBroadcastBadJson(j - "alias", "failed to parse json message")
     }
   }
