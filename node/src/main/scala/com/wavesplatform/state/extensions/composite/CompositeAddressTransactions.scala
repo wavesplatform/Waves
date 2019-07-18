@@ -7,10 +7,15 @@ import com.wavesplatform.state.{Diff, Height}
 import com.wavesplatform.transaction.{Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
 
-private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, getDiff: () => Option[Diff]) extends AddressTransactions {
+private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, height: Height, getDiff: () => Option[Diff]) extends AddressTransactions {
   override def addressTransactionsIterator(address: Address,
                                            types: Set[TransactionParser],
                                            fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
-    com.wavesplatform.state.addressTransactionsFromDiff(baseProvider, getDiff())(address, types, fromId)
+    val fromDiff = for {
+      diff <- getDiff().iterator
+      (tx, addresses) <- diff.transactions.valuesIterator
+    } yield (height, tx, addresses)
+
+    com.wavesplatform.state.addressTransactionsCompose(baseProvider, CloseableIterator.fromIterator(fromDiff))(address, types, fromId)
   }
 }

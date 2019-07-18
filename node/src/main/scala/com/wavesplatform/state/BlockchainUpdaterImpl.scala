@@ -681,7 +681,7 @@ object BlockchainUpdaterImpl extends ScorexLogging with AddressTransactions.Prov
       b1.timestamp == b2.timestamp
 
   def addressTransactions(bu: BlockchainUpdaterImpl): AddressTransactions =
-    new CompositeAddressTransactions(bu.blockchain, () => bu.readLock(bu.ngStateValue.map(_.bestLiquidDiff)))
+    new CompositeAddressTransactions(bu.blockchain, Height @@ bu.height, () => bu.readLock(bu.ngStateValue.map(_.bestLiquidDiff)))
 
   def distributions(bu: BlockchainUpdaterImpl): Distributions =
     new CompositeDistributions(bu, bu.blockchain, () => bu.readLock(bu.ngStateValue.map(_.bestLiquidDiff)))

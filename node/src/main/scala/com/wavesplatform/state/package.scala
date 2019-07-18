@@ -80,7 +80,7 @@ package object state {
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  private[state] def addressTransactionsFromDiff(b: AddressTransactions, d: Option[Diff])(address: Address,
+  private[state] def addressTransactionsFromDiff(at: AddressTransactions, d: Option[Diff])(address: Address,
                                                                                           types: Set[TransactionParser],
                                                                                           fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
 
@@ -97,17 +97,11 @@ package object state {
       txs
         .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
 
-    def transactions: Diff => Iterator[(Int, Transaction)] =
-      withFilterAndLimit _ compose withPagination compose transactionsFromDiff
-
-    d.fold(b.addressTransactionsIterator(address, types, fromId)) { diff =>
-      fromId match {
-        case Some(id) if !diff.transactions.contains(id) => b.addressTransactionsIterator(address, types, fromId)
-        case _ =>
-          val diffTxs = transactions(diff).map(kv => (Height(kv._1), kv._2))
-          CloseableIterator.seq(diffTxs, b.addressTransactionsIterator(address, types, None))
-      }
-    }
+    CloseableIterator
+      .seq(
+        withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
+        at.addressTransactionsIterator(address, types, fromId)
+      )
   }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {

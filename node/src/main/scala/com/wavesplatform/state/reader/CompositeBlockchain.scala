@@ -241,7 +241,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
   def addressTransactions(bu: CompositeBlockchain): AddressTransactions =
-    new CompositeAddressTransactions(bu.inner, () => bu.maybeDiff)
+    new CompositeAddressTransactions(bu.inner, Height @@ bu.height, () => bu.maybeDiff)
 
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
