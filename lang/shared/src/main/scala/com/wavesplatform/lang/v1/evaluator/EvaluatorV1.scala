@@ -91,7 +91,7 @@ fields.get(field) match {
         .orElse(
           // no such function, try data constructor
           header match {
-            case FunctionHeader.User(typeName) =>
+            case FunctionHeader.User(typeName, _) =>
               types.get(ctx).get(typeName).collect {
                 case t @ CASETYPEREF(_, fields) =>
                   args

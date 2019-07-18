@@ -37,7 +37,7 @@ object JsAPI {
         case FUNCTION_CALL(function, args) =>
           jObj.applyDynamic("apply")("type" -> "CALL", "name" -> (function match {
             case Native(name) => name.toString()
-            case User(name)   => name
+            case User(internalName, _)   => internalName
           }), "args" -> args.map(r).toJSArray)
         case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
       }

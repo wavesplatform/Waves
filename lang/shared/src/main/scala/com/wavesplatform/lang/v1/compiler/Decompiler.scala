@@ -105,7 +105,7 @@ object Decompiler {
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
     val i = if (firstLinePolicy == DontIndentFirstLine /*braces == BracesWhenNeccessary*/) 0 else ctx.ident
     e flatMap {
-      case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b => 
+      case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
         expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>
           out("match " ++ ex ++ " {" ++ NEWLINE, ctx.ident) ++
           out( b, 0) ++
@@ -155,7 +155,7 @@ object Decompiler {
           .toVector
           .sequence
         func match {
-          case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", i))
+          case FunctionHeader.User(_, name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", i))
           case FunctionHeader.Native(name) =>
             ctx.binaryOps.get(name) match {
               case Some(binOp) =>
