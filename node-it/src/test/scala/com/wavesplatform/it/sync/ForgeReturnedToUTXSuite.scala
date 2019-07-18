@@ -15,8 +15,6 @@ class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with Node
   import ForgeReturnedToUTXSuite._
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private val transferAmount = 1000.waves
-
   private def miner = nodes.head
   private def last  = nodes.last
 
