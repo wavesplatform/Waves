@@ -297,7 +297,7 @@ object PBTransactions {
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
 
-          desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1
+          desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_, all = false))._1
 
           _ <- Either.cond(desFCOpt.isEmpty || desFCOpt.get.isRight,
                            (),
@@ -681,7 +681,7 @@ object PBTransactions {
 
         val data = InvokeScriptTransactionData(
           Some(PBRecipients.create(dappAddress)),
-          ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+          ByteString.copyFrom(Deser.serializeOptionOfArray(fcOpt)(Serde.serialize(_))),
           payment.map(p => (p.assetId, p.amount): Amount)
         )
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))

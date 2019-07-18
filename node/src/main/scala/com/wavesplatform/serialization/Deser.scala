@@ -17,7 +17,7 @@ object Deser {
 
   def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
     val length = Shorts.fromByteArray(bytes.slice(position, position + 2))
-    require(0 <= length && length <= bytes.size, s"Invalid array size $length")
+    require(0 <= length && length <= bytes.length, s"Invalid array size $length")
     (bytes.slice(position + 2, position + 2 + length), position + 2 + length)
   }
 
@@ -26,14 +26,14 @@ object Deser {
   }
 
   def parseByteArrayOption(bytes: Array[Byte], position: Int, length: Int): (Option[Array[Byte]], Int) = {
-    if (bytes.slice(position, position + 1).head == (1: Byte)) {
+    if (bytes(position) == (1: Byte)) {
       val b = bytes.slice(position + 1, position + 1 + length)
       (Some(b), position + 1 + length)
     } else (None, position + 1)
   }
 
   def parseOption[T](bytes: Array[Byte], position: Int, length: Int = -1)(deser: Array[Byte] => T): (Option[T], Int) = {
-    if (bytes.slice(position, position + 1).head == (1: Byte)) {
+    if (bytes(position) == (1: Byte)) {
       val (arr, arrPosEnd) =
         if (length < 0) {
           parseArrayWithLength(bytes, position + 1)
@@ -73,7 +73,7 @@ object Deser {
   }
 
   def parseMerkleRootHash(bytes: Array[Byte], position: Int): (Digest32, Int) = {
-    if (bytes.slice(position, position + 1).head == (1: Byte)) {
+    if (bytes(position) == (1: Byte)) {
       val b = bytes.slice(position + 1, position + 1 + 32)
       (Digest32 @@ b, position + 1 + 32)
     } else (Digest32 @@ Array.emptyByteArray, position + 1)
