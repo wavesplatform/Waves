@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -163,7 +163,7 @@ class AddressRouteSpec
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
       (response \ "scriptText").as[String] shouldBe "TRUE" // [WAIT] "true"
       (response \ "complexity").as[Long] shouldBe 1
-      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
     (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: AddressOrAlias) => None)
@@ -195,25 +195,63 @@ class AddressRouteSpec
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
-      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val dataKeys = List("abc", "aBcD", "ABD", "ac",
-      "ab1c", "1aB1cD", "A1BD0", "a110b", "123", "reeee",
-      " ab", "ab ", "a b\n", "ab1 \n\t", "\n\raB1\t", "\n  \r  \t\t",
-      "!#$%&'()*+,", "!#$%&'()<*=>+,", "!", "<!@#qwe>", "\\", "\"\\", "qwe!",
-      "\b", "\u0000", "\b\b", "\bqweasd\u0000", "\u0000qweqwe")
+    val dataKeys = List(
+      "abc",
+      "aBcD",
+      "ABD",
+      "ac",
+      "ab1c",
+      "1aB1cD",
+      "A1BD0",
+      "a110b",
+      "123",
+      "reeee",
+      " ab",
+      "ab ",
+      "a b\n",
+      "ab1 \n\t",
+      "\n\raB1\t",
+      "\n  \r  \t\t",
+      "!#$%&'()*+,",
+      "!#$%&'()<*=>+,",
+      "!",
+      "<!@#qwe>",
+      "\\",
+      "\"\\",
+      "qwe!",
+      "\b",
+      "\u0000",
+      "\b\b",
+      "\bqweasd\u0000",
+      "\u0000qweqwe"
+    )
 
     val testData: Map[String, String] =
-      dataKeys
-        .map { k => k -> Random.nextString(16)}
-        .toMap
+      dataKeys.map { k =>
+        k -> Random.nextString(16)
+      }.toMap
 
-    val regexps = List(/*"abc", "bca",*/
-      "[a-zA-Z]{1,}", "[a-z0-9]{0,4}", "[a-zA-Z0-9]{1,4}", "[a-z!-/]{2,}", "[!-/:-@]{0,}", "re*", "re.ee",
-      "\\w{0,}", "\\d{0,}", "[\\w\\d]{0,}", "\\s{0,}", "^1aB1cD$", "(a|b)c")
+    val regexps = List(
+      /*"abc", "bca",*/
+      "[a-zA-Z]{1,}",
+      "[a-z0-9]{0,4}",
+      "[a-zA-Z0-9]{1,4}",
+      "[a-z!-/]{2,}",
+      "[!-/:-@]{0,}",
+      "re*",
+      "re.ee",
+      "\\w{0,}",
+      "\\d{0,}",
+      "[\\w\\d]{0,}",
+      "\\s{0,}",
+      "^1aB1cD$",
+      "(a|b)c"
+    )
 
     (blockchain.accountDataKeys _)
       .when(allAccounts(1).toAddress)
@@ -231,9 +269,12 @@ class AddressRouteSpec
 
     for (regex <- regexps) {
       Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-        val kvs = responseAs[JsArray].value.map { json =>
-          ((json \ "key").as[String], (json \ "value").as[String])
-        }.toList.sortBy(_._1)
+        val kvs = responseAs[JsArray].value
+          .map { json =>
+            ((json \ "key").as[String], (json \ "value").as[String])
+          }
+          .toList
+          .sortBy(_._1)
 
         val regexPattern = regex.r.pattern
         kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
@@ -242,9 +283,12 @@ class AddressRouteSpec
 
     for (regex <- regexps.map(rgx => URLEncoder.encode(rgx, "UTF-8"))) {
       Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-        val kvs = responseAs[JsArray].value.map {
-          json => ((json \ "key").as[String], (json \ "value").as[String])
-        }.toList.sortBy(_._1)
+        val kvs = responseAs[JsArray].value
+          .map { json =>
+            ((json \ "key").as[String], (json \ "value").as[String])
+          }
+          .toList
+          .sortBy(_._1)
 
         val regexPattern = URLDecoder.decode(regex, "UTF-8").r.pattern
         kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
