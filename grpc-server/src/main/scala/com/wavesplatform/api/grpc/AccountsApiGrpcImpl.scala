@@ -10,8 +10,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler)
-    extends AccountsApiGrpc.AccountsApi {
+class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
   private[this] val commonApi = new CommonAccountApi(blockchain)
 
   override def getBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = {
@@ -49,11 +48,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler)
   }
 
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
-    val transactions = Observable.defer(commonApi.activeLeases(request.address.toAddress) match {
-      case Right(txs)  => Observable.fromIterable(txs)
-      case Left(error) => Observable.raiseError(new IllegalArgumentException(error))
-    })
-
+    val transactions = commonApi.activeLeases(request.address.toAddress)
     val result = transactions.map { case (height, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB)) }
     responseObserver.completeWith(result)
   }

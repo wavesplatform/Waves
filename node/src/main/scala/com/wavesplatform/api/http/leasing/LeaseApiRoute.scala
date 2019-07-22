@@ -15,11 +15,12 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import monix.execution.Scheduler
 import play.api.libs.json.JsNumber
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(implicit sc: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -45,10 +46,10 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
       complete(Address.fromString(address) match {
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
-          commonAccountApi.activeLeases(a).map(_.collect {
+          commonAccountApi.activeLeases(a).collect {
             case (height, leaseTransaction: LeaseTransaction) =>
               leaseTransaction.json() + ("height" -> JsNumber(height))
-          })
+          }.toListL.runAsync
       })
     }
   }

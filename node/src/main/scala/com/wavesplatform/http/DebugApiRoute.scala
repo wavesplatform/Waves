@@ -198,7 +198,7 @@ case class DebugApiRoute(ws: WavesSettings,
     Array(
       new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
     ))
-  def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes) & extractExecutionContext) { implicit ec =>
+  def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes)) {
     json[RollbackParams] { params =>
       ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
@@ -293,7 +293,7 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
     ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
-    (delete & withAuth & extractExecutionContext) { implicit ec =>
+    (delete & withAuth) {
       val signatureEi: Either[ValidationError, ByteStr] =
         ByteStr
           .decodeBase58(signature)

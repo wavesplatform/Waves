@@ -23,7 +23,7 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
                                              fromId: Option[ByteStr]): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
-    db.get(Keys.addressId(address)).fold((Iterator.empty[(Height, Transaction)], () => ())) { id =>
+    db.get(Keys.addressId(address)).fold(Observable.empty[(Height, Transaction)]) { id =>
       val (heightAndTxs, close) = if (dbSettings.storeTransactionsByAddress) {
         def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
           if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums

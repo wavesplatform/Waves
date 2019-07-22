@@ -3,11 +3,11 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
+import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {
@@ -68,13 +68,13 @@ class CommonAccountApi(blockchain: Blockchain) {
       .flatMap(Observable.fromIterable(_))
   }
 
-  def activeLeases(address: Address): Either[String, Seq[(Int, LeaseTransaction)]] = {
+  def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
     blockchain
-      .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-      .map(_.collect {
+      .addressTransactionsObservable(address, Set(LeaseTransactionV1, LeaseTransactionV2))
+      .collect {
         case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
           (height, leaseTransaction)
-      })
+      }
   }
 }
 
