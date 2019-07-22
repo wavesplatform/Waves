@@ -8,7 +8,8 @@ import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionP
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.utils.{CloseableIterator, Paged}
+import com.wavesplatform.utils.Paged
+import monix.reactive.Observable
 
 private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends Distributions {
   import LevelDBWriter._
@@ -18,31 +19,32 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
   def portfolio(a: Address): Portfolio =
     portfolioCache.get(a, () => loadPortfolio(a))
 
-  def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = readStream { db =>
-    val assetIdStream: CloseableIterator[IssuedAsset] = db
-      .get(Keys.addressId(address))
-      .fold(CloseableIterator.empty[IssuedAsset]) { id =>
-        val addressId = AddressId @@ id
+  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = readOnlyNoClose { (snapshot, db) =>
+    def issueTxIterator = {
+      val assetIds = db
+        .get(Keys.addressId(address))
+        .fold(Seq.empty[IssuedAsset]) { id =>
+          val addressId = AddressId @@ id
+          db.get(Keys.assetList(addressId))
+        }
 
-        val iter = db.get(Keys.assetList(addressId)).iterator
+      assetIds.iterator
+        .flatMap(ia => transactionInfo(ia.id).map(_._2))
+        .collect {
+          case itx: IssueTransaction if itx.isNFT => itx
+        }
+    }
 
-        CloseableIterator(iter, () => CloseableIterator.close(iter))
-      }
-
-    val issueTxStream = assetIdStream
-      .flatMap(ia => transactionInfo(ia.id).map(_._2))
-      .collect {
-        case itx: IssueTransaction if itx.isNFT => itx
-      }
-
-    from
+    val result = from
       .flatMap(ia => transactionInfo(ia.id))
-      .fold(issueTxStream) {
+      .fold(issueTxIterator) {
         case (_, afterTx) =>
-          issueTxStream
+          issueTxIterator
             .dropWhile(_.id() != afterTx.id())
             .drop(1)
       }
+
+    Observable.fromIterator(result, () => snapshot.close())
   }
 
   override def assetDistribution(asset: IssuedAsset): AssetDistribution = readOnly { db =>

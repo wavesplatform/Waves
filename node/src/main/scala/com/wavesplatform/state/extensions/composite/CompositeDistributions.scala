@@ -7,7 +7,7 @@ import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.utils.CloseableIterator
+import monix.reactive.Observable
 
 private[state] final class CompositeDistributions(blockchain: Blockchain, baseProvider: Distributions, getDiff: () => Option[Diff])
     extends Distributions {
@@ -16,7 +16,7 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
     Monoid.combine(baseProvider.portfolio(a), p)
   }
 
-  override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
+  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
     com.wavesplatform.state.nftListFromDiff(blockchain, baseProvider, getDiff())(address, from)
 
   override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {

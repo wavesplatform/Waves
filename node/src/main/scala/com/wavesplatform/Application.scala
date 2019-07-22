@@ -253,7 +253,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot
-        ),
+        )(apiScheduler),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, blockchainUpdater, time)(apiScheduler),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
@@ -426,7 +426,7 @@ object Application {
     val isMetricsStarted = Metrics.start(settings.metrics, time)
 
     RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
-      import actorSystem.dispatcher
+
       isMetricsStarted.foreach { started =>
         if (started) {
           import settings.synchronizationSettings.microBlockSynchronizer

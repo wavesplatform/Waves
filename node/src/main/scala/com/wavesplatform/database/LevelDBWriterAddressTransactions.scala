@@ -1,5 +1,7 @@
 package com.wavesplatform.database
 
+import java.io.IOException
+
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -7,20 +9,22 @@ import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.{Transaction, TransactionParser, TransactionParsers}
-import com.wavesplatform.utils.CloseableIterator
+import monix.reactive.Observable
 
 import scala.util.Success
+import scala.util.control.NonFatal
 
 private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: LevelDBWriter) extends AddressTransactions {
-  import levelDBWriter.{dbSettings, writableDB}
 
-  override def addressTransactionsIterator(address: Address,
-                                           types: Set[TransactionParser],
-                                           fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = writableDB.readOnlyStream { db =>
+  import levelDBWriter.{dbSettings, readOnlyNoClose}
+
+  override def addressTransactionsObservable(address: Address,
+                                             types: Set[TransactionParser],
+                                             fromId: Option[ByteStr]): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
-    db.get(Keys.addressId(address)).fold(CloseableIterator.empty[(Height, Transaction)]) { id =>
-      val heightAndTxs: CloseableIterator[(Height, TxNum, Transaction)] = if (dbSettings.storeTransactionsByAddress) {
+    db.get(Keys.addressId(address)).fold((Iterator.empty[(Height, Transaction)], () => ())) { id =>
+      val (heightAndTxs, close) = if (dbSettings.storeTransactionsByAddress) {
         def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
           if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 
@@ -41,8 +45,9 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
               case None                   => Nil
             })
 
-        CloseableIterator.fromIterator(takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter))
-          .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
+        (takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
+          .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
+          () => ())
       } else {
         def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
           case None => txNums
@@ -52,38 +57,47 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
               .dropWhile { case (streamHeight, streamNum, _) => streamNum >= filterNum && streamHeight >= filterHeight }
         }
 
-        transactionsIterator(types.toVector, reverse = true)
-          .transform(takeAfter(_, maybeAfter))
+        val (iter, close) = transactionsIterator(types.toVector, reverse = true)
+        (takeAfter(iter, maybeAfter), close)
       }
 
-      heightAndTxs
-        .transform(_.map { case (height, _, tx) => (height, tx) })
+      Observable.fromIterator(heightAndTxs.map { case (height, _, tx) => (height, tx) }, { () =>
+        close()
+        snapshot.close()
+      })
     }
   }
 
-  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, TxNum, Transaction)] =
-    writableDB.readOnlyStream { db =>
-      val baseIterator: CloseableIterator[(Height, TxNum)] =
-        if (reverse) {
-          for {
-            height  <- CloseableIterator.fromIterator((levelDBWriter.height to 0 by -1).iterator)
-            (bh, _) <- levelDBWriter.blockHeaderAndSize(height).iterator
-            txNum   <- bh.transactionCount to 0 by -1
-          } yield (Height(height), TxNum(txNum.toShort))
-        } else {
-          db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix)
-            .transform(_.map { kv =>
-              val heightNumBytes = kv.getValue
-
-              val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-              val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
-
-              (height, txNum)
-            })
+  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): (Iterator[(Height, TxNum, Transaction)], () => Unit) =
+    readOnlyNoClose { (snapshot, db) =>
+      def iterateOverStream(prefix: Array[Byte]) = {
+        import scala.collection.JavaConverters._
+        val dbIter = db.iterator
+        try {
+          dbIter.seek(prefix)
+          (dbIter.asScala.takeWhile(_.getKey.startsWith(prefix)), { () =>
+            dbIter.close()
+            snapshot.close()
+          })
+        } catch {
+          case NonFatal(err) =>
+            dbIter.close()
+            throw new IOException("Couldn't create DB iterator", err)
         }
+      }
 
-      baseIterator
-        .transform(_.flatMap {
+      val (iter, close) = iterateOverStream(Shorts.toByteArray(Keys.TransactionHeightNumByIdPrefix))
+
+      val result = iter
+        .map { kv =>
+          val heightNumBytes = kv.getValue
+
+          val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+          val txNum = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+
+          (height, txNum)
+        }
+        .flatMap {
           case (height, txNum) =>
             db.get(Keys.transactionBytesAt(height, txNum))
               .flatMap { txBytes =>
@@ -96,6 +110,8 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
                 }
               }
               .map((height, txNum, _))
-        })
+        }
+
+      (result, close)
     }
 }

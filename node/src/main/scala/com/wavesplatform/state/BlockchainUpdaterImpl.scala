@@ -21,7 +21,6 @@ import com.wavesplatform.state.extensions.composite.{CompositeAddressTransaction
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
@@ -623,16 +622,6 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
-  /* override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
-    ngState.fold(blockchain.transactionsIterator(ofTypes, reverse)) { ng =>
-      val typeSet = ofTypes.toSet
-      val ngTransactions = ng.bestLiquidDiff.transactions.valuesIterator
-        .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
-
-      CloseableIterator.seq(ngTransactions, blockchain.transactionsIterator(ofTypes, reverse))
-    }
-  } */
-
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
     ngState flatMap { ng =>
       ng.bestLiquidDiff.transactions.get(id).map(_._1)
@@ -656,12 +645,6 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
         blockchain.leaseBalance(address)
     }
   }
-
-  override def addressTransactions(address: Address,
-                                   types: Set[Type],
-                                   count: Int,
-                                   fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] =
-    AddressTransactions.createListEither(this, this)(address, types, count, fromId)
 
   //noinspection ScalaStyle
   private[this] object metrics {

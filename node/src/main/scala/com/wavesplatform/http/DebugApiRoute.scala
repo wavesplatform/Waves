@@ -23,7 +23,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -60,7 +60,7 @@ case class DebugApiRoute(ws: WavesSettings,
                          extLoaderStateReporter: Coeval[RxExtensionLoader.State],
                          mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
                          scoreReporter: Coeval[RxScoreObserver.Stats],
-                         configRoot: ConfigObject)
+                         configRoot: ConfigObject)(implicit sc: Scheduler)
     extends ApiRoute
     with WithSettings
     with ScorexLogging {
@@ -393,9 +393,11 @@ case class DebugApiRoute(ws: WavesSettings,
   }
 
   @Path("/stateChanges/address/{address}/limit/{limit}")
-  @ApiOperation(value = "List of transactions by address with state changes",
-                notes = "Get list of transactions with state changes where specified address has been involved",
-                httpMethod = "GET")
+  @ApiOperation(
+    value = "List of transactions by address with state changes",
+    notes = "Get list of transactions with state changes where specified address has been involved",
+    httpMethod = "GET"
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
@@ -411,30 +413,23 @@ case class DebugApiRoute(ws: WavesSettings,
       (address, limit, afterOpt) =>
         validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
           import cats.implicits._
-          val resultE: Either[ValidationError, Seq[JsObject]] = for {
-            txs <- concurrent
-              .blocking(
-                blockchain.addressTransactions(address,
-                                               Set.empty[Byte],
-                                               limit,
-                                               afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption)))
-              .left
-              .map(GenericError(_))
-            jsons <- txs
-              .map {
-                case (height, tx: InvokeScriptTransaction) =>
-                  blockchain
-                    .invokeScriptResult(TransactionId(tx.id()))
-                    .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
 
-                case (height, tx) =>
-                  Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
-              }
-              .toList
-              .sequence
-          } yield jsons
+          val result = blockchain
+            .addressTransactionsObservable(address, Set.empty, afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption))
+            .map {
+              case (height, tx: InvokeScriptTransaction) =>
+                blockchain
+                  .invokeScriptResult(TransactionId(tx.id()))
+                  .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
 
-          complete(resultE)
+              case (height, tx) =>
+                Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
+            }
+            .take(limit)
+            .toListL
+            .map(_.sequence)
+
+          complete(result.runAsyncLogErr)
         }
     }
 }

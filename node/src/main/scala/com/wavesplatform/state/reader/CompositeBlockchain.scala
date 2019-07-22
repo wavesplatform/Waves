@@ -13,7 +13,6 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -188,12 +187,6 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
     val diffData = diff.accountData.get(acc).orEmpty
     diffData.data.get(key).orElse(inner.accountData(acc, key))
   }
-
-  override def addressTransactions(address: Address,
-                                   types: Set[Type],
-                                   count: Int,
-                                   fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] =
-    AddressTransactions.createListEither(this, this)(address, types, count, fromId)
 
   override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)
 

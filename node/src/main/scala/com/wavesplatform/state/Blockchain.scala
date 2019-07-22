@@ -49,10 +49,7 @@ trait Blockchain {
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
 
-  def addressTransactions(address: Address,
-                          types: Set[Transaction.Type],
-                          count: Int,
-                          fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]]
+  def collectTransactions[T](address: Address, types: Set[Transaction.Type])(pf: PartialFunction[Transaction, T]): Seq[T]
 
   def containsTransaction(tx: Transaction): Boolean
 

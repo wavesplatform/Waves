@@ -19,7 +19,6 @@ import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -27,9 +26,9 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import monix.reactive.Observer
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -77,7 +76,10 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
     new LevelDBDistributions(ldb)
 }
 
-class LevelDBWriter(private[database] val writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], val settings: BlockchainSettings, val dbSettings: DBSettings)
+class LevelDBWriter(private[database] val writableDB: DB,
+                    spendableBalanceChanged: Observer[(Address, Asset)],
+                    val settings: BlockchainSettings,
+                    val dbSettings: DBSettings)
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
@@ -88,9 +90,12 @@ class LevelDBWriter(private[database] val writableDB: DB, spendableBalanceChange
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
-  private[database] def readStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = CloseableIterator.defer(writableDB.readOnlyStream(f))
-
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
+
+  private[database] def readOnlyNoClose[A](f: (Snapshot, ReadOnlyDB) => A): A = {
+    val snapshot = writableDB.getSnapshot
+    f(snapshot, new ReadOnlyDB(writableDB, new ReadOptions().snapshot(snapshot)))
+  }
 
   private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
@@ -646,9 +651,6 @@ class LevelDBWriter(private[database] val writableDB: DB, spendableBalanceChange
     db.get(Keys.transactionHNById(txId)).map(_._1)
   }
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[BlockId]): Either[String, Seq[(Height, Transaction)]] =
-    AddressTransactions.createListEither(this, this)(address, types, count, fromId)
-
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
     if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
     else
@@ -725,25 +727,26 @@ class LevelDBWriter(private[database] val writableDB: DB, spendableBalanceChange
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
-    val iterator = readStream { db =>
-      db.iterateOverStream(Keys.TransactionHeightNumByIdPrefix).flatMap { kv =>
-        val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = readOnly { db =>
+    val results = Vector.newBuilder[T]
+    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
+      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
 
-        if (loadLeaseStatus(db, txId)) {
-          val heightNumBytes = kv.getValue
+      val txOption = if (loadLeaseStatus(db, txId)) {
+        val heightNumBytes = kv.getValue
 
-          val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-          val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+        val txNum = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-          db.get(Keys.transactionAt(height, txNum))
-        } else None
+        db.get(Keys.transactionAt(height, txNum))
+      } else None
+
+      txOption match {
+        case Some(tx: LeaseTransaction) if pf.isDefinedAt(tx) => results += pf(tx)
+        case _ => // Skip
       }
     }
-
-    iterator
-      .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
-      .closeAfter(_.toVector)
+    results.result()
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
@@ -902,8 +905,6 @@ class LevelDBWriter(private[database] val writableDB: DB, spendableBalanceChange
         db.get(Keys.invokeScriptResult(height, txNum))
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
-
-
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

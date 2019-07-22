@@ -6,7 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.utils.{CloseableIterator, Paged}
+import com.wavesplatform.utils.Paged
 import monix.reactive.Observable
 
 trait Distributions {
@@ -20,7 +20,7 @@ trait Distributions {
 
   def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
 
-  def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction]
+  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction]
 }
 
 object Distributions {
@@ -40,19 +40,6 @@ object Distributions {
 
     override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
-    override def nftIterator(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = CloseableIterator.empty
-  }
-
-  implicit class DistributionsExt(d: Distributions) {
-    final def nftObs(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
-      Observable.defer {
-        val iterator = d.nftIterator(address, from)
-        Observable.fromIterator(iterator, () => iterator.close())
-      }
-
-    final def nftList(address: Address, from: Option[IssuedAsset], count: Int): Seq[IssueTransaction] =
-      d.nftIterator(address, from)
-        .take(count)
-        .closeAfter(_.toVector)
+    override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.empty
   }
 }

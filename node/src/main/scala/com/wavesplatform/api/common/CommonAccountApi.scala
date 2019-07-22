@@ -3,7 +3,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -44,7 +43,7 @@ class CommonAccountApi(blockchain: Blockchain) {
   }
 
   def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
-    Distributions(blockchain).nftObs(address, from)
+    blockchain.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain.accountScript(address)

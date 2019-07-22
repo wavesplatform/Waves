@@ -558,7 +558,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
-            newState.addressTransactionsIterator(acc.toAddress, Set.empty, None).toList.head._2 shouldBe ci
+            newState.addressTransactionsObservable(acc.toAddress, Set.empty, None).toList.head._2 shouldBe ci
         }
     }
   }
