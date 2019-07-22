@@ -31,14 +31,14 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
 
   property("syntax errors") {
     val repl = Repl()
-    repl.execute(""" let a = {{1} """) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
-    repl.execute(""" 1 ++ 2 """)       shouldBe Left("Compilation failed: expected a second operator in 4-4")
+    repl.execute(""" let a = {{1} """) shouldBe Left("Compilation failed: expected a value's expression in 10-10")
+    repl.execute(""" 1 ++ 2 """)       shouldBe Left("Compilation failed: expected a second operator in 5-5")
   }
 
   property("logic errors") {
     val repl = Repl()
-    repl.execute(""" let a = base64'12345' """) shouldBe Left("Compilation failed: can't parse Base64 string in 17-21")
-    repl.execute(""" let b = "abc" + 1 """)     shouldBe Left("Compilation failed: Can't find a function overload '+'(String, Int) in 9-18")
+    repl.execute(""" let a = base64'12345' """) shouldBe Left("Compilation failed: can't parse Base64 string in 18-22")
+    repl.execute(""" let b = "abc" + 1 """)     shouldBe Left("Compilation failed: Can't find a function overload '+'(String, Int) in 10-19")
   }
 
   property("exceptions") {
