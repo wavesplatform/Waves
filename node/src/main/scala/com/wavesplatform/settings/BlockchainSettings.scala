@@ -58,7 +58,7 @@ object FunctionalitySettings {
     minimalGeneratingBalanceAfter = 1479168000000L,
     allowTransactionsFromFutureUntil = 1479168000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
+    allowInvalidReissueInSameBlockUntilTimestamp = 1530161445559L, // 1492768800000L
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
@@ -76,7 +76,7 @@ object FunctionalitySettings {
     minimalGeneratingBalanceAfter = 0,
     allowTransactionsFromFutureUntil = 1478100000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L, // TODO: set to data tx activation timestamp
+    allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
     blockVersion3AfterHeight = 161700,
