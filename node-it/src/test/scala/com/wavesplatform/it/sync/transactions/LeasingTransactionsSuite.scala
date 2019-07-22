@@ -11,11 +11,28 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   private val errorMessage = "Reason: Cannot lease more than own"
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
-    for (v <- supportedVersions) {
+  //  for (v <- supportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
-      val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = v).id
+      val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = 2).id
+      nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
+
+      miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
+      miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
+    //}
+  }
+
+  test("can lease by aliase") {
+
+    val aliasId = miner.createAlias(secondAddress, "testalias", minFee, 2).id
+    miner.waitForTransaction(aliasId)
+
+   for (v <- supportedVersions) {
+      val (balance1, eff1) = miner.accountBalances(firstAddress)
+      val (balance2, eff2) = miner.accountBalances(secondAddress)
+
+      val createdLeaseTxId = sender.lease(firstAddress, aliasId, leasingAmount, leasingFee = minFee, version = 2).id
       nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
 
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
