@@ -106,7 +106,10 @@ object Explorer extends ScorexLogging {
     log.info(s"Blockchain height is $blockchainHeight")
     try {
 
-      val flag = args(1).toUpperCase
+      val flag = Try(args(1)).fold(e => {
+        log.error("Failed to resolve second startup argument.", e)
+        throw e
+      }, identity).toUpperCase
 
       flag match {
         case "B" =>
