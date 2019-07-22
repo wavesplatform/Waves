@@ -7,32 +7,36 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 import com.wavesplatform.it.sync._
 
+import scala.util.Random
+
 class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val errorMessage = "Reason: Cannot lease more than own"
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
-  //  for (v <- supportedVersions) {
+    for (v <- supportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
-      val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = 2).id
+      val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
 
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
       miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
-    //}
+    }
   }
 
-  test("can lease by aliase") {
+  test("can lease by alias") {
 
-    val aliasId = miner.createAlias(secondAddress, "testalias", minFee, 2).id
+    val alias   = s"testalias.${Random.alphanumeric.take(9).mkString}".toLowerCase
+    val aliasId = miner.createAlias(secondAddress, alias, minFee).id
     miner.waitForTransaction(aliasId)
+    val fullAlias = miner.aliasByAddress(secondAddress).find(_.endsWith(alias)).get
 
-   for (v <- supportedVersions) {
+    for (v <- supportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
-      val createdLeaseTxId = sender.lease(firstAddress, aliasId, leasingAmount, leasingFee = minFee, version = 2).id
+      val createdLeaseTxId = sender.lease(firstAddress, fullAlias, leasingAmount, leasingFee = minFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
 
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
