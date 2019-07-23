@@ -83,10 +83,10 @@ timeout(time:90, unit:'MINUTES') {
                             catch (err) {}
                             finally{
                                 dir('it/target/logs') {
-                                    sh "tar zcf logs.tar.gz * || true"
+                                    sh "tar -czvf logs.tar.gz * || true"
                                 }
                                 dir('node-it/target/logs') {
-                                    sh "tar zcf node.logs.tar.gz * || true"
+                                    sh "tar -czvf node.logs.tar.gz * || true"
                                 }
                             }
                         }
@@ -107,7 +107,10 @@ timeout(time:90, unit:'MINUTES') {
                     println(err.toString())
                  }
                 finally{
-                    archiveArtifacts artifacts: 'it/target/logs/*.logs.tar.gz'
+                    logArchiveLocation = findFiles(glob: '**/*logs.tar.gz')
+                    logArchiveLocation.each {
+                        archiveArtifacts it.path
+                    }
                     ut.notifySlack("mtuktarov-test", currentBuild.result)
                 }
             }
