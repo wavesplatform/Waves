@@ -141,7 +141,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
         header.consensusData.baseTarget,
         header.consensusData.generationSignature,
         header.transactionCount,
-        header.featureVotes.map(_.toLong).toSeq
+        header.featureVotes.map(_.toLong).toSeq.sorted
       )
     }.toOption
 }
