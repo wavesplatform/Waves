@@ -58,7 +58,7 @@ timeout(time:90, unit:'MINUTES') {
                                 $class: 'GitSCM',
                                 branches: [[ name: branch ]],
                                 doGenerateSubmoduleConfigurations: false,
-                                extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'WavesGUI']],
+                                extensions: [],
                                 submoduleCfg: [],
                                 userRemoteConfigs: [[url: repo_url]]
                             ])
