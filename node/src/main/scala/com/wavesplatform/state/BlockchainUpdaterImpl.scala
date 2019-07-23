@@ -69,6 +69,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
 
   publishLastBlockInfo()
 
+  @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
