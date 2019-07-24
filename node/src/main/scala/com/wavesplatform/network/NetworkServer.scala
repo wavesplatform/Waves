@@ -216,7 +216,7 @@ object NetworkServer extends ScorexLogging {
       log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
       if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
         peerDatabase
-          .randomPeer(excluded = excludedAddresses ++ all)
+          .randomPeers(settings.networkSettings.maxOutboundConnections - outgoingChannels.size(), excluded = excludedAddresses ++ all)
           .foreach(doConnect)
       }
 

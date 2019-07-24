@@ -10,6 +10,7 @@ import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection._
 import scala.concurrent.duration.FiniteDuration
@@ -114,6 +115,19 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       case (None, v @ Some(_))    => v
       case _                      => None
     }
+  }
+
+  override def randomPeers(max: Int, excluded: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] = {
+    @tailrec
+    def go(cnt: Int, curExcluded: immutable.Set[InetSocketAddress], peers: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] = {
+      if (cnt >= max) peers
+      else
+        randomPeer(curExcluded) match {
+          case Some(peer) => go(cnt + 1, curExcluded + peer, peers + peer)
+          case None => peers
+        }
+    }
+    go(0, excluded, immutable.Set())
   }
 
   def clearBlacklist(): Unit = {
