@@ -5,11 +5,10 @@ import com.wavesplatform.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.{block => vb}
+import com.wavesplatform.{crypto, block => vb}
 
 //noinspection ScalaStyle
 trait PBImplicitConversions {
@@ -77,7 +76,6 @@ trait PBImplicitConversions {
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
     def toPBByteString     = ByteString.copyFrom(bytes.arr)
     def toPublicKeyAccount = PublicKey(bytes)
-    def toAddress          = Address.fromBytes(bytes).explicitGet()
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
