@@ -200,7 +200,7 @@ object CryptoContext {
 
     version match {
       case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
-      case V3      => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
+      case V3 | V4 => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
     }
   }
 

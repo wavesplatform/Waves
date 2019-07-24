@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.collection.JavaConverters._
@@ -34,6 +34,7 @@ object DocExport {
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+          override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
           override def tthis: Recipient.Address                                                                        = ???
         }
       )

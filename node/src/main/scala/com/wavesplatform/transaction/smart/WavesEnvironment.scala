@@ -16,6 +16,8 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
+import scala.util.Try
+
 object WavesEnvironment {
   type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
 }
@@ -124,4 +126,22 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
       generatorPublicKey = ByteStr(blockH.signerData.generator)
     )
   }
+
+  override def blockHeaderParser(bytes: Array[Byte]): Option[domain.BlockHeader] =
+    Try {
+      val header = BlockHeader.readHeaderOnly(bytes)
+
+      domain.BlockHeader(
+        header.timestamp,
+        header.version,
+        header.reference,
+        header.signerData.generator.toAddress.bytes,
+        header.signerData.generator.bytes,
+        header.signerData.signature,
+        header.consensusData.baseTarget,
+        header.consensusData.generationSignature,
+        header.transactionCount,
+        header.featureVotes.map(_.toLong).toSeq.sorted
+      )
+    }.toOption
 }
