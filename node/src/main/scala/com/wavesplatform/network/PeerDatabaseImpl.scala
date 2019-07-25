@@ -99,36 +99,40 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
-  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
-    def excludeAddress(isa: InetSocketAddress): Boolean = {
-      excluded(isa) || Option(isa.getAddress).exists(blacklistedHosts) || suspendedHosts(isa.getAddress)
-    }
-    // excluded only contains local addresses, our declared address, and external declared addresses we already have
-    // connection to, so it's safe to filter out all matching candidates
-    unverifiedPeers.removeIf(excluded(_))
-    val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
-    val verified   = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
+  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] =
+    randomPeers(1, excluded).headOption
 
-    (unverified, verified) match {
-      case (Some(_), v @ Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
-      case (Some(_), None)        => Some(unverifiedPeers.poll())
-      case (None, v @ Some(_))    => v
-      case _                      => None
-    }
-  }
+  override def randomPeers(max: Int, excluded: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] =
+    unverifiedPeers.synchronized {
+      def excludeAddress(isa: InetSocketAddress): Boolean = {
+        excluded(isa) || Option(isa.getAddress).exists(blacklistedHosts) || suspendedHosts(isa.getAddress)
+      }
+      // excluded only contains local addresses, our declared address, and external declared addresses we already have
+      // connection to, so it's safe to filter out all matching candidates
+      unverifiedPeers.removeIf(excluded(_))
 
-  override def randomPeers(max: Int, excluded: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] = {
-    @tailrec
-    def go(cnt: Int, curExcluded: immutable.Set[InetSocketAddress], peers: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] = {
-      if (cnt >= max) peers
-      else
-        randomPeer(curExcluded) match {
-          case Some(peer) => go(cnt + 1, curExcluded + peer, peers + peer)
-          case None => peers
-        }
+      val verifiedKnownPeers = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq.filterNot(excludeAddress)).take(max)
+
+      @tailrec
+      def choice(chosenPeers: immutable.Set[InetSocketAddress], verifiedPeers: Seq[InetSocketAddress]): immutable.Set[InetSocketAddress] =
+        if (chosenPeers.size < max) {
+          val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
+          val verified   = verifiedPeers.headOption
+
+          (unverified, verified) match {
+            case (Some(_), Some(v)) =>
+              if (Random.nextBoolean())
+                choice(chosenPeers + unverifiedPeers.poll(), verifiedPeers)
+              else
+                choice(chosenPeers + v, verifiedPeers.tail)
+            case (Some(_), None) => choice(chosenPeers + unverifiedPeers.poll(), verifiedPeers)
+            case (None, Some(v)) => choice(chosenPeers + v, verifiedPeers.tail)
+            case _               => chosenPeers
+          }
+        } else chosenPeers
+
+      choice(immutable.Set.empty, verifiedKnownPeers)
     }
-    go(0, excluded, immutable.Set())
-  }
 
   def clearBlacklist(): Unit = {
     blacklist.invalidateAll()
