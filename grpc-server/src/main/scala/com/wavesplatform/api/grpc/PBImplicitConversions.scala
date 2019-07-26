@@ -83,7 +83,6 @@ trait PBImplicitConversions {
     def toByteStr          = ByteStr(bytes.toByteArray)
 
     def toPublicKey = PublicKey(bytes.toByteArray)
-
     def toAddress: Address = PBRecipients.toAddress(Recipient().withAddress(bytes)).explicitGet()
   }
 
