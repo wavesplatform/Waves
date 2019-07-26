@@ -46,7 +46,7 @@ trait PBImplicitConversions {
         header.timestamp,
         header.version.toByte,
         header.reference.toByteStr,
-        vb.SignerData(header.generator.toPublicKeyAccount, signature),
+        vb.SignerData(header.generator.toPublicKey, signature),
         NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
         0,
         header.featureVotes.map(intToShort).toSet
@@ -74,14 +74,17 @@ trait PBImplicitConversions {
   }
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
-    def toPBByteString     = ByteString.copyFrom(bytes.arr)
-    def toPublicKeyAccount = PublicKey(bytes)
+    def toPBByteString = ByteString.copyFrom(bytes.arr)
+
+    def toPublicKey = PublicKey(bytes)
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
     def toByteStr          = ByteStr(bytes.toByteArray)
-    def toPublicKeyAccount = PublicKey(bytes.toByteArray)
-    def toAddress          = Address.fromBytes(bytes.toByteArray).explicitGet()
+
+    def toPublicKey = PublicKey(bytes.toByteArray)
+
+    def toAddress: Address = PBRecipients.toAddress(Recipient().withAddress(bytes)).explicitGet()
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString
