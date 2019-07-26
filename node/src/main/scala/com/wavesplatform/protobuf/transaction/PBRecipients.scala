@@ -23,7 +23,6 @@ object PBRecipients {
     else Left(GenericError(s"Invalid address length: ${bytes.length}"))
   }
 
-  //noinspection ScalaDeprecation
   def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {
     case Recipient.Recipient.Address(bytes) => toAddress(bytes.toByteArray)
     case _                                  => Left(GenericError(s"Not an address: $r"))
