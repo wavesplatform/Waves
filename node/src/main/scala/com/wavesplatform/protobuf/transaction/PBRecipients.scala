@@ -7,7 +7,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
-  val CompressedAddressLength = Address.AddressLength - 6
+  val CompressedAddressLength: Int = Address.AddressLength - 6
 
   def create(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
     case a: Address => Recipient().withAddress(ByteString.copyFrom(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
