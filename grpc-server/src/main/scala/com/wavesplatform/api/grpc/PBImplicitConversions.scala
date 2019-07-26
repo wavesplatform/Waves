@@ -75,13 +75,13 @@ trait PBImplicitConversions {
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
     def toPBByteString = ByteString.copyFrom(bytes.arr)
-    def toPublicKey = PublicKey(bytes)
+    def toPublicKey    = PublicKey(bytes)
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
     def toByteStr          = ByteStr(bytes.toByteArray)
-    def toPublicKey = PublicKey(bytes.toByteArray)
-    def toAddress: Address = PBRecipients.toAddress(Recipient().withAddress(bytes)).explicitGet()
+    def toPublicKey        = PublicKey(bytes.toByteArray)
+    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).explicitGet()
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString
