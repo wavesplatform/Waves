@@ -221,7 +221,7 @@ object NetworkServer extends ScorexLogging {
             .foreach(doConnect)
         else
           peerDatabase
-            .randomPeer(excluded = excludedAddresses ++ all)
+            .randomPeers(1, excluded = excludedAddresses ++ all)
             .foreach(doConnect)
       }
 

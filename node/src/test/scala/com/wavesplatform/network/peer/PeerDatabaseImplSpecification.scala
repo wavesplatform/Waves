@@ -11,6 +11,7 @@ import net.ceedubs.ficus.Ficus._
 import org.scalatest.{Matchers, path}
 
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
+  import PeerDatabaseImplSpecification._
 
   private val config1   = ConfigFactory.parseString("""waves.network {
       |  file = null
@@ -154,4 +155,11 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   private def sleepShort() = Thread.sleep(200)
 
+}
+
+object PeerDatabaseImplSpecification {
+  implicit class PeerDatabaseImplExt(database: PeerDatabaseImpl) {
+    def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] =
+      database.randomPeers(1, excluded).headOption
+  }
 }

@@ -99,9 +99,6 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
-  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] =
-    randomPeers(1, excluded).headOption
-
   override def randomPeers(max: Int, excluded: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] =
     unverifiedPeers.synchronized {
       def excludeAddress(isa: InetSocketAddress): Boolean = {
