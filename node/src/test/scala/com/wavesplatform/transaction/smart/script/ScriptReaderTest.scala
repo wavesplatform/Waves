@@ -45,10 +45,18 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
     }
   }
 
-  property("should return correct error for invalid starting bytes") {
+  property("should return correct error for invalid length script") {
     import ScriptReaderTest._
 
-    forAll(Gen.oneOf(invalidPrefix, invalidPrefixV0)) { scBytes =>
+    forAll(invalidPrefixV0Length) { scBytes =>
+      ScriptReader.fromBytes(scBytes) shouldBe 'left
+    }
+  }
+
+  property("should return correct error for script with invalid start bytes") {
+    import ScriptReaderTest._
+
+    forAll(Gen.oneOf(invalidPrefixV0, invalidPrefix)) { scBytes =>
       ScriptReader.fromBytes(scBytes) shouldBe 'left
     }
   }
@@ -57,18 +65,42 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
 object ScriptReaderTest {
 
   val validStdLibVersions: Set[Int] = DirectiveDictionary[StdLibVersion].all.map(_.id).toSet
+  val validContentTypes: Set[Int]   = DirectiveDictionary[ContentType].all.map(_.id).toSet
 
-  // version byte 0 but no StdLibVersion byte and/or ContentType byte
-  val invalidPrefixV0: Gen[Array[Byte]] =
+  val invalidPrefixV0ContentType: Gen[Array[Byte]] =
+    for {
+      c <- Arbitrary.arbitrary[Byte].filter(!validContentTypes.contains(_))
+      v <- Gen.oneOf(validStdLibVersions.toSeq)
+    } yield 0.toByte +: Array(c, v).map(_.toByte)
+
+  val invalidPrefixV0StdLibVersion: Gen[Array[Byte]] =
+    for {
+      c <- Gen.oneOf(validContentTypes.toSeq)
+      v <- Arbitrary.arbitrary[Byte].filter(!validStdLibVersions.contains(_))
+    } yield 0.toByte +: Array(c, v).map(_.toByte)
+
+  val invalidPrefixV0Both: Gen[Array[Byte]] =
+    for {
+      c <- Arbitrary.arbitrary[Byte].filter(!validContentTypes.contains(_))
+      v <- Arbitrary.arbitrary[Byte].filter(!validStdLibVersions.contains(_))
+    } yield 0.toByte +: Array(c, v)
+
+  // version byte 0 but no StdLibVersion byte and/or no ContentType byte
+  val invalidPrefixV0Length: Gen[Array[Byte]] =
     for {
       n  <- Gen.oneOf(0, 1)
       bs <- Gen.listOfN(n, Arbitrary.arbitrary[Byte])
     } yield 0.toByte +: bs.toArray
 
+  // version byte 0 but unknown StdLibVersion byte and/or unknown ContentType byte
+  val invalidPrefixV0: Gen[Array[Byte]] =
+    Gen.oneOf(invalidPrefixV0ContentType, invalidPrefixV0StdLibVersion, invalidPrefixV0Both)
+
   // invalid version byte and unknown length of remaining bytes
   val invalidPrefix: Gen[Array[Byte]] =
     for {
-      v   <- Arbitrary.arbitrary[Byte].filter(b => !validStdLibVersions.contains(b) && b != 0)
-      bs  <- Gen.listOf(Arbitrary.arbitrary[Byte])
+      v  <- Arbitrary.arbitrary[Byte].filter(b => !validStdLibVersions.contains(b) && b != 0)
+      n  <- Gen.choose(0, 5)
+      bs <- Gen.listOfN(n, Arbitrary.arbitrary[Byte])
     } yield v +: bs.toArray
 }

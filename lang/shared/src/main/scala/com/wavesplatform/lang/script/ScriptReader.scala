@@ -21,11 +21,13 @@ object ScriptReader {
         if (bytes.isEmpty)
           Left(ScriptParseError(s"Can't parse empty script bytes"))
         else {
-          val versionByte: Byte = bytes.head
-          if (versionByte == 0 && bytes.length > 2)
-            Right((DirectiveDictionary[ContentType].idMap(bytes(1)), DirectiveDictionary[StdLibVersion].idMap(bytes(2)), 3))
+          val versionByte    = bytes.head
+          val contentTypes   = DirectiveDictionary[ContentType].idMap
+          val stdLibVersions = DirectiveDictionary[StdLibVersion].idMap
+          if (versionByte == 0 && bytes.length > 2 && contentTypes.contains(bytes(1)) && stdLibVersions.contains(bytes(2)))
+            Right((contentTypes(bytes(1)), stdLibVersions(bytes(2)), 3))
           else if (versionByte == V1.id || versionByte == V2.id || versionByte == V3.id)
-            Right((Expression, DirectiveDictionary[StdLibVersion].idMap(versionByte.toInt), 1))
+            Right((Expression, stdLibVersions(versionByte.toInt), 1))
           else Left(ScriptParseError(s"Can't parse script bytes starting with ${bytes.take(3).mkString("[", ",", "]")}"))
         }
       }
