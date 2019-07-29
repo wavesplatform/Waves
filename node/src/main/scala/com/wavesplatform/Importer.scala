@@ -13,18 +13,17 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
@@ -95,36 +94,21 @@ object Importer extends ScorexLogging {
       case t => t
     }
 
-  def initTime(ntpServer: String): NTP = new NTP(ntpServer)
-
-  def initUtxPool(): UtxPool = new UtxPool {
-    override def putIfNew(tx: Transaction, b: Boolean)                 = ???
-    override def removeAll(txs: Traversable[Transaction]): Unit        = {}
-    override def spendableBalance(addr: Address, assetId: Asset): Long = ???
-    override def pessimisticPortfolio(addr: Address): Portfolio        = ???
-    override def all                                                   = ???
-    override def size                                                  = ???
-    override def transactionById(transactionId: ByteStr)               = ???
-    override def packUnconfirmed(rest: MultiDimensionalMiningConstraint,
-                                 maxPackTime: Duration): (Seq[Transaction], MultiDimensionalMiningConstraint) = ???
-    override def close(): Unit                                                                                = {}
-  }
-
   def initBlockchain(scheduler: Scheduler,
                      time: NTP,
-                     utxPool: UtxPool,
                      settings: WavesSettings,
                      importOptions: ImportOptions,
-                     blockchainUpdated: Observer[BlockchainUpdated]): (Blockchain with BlockchainUpdater, AppendBlock) = {
+                     blockchainUpdated: Observer[BlockchainUpdated]): (Blockchain with BlockchainUpdater, AppendBlock, UtxPoolImpl) = {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
       StorageFactory(settings, db, time, Observer.empty, blockchainUpdated)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
-    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, settings, scheduler, importOptions.verify) _
+    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
     checkGenesis(settings, blockchainUpdater)
 
-    (blockchainUpdater, extAppender)
+    (blockchainUpdater, extAppender, utxPool)
   }
 
   def initExtensions(wavesSettings: WavesSettings,
@@ -171,10 +155,17 @@ object Importer extends ScorexLogging {
     val start    = System.currentTimeMillis()
     var counter  = 0
 
-    var blocksToSkip  = blockchainUpdater.height - 1
-    val blocksToApply = importOptions.importHeight - blockchainUpdater.height + 1
+    val startHeight   = blockchainUpdater.height
+    var blocksToSkip  = startHeight - 1
+    val blocksToApply = importOptions.importHeight - startHeight + 1
 
-    println(s"Skipping $blocksToSkip block(s)")
+    log.info(s"Skipping $blocksToSkip block(s)")
+
+    sys.addShutdownHook {
+      import scala.concurrent.duration._
+      val millis = (System.nanoTime() - start).nanos.toMillis
+      log.info(s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}")
+    }
 
     while (!quit && counter < blocksToApply) {
       val s1 = bis.read(lenBytes)
@@ -201,11 +192,11 @@ object Importer extends ScorexLogging {
             }
           }
         } else {
-          println(s"$s2 != expected $len")
+          log.info(s"$s2 != expected $len")
           quit = true
         }
       } else {
-        println(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
+        log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
         quit = true
       }
     }
@@ -225,13 +216,13 @@ object Importer extends ScorexLogging {
       fis <- initFileStream(importOptions.blockchainFile)
       bis = new BufferedInputStream(fis)
 
-      scheduler                        = Schedulers.singleThread("appender")
-      time                             = initTime(wavesSettings.ntpServer)
-      utxPool                          = initUtxPool()
-      blockchainUpdated                = ConcurrentSubject.publish[BlockchainUpdated]
-      (blockchainUpdater, appendBlock) = initBlockchain(scheduler, time, utxPool, wavesSettings, importOptions, blockchainUpdated)
-      extensions                       = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
-      _                                = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
+      scheduler = Schedulers.singleThread("appender")
+      time      = new NTP(wavesSettings.ntpServer)
+
+      blockchainUpdated                         = ConcurrentSubject.publish[BlockchainUpdated]
+      (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdated)
+      extensions                                = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
+      _                                         = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield
       () => {
         Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)

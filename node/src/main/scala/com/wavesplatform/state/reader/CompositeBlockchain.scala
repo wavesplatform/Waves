@@ -14,10 +14,12 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
 
-final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carry: Long = 0) extends Blockchain {
+final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carry: Long = 0)
+    extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
@@ -79,6 +81,15 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
         case (lt: LeaseTransaction, _) =>
           LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
+  }
+
+  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = {
+    diff.transactions
+      .get(id)
+      .collect {
+        case (tx: TransferTransaction, _) => (height, tx)
+      }
+      .orElse(inner.transferById(id))
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =

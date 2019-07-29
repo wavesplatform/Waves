@@ -3,7 +3,8 @@ package com.wavesplatform.http
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.api.http.{ApiKeyNotValid, PeersApiRoute}
+import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.PeersApiRoute
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import io.netty.channel.Channel

@@ -81,7 +81,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val tx1      = sender.putData(secondAddress, intList, calcDataFee(intList)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
 
-    sender.getData(secondAddress, "int") shouldBe intEntry
+    sender.getDataByKey(secondAddress, "int") shouldBe intEntry
     sender.getData(secondAddress) shouldBe intList
 
     // define boolean entry
@@ -96,9 +96,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val txS         = sender.putData(secondAddress, stringList, calcDataFee(stringList)).id
     nodes.waitForHeightAriseAndTxPresent(txS)
 
-    sender.getData(secondAddress, "int") shouldBe intEntry
-    sender.getData(secondAddress, "bool") shouldBe boolEntry
-    sender.getData(secondAddress, "str") shouldBe stringEntry
+    sender.getDataByKey(secondAddress, "int") shouldBe intEntry
+    sender.getDataByKey(secondAddress, "bool") shouldBe boolEntry
+    sender.getDataByKey(secondAddress, "str") shouldBe stringEntry
     sender.getData(secondAddress) shouldBe boolList ++ intList ++ stringList
 
     // redefine int entry
@@ -107,8 +107,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val tx3        = sender.putData(secondAddress, reIntList, calcDataFee(reIntList)).id
     nodes.waitForHeightAriseAndTxPresent(tx3)
 
-    sender.getData(secondAddress, "int") shouldBe reIntEntry
-    sender.getData(secondAddress, "bool") shouldBe boolEntry
+    sender.getDataByKey(secondAddress, "int") shouldBe reIntEntry
+    sender.getDataByKey(secondAddress, "bool") shouldBe boolEntry
     sender.getData(secondAddress) shouldBe boolList ++ reIntList ++ stringList
 
     // define tx with all types
@@ -122,10 +122,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val txId             = sender.putData(secondAddress, dataAllTypes, fee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    sender.getData(secondAddress, "int") shouldBe intEntry2
-    sender.getData(secondAddress, "bool") shouldBe boolEntry2
-    sender.getData(secondAddress, "blob") shouldBe blobEntry2
-    sender.getData(secondAddress, "str") shouldBe stringEntry2
+    sender.getDataByKey(secondAddress, "int") shouldBe intEntry2
+    sender.getDataByKey(secondAddress, "bool") shouldBe boolEntry2
+    sender.getDataByKey(secondAddress, "blob") shouldBe blobEntry2
+    sender.getDataByKey(secondAddress, "str") shouldBe stringEntry2
     sender.getData(secondAddress) shouldBe dataAllTypes.sortBy(_.key)
 
     miner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
@@ -153,13 +153,13 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val boolDataFee = calcDataFee(boolData)
     val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
     nodes.waitForHeightAriseAndTxPresent(firstTx)
-    sender.getData(firstAddress, nonLatinKey) shouldBe boolData.head
+    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
 
     val longData    = List(IntegerDataEntry(nonLatinKey, 100500))
     val longDataFee = calcDataFee(longData)
     val secondTx    = sender.putData(firstAddress, longData, longDataFee).id
     nodes.waitForHeightAriseAndTxPresent(secondTx)
-    sender.getData(firstAddress, nonLatinKey) shouldBe longData.head
+    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe longData.head
   }
 
   test("malformed JSON") {
@@ -274,11 +274,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
     txIds foreach nodes.waitForTransaction
 
     val r = scala.util.Random.nextInt(199)
-    sender.getData(thirdAddress, s"int$r") shouldBe IntegerDataEntry(s"int$r", 1000 + r)
-    sender.getData(thirdAddress, s"bool$r") shouldBe BooleanDataEntry(s"bool$r", false)
-    sender.getData(thirdAddress, s"blob$r") shouldBe BinaryDataEntry(s"blob$r", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
-    sender.getData(thirdAddress, s"str$r") shouldBe StringDataEntry(s"str$r", s"hi there! + $r")
-    sender.getData(thirdAddress, s"integer$r") shouldBe IntegerDataEntry(s"integer$r", 1000 - r)
+    sender.getDataByKey(thirdAddress, s"int$r") shouldBe IntegerDataEntry(s"int$r", 1000 + r)
+    sender.getDataByKey(thirdAddress, s"bool$r") shouldBe BooleanDataEntry(s"bool$r", false)
+    sender.getDataByKey(thirdAddress, s"blob$r") shouldBe BinaryDataEntry(s"blob$r", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
+    sender.getDataByKey(thirdAddress, s"str$r") shouldBe StringDataEntry(s"str$r", s"hi there! + $r")
+    sender.getDataByKey(thirdAddress, s"integer$r") shouldBe IntegerDataEntry(s"integer$r", 1000 - r)
 
     sender.getData(thirdAddress).size shouldBe 1000
   }

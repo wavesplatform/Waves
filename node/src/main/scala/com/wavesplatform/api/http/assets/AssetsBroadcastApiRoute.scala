@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.{UnsupportedTransactionType => _, _}
+import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
@@ -62,7 +62,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
           xs.view
             .map {
               case Left(e)   => TracedResult(Left(e))
-              case Right(tx) => utx.putIfNew(tx).map { case shouldBroadcast => (tx, shouldBroadcast) }
+              case Right(tx) => utx.putIfNew(tx).map(tx -> _)
             }
             .map {
               case TracedResult(result, log) =>
@@ -83,7 +83,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
 
       r.map { xs =>
         xs.map {
-          case (l @ Left(e),    trace) => TracedResult(Left(e), trace).json
+          case (Left(e), trace)        => TracedResult(Left(e), trace).json
           case (Right((tx, _)), trace) => TracedResult(Right(tx), trace).json
         }
       }

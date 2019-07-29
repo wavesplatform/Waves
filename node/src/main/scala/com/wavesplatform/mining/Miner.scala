@@ -17,7 +17,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -48,7 +48,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 blockchainUpdater: BlockchainUpdater with NG,
                 settings: WavesSettings,
                 timeService: Time,
-                utx: UtxPool,
+                utx: UtxPoolImpl,
                 wallet: Wallet,
                 pos: PoSSelector,
                 val minerScheduler: SchedulerService,
@@ -138,10 +138,11 @@ class MinerImpl(allChannels: ChannelGroup,
       _ = log.debug(s"Forging with ${account.address}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
       _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
-      estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
-      mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime))
-      _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+      estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
+      mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
+      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(
+        utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime))
+      _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
         .leftMap(_.err)
@@ -297,7 +298,7 @@ class MinerImpl(allChannels: ChannelGroup,
         log.debug(s"Next attempt for acc=$account in $offset")
         generateOneBlockTask(account)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(blockchainUpdater, timeService, utx, pos, settings, appenderScheduler)(block)
+            BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
               .asyncBoundary(minerScheduler)
               .map {
                 case Left(err) => log.warn("Error mining Block: " + err.toString)
