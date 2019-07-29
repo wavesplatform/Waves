@@ -20,12 +20,12 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{CommonValidation, ENOUGH_AMT, assertDiffAndState}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
 import monix.eval.Coeval
@@ -467,8 +467,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           }
 
           val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr).explicitGet()).explicitGet()
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
-          val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
+          val setScriptTx    = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = InvokeScriptTransaction
             .selfSigned(
@@ -476,7 +476,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               masterAcc,
               Some(fc),
               Seq.empty,
-              CommonValidation.FeeUnit * (CommonValidation.FeeConstants(InvokeScriptTransaction.typeId) + CommonValidation.ScriptExtraFee),
+              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
               Waves,
               System.currentTimeMillis()
             )
