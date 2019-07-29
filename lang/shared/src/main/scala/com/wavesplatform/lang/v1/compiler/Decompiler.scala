@@ -4,7 +4,9 @@ import cats.implicits._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import monix.eval.Coeval
 
 object Decompiler {
@@ -103,7 +105,12 @@ object Decompiler {
   val MatchRef = """(\$match\d*)""".r
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
+    def argsStr(args: List[EXPR]) = args.map(argStr).toVector.sequence
+    def listStr(elems: List[EXPR]) = argsStr(elems).map(_.mkString("[", ", ", "]"))
+    def argStr(elem: EXPR) = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
+
     val i = if (firstLinePolicy == DontIndentFirstLine /*braces == BracesWhenNeccessary*/) 0 else ctx.ident
+
     e flatMap {
       case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
         expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>
@@ -149,11 +156,14 @@ object Decompiler {
           out("if (" + c + ")" + NEWLINE, i) +
             out("then " + it + NEWLINE, ctx.ident + 1) +
             out("else " + iff, ctx.ident + 1)
+      case FUNCTION_CALL(`cons`, args) =>
+        collectListArgs(args) match {
+          case (elems, None)               => listStr(elems)
+          case (List(elem), Some(listVar)) => argStr(elem).map(v => s"$v :: $listVar")
+          case (elems, Some(listVar))      => listStr(elems).map(v => s"$v :: $listVar")
+        }
       case Terms.FUNCTION_CALL(func, args) =>
-        val argsCoeval = args
-          .map(a => expr(pure(a), ctx, BracesWhenNeccessary, DontIndentFirstLine))
-          .toVector
-          .sequence
+        val argsCoeval = argsStr(args)
         func match {
           case FunctionHeader.User(_, name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", i))
           case FunctionHeader.Native(name) =>
@@ -170,6 +180,21 @@ object Decompiler {
         }
       case _: Terms.ARR     => ??? // never happens
       case _: Terms.CaseObj => ??? // never happens
+    }
+  }
+
+  private val nil  = REF("nil")
+  private val cons = Native(FunctionIds.CREATE_LIST)
+
+  private def collectListArgs(args: List[EXPR]): (List[EXPR], Option[String]) = {
+    def flattenRec(args: List[EXPR]): List[EXPR] = args match {
+      case a :: FUNCTION_CALL(`cons`, nextArgs) :: Nil => a :: flattenRec(nextArgs)
+      case l => l
+    }
+    flattenRec(args) match {
+      case a :+ `nil`        => (a, None)
+      case a :+ REF(listVar) => (a, Some(listVar))
+      case l                 => (l, None)
     }
   }
 

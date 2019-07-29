@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.TimeUnit
 
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{CacheBuilder, RemovalNotification}
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
@@ -18,20 +18,37 @@ import scala.util.control.NonFatal
 
 class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
-  private def cache[T <: AnyRef](timeout: FiniteDuration) =
-    CacheBuilder
-      .newBuilder()
-      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
-      .build[T, java.lang.Long]()
+  private type PeerRemoved[T] = RemovalNotification[T, java.lang.Long]
+  private type PeerRemovalListener[T] = PeerRemoved[T] => Unit
+
+  private def cache[T <: AnyRef](timeout: FiniteDuration, removalListener: Option[PeerRemovalListener[T]] = None) =
+    removalListener.fold {
+      CacheBuilder
+        .newBuilder()
+        .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+        .build[T, java.lang.Long]()
+    } { listener =>
+      CacheBuilder
+        .newBuilder()
+        .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+        .removalListener(listener(_))
+        .build[T, java.lang.Long]()
+    }
 
   private type PeersPersistenceType = Set[String]
-  private val peersPersistence = cache[InetSocketAddress](settings.peersDataResidenceTime)
+  private val peersPersistence = cache[InetSocketAddress](settings.peersDataResidenceTime, Some(nonExpiringKnownPeers))
   private val blacklist        = cache[InetAddress](settings.blackListResidenceTime)
   private val suspension       = cache[InetAddress](settings.suspensionResidenceTime)
   private val reasons          = mutable.Map.empty[InetAddress, String]
   private val unverifiedPeers  = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
-  for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
+  private val knownPeersAddresses = settings.knownPeers.map(inetSocketAddress(_, 6863))
+
+  private def nonExpiringKnownPeers(n: PeerRemoved[InetSocketAddress]): Unit =
+    if (n.wasEvicted() && knownPeersAddresses.contains(n.getKey))
+      peersPersistence.put(n.getKey, n.getValue)
+
+  for (a <- knownPeersAddresses) {
     // add peers from config with max timestamp so they never get evicted from the list of known peers
     doTouch(a, Long.MaxValue)
   }
@@ -80,7 +97,8 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     }
   }
 
-  override def knownPeers: immutable.Map[InetSocketAddress, Long] =
+  override def knownPeers: immutable.Map[InetSocketAddress, Long] = {
+    peersPersistence.cleanUp() // run all deferred actions (expiration/listeners/etc)
     peersPersistence
       .asMap()
       .asScala
@@ -88,6 +106,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
         case (addr, ts) if !(settings.enableBlacklisting && blacklistedHosts.contains(addr.getAddress)) => addr -> ts.toLong
       }
       .toMap
+  }
 
   override def blacklistedHosts: immutable.Set[InetAddress] = blacklist.asMap().asScala.keys.toSet
 
