@@ -64,25 +64,25 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
 
 object ScriptReaderTest {
 
-  val validStdLibVersions: Set[Int] = DirectiveDictionary[StdLibVersion].all.map(_.id).toSet
-  val validContentTypes: Set[Int]   = DirectiveDictionary[ContentType].all.map(_.id).toSet
+  val validStdLibVersions: Set[Byte] = DirectiveDictionary[StdLibVersion].all.map(_.id.toByte).toSet
+  val validContentTypes: Set[Byte]   = DirectiveDictionary[ContentType].all.map(_.id.toByte).toSet
 
   val invalidPrefixV0ContentType: Gen[Array[Byte]] =
     for {
-      c <- Arbitrary.arbitrary[Byte].filter(!validContentTypes.contains(_))
+      c <- Gen.negNum[Byte]
       v <- Gen.oneOf(validStdLibVersions.toSeq)
-    } yield 0.toByte +: Array(c, v).map(_.toByte)
+    } yield 0.toByte +: Array(c, v)
 
   val invalidPrefixV0StdLibVersion: Gen[Array[Byte]] =
     for {
       c <- Gen.oneOf(validContentTypes.toSeq)
-      v <- Arbitrary.arbitrary[Byte].filter(!validStdLibVersions.contains(_))
-    } yield 0.toByte +: Array(c, v).map(_.toByte)
+      v <- Gen.negNum[Byte]
+    } yield 0.toByte +: Array(c, v)
 
   val invalidPrefixV0Both: Gen[Array[Byte]] =
     for {
-      c <- Arbitrary.arbitrary[Byte].filter(!validContentTypes.contains(_))
-      v <- Arbitrary.arbitrary[Byte].filter(!validStdLibVersions.contains(_))
+      c <- Gen.negNum[Byte]
+      v <- Gen.negNum[Byte]
     } yield 0.toByte +: Array(c, v)
 
   // version byte 0 but no StdLibVersion byte and/or no ContentType byte
@@ -99,7 +99,7 @@ object ScriptReaderTest {
   // invalid version byte and unknown length of remaining bytes
   val invalidPrefix: Gen[Array[Byte]] =
     for {
-      v  <- Arbitrary.arbitrary[Byte].filter(b => !validStdLibVersions.contains(b) && b != 0)
+      v  <- Gen.negNum[Byte]
       n  <- Gen.choose(0, 5)
       bs <- Gen.listOfN(n, Arbitrary.arbitrary[Byte])
     } yield v +: bs.toArray

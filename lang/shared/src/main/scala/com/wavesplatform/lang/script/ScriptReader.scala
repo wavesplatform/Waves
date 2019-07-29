@@ -17,18 +17,22 @@ object ScriptReader {
     val computedCheckSum  = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
 
     (for {
+      versionByte <- bytes.headOption.toRight(ScriptParseError("Can't parse empty script bytes"))
       a <- {
-        if (bytes.isEmpty)
-          Left(ScriptParseError(s"Can't parse empty script bytes"))
-        else {
-          val versionByte    = bytes.head
-          val contentTypes   = DirectiveDictionary[ContentType].idMap
-          val stdLibVersions = DirectiveDictionary[StdLibVersion].idMap
-          if (versionByte == 0 && bytes.length > 2 && contentTypes.contains(bytes(1)) && stdLibVersions.contains(bytes(2)))
-            Right((contentTypes(bytes(1)), stdLibVersions(bytes(2)), 3))
-          else if (versionByte == V1.id || versionByte == V2.id || versionByte == V3.id)
-            Right((Expression, stdLibVersions(versionByte.toInt), 1))
-          else Left(ScriptParseError(s"Can't parse script bytes starting with ${bytes.take(3).mkString("[", ",", "]")}"))
+        val contentTypes   = DirectiveDictionary[ContentType].idMap
+        val stdLibVersions = DirectiveDictionary[StdLibVersion].idMap
+        versionByte match {
+          case 0 =>
+            if (bytes.length <= 2)
+              Left(ScriptParseError(s"Illegal length of script: ${bytes.length}"))
+            else if (!contentTypes.contains(bytes(1)))
+              Left(ScriptParseError(s"Invalid content type of script: ${bytes(1)}"))
+            else if (!stdLibVersions.contains(bytes(2)))
+              Left(ScriptParseError(s"Invalid version of script: ${bytes(2)}"))
+            else
+              Right((contentTypes(bytes(1)), stdLibVersions(bytes(2)), 3))
+          case v if !stdLibVersions.contains(v) => Left(ScriptParseError(s"Invalid version of script: $v"))
+          case v                                => Right((Expression, stdLibVersions(v.toInt), 1))
         }
       }
       (scriptType, stdLibVersion, offset) = a
