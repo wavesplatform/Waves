@@ -266,8 +266,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
          |func baz (a) = {
          |    let x = invocation.caller.bytes
          |    if (foo())
-         |        then WriteSet(cons(DataEntry("b", 1), cons(DataEntry("sender", x), nil)))
-         |        else WriteSet(cons(DataEntry("a", a), cons(DataEntry("sender", x), nil)))
+         |        then WriteSet([DataEntry("b", 1), DataEntry("sender", x)])
+         |        else WriteSet([DataEntry("a", a), DataEntry("sender", x)])
          |    }
          |
          |
@@ -543,5 +543,25 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     |    case x => 
     |        2
     |}""".stripMargin
+  }
+
+  property("multiple value list") {
+    val script = """["a", "b", "c", "d"]"""
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
+
+  property("single value list") {
+    val script = """["a"]"""
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
+
+  property("existing list concat") {
+    val script =
+      """let list = ["b", "c", "d"]
+        |"a" :: list""".stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
   }
 }

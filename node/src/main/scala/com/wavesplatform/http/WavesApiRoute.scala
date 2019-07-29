@@ -1,16 +1,17 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.server.{Directive, Route}
+import com.wavesplatform.api.http.ApiError.DiscontinuedApi
 import com.wavesplatform.api.http.assets.TransferV1Request
-import com.wavesplatform.api.http.{ApiRoute, DiscontinuedApi, WithSettings}
+import com.wavesplatform.api.http.{ApiRoute, WithSettings}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import com.wavesplatform.wallet.Wallet
 
 @Path("/waves")
 @Api(value = "waves")
@@ -53,21 +54,20 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
 
   @Deprecated
   @Path("/payment/signature")
-  def signPayment: Route = reject(path("payment" / "signature"))
+  def signPayment: Route = discontinued(path("payment" / "signature"))
 
   @Deprecated
   @Path("/create-signed-payment")
-  def createdSignedPayment: Route = reject(path("create-signed-payment"))
+  def createdSignedPayment: Route = discontinued(path("create-signed-payment"))
 
   @Deprecated
   @Path("/external-payment")
-  def externalPayment: Route = reject(path("external-payment"))
+  def externalPayment: Route = discontinued(path("external-payment"))
 
   @Deprecated()
   @Path("/broadcast-signed-payment")
-  def broadcastSignedPayment: Route = reject(path("broadcast-signed-payment"))
+  def broadcastSignedPayment: Route = discontinued(path("broadcast-signed-payment"))
 
-  private def reject(path: Directive[Unit]): Route = (path & post) {
-    complete(DiscontinuedApi)
-  }
+  private[this] def discontinued(path: Directive[Unit]): Route =
+    (path & post) (complete(DiscontinuedApi))
 }

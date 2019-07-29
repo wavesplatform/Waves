@@ -820,8 +820,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToString(toStringLong, CONST_LONG(n)) shouldBe evaluated(n.toString)
-      Try(evalToString(toStringLong, CONST_STRING("").explicitGet())).isFailure shouldBe true
-      Try(evalToString(toStringBoolean, CONST_STRING("").explicitGet())).isFailure shouldBe true
+      evalToString(toStringLong, CONST_STRING("").explicitGet()) should produce("Can't apply (CONST_STRING) to 'toString(u: Int)'")
+      evalToString(toStringBoolean, CONST_STRING("").explicitGet()) should produce("Can't apply (CONST_STRING) to 'toString(b: Boolean)'")
     }
   }
 
@@ -831,7 +831,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteStr.fromBytes(1))
     evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteStr.fromBytes(0))
-    Try(evalToBytes(toStringBoolean, REF("unit"))).isFailure shouldBe true
+    evalToBytes(toStringBoolean, REF("unit")) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe evaluated(ByteStr(ByteBuffer.allocate(8).putLong(n).array))

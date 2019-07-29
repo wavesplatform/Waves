@@ -54,7 +54,7 @@ object CryptoContext {
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction =
       NativeFunction(name, cost, internalName, BYTESTR, ("bytes", BYTESTR)) {
         case CONST_BYTESTR(m: ByteStr) :: Nil => CONST_BYTESTR(ByteStr(h(m.arr)))
-        case _                                => ???
+        case xs                               => notImplemented(s"$name(bytes: ByteVector)", xs)
       }
 
     val keccak256F: BaseFunction  = hashFunction("keccak256", KECCAK256, 10)(global.keccak256)
@@ -74,7 +74,7 @@ object CryptoContext {
           Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
-        case _ => ???
+        case xs => notImplemented(s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
 
     val rsaVerifyF: BaseFunction =
@@ -95,7 +95,7 @@ object CryptoContext {
           algFromCO(digestAlg) map { alg =>
             CONST_BOOLEAN(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
           }
-        case _ => ???
+        case xs => notImplemented(s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
 
     def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, ("bytes", BYTESTR)) {
@@ -132,7 +132,7 @@ object CryptoContext {
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
           Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
-        case _ => ???
+        case xs => notImplemented(s"checkMerkleProof(merkleRoot: ByteVector, merkleProof: ByteVector, valueBytes: ByteVector)", xs)
       }
 
     def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
