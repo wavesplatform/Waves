@@ -32,7 +32,7 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   private[this] val decompilerExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
@@ -139,6 +139,42 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
           .compile(code)
           .fold(
             e => ScriptCompilerError(e), {
+              case (script, complexity) =>
+                Json.obj(
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
+                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                )
+            }
+          )
+      )
+    }
+  }
+
+  @Path("/script/compileWithImports")
+  @ApiOperation(value = "Compile script", notes = "Compiles string code with imports to base64 script representation", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "com.wavesplatform.api.http.ScriptWithImportsRequest",
+        paramType = "body",
+        value = "Script code with imports"
+      )
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "base64 or error")
+    ))
+  def compileWithImports: Route = path("script" / "compileWithImports") {
+    import ScriptWithImportsRequest._
+    (post & entity(as[ScriptWithImportsRequest])) { req =>
+      complete(
+        ScriptCompiler.compile(req.script, req.imports)
+          .fold(
+            e => ScriptCompilerError(e),
+            {
               case (script, complexity) =>
                 Json.obj(
                   "script"     -> script.bytes().base64,

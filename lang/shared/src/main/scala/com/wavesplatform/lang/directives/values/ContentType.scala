@@ -8,6 +8,7 @@ sealed abstract class ContentType(text: String, id: Int) extends DirectiveValue(
 }
 case object Expression extends ContentType("EXPRESSION", 1)
 case object DApp       extends ContentType("DAPP", 2)
+case object Library    extends ContentType("LIBRARY", 3)
 
 object ContentType {
   implicit object ContentDic extends DirectiveDictionary[ContentType] {

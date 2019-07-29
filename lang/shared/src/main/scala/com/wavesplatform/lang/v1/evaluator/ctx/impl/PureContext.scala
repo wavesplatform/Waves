@@ -644,8 +644,10 @@ object PureContext {
     }
   }
 
+  lazy val unitVarName = "unit"
+
   private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
+    (unitVarName, ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
     ("UP", ((roundUp, "'UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
     ("HALFUP", ((roundHalfUp, "'HALF_UP' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
     ("HALFDOWN", ((roundHalfUp, "'HALF_DOWN' rounding mode"), LazyVal(EitherT.pure(CaseObj(roundHalfDown, Map.empty))))),

@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.UtilsApiRoute
+import com.wavesplatform.api.http.{ScriptWithImportsRequest, UtilsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
@@ -14,6 +14,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -112,6 +113,49 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
+      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+    }
+  }
+
+  routePath("/script/compileWithImports") in {
+    Post(routePath("/script/compileWithImports"), ScriptWithImportsRequest("(1 == 2)")) ~> route ~> check {
+      val json           = responseAs[JsValue]
+      val expectedScript = ExprScript(V2, script).explicitGet()
+
+      Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
+      (json \ "complexity").as[Long] shouldBe 3
+      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+    }
+
+    val request = ScriptWithImportsRequest(
+      """
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# IMPORT lib #-}
+        | let a = 5
+        | inc(a) == a + 1
+      """.stripMargin,
+      Map(
+        "lib" ->
+          """
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin
+      )
+    )
+    Post(routePath("/script/compileWithImports"), request) ~> route ~> check {
+      val expectedScript =
+        """
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          | func inc(a: Int) = a + 1
+          | let a = 5
+          | inc(a) == a + 1
+        """.stripMargin
+      val compiled = ScriptCompiler.compile(expectedScript)
+
+      val json = responseAs[JsValue]
+      val base64Result = Script.fromBase64String((json \ "script").as[String])
+      base64Result shouldBe compiled.map(_._1)
+      (json \ "complexity").as[Long] shouldBe compiled.map(_._2).explicitGet()
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
   }

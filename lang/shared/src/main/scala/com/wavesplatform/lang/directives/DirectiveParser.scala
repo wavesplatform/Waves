@@ -35,7 +35,10 @@ object DirectiveParser {
         case (keyRaw, valueRaw) =>
           for {
             key   <- DirectiveKey.textMap.get(keyRaw).toRight(s"Illegal directive key $keyRaw")
-            value <- key.valueDic.textMap.get(valueRaw).toRight(s"Illegal directive value $valueRaw for key $keyRaw")
+            value <- key match {
+              case k: PredefinedDirectiveKey => k.valueDic.textMap.get(valueRaw).toRight(s"Illegal directive value $valueRaw for key $keyRaw")
+              case k: ArbitraryDirectiveKey  => Right(k.valueMapper(valueRaw))
+            }
           } yield Directive(key, value)
       }
 
