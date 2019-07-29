@@ -15,14 +15,19 @@ object ScriptReader {
   def fromBytes(bytes: Array[Byte], checkComplexity: Boolean = true): Either[ScriptParseError, Script] = {
     val checkSum          = bytes.takeRight(checksumLength)
     val computedCheckSum  = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
-    val versionByte: Byte = bytes.head
+
     (for {
       a <- {
-        if (versionByte == 0)
-          Right((DirectiveDictionary[ContentType].idMap(bytes(1)), DirectiveDictionary[StdLibVersion].idMap(bytes(2)), 3))
-        else if (versionByte == V1.id || versionByte == V2.id || versionByte == V3.id)
-          Right((Expression, DirectiveDictionary[StdLibVersion].idMap(versionByte.toInt), 1))
-        else Left(ScriptParseError(s"Can't parse script bytes starting with [${bytes(0).toInt},${bytes(1).toInt},${bytes(2).toInt}]"))
+        if (bytes.isEmpty)
+          Left(ScriptParseError(s"Can't parse empty script bytes"))
+        else {
+          val versionByte: Byte = bytes.head
+          if (versionByte == 0 && bytes.length > 2)
+            Right((DirectiveDictionary[ContentType].idMap(bytes(1)), DirectiveDictionary[StdLibVersion].idMap(bytes(2)), 3))
+          else if (versionByte == V1.id || versionByte == V2.id || versionByte == V3.id)
+            Right((Expression, DirectiveDictionary[StdLibVersion].idMap(versionByte.toInt), 1))
+          else Left(ScriptParseError(s"Can't parse script bytes starting with ${bytes.take(3).mkString("[", ",", "]")}"))
+        }
       }
       (scriptType, stdLibVersion, offset) = a
       scriptBytes                         = bytes.drop(offset).dropRight(checksumLength)
