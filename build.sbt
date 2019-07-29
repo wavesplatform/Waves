@@ -27,6 +27,35 @@ lazy val commonJVM = common.jvm
 lazy val langSharedSources = Paths.get("lang/shared/src/main/scala").toAbsolutePath.toFile
 lazy val langProtoModels   = Paths.get("lang/shared/src/main/protobuf").toAbsolutePath.toFile
 
+lazy val versionSourceTask = (path: String) =>
+  Def.task {
+    // WARNING!!!
+    // Please, update the fallback version every major and minor releases.
+    // This version is used then building from sources without Git repository
+    // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+    val FallbackVersion = (1, 0, 2)
+
+    val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
+    val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
+    val (major, minor, patch) = version.value match {
+      case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+      case _                            => FallbackVersion
+    }
+    IO.write(
+      versionFile,
+      s"""package $path
+       |
+       |object Version {
+       |  val VersionString = "${version.value}"
+       |  val VersionTuple = ($major, $minor, $patch)
+       |}
+       |""".stripMargin
+    )
+    Seq(versionFile)
+}
+
+lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += versionSourceTask(path)))
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
@@ -45,34 +74,6 @@ lazy val lang =
       ))
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
-
-lazy val versionSourceTask = (path: String) => Def.task {
-  // WARNING!!!
-  // Please, update the fallback version every major and minor releases.
-  // This version is used then building from sources without Git repository
-  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (1, 0, 1)
-
-  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
-  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-  val (major, minor, patch) = version.value match {
-    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case _                            => FallbackVersion
-  }
-  IO.write(
-    versionFile,
-    s"""package $path
-       |
-       |object Version {
-       |  val VersionString = "${version.value}"
-       |  val VersionTuple = ($major, $minor, $patch)
-       |}
-       |""".stripMargin
-  )
-  Seq(versionFile)
-}
-
-lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += versionSourceTask(path)))
 
 lazy val langJS  = lang.js.settings(versionSourceSetting("com.wavesplatform.lang"))
 lazy val langJVM = lang.jvm
