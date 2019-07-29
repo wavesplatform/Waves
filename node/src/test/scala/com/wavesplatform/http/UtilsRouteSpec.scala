@@ -130,12 +130,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val request = ScriptWithImportsRequest(
       """
         | {-# SCRIPT_TYPE ACCOUNT #-}
-        | {-# IMPORT lib #-}
+        | {-# IMPORT dir/my/lib.ride #-}
         | let a = 5
         | inc(a) == a + 1
       """.stripMargin,
       Map(
-        "lib" ->
+        "dir/my/lib.ride" ->
           """
             | {-# CONTENT_TYPE LIBRARY #-}
             | func inc(a: Int) = a + 1

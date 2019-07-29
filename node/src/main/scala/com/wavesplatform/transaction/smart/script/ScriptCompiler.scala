@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
-import cats.data.{NonEmptyChain}
+import cats.data.NonEmptyChain
 import cats.implicits._
 import cats.kernel.CommutativeSemigroup
 import com.wavesplatform.lang.directives._

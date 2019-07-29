@@ -29,7 +29,7 @@ object ScriptReader {
 
       _ <- Either.cond(java.util.Arrays.equals(checkSum, computedCheckSum), (), ScriptParseError("Invalid checksum"))
       s <- scriptType match {
-        case Expression =>
+        case Expression | Library =>
           for {
             _ <- if (checkComplexity) {
               ExprScript.validateBytes(scriptBytes)
