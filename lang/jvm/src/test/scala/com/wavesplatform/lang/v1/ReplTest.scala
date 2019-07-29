@@ -46,4 +46,11 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val msg = "error message"
     repl.execute(s""" throw("$msg") """) shouldBe Left(msg)
   }
+
+  property("waves context funs") {
+    val repl = Repl()
+    repl.execute(s""" transferTransactionById(base58'fdg') """) shouldBe Left("Blockchain state is unavailable from REPL")
+    repl.execute(s""" let a = height """)
+    repl.execute(s""" a """)  shouldBe Right("0")
+  }
 }
