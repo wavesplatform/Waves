@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.lease.LeaseCancelTransactionV2.currentChainId
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
 import play.api.libs.json.JsObject

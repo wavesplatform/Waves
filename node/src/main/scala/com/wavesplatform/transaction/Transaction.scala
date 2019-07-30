@@ -14,6 +14,7 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
+  def chainByte: Option[Byte] = None
 
   def typeId: Byte = builder.typeId
 

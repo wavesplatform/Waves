@@ -12,6 +12,7 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
@@ -57,12 +58,17 @@ package object settings {
 
     val withApp = external
       .withFallback(ConfigFactory.defaultApplication())
+      .withFallback(ConfigFactory.defaultReference())
+      .resolve()
 
-    val directoryDefaults = ConfigFactory
-      .parseString(s"waves.directory = ${defaultDirectory(withApp)}")
+    val cmdDefaults =
+      Try(withApp.getConfig("waves.defaults"))
+        .getOrElse(ConfigFactory.empty())
+        .atPath("waves")
 
     external
-      .withFallback(directoryDefaults)
+      .withFallback(cmdDefaults)
+      .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(withApp)}"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
@@ -79,7 +85,7 @@ package object settings {
 
     def nixDefaultDirectory: String = {
       val maybeXdgDir = sys.env.get("XDG_DATA_HOME")
-      val defaultDir = s"$${user.home}/.local/share"
+      val defaultDir  = s"$${user.home}/.local/share"
 
       maybeXdgDir getOrElse defaultDir
     }

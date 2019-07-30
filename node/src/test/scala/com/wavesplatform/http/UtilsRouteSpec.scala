@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
+import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto

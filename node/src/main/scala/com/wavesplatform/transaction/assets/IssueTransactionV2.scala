@@ -10,7 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.TxValidationError.{GenericError, WrongChain}
+import com.wavesplatform.transaction.TxValidationError.WrongChain
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.{validation, _}
 import monix.eval.Coeval
