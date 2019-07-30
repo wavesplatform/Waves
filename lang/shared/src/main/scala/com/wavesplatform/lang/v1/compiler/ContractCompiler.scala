@@ -28,7 +28,7 @@ object ContractCompiler {
     }
     val r = for {
       annotations <- annotationsM
-      annotationBindings = annotations.flatMap(_.dic.toList).map { case (n, t) => (n, (t, "Annotation-bound value")) }
+      annotationBindings = annotations.flatMap(_.dic.toList)
       compiledBody <- local {
         for {
           _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))

@@ -13,7 +13,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
@@ -25,7 +25,7 @@ import scala.concurrent.ExecutionContext
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with WithSettings {
+case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with WithSettings {
 
   import UtilsApiRoute._
 
@@ -110,7 +110,7 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
                 Json.obj(
                   "script"     -> script.bytes().base64,
                   "complexity" -> complexity,
-                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
                 )
             }
           )
@@ -147,7 +147,7 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
                 Json.obj(
                   "script"     -> script.bytes().base64,
                   "complexity" -> complexity,
-                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
                 )
             }
           )
@@ -189,7 +189,7 @@ case class  UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends 
                   "script"     -> code,
                   "scriptText" -> script.expr.toString, // [WAIT] Script.decompile(script),
                   "complexity" -> complexity,
-                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
                 )
             }
           )
