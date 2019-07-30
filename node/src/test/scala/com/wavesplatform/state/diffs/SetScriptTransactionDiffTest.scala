@@ -15,6 +15,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -53,7 +54,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     script = ContractScript(
       V3,
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List.empty,
         List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None
