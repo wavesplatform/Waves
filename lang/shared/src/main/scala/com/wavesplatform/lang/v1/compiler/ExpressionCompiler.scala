@@ -195,9 +195,7 @@ object ExpressionCompiler {
           } yield (name, union)
       }
       compiledFuncBody <- local {
-        val newArgs: VariableTypes = argTypes.map {
-          case (a, t) => (a, (t, s"Defined at ${p.start}"))
-        }.toMap
+        val newArgs: VariableTypes = argTypes.toMap
         modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
           .flatMap(_ => compileExpr(func.expr))
       }
@@ -206,7 +204,7 @@ object ExpressionCompiler {
   }
 
   def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
-    modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (letType -> s"Defined at ${p.start}"))))
+    modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> letType)))
 
   def updateCtx(funcName: String, typeSig: FunctionTypeSignature): CompileM[Unit] =
     modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
@@ -273,7 +271,7 @@ object ExpressionCompiler {
       result <- ctx.varDefs
         .get(key)
         .fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
-          (REF(key): EXPR, t._1: FINAL).pure[CompileM])
+          (REF(key): EXPR, t).pure[CompileM])
     } yield result
   }
 
