@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, WrongChain}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -40,7 +40,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
-        .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
+        .cond(tx.chainId == currentChainId, (), WrongChain(currentChainId, tx.chainId))
         .flatMap(_ => LeaseCancelTransaction.validateLeaseCancelParams(tx))
         .map(_ => tx)
         .foldToTry
@@ -54,7 +54,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
+      _ <- Either.cond(chainId == currentChainId, (), WrongChain(currentChainId, chainId))
       _ <- LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee)
     } yield LeaseCancelTransactionV2(chainId, sender, leaseId, fee, timestamp, proofs)
   }

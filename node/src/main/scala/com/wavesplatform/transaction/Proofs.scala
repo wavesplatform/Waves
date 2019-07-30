@@ -10,6 +10,9 @@ import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 
 import scala.util.Try
+import com.wavesplatform.transaction.TxValidationError.UsupportedProofVersion
+import com.wavesplatform.transaction.TxValidationError.TooManyProofs
+import com.wavesplatform.transaction.TxValidationError.ToBigProof
 
 case class Proofs(proofs: List[ByteStr]) {
   val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Bytes.concat(Array(Proofs.Version), Deser.serializeArrays(proofs.map(_.arr))))
@@ -28,8 +31,9 @@ object Proofs {
 
   protected def validate(proofs: Seq[ByteStr]): Either[ValidationError, Unit] = {
     for {
-      _ <- Either.cond(proofs.lengthCompare(MaxProofs) <= 0, (), GenericError(s"Too many proofs, max $MaxProofs proofs"))
-      _ <- Either.cond(!proofs.map(_.arr.length).exists(_ > MaxProofSize), (), GenericError(s"Too large proof, must be max $MaxProofSize bytes"))
+      _ <- Either.cond(proofs.lengthCompare(MaxProofs) <= 0, (), TooManyProofs(MaxProofs, proofs.length))
+      biggestProofSize = if (proofs.nonEmpty) proofs.map(_.arr.length).max else 0
+      _ <- Either.cond(biggestProofSize <= MaxProofSize, (), ToBigProof(MaxProofSize, biggestProofSize))
     } yield ()
   }
 
@@ -48,7 +52,8 @@ object Proofs {
 
   def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
     for {
-      _    <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
+      version <- Try(ab.head.toInt).toEither.left.map(err => GenericError(err.toString))
+      _    <- Either.cond(version == 1, (), UsupportedProofVersion(version, List(1)))
       arrs <- Try(Deser.parseArrays(ab.tail)).toEither.left.map(er => GenericError(er.toString))
       r    <- createWithBytes(arrs.map(ByteStr(_)), ab)
     } yield r

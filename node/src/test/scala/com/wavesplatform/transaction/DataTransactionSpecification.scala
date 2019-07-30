@@ -117,7 +117,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
         val emptyKey   = List(IntegerDataEntry("", 2))
         val emptyKeyEi = DataTransaction.create(sender, emptyKey, fee, timestamp, proofs)
-        emptyKeyEi shouldBe Left(TxValidationError.GenericError("Empty key found"))
+        emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
         val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = DataTransaction.create(sender, keyTooLong, fee, timestamp, proofs)
@@ -130,7 +130,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val e               = BooleanDataEntry("dupe", true)
         val duplicateKeys   = e +: data.drop(3) :+ e
         val duplicateKeysEi = DataTransaction.create(sender, duplicateKeys, fee, timestamp, proofs)
-        duplicateKeysEi shouldBe Left(TxValidationError.GenericError("Duplicate keys found"))
+        duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
 
         val noFeeEi = DataTransaction.create(sender, data, 0, timestamp, proofs)
         noFeeEi shouldBe Left(TxValidationError.InsufficientFee())

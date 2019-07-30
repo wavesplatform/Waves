@@ -85,4 +85,6 @@ object FunctionIds {
   val ADDRESSFROMRECIPIENT: Short = 1060
   val ADDRESSTOSTRING: Short      = 1061
 
+  val BLOCKHEADER_FROM_BYTES: Short = 1070
+
 }

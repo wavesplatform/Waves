@@ -3,6 +3,7 @@ package com.wavesplatform.block
 import java.nio.ByteBuffer
 
 import cats._
+import com.google.common.io.ByteStreams
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.fields.FeaturesBlockField
@@ -48,6 +49,66 @@ class BlockHeader(val timestamp: Long,
 }
 
 object BlockHeader extends ScorexLogging {
+  def writeHeaderOnly(bh: BlockHeader): Array[Byte] = {
+    val ndo = ByteStreams.newDataOutput()
+
+    ndo.writeByte(bh.version)
+    ndo.writeLong(bh.timestamp)
+    ndo.write(bh.reference)
+    ndo.writeLong(bh.consensusData.baseTarget)
+    ndo.write(bh.consensusData.generationSignature)
+
+    if (bh.version == 1 | bh.version == 2)
+      ndo.writeByte(bh.transactionCount)
+    else
+      ndo.writeInt(bh.transactionCount)
+
+    ndo.writeInt(bh.featureVotes.size)
+    bh.featureVotes.foreach(s => ndo.writeShort(s))
+    ndo.write(bh.signerData.generator)
+    ndo.write(bh.signerData.signature)
+
+    ndo.toByteArray
+  }
+
+  def readHeaderOnly(bytes: Array[Byte]): BlockHeader = {
+    val ndi = ByteStreams.newDataInput(bytes)
+
+    val version   = ndi.readByte()
+    val timestamp = ndi.readLong()
+
+    val referenceArr = new Array[Byte](SignatureLength)
+    ndi.readFully(referenceArr)
+
+    val baseTarget = ndi.readLong()
+
+    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    ndi.readFully(genSig)
+
+    val transactionCount = {
+      if (version == 1 || version == 2) ndi.readByte()
+      else ndi.readInt()
+    }
+    val featureVotesCount = ndi.readInt()
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+
+    val generator = new Array[Byte](KeyLength)
+    ndi.readFully(generator)
+
+    val signature = new Array[Byte](SignatureLength)
+    ndi.readFully(signature)
+
+    new BlockHeader(
+      timestamp,
+      version,
+      referenceArr,
+      SignerData(PublicKey(ByteStr(generator)), signature),
+      NxtLikeConsensusBlockData(baseTarget, genSig),
+      transactionCount,
+      featureVotes
+    )
+  }
+
   def parseBytes(bytes: Array[Byte]): Try[(BlockHeader, Array[Byte])] =
     Try {
 

@@ -34,7 +34,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       case BlockWithHeight(Some(PBBlock(Some(header), _, _)), _) =>
         request.filter match {
           case BlockRangeRequest.Filter.Generator(generator) =>
-            header.generator == generator || header.generator.toPublicKey.toAddress.bytes == generator.toByteStr
+            header.generator == generator || PublicKey.toAddress(PublicKey(header.generator)).bytes == generator.toByteStr
           case BlockRangeRequest.Filter.Empty => true
         }
 

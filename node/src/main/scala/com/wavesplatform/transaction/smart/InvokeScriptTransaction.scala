@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.lease.LeaseCancelTransactionV2.currentChainId
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -165,7 +166,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   def validate(tx: InvokeScriptTransaction): Either[ValidationError, Unit] = {
     for {
-      _ <- Either.cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
+      _ <- Either.cond(tx.chainId == currentChainId, (), WrongChain(currentChainId, tx.chainId))
       _ <- validate(tx.funcCallOpt, tx.payment, tx.fee)
       _ <- Either.cond(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
     } yield ()
