@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.values.{Imports, Library, ScriptType}
 object ScriptPreprocessor {
   def apply(
     scriptText: String,
-    libraries:  Map[String, String] = Map(),
+    libraries:  Map[String, String],
     ds:         DirectiveSet
   ): Either[String, String] =
     for {
