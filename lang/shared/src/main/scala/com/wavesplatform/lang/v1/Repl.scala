@@ -58,7 +58,7 @@ case class Repl(ver: StdLibVersion = V3) {
       eval              <- tryEi(EvaluatorV1[EVALUATED](ctx.evaluationContext, compiled))
     } yield (eval.prettyString(0), cType)
 
-  private def tryEi[R](r: Either[String, R]): Either[String, R] =
+  private def tryEi[R](r: => Either[String, R]): Either[String, R] =
     Try(r)
       .toEither
       .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
