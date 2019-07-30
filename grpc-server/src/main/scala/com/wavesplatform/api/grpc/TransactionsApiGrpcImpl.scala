@@ -77,7 +77,7 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
         tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
       } yield tx
 
-    val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKeyAccount
+    val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKey
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString).toFuture
   }
 

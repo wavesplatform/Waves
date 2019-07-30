@@ -3,6 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
@@ -14,7 +15,9 @@ import play.api.libs.json._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute with WithSettings {
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
+    extends ApiRoute
+    with WithSettings {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
   private[this] val commonApi           = new CommonBlocksApi(blockchain)
 
@@ -38,9 +41,12 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
           if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
             val result = for {
               address <- Address.fromString(address)
-              pairs     = commonApi.blocksRange(start, end).filter(_._1.signerData.generator.address == address)
-              jsonPairs = pairs.map(pair => pair._1.json().addBlockFields(pair._2))
-              result    = jsonPairs.toListL.map(JsArray(_))
+              jsonBlocks = commonApi.blockHeadersRange(start, end).filter(_._1.signerData.generator.toAddress == address)
+              .map {
+            case (_, _, h) =>
+              blockchain.blockAt(h).get.json().addBlockFields(h)
+          }
+              result    = jsonBlocks.toListL.map(JsArray(_))
             } yield result.runToFuture
 
             complete(result)

@@ -1,12 +1,14 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._

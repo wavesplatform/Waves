@@ -10,6 +10,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import cats.instances.all._
+import cats.syntax.option._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -32,6 +33,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils.{LoggerFacade, NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -42,13 +44,13 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
-import monix.execution.Scheduler._
-import monix.execution.schedulers.SchedulerService
+import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -83,8 +85,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
   private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
   private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
-  private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
-  private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
+  private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
+  private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = log.error("Error in Miner", _))
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -120,10 +122,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       else Miner.Disabled
 
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, settings, allChannels, peerDatabase, miner, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, miner, appenderScheduler) _
 
     val processFork =
-      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, settings, knownInvalidBlocks, peerDatabase, miner, allChannels, appenderScheduler) _
+      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, miner, appenderScheduler) _
     val processMicroBlock =
       MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
@@ -158,7 +160,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject,
       scoreObserverScheduler
     )
-    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(
+    val (microblockData, mbSyncCacheSizes) = MicroBlockSynchronizer(
       settings.synchronizationSettings.microBlockSynchronizer,
       peerDatabase,
       lastBlockInfo.map(_.id),
@@ -184,20 +186,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       new UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)
     utxSynchronizer.publishTransactions(transactions)
 
-    val microBlockSink = microblockDatas
+    val microBlockSink = microblockData
       .mapEval(scala.Function.tupled(processMicroBlock))
 
     val blockSink = newBlocks
       .mapEval(scala.Function.tupled(processBlock))
 
     Observable(microBlockSink, blockSink).merge.subscribe()
-
-    lastBlockInfo
-      .map(_.height)
-      .distinctUntilChanged
-      .whileBusyDropEvents
-      .doOnNext(_ => utxStorage.cleanupTask)
-      .subscribe()
 
     miner.scheduleMining()
 
@@ -310,7 +305,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       spendableBalanceChanged.onComplete()
       utx.close()
 
-      shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
+      shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes.some)
 
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
@@ -333,7 +328,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
       shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
-      shutdownAndWait(appenderScheduler, "Appender", 5.minutes)
+      shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some, tryForce = false)
 
       log.info("Closing storage")
       db.close()
@@ -342,16 +337,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Shutdown complete")
     }
 
-  private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: FiniteDuration = 1.minute): Unit = {
+  private def shutdownAndWait(scheduler: SchedulerService,
+                              name: String,
+                              timeout: Option[FiniteDuration] = none,
+                              tryForce: Boolean = true): Unit = {
     log.debug(s"Shutting down $name")
-    scheduler.shutdown()
-    val r = Await.result(scheduler.awaitTermination(timeout, global), 2 * timeout)
-    if (r)
-      log.info(s"$name was shutdown successfully")
-    else
-      log.warn(s"Failed to shutdown $name properly during timeout")
+    scheduler match {
+      case es: ExecutorScheduler if tryForce => es.executor.shutdownNow()
+      case s                                 => s.shutdown()
+    }
+    timeout.foreach { to =>
+      val r = Await.result(scheduler.awaitTermination(to, global), 2 * to)
+      if (r)
+        log.info(s"$name was shutdown successfully")
+      else
+        log.warn(s"Failed to shutdown $name properly during timeout")
+    }
   }
-
 }
 
 object Application {

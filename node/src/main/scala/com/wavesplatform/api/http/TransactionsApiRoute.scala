@@ -1,9 +1,9 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -78,7 +78,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case Success(id) =>
             commonApi.transactionById(id) match {
               case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None          => complete(StatusCodes.NotFound             -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+              case None => complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }
@@ -118,7 +118,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>
-                complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in UTX"))
+                complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }

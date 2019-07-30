@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -14,6 +13,8 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.reactive.Observable
+import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 
 import scala.concurrent.Future
 
@@ -41,7 +42,13 @@ private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, w
   }
 
   def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] = {
-    CommonValidation.getMinFee(blockchain, blockchain.height, tx)
+    FeeValidation
+      .getMinFee(blockchain, blockchain.height, tx)
+      .map {
+        case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+          (asset, feeInAsset, feeInWaves)
+      }
+
   }
 
   def broadcastTransaction(tx: VanillaTransaction, forceBroadcast: Boolean = false): Future[TracedResult[ValidationError, Boolean]] = {

@@ -22,7 +22,7 @@ target
 
 # local settings
 localsettings.json
-local.conf
+*local.conf
 waves_logback.xml
 
 # Text files
@@ -40,3 +40,4 @@ Dockerfile
 package
 !src/package
 native
+lang/shared/src/main/scala/com/wavesplatform/protobuf/

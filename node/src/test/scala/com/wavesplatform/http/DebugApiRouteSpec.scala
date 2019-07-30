@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.ApiKeyNotValid
+import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.{NTPTime, TestWallet}
 

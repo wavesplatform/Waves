@@ -6,6 +6,8 @@
    2. You've checked "Make project before run"
  */
 
+import java.nio.file.Paths
+
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -22,22 +24,32 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
+lazy val langSharedSources = Paths.get("lang/shared/src/main/scala").toAbsolutePath.toFile
+lazy val langProtoModels   = Paths.get("lang/shared/src/main/protobuf").toAbsolutePath.toFile
+
+lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += Tasks.versionSource(path)))
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
-      version := "1.0.0",
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
+      resolvers += Resolver.sbtPluginRepo("releases"),
+      cleanFiles += langSharedSources / "com" / "wavesplatform" / "protobuf",
+      inConfig(Compile)(Seq(
+        PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources,
+        PB.protoSources := Seq(langProtoModels),
+        PB.deleteTargetDirectory := false,
+        sourceGenerators += Tasks.docSource
+      ))
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
-lazy val langJS  = lang.js
+lazy val langJS  = lang.js.settings(versionSourceSetting("com.wavesplatform.lang"))
 lazy val langJVM = lang.jvm
 
 lazy val node = project
@@ -45,6 +57,7 @@ lazy val node = project
     commonJVM % "compile;test->test",
     langJVM   % "compile;test->test"
   )
+  .settings(versionSourceSetting("com.wavesplatform"))
 
 lazy val `grpc-server` = project
   .dependsOn(node % "compile;test->test;runtime->provided")
@@ -147,9 +160,10 @@ packageAll := Def
   .sequential(
     root / cleanAll,
     Def.task {
-      (node /  assembly).value
+      (node / assembly).value
       (node / Debian / packageBin).value
-    (`grpc-server` /Universal / packageZipTarball).value
+      (`grpc-server` / Universal / packageZipTarball).value
+      (`grpc-server` / Debian / packageBin).value
     }
   )
   .value
