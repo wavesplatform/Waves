@@ -68,4 +68,100 @@ class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers 
 
     processAndEval(script, libraries) shouldBe Right(CONST_BOOLEAN(true))
   }
+
+  property("library without CONTENT_TYPE LIBRARY") {
+    val script =
+      """
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# IMPORT lib1,lib2,lib3 #-}
+        | let a = 5
+        | multiply(inc(a), dec(a)) == (5 + 1) * (5 - 1)
+      """.stripMargin
+
+    val libraries =
+      Map(
+        "lib1" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin,
+        "lib2" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE EXPRESSION #-}
+            | func dec(a: Int) = a - 1
+          """.stripMargin,
+        "lib3" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func multiply(a: Int, b: Int) = a * b
+          """.stripMargin
+      )
+
+    processAndEval(script, libraries) shouldBe Left("CONTENT_TYPE of `lib2` is not LIBRARY")
+  }
+
+  property("library SCRIPT_TYPE mismatch") {
+    val script =
+      """
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# IMPORT lib1,lib2,lib3 #-}
+        | let a = 5
+        | multiply(inc(a), dec(a)) == (5 + 1) * (5 - 1)
+      """.stripMargin
+
+    val libraries =
+      Map(
+        "lib1" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin,
+        "lib2" ->
+          """
+            | {-# SCRIPT_TYPE  ASSET   #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func dec(a: Int) = a - 1
+          """.stripMargin,
+        "lib3" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func multiply(a: Int, b: Int) = a * b
+          """.stripMargin
+      )
+
+    processAndEval(script, libraries) shouldBe Left("SCRIPT_TYPE of `lib2` is ASSET should be the same with script")
+  }
+
+  property("unresolved libraries") {
+    val script =
+      """
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# IMPORT lib1,lib2,lib3,lib4 #-}
+        | let a = 5
+        | multiply(inc(a), dec(a)) == (5 + 1) * (5 - 1)
+      """.stripMargin
+
+    val libraries =
+      Map(
+        "lib1" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin,
+        "lib2" ->
+          """
+            | {-# SCRIPT_TYPE  ASSET   #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func dec(a: Int) = a - 1
+          """.stripMargin
+      )
+
+    processAndEval(script, libraries) shouldBe Left("Unresolved imports: `lib3`, `lib4`")
+  }
 }

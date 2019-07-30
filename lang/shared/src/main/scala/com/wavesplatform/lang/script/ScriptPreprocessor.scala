@@ -48,7 +48,7 @@ object ScriptPreprocessor {
       directives <- DirectiveParser(librarySrc)
       ds         <- Directive.extractDirectives(directives)
       _          <- Either.cond(ds.contentType == Library,   (), s"CONTENT_TYPE of `$libraryName` is not LIBRARY")
-      _          <- Either.cond(ds.scriptType == scriptType, (), s"SCRIPT_TYPE of `$libraryName` is $scriptType should be the same with script")
+      _          <- Either.cond(ds.scriptType == scriptType, (), s"SCRIPT_TYPE of `$libraryName` is ${ds.scriptType.text} should be the same with script")
     } yield ()
 
   private val importRegex = s"\\${DirectiveParser.start}\\s*${DirectiveKey.IMPORT.text}.*${DirectiveParser.end}"
