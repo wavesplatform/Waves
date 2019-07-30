@@ -6,11 +6,10 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TxValidationError._
-import monix.execution.Scheduler
 
 import scala.util.Left
 
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)(implicit sc: Scheduler)
+case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {

@@ -42,7 +42,6 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
-import monix.execution.Scheduler
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -59,7 +58,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   app =>
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
-  private[this] val apiScheduler = Scheduler(actorSystem.dispatcher)
 
   private val db = openDB(settings.dbSettings.directory)
 
@@ -232,13 +230,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater)(apiScheduler),
-        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time)(apiScheduler),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
+        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time)(apiScheduler),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         DebugApiRoute(
           settings,
           time,
@@ -257,14 +255,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           scoreStatsReporter,
           configRoot
         ),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time)(apiScheduler),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        assets.AssetsBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)(apiScheduler),
+        assets.AssetsBroadcastApiRoute(settings.restAPISettings, utxSynchronizer),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxSynchronizer),
         AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
         AliasBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)
-      ).filter(_ != null)
+      )
 
       val apiTypes: Set[Class[_]] = Set(
         classOf[NodeApiRoute],

@@ -12,6 +12,7 @@ import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, `X-Api-Key`, a
 import com.wavesplatform.lang.ValidationError.ValidationErrorException
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import monix.execution.Scheduler
 import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
@@ -53,6 +54,8 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     (path(pathMatcher) & post & withAuth) {
       json[A](f)
     }
+
+  def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 }
 
 trait WithSettings { this: ApiRoute =>

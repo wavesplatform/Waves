@@ -40,8 +40,7 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)(
-  implicit ec: Scheduler)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -185,7 +184,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
     ))
-  def nft: Route = (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
+  def nft: Route = extractScheduler(implicit sc => (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
     val response: Either[ApiError, Future[JsArray]] = for {
       addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
       limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
@@ -210,7 +209,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     }
 
     complete(response)
-  }
+  })
 
   def transfer: Route =
     processRequest[TransferRequests](

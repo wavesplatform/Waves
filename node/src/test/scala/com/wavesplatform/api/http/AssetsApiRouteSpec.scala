@@ -9,7 +9,6 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
-import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
@@ -26,7 +25,7 @@ class AssetsApiRouteSpec
   private val blockchain = stub[Blockchain]
 
   private val route =
-    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime)(Scheduler(executor)).route
+    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime).route
 
   private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(

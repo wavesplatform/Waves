@@ -26,8 +26,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)(
-    implicit ec: Scheduler)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with WithSettings
     with BroadcastRoute {
@@ -278,20 +277,22 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         paramType = "query"
       )
     ))
-  def getData: Route = (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
-    maybeRegex match {
-      case None => complete(accountData(address))
-      case Some(regex) =>
-        complete(
-          Try(regex.r)
-            .fold(
-              _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
-              r => accountData(address, r.pattern)
+  def getData: Route =
+    extractScheduler(implicit sc =>
+      (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
+        maybeRegex match {
+          case None => complete(accountData(address))
+          case Some(regex) =>
+            complete(
+              Try(regex.r)
+                .fold(
+                  _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+                  r => accountData(address, r.pattern)
+                )
             )
-        )
 
-    }
-  }
+        }
+    })
 
   @Path("/data/{address}/{key}")
   @ApiOperation(value = "Data by Key", notes = "Read data associated with an account and a key", httpMethod = "GET")
@@ -391,7 +392,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String): ToResponseMarshallable = {
+  private def accountData(address: String)(implicit sc: Scheduler): ToResponseMarshallable = {
     Address
       .fromString(address)
       .map { acc =>
@@ -400,7 +401,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String, regex: Pattern): ToResponseMarshallable = {
+  private def accountData(address: String, regex: Pattern)(implicit sc: Scheduler): ToResponseMarshallable = {
     Address
       .fromString(address)
       .map { addr =>

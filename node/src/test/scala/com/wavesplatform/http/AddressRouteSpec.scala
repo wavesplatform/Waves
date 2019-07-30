@@ -10,7 +10,6 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.StringDataEntry
-import monix.execution.Scheduler
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -44,7 +43,7 @@ class AddressRouteSpec
   (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   private val route =
-    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime)(Scheduler.global).route
+    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

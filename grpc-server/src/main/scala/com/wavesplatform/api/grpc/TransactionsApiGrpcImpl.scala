@@ -20,7 +20,8 @@ import scala.util.Try
 class TransactionsApiGrpcImpl(wallet: Wallet,
                               blockchain: Blockchain,
                               utx: UtxPool,
-                              utxPoolSynchronizer: UtxPoolSynchronizer)(implicit sc: Scheduler)
+                              utxPoolSynchronizer: UtxPoolSynchronizer,
+                              forceBroadcast: Boolean)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
@@ -82,7 +83,7 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
     commonApi
-      .broadcastTransaction(tx.toVanilla, forceBroadcast = true)
+      .broadcastTransaction(tx.toVanilla, forceBroadcast)
       .flatMap(_.resultE.fold(Future.failed(_), _ => Future.successful(tx)))
   }
 

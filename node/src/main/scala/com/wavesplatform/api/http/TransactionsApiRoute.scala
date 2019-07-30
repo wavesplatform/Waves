@@ -30,7 +30,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                                 blockchain: Blockchain,
                                 utx: UtxPool,
                                 utxPoolSynchronizer: UtxPoolSynchronizer,
-                                time: Time)(implicit sc: Scheduler)
+                                time: Time)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions
@@ -59,7 +59,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     ))
   def addressLimit: Route = {
     (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
-      complete(transactionsByAddress(address, limit, maybeAfter))
+      extractScheduler(implicit sc => complete(transactionsByAddress(address, limit, maybeAfter)))
     }
   }
 
@@ -205,7 +205,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       )
     ))
   def broadcast: Route =
-    (pathPrefix("broadcast") & post) {
+    (pathPrefix("broadcast") & post)(extractExecutionContext { implicit ec =>
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
         complete {
           TracedResult
@@ -217,7 +217,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             .map(_.leftMap(ApiError.fromValidationError))
         }
       }
-    }
+    })
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -233,7 +233,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(implicit sc: Scheduler): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
       lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 
