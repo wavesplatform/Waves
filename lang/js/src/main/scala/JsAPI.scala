@@ -229,7 +229,6 @@ object JsAPI {
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
-<<<<<<< HEAD
   val repl = Repl()
 
   @JSExportTopLevel("repl")
@@ -240,6 +239,4 @@ object JsAPI {
         r => js.Dynamic.literal("result" -> r)
       )
   }
-=======
->>>>>>> version-0.17.x
 }
