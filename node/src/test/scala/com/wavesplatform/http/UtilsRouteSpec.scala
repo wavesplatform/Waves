@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -72,9 +73,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "STDLIB_VERSION").as[Int] shouldBe 2
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-      "{-# STDLIB_VERSION 2 #-}\n" +
-      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
-      "true"
+        "{-# STDLIB_VERSION 2 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
     }
 
     //V3 Expression
@@ -83,9 +84,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-      "{-# STDLIB_VERSION 3 #-}\n" +
-      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
-      "true"
+        "{-# STDLIB_VERSION 3 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
     }
 
     val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
@@ -113,7 +114,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
@@ -124,7 +125,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
     val request = ScriptWithImportsRequest(
@@ -156,7 +157,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val base64Result = Script.fromBase64String((json \ "script").as[String])
       base64Result shouldBe compiled.map(_._1)
       (json \ "complexity").as[Long] shouldBe compiled.map(_._2).explicitGet()
-      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
@@ -168,7 +169,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "script").as[String] shouldBe base64
       (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(1, 2))" // [WAIT] s"(1 == 2)"
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
