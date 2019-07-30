@@ -1,6 +1,7 @@
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Version
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.DocSource
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.Directive.extractDirectives
@@ -38,7 +39,7 @@ object JsAPI {
         case FUNCTION_CALL(function, args) =>
           jObj.applyDynamic("apply")("type" -> "CALL", "name" -> (function match {
             case Native(name) => name.toString()
-            case User(name)   => name
+            case User(internalName, _)   => internalName
           }), "args" -> args.map(r).toJSArray)
         case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
       }
@@ -104,21 +105,28 @@ object JsAPI {
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).vars
-      .map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1._1), "doc" -> v._2._1._2))
+      .map(v => js.Dynamic.literal(
+        "name" -> v._1,
+        "type" -> typeRepr(v._2._1),
+        "doc"  -> DocSource.varData((v._1, ver))
+      ))
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
-      .map(f =>
+      .map(f => {
+        val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.args.toList, ver))
         js.Dynamic.literal(
-          "name"       -> f.name,
-          "doc"        -> f.docString,
+          "name" -> f.name,
+          "doc" -> funcDoc,
           "resultType" -> typeRepr(f.signature.result),
-          "args" -> ((f.argsDoc zip f.signature.args) map { arg =>
-            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._1._2)
-          }).toJSArray
-      ))
+          "args" -> (f.args, f.signature.args, paramsDoc).zipped.toList
+            .map { arg =>
+              js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
+            }.toJSArray
+        )
+      })
       .toJSArray
 
   @JSExportTopLevel("contractLimits")

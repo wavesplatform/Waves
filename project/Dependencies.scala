@@ -101,6 +101,7 @@ object Dependencies {
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
         .exclude("org.typelevel", "cats-testkit_2.12"),
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
