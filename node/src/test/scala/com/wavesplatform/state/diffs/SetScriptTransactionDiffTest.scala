@@ -1,21 +1,20 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}

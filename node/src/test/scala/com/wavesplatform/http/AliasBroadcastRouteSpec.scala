@@ -8,7 +8,6 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
@@ -23,7 +22,9 @@ class AliasBroadcastRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
+  (utxPoolSynchronizer.publishTransaction _)
+    .when(*, *, *)
+    .onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
 
   "returns StateCheckFiled" - {
     val route = AliasBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
