@@ -13,8 +13,8 @@ private[state] final class CompositeAddressTransactions(baseProvider: AddressTra
                                              fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
     val fromDiff = for {
       diff <- getDiff().toIterable
-      (tx, addresses) <- diff.transactions.values.toVector.reverse
-    } yield (height, tx, addresses)
+      (height, tx, addresses) <- diff.transactions.values.toVector.reverse
+    } yield (Height(height), tx, addresses)
 
     com.wavesplatform.state.addressTransactionsCompose(baseProvider, Observable.fromIterable(fromDiff))(address, types, fromId)
   }

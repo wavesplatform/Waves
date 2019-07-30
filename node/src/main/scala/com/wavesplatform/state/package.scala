@@ -65,19 +65,19 @@ package object state {
         }
     }
 
-    def nftFromBlockchain: CloseableIterator[IssueTransaction] =
-      b.nftList(address, after)
+    def nftFromBlockchain =
+      b.nftObservable(address, after)
         .filter { itx =>
           val asset = IssuedAsset(itx.assetId())
 
           nonZeroBalance(asset)
         }
 
-    d.fold(bd.nftObservable(address, after)) { d =>
+    d.fold(nftFromBlockchain) { d =>
       after match {
-        case None => Observable(nftFromDiff(d, after), bd.nftObservable(address, after)).concat
-        case Some(asset) if d.issuedAssets contains asset => Observable(nftFromDiff(d, after), bd.nftObservable(address, None)).concat
-        case _ => bd.nftObservable(address, after)
+        case None => Observable(nftFromDiff(d, after), nftFromBlockchain).concat
+        case Some(asset) if d.issuedAssets contains asset => Observable(nftFromDiff(d, after), nftFromBlockchain).concat
+        case _ => nftFromBlockchain
       }
     }
   }
@@ -88,16 +88,16 @@ package object state {
     types: Set[TransactionParser],
     fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
-    def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
-      d.transactions.values.toSeq.reverseIterator
+    def transactionsFromDiff(d: Diff): Iterator[(Height, Transaction, Set[Address])] =
+      d.transactions.values.toSeq.reverseIterator.map(v => (Height(v._1), v._2, v._3))
 
-    def withPagination(txs: Observable[(Int, Transaction, Set[Address])]): Observable[(Int, Transaction, Set[Address])] =
+    def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {
         case None     => txs
         case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: Observable[(Int, Transaction, Set[Address])]): Observable[(Int, Transaction)] =
+    def withFilterAndLimit(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] =
       txs
         .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
 
