@@ -31,10 +31,12 @@ class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void
 
 case object HandshakeTimeoutExpired
 
-class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
+abstract class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var timeout: Option[ScheduledFuture[_]] = None
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
+
+  def handshakeTimeout: FiniteDuration
 
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log.trace(s"${id(ctx)} Scheduling handshake timeout, timeout = $handshakeTimeout")
@@ -65,6 +67,17 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
       super.channelRead(ctx, hs)
     case other =>
       super.channelRead(ctx, other)
+  }
+}
+
+object HandshakeTimeoutHandler {
+
+  @Sharable
+  class Static(val handshakeTimeout: FiniteDuration) extends HandshakeTimeoutHandler
+
+  @Sharable
+  class Dynamic(decider: => FiniteDuration) extends HandshakeTimeoutHandler {
+    override def handshakeTimeout: FiniteDuration = decider
   }
 }
 
@@ -102,6 +115,9 @@ abstract class HandshakeHandler(localHandshake: Handshake,
               establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 
               ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
+              Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
+                log.info(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
+              }
               ctx.channel().closeFuture().addListener { f: ChannelFuture =>
                 peerConnections.remove(key, f.channel())
                 establishedConnections.remove(f.channel())
@@ -132,7 +148,8 @@ abstract class HandshakeHandler(localHandshake: Handshake,
 
 object HandshakeHandler extends ScorexLogging {
 
-  val NodeNameAttributeKey = AttributeKey.newInstance[String]("name")
+  val NodeNameAttributeKey         = AttributeKey.newInstance[String]("name")
+  val ConnectionStartAttributeKey  = AttributeKey.newInstance[Long]("connectionStart")
 
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
     (remoteVersion._1 == 0 && remoteVersion._2 >= 13) || (remoteVersion._1 == 1 && remoteVersion._2 >= 0)
@@ -174,6 +191,7 @@ object HandshakeHandler extends ScorexLogging {
       extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
     override protected def channelActive(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
+      ctx.channel().attr(ConnectionStartAttributeKey).set(System.currentTimeMillis())
       super.channelActive(ctx)
     }
   }

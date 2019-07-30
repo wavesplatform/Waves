@@ -55,7 +55,7 @@ class ClientSpec extends FreeSpec with Matchers with MockFactory with Transactio
 
   private def createEmbeddedChannel(allChannels: ChannelGroup) = new EmbeddedChannel(
     new HandshakeDecoder(PeerDatabase.NoOp),
-    new HandshakeTimeoutHandler(1.minute),
+    new HandshakeTimeoutHandler.Static(1.minute),
     new HandshakeHandler.Client(
       handshake = clientHandshake,
       establishedConnections = new ConcurrentHashMap(),

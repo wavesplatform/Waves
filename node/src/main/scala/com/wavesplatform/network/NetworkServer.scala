@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
 import java.nio.channels.ClosedChannelException
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, ScheduledFuture}
 
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
@@ -108,7 +108,7 @@ object NetworkServer extends ScorexLogging {
           inboundConnectionFilter,
           new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
           new HandshakeDecoder(peerDatabase),
-          new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
+          new HandshakeTimeoutHandler.Static(settings.networkSettings.handshakeTimeout),
           serverHandshakeHandler,
           lengthFieldPrepender,
           new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
@@ -132,6 +132,14 @@ object NetworkServer extends ScorexLogging {
 
     val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
+    val averageHandshakePeriod = 200.millis
+    val defaultHandshakeDelay  = 5.seconds
+    val greedyHandshakeDelay   = averageHandshakePeriod + 20.millis
+
+    val clientHandshakeTimeoutHandler = new HandshakeTimeoutHandler.Dynamic(
+      if (peerConnections.isEmpty) averageHandshakePeriod else settings.networkSettings.handshakeTimeout
+    )
+
     val bootstrap = new Bootstrap()
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
       .group(workerGroup)
@@ -139,7 +147,7 @@ object NetworkServer extends ScorexLogging {
       .handler(new PipelineInitializer[SocketChannel](Seq(
         new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
-        new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
+        clientHandshakeTimeoutHandler,
         clientHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
@@ -202,42 +210,55 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
-    val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
-      import scala.collection.JavaConverters._
-      val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+    @volatile var connectTask: Option[ScheduledFuture[_]] = None
 
-      def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
+    def scheduleConnectTask(): Unit = {
+      val delay = if (peerConnections.isEmpty) greedyHandshakeDelay else defaultHandshakeDelay
+      log.trace(s"Scheduling handshake, delay = $delay")
 
-      val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-      val incoming = all.filterNot(outgoing.contains)
+      connectTask = Some {
+        workerGroup.schedule(delay) {
+          import scala.collection.JavaConverters._
+          val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
-      def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
+          def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
-      log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-      if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
-        if (outgoing.isEmpty) // trying to more actively establish connections
-          peerDatabase
-            .randomPeers(settings.networkSettings.maxOutboundConnections, excluded = excludedAddresses ++ all)
-            .foreach(doConnect)
-        else
-          peerDatabase
-            .randomPeers(1, excluded = excludedAddresses ++ all)
-            .foreach(doConnect)
+          val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+          val incoming = all.filterNot(outgoing.contains)
+
+          def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
+
+          log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+          if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
+            if (outgoing.isEmpty) // trying to more actively establish connections
+              peerDatabase
+                .randomPeers(settings.networkSettings.maxOutboundConnections, excluded = excludedAddresses ++ all)
+                .foreach(doConnect)
+            else
+              peerDatabase
+                .randomPeers(1, excluded = excludedAddresses ++ all)
+                .foreach(doConnect)
+          }
+
+          Metrics.write(
+            Point
+              .measurement("connections")
+              .addField("outgoing", outgoingStr)
+              .addField("incoming", incomingStr)
+              .addField("n", all.size)
+          )
+
+          scheduleConnectTask()
+        }
       }
-
-      Metrics.write(
-        Point
-          .measurement("connections")
-          .addField("outgoing", outgoingStr)
-          .addField("incoming", incomingStr)
-          .addField("n", all.size)
-      )
     }
+
+    scheduleConnectTask()
 
     def doShutdown(): Unit =
       try {
         shutdownInitiated = true
-        connectTask.cancel(false)
+        connectTask.foreach(_.cancel(false))
         serverChannel.foreach(_.close().await())
         log.debug("Unbound server")
         allChannels.close().await()
