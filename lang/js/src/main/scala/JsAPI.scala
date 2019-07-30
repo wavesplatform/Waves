@@ -175,7 +175,18 @@ object JsAPI {
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = false)
+          .map {
+            case (bytes, ast, complexity) =>
+              js.Dynamic.literal(
+                "result" -> Global.toBuffer(bytes),
+                "ast" -> toJs(ast),
+                "complexity" -> complexity
+              )
+          }
+      case Library =>
+        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = true)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(

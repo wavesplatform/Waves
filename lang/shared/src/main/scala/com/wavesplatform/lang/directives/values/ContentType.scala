@@ -13,7 +13,7 @@ case object Library    extends ContentType("LIBRARY", 3)
 object ContentType {
   implicit object ContentDic extends DirectiveDictionary[ContentType] {
     override val default: ContentType           = Expression
-    override val all:     Iterable[ContentType] = Seq(Expression, DApp)
+    override val all:     Iterable[ContentType] = Seq(Expression, DApp, Library)
   }
 
   def isDApp(isDApp: Boolean): ContentType = if (isDApp) DApp else Expression

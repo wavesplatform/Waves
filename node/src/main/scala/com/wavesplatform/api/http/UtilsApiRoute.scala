@@ -179,7 +179,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
                 Json.obj(
                   "script"     -> script.bytes().base64,
                   "complexity" -> complexity,
-                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
                 )
             }
           )

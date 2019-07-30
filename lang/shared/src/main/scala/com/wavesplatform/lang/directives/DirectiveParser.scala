@@ -26,7 +26,7 @@ object DirectiveParser {
       .repX(min = 1).!
 
   private val directiveValueP: P[String] =
-    P(CharIn('a' to 'z') | CharIn('A' to 'Z') | CharIn('0' to '9'))
+    P(CharIn('a' to 'z') | CharIn('A' to 'Z') | CharIn('0' to '9') | CharIn(Seq('/', '\\', '.', ',')))
       .repX(min = 1).!
 
   private val parser: P[Either[ExecutionError, Directive]] =
