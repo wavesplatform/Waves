@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -221,7 +222,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract with verifier decompilation") {
     val contract = DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List(FUNC("foo", List(), FALSE), FUNC("bar", List(), IF(FUNCTION_CALL(User("foo"), List()), TRUE, FALSE))),
       List(
         CallableFunction(
@@ -284,7 +285,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract decompilation") {
     val contract = DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(
@@ -316,7 +317,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract decompilation with meta") {
     val contract = DApp(
-      ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+      DAppMeta(),
       List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(

@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
+import com.google.protobuf.ByteString
 import java.net.{URLDecoder, URLEncoder}
-
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -11,6 +11,8 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
 import monix.execution.Scheduler
 
@@ -177,7 +179,12 @@ class AddressRouteSpec
     }
 
     val contractWithMeta = DApp(
-      meta = ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+      meta = DAppMeta(
+        version = 1,
+        List(
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 3)))
+        )
+      ),
       decs = List(),
       callableFuncs = List(),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
@@ -189,8 +196,15 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAQBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "scriptText").as[String] shouldBe "DApp(2VfUX,List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAkIARIFCgMBAgMAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAYSVyVy"
+      (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
+      "DAppMeta\\(" +
+        "1," +
+        "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
+        "List\\(\\)," +
+        "List\\(\\)," +
+        "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),TRUE\\)\\)\\)" +
+      "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)

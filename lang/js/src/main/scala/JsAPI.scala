@@ -4,6 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, RecKeyValue, RecKeyValueFolder, Single}
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
@@ -18,6 +19,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 
 import scala.scalajs.js
+import scala.scalajs.js.Any
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
@@ -219,16 +221,26 @@ object JsAPI {
   }
 
   @JSExportTopLevel("decompile")
-  def decompile(input: String): js.Dynamic = {
-    val decompiled = Global.decompile(input).right.map { scriptText =>
-      js.Dynamic.literal("result" -> scriptText)
-    }
-    decompiled.fold(
-      err => js.Dynamic.literal("error" -> err.m),
-      identity
+  def decompile(input: String): js.Dynamic =
+    Global.decompile(input)
+      .fold(
+        err => js.Dynamic.literal("error" -> err.m),
+        { case (scriptText, meta) =>
+          jObj(
+            "result" -> scriptText,
+            "meta"   -> metaConverter.foldRoot(meta)
+          )
+        }
+      )
+
+  lazy val metaConverter: RecKeyValueFolder[Any, js.Object with js.Dynamic] =
+    RecKeyValueFolder(
+      Any.fromString,
+      _.toJSArray,
+      js.Dynamic.literal.applyDynamic("apply")(_: _*)
     )
-  }
 
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
+
 }

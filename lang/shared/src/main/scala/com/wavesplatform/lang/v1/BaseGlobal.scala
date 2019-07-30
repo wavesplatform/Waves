@@ -4,10 +4,13 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
+import cats.implicits._
+import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -85,10 +88,10 @@ trait BaseGlobal {
     s ++ checksum(s)
   }
 
-  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ ContractSerDe.serialize(c)
-    s ++ checksum(s)
-  }
+  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] =
+    ContractSerDe.serialize(c)
+      .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
+      .map(r => r ++ checksum(r))
 
   def compileExpression(input: String,
                         context: CompilerContext,
@@ -117,14 +120,26 @@ trait BaseGlobal {
     for {
       dapp       <- ContractCompiler.compile(input, ctx)
       complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp)
-    } yield (serializeContract(dapp, stdLibVersion), dapp, complexity._1, complexity._2)
+      bytes      <- serializeContract(dapp, stdLibVersion)
+    } yield (bytes, dapp, complexity._1, complexity._2)
 
-  def decompile(compiledCode: String): Either[ScriptParseError, String] = {
-    Script.fromBase64String(compiledCode, checkComplexity = false).right.map { script =>
-      val (scriptText, _) = Script.decompile(script)
-      scriptText
+  def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
+    for {
+      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      meta   <- scriptMeta(script)
+    } yield (Script.decompile(script)._1, meta)
+
+  def scriptMeta(compiledCode: String): Either[ScriptParseError, Dic] =
+    for {
+      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      meta   <- scriptMeta(script)
+    } yield meta
+
+  def scriptMeta(script: Script): Either[ScriptParseError, Dic] =
+    script match {
+      case ContractScriptImpl(_, dApp, _) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
+      case _                              => Right(Dic(Map()))
     }
-  }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
 
