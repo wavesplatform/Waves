@@ -165,7 +165,7 @@ object Decompiler {
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = argsStr(args)
         func match {
-          case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", i))
+          case FunctionHeader.User(_, name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", i))
           case FunctionHeader.Native(name) =>
             ctx.binaryOps.get(name) match {
               case Some(binOp) =>

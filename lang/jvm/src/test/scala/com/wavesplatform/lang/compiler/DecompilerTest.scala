@@ -4,15 +4,17 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -25,10 +27,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     def shouldEq(s2: String) = s1.replace("\r\n", "\n") shouldEqual s2.replace("\r\n", "\n")
   }
 
-  val CTX: CTX =
-    Monoid.combineAll(Seq(testContext, CryptoContext.build(Global, V3)))
+  val ctx: CTX =
+    Monoid.combineAll(Seq(
+      testContext,
+      CryptoContext.build(Global, V3),
+      WavesContext.build(DirectiveSet.contractDirectiveSet, Common.emptyBlockchainEnvironment())
+    ))
 
-  val decompilerContext = CTX.decompilerContext
+  val decompilerContext = ctx.decompilerContext
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -482,7 +488,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   def compile(code: String): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed = ExpressionCompiler(compilerContext, untyped)
+    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed
   }
 
@@ -561,6 +567,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val script =
       """let list = ["b", "c", "d"]
         |"a" :: list""".stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
+
+  property("extracted functions") {
+    val script = """addressFromStringValue("abcd")"""
     val Right((expr, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
