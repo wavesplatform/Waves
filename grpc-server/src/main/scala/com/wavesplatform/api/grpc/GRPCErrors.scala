@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc
 
-import com.wavesplatform.api.http.ApiError.ApiErrorException
-import com.wavesplatform.api.http.{ApiError, TransactionNotExists, WalletAddressNotExists, WalletAlreadyExists, WalletLocked, WalletNotExist}
+import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.lang.ValidationError.ValidationErrorException
 import io.grpc.Metadata.AsciiMarshaller
 import io.grpc.{Metadata, Status, StatusException}
@@ -16,7 +16,7 @@ object GRPCErrors {
 
   private[this] def errorToStatusException(api: ApiError): StatusException = {
     val code = api match {
-      case WalletNotExist | WalletAddressNotExists | TransactionNotExists => Status.NOT_FOUND
+      case WalletNotExist | WalletAddressDoesNotExist | TransactionDoesNotExist => Status.NOT_FOUND
       case WalletAlreadyExists                                            => Status.ALREADY_EXISTS
       case WalletLocked                                                   => Status.PERMISSION_DENIED
       case _                                                              => Status.INVALID_ARGUMENT

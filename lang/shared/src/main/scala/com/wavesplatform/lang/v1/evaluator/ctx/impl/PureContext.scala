@@ -1,25 +1,23 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.nio.charset.StandardCharsets
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.{BufferUnderflowException, ByteBuffer}
 
 import cats.data.EitherT
-import cats.kernel.Monoid
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.MalformedInputException
-import java.nio.{BufferUnderflowException, ByteBuffer}
-
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
@@ -61,7 +59,7 @@ object PureContext {
   lazy val eq: BaseFunction =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "Equality", ("a", TYPEPARAM('T'), "value"), ("b", TYPEPARAM('T'), "value")) {
       case a :: b :: Nil => Right(CONST_BOOLEAN(a == b))
-      case _             => ???
+      case xs            => notImplemented(s"${EQ_OP.func}(a: T, b: T)", xs)
     }
 
   lazy val ne: BaseFunction =
@@ -157,7 +155,7 @@ object PureContext {
         _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
         _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
       } yield CONST_LONG(result.toLong)
-    case _ => ???
+    case xs => notImplemented("fraction(value: Int, numerator: Int, denominator: Int)", xs)
   }
 
   lazy val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf",
@@ -184,18 +182,18 @@ object PureContext {
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTESTR, "Bytes array representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => CONST_BYTESTR(ByteStr.fromBytes(1))
       case FALSE :: Nil => CONST_BYTESTR(ByteStr.fromBytes(0))
-      case _            => ???
+      case xs           => notImplemented("toBytes(b: Boolean)", xs)
     }
 
   lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTESTR, "Bytes array representation", ("n", LONG, "value")) {
     case CONST_LONG(n) :: Nil => CONST_BYTESTR(ByteStr.fromLong(n))
-    case _                    => ???
+    case xs                   => notImplemented("toBytes(u: Int)", xs)
   }
 
   lazy val toBytesString: BaseFunction =
     NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTESTR, "Bytes array representation", ("s", STRING, "value")) {
       case CONST_STRING(s) :: Nil => CONST_BYTESTR(ByteStr(s.getBytes(StandardCharsets.UTF_8)))
-      case _                      => ???
+      case xs                     => notImplemented("toBytes(s: String)", xs)
     }
 
   lazy val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "String size in characters", ("xs", STRING, "string")) {
@@ -207,12 +205,12 @@ object PureContext {
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => CONST_STRING("true")
       case FALSE :: Nil => CONST_STRING("false")
-      case _            => ???
+      case xs           => notImplemented("toString(b: Boolean)", xs)
     }
 
   lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
     case CONST_LONG(n) :: Nil => CONST_STRING(n.toString)
-    case _                    => ???
+    case xs                   => notImplemented("toString(u: Int)", xs)
   }
 
   lazy val takeBytes: BaseFunction =
@@ -527,14 +525,14 @@ object PureContext {
       body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
       case a :: b :: Nil => body(a, b)
-      case _             => ???
+      case xs            => notImplemented(s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }
 
   def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (Long, Long) => Boolean): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
       case CONST_LONG(a) :: CONST_LONG(b) :: Nil => Right(CONST_BOOLEAN(body(a, b)))
-      case _                                     => ???
+      case xs                                    => notImplemented(s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }
 
   def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
@@ -563,13 +561,13 @@ object PureContext {
           case e: java.lang.IndexOutOfBoundsException => s"Index $pos out of bounds for length ${arr.size}"
           case e: Throwable                           => e.toString
         })
-      case _ => ???
+      case xs => notImplemented(s"getElement(arr: Array, pos: Int)", xs)
     }
 
   lazy val getListSize: BaseFunction =
     NativeFunction("size", 2, SIZE_LIST, LONG, "Size of list", ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')), "list")) {
       case ARR(arr) :: Nil => Right(CONST_LONG(arr.size.toLong))
-      case _               => ???
+      case xs              => notImplemented(s"size(arr: Array)", xs)
     }
 
   lazy val uMinus: BaseFunction =

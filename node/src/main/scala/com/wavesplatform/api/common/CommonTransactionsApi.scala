@@ -4,7 +4,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -32,7 +33,12 @@ private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, w
   }
 
   def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] = {
-    CommonValidation.getMinFee(blockchain, tx)
+    FeeValidation
+      .getMinFee(blockchain, tx)
+      .map {
+        case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+          (asset, feeInAsset, feeInWaves)
+      }
   }
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, VanillaTransaction] = {

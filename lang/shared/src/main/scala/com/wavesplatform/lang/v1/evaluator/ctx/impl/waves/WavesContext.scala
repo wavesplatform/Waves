@@ -61,7 +61,7 @@ object WavesContext {
                 case b: Boolean => Right(CONST_BOOLEAN(b))
               }
           }
-        case _ => ???
+        case xs => notImplemented(s"$name(s: String)", xs)
       }
 
     val getIntegerFromStateF: BaseFunction = getDataFromStateF("getInteger", DATA_LONG_FROM_STATE, DataType.Long)
@@ -90,7 +90,7 @@ object WavesContext {
             case Some(s: CONST_STRING) if dataType == DataType.String     => Right(s)
             case _                                                        => Right(unit)
           }
-        case _ => ???
+        case xs => notImplemented(s"$name(s: String)", xs)
       }
 
     val getIntegerFromArrayF: BaseFunction = getDataFromArrayF("getInteger", DATA_LONG_FROM_ARRAY, DataType.Long)
@@ -288,7 +288,7 @@ object WavesContext {
           environmentFunctions
             .addressFromAlias(fields("alias").asInstanceOf[CONST_STRING].s)
             .map(resolved => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(resolved.bytes).explicitGet())))
-        case _ => ???
+        case xs => notImplemented(s"addressFromRecipient(a: AddressOrAlias)", xs)
       }
 
     val stringFromAddressF: BaseFunction =
@@ -301,7 +301,7 @@ object WavesContext {
         ("Address", addressType, "address")
       ) {
         case CaseObj(`addressType`, fields) :: Nil => CONST_STRING(fields("bytes").asInstanceOf[CONST_BYTESTR].bs.toString)
-        case _                                     => ???
+        case xs => notImplemented(s"toString(a: Address)", xs)
       }
 
     val inputEntityCoeval: Eval[Either[String, CaseObj]] = {
@@ -335,7 +335,7 @@ object WavesContext {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled, version))
           Right(fromOptionCO(maybeDomainTx))
-        case _ => ???
+        case xs => notImplemented(s"transactionById(u: ByteVector)", xs)
       }
     }
 
@@ -352,7 +352,7 @@ object WavesContext {
           val transferTxO = env.transferTransactionById(id.arr).map(transactionObject(_, proofsEnabled, version))
           Right(fromOptionCO(transferTxO))
 
-        case _ => ???
+        case xs => notImplemented(s"transferTransactionById(u: ByteVector)", xs)
       }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
@@ -375,7 +375,7 @@ object WavesContext {
         case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
           env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(CONST_LONG)
 
-        case _ => ???
+        case xs => notImplemented(s"assetBalance(u: ByteVector|Unit)", xs)
       }
 
     val assetInfoF: BaseFunction =
@@ -392,7 +392,7 @@ object WavesContext {
             case Some(result) => Right(result)
             case _            => Right(unit)
           }
-        case _ => ???
+        case xs => notImplemented(s"assetInfo(u: ByteVector)", xs)
       }
 
     val wavesBalanceF: UserFunction =
@@ -410,7 +410,7 @@ object WavesContext {
       ("id", BYTESTR, "transaction Id")
     ) {
       case CONST_BYTESTR(id: ByteStr) :: Nil => Right(fromOptionL(env.transactionHeightById(id.arr).map(_.toLong)))
-      case _                                 => ???
+      case xs => notImplemented(s"transactionHeightById(u: ByteVector)", xs)
     }
 
     val blockInfoByHeightF: BaseFunction = NativeFunction(
@@ -422,7 +422,7 @@ object WavesContext {
       ("height", LONG, "block height")
     ) {
       case CONST_LONG(height: Long) :: Nil => Right(env.blockInfoByHeight(height.toInt).map(Bindings.buildLastBlockInfo))
-      case _                               => ???
+      case xs => notImplemented(s"blockInfoByHeight(u: Int)", xs)
     }
 
     val parseBlockHeaderF: BaseFunction =

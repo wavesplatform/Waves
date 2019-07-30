@@ -3,13 +3,13 @@ package com.wavesplatform.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
@@ -168,16 +168,14 @@ case class DebugApiRoute(ws: WavesSettings,
     complete(ng.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit ec: ExecutionContext): Future[ToResponseMarshallable] = {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit ec: ExecutionContext): Future[Either[ValidationError, JsObject]] = {
     rollbackTask(blockId).asyncBoundary
-      .map {
-        case Right(blocks) =>
-          allChannels.broadcast(LocalScoreChanged(ng.score))
-          if (returnTransactionsToUtx) blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
-          miner.scheduleMining()
-          Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
-        case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
-      }
+      .map(_.map { blocks =>
+        allChannels.broadcast(LocalScoreChanged(ng.score))
+        if (returnTransactionsToUtx) blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
+        miner.scheduleMining()
+        Json.obj("BlockId" -> blockId.toString)
+      })
       .runAsyncLogErr(Scheduler(ec))
   }
 
@@ -381,11 +379,12 @@ case class DebugApiRoute(ws: WavesSettings,
           .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
         complete(resultE)
 
-      case None =>
-        complete(StatusCodes.NotFound)
+      case Some((_, tx)) =>
+        complete(ApiError.UnsupportedTransactionType)
 
-      case _ =>
-        complete(StatusCodes.NotImplemented)
+      case None =>
+        complete(ApiError.TransactionDoesNotExist)
+
     }
   }
 
