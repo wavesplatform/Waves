@@ -1,7 +1,7 @@
 package com.wavesplatform.common
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -15,7 +15,7 @@ class SponsorshipMathBenchmark {
   @Benchmark
   def bigDecimal_test(bh: Blackhole): Unit = {
     def toWaves(assetFee: Long, sponsorship: Long): Long = {
-      val waves = (BigDecimal(assetFee) * BigDecimal(CommonValidation.FeeUnit)) / BigDecimal(sponsorship)
+      val waves = (BigDecimal(assetFee) * BigDecimal(FeeValidation.FeeUnit)) / BigDecimal(sponsorship)
       if (waves > Long.MaxValue) {
         throw new java.lang.ArithmeticException("Overflow")
       }
@@ -28,7 +28,7 @@ class SponsorshipMathBenchmark {
   @Benchmark
   def bigInt_test(bh: Blackhole): Unit = {
     def toWaves(assetFee: Long, sponsorship: Long): Long = {
-      val waves = BigInt(assetFee) * CommonValidation.FeeUnit / sponsorship
+      val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
       waves.bigInteger.longValueExact()
     }
 
