@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import org.scalacheck.Gen
@@ -59,7 +60,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
         AddressScheme.current.chainId,
         accountA,
         IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
-        Some(ContractScript(V3, DApp(ByteStr.empty, List.empty, List.empty, None)).explicitGet()),
+        Some(ContractScript(V3, DApp(DAppMeta(), List.empty, List.empty, None)).explicitGet()),
         1222,
         System.currentTimeMillis(),
         Proofs.empty

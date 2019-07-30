@@ -3,11 +3,14 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 import java.util.concurrent.Executors
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
@@ -15,6 +18,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
@@ -32,7 +36,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ estimate ~ scriptMeta ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   private[this] val decompilerExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
@@ -192,6 +196,45 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       )
     }
   }
+
+  @Path("/script/meta")
+  @ApiOperation(value = "Meta", notes = "Account's script meta", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Script code",
+        example = "true"
+      )
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "meta or error")
+    )
+  )
+  def scriptMeta: Route = path("script" / "meta") {
+    (
+      post
+        & entity(as[String])
+        & withExecutionContext(decompilerExecutionContext)
+    ) { code =>
+      val result: ToResponseMarshallable = Global.scriptMeta(code)
+        .map(metaConverter.foldRoot)
+        .fold(e => e, r => r)
+      complete(result)
+    }
+  }
+
+  lazy val metaConverter: RecKeyValueFolder[JsValueWrapper, JsObject] =
+    RecKeyValueFolder(
+      Json.toJsFieldJsValueWrapper(_),
+      l => Json.arr(l: _*),
+      m => Json.obj(m: _*)
+    )
 
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")
