@@ -19,7 +19,7 @@ trait PeerDatabase extends AutoCloseable {
 
   def suspendedHosts: Set[InetAddress]
 
-  def randomPeers(max: Int, excluded: Set[InetSocketAddress]): Set[InetSocketAddress]
+  def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 
   def detailedBlacklist: Map[InetAddress, (Long, String)]
 
@@ -47,7 +47,7 @@ object PeerDatabase extends ScorexLogging {
 
     override def blacklistedHosts: Set[InetAddress] = Set.empty
 
-    override def randomPeers(max: Int, excluded: Set[InetSocketAddress]): Set[InetSocketAddress] = Set.empty
+    override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
 
     override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
 

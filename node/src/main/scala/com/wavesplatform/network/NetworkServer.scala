@@ -230,14 +230,9 @@ object NetworkServer extends ScorexLogging {
 
           log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
           if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
-            if (outgoing.isEmpty) // trying to more actively establish connections
-              peerDatabase
-                .randomPeers(settings.networkSettings.maxOutboundConnections, excluded = excludedAddresses ++ all)
-                .foreach(doConnect)
-            else
-              peerDatabase
-                .randomPeers(1, excluded = excludedAddresses ++ all)
-                .foreach(doConnect)
+            peerDatabase
+              .randomPeer(excluded = excludedAddresses ++ all)
+              .foreach(doConnect)
           }
 
           Metrics.write(

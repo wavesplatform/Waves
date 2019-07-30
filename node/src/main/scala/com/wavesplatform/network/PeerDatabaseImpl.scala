@@ -10,7 +10,6 @@ import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection._
 import scala.concurrent.duration.FiniteDuration
@@ -99,37 +98,23 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
-  override def randomPeers(max: Int, excluded: immutable.Set[InetSocketAddress]): immutable.Set[InetSocketAddress] =
-    unverifiedPeers.synchronized {
-      def excludeAddress(isa: InetSocketAddress): Boolean = {
-        excluded(isa) || Option(isa.getAddress).exists(blacklistedHosts) || suspendedHosts(isa.getAddress)
-      }
-      // excluded only contains local addresses, our declared address, and external declared addresses we already have
-      // connection to, so it's safe to filter out all matching candidates
-      unverifiedPeers.removeIf(excluded(_))
-
-      val verifiedKnownPeers = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq.filterNot(excludeAddress)).take(max)
-
-      @tailrec
-      def choice(chosenPeers: immutable.Set[InetSocketAddress], verifiedPeers: Seq[InetSocketAddress]): immutable.Set[InetSocketAddress] =
-        if (chosenPeers.size < max) {
-          val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
-          val verified   = verifiedPeers.headOption
-
-          (unverified, verified) match {
-            case (Some(_), Some(v)) =>
-              if (Random.nextBoolean())
-                choice(chosenPeers + unverifiedPeers.poll(), verifiedPeers)
-              else
-                choice(chosenPeers + v, verifiedPeers.tail)
-            case (Some(_), None) => choice(chosenPeers + unverifiedPeers.poll(), verifiedPeers)
-            case (None, Some(v)) => choice(chosenPeers + v, verifiedPeers.tail)
-            case _               => chosenPeers
-          }
-        } else chosenPeers
-
-      choice(immutable.Set.empty, verifiedKnownPeers)
+  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
+    def excludeAddress(isa: InetSocketAddress): Boolean = {
+      excluded(isa) || Option(isa.getAddress).exists(blacklistedHosts) || suspendedHosts(isa.getAddress)
     }
+    // excluded only contains local addresses, our declared address, and external declared addresses we already have
+    // connection to, so it's safe to filter out all matching candidates
+    unverifiedPeers.removeIf(excluded(_))
+    val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
+    val verified   = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
+
+    (unverified, verified) match {
+      case (Some(_), v @ Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
+      case (Some(_), None)        => Some(unverifiedPeers.poll())
+      case (None, v @ Some(_))    => v
+      case _                      => None
+    }
+  }
 
   def clearBlacklist(): Unit = {
     blacklist.invalidateAll()
