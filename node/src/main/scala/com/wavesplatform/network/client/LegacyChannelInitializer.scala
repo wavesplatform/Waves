@@ -50,7 +50,7 @@ class LegacyChannelInitializer(trafficLoggerSettings: TrafficLogger.Settings, ha
     ch.pipeline()
       .addLast(
         new HandshakeDecoder(PeerDatabase.NoOp),
-        new HandshakeTimeoutHandler.Static(30.seconds),
+        new HandshakeTimeoutHandler(30.seconds),
         new ClientHandshakeHandler(handshake, promise),
         new LengthFieldPrepender(lengthFieldLength),
         new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),

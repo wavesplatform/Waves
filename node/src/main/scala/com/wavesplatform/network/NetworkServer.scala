@@ -108,7 +108,7 @@ object NetworkServer extends ScorexLogging {
           inboundConnectionFilter,
           new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
           new HandshakeDecoder(peerDatabase),
-          new HandshakeTimeoutHandler.Static(settings.networkSettings.handshakeTimeout),
+          new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
           serverHandshakeHandler,
           lengthFieldPrepender,
           new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
@@ -132,13 +132,9 @@ object NetworkServer extends ScorexLogging {
 
     val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
-    val averageHandshakePeriod = 200.millis
+    val averageHandshakePeriod = 1.second
     val defaultHandshakeDelay  = 5.seconds
     val greedyHandshakeDelay   = averageHandshakePeriod + 20.millis
-
-    val clientHandshakeTimeoutHandler = new HandshakeTimeoutHandler.Dynamic(
-      if (peerConnections.isEmpty) averageHandshakePeriod else settings.networkSettings.handshakeTimeout
-    )
 
     val bootstrap = new Bootstrap()
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
@@ -147,7 +143,7 @@ object NetworkServer extends ScorexLogging {
       .handler(new PipelineInitializer[SocketChannel](Seq(
         new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
-        clientHandshakeTimeoutHandler,
+        new HandshakeTimeoutHandler(if (peerConnections.isEmpty) averageHandshakePeriod else settings.networkSettings.handshakeTimeout),
         clientHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
