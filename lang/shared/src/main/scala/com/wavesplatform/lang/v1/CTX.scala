@@ -12,7 +12,7 @@ import scala.scalajs.js.annotation._
 
 @JSExportTopLevel("CTX")
 case class CTX(@(JSExport @field) types: Seq[FINAL],
-               @(JSExport @field) vars: Map[String, ((FINAL, String), LazyVal)],
+               @(JSExport @field) vars: Map[String, (FINAL, LazyVal)],
                @(JSExport @field) functions: Array[BaseFunction]) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap
   lazy val evaluationContext: EvaluationContext = {
@@ -23,9 +23,9 @@ case class CTX(@(JSExport @field) types: Seq[FINAL],
     EvaluationContext(typeDefs = typeDefs, letDefs = vars.mapValues(_._2), functions = functions.map(f => f.header -> f).toMap)
   }
   lazy val compilerContext: CompilerContext = CompilerContext(
-    predefTypes = typeDefs,
-    varDefs = vars.mapValues(_._1),
-    functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
+    typeDefs,
+    vars.mapValues(_._1),
+    functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
   val opsNames = BinaryOperation.opsByPriority

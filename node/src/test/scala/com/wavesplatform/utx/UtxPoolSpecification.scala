@@ -67,7 +67,7 @@ class UtxPoolSpecification
     with WithDomain {
   val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
-  import CommonValidation.{ScriptExtraFee => extraFee}
+  import FeeValidation.{ScriptExtraFee => extraFee}
   import FunctionalitySettings.TESTNET.{maxTransactionTimeBackOffset => maxAge}
   import UtxPoolSpecification._
 
@@ -113,7 +113,7 @@ class UtxPoolSpecification
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
-    val minFee    = CommonValidation.FeeConstants(TransferTransaction.typeId) + CommonValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
+    val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
     val txs = for { fee <- chooseNum(minFee, amount) } yield
       MassTransferTransaction.selfSigned(Waves, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).explicitGet()
     txs.label("transferWithRecipient")
@@ -184,7 +184,7 @@ class UtxPoolSpecification
 
   private val withValidPaymentsNotAdded = (for {
     (sender, senderBalance, bcu) <- stateGen
-    recipient <- accountGen
+    recipient                    <- accountGen
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
@@ -214,12 +214,12 @@ class UtxPoolSpecification
   } yield {
     val settings =
       UtxSettings(txs.length,
-        PoolDefaultMaxBytes,
-        1000,
-        Set(sender.address),
-        Set(recipient.address),
-        allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false)
+                  PoolDefaultMaxBytes,
+                  1000,
+                  Set(sender.address),
+                  Set(recipient.address),
+                  allowTransactionsFromSmartAccounts = true,
+                  allowSkipChecks = false)
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
@@ -235,12 +235,12 @@ class UtxPoolSpecification
       val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
       val settings =
         UtxSettings(txs.length,
-          PoolDefaultMaxBytes,
-          1000,
-          Set(sender.address),
-          whitelist,
-          allowTransactionsFromSmartAccounts = true,
-          allowSkipChecks = false)
+                    PoolDefaultMaxBytes,
+                    1000,
+                    Set(sender.address),
+                    whitelist,
+                    allowTransactionsFromSmartAccounts = true,
+                    allowSkipChecks = false)
       val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
@@ -358,7 +358,7 @@ class UtxPoolSpecification
       utxSettings =
         UtxSettings(20, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)) {
       (txs, utx, _) =>
-        utx.putIfNew(txs.head).resultE should matchPattern { case Right(true) => }
+        utx.putIfNew(txs.head).resultE should matchPattern { case Right(true)  => }
         utx.putIfNew(txs.head).resultE should matchPattern { case Right(false) => }
     }
 
@@ -600,12 +600,13 @@ class UtxPoolSpecification
                 timeSourceIsRunning = true
                 0L
               }
-            val settings = UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+            val settings =
+              UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
             val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource())
 
-          utxPool.putIfNew(transfer).resultE.explicitGet()
-          val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
-          tx should contain (transfer)
+            utxPool.putIfNew(transfer).resultE.explicitGet()
+            val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
+            tx should contain(transfer)
         }
       }
     }

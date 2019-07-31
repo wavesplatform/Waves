@@ -24,29 +24,6 @@ import scala.util.{Left, Right, Try}
 
 object CommonValidation {
 
-  val ScriptExtraFee = 400000L
-  val FeeUnit        = 100000
-  val NFTMultiplier  = 0.001
-
-  val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId            -> 0,
-    PaymentTransaction.typeId            -> 1,
-    IssueTransaction.typeId              -> 1000,
-    ReissueTransaction.typeId            -> 1000,
-    BurnTransaction.typeId               -> 1,
-    TransferTransaction.typeId           -> 1,
-    MassTransferTransaction.typeId       -> 1,
-    LeaseTransaction.typeId              -> 1,
-    LeaseCancelTransaction.typeId        -> 1,
-    ExchangeTransaction.typeId           -> 3,
-    CreateAliasTransaction.typeId        -> 1,
-    DataTransaction.typeId               -> 1,
-    SetScriptTransaction.typeId          -> 10,
-    SponsorFeeTransaction.typeId         -> 1000,
-    SetAssetScriptTransaction.typeId     -> (1000 - 4),
-    smart.InvokeScriptTransaction.typeId -> 5
-  )
-
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {

@@ -35,7 +35,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
         PureContext.build(Global, V1),
         CTX(
           Seq(transactionType),
-          Map(("tx", ((transactionType, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
+          Map(("tx", (transactionType, LazyVal(EitherT.pure(tx))))),
           Array.empty
         )
       )
