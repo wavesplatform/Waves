@@ -4,7 +4,7 @@ import java.io.Closeable
 import scala.collection.{AbstractIterator, GenTraversableOnce, Iterator}
 
 //noinspection ScalaStyle
-sealed trait CloseableIterator[+A] extends Iterator[A] with Closeable {
+sealed trait CloseableIterator[+A] extends Iterator[A] with AutoCloseable {
   private[this] def withIterator[B](iterator: Iterator[B]): CloseableIterator[B] =
     CloseableIterator(
       iterator,
@@ -84,6 +84,7 @@ object CloseableIterator {
     override def next(): T =
       iterator.next()
 
+    @SuppressWarnings(Array("deprecation"))
     override def finalize(): Unit = {
       if (!this.closed) {
         System.err.println(s"CloseableIterator leaked: $this [${System.identityHashCode(this)}]")
