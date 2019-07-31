@@ -130,7 +130,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
           val minFee = Sponsorship
             .fromWaves(
-              CommonValidation.FeeConstants(insufficientFee.builder.typeId) * CommonValidation.FeeUnit,
+              FeeValidation.FeeConstants(insufficientFee.builder.typeId) * FeeValidation.FeeUnit,
               sponsor.minSponsoredAssetFee.get
             )
 

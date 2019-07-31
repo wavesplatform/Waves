@@ -121,7 +121,7 @@ object Terms {
       )
   }
 
-  case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = if (b) "TRUE" else "FALSE" }
+  case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = b.toString }
 
   lazy val TRUE  = CONST_BOOLEAN(true)
   lazy val FALSE = CONST_BOOLEAN(false)

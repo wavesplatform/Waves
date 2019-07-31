@@ -1,19 +1,23 @@
 package com.wavesplatform.http
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.UtilsApiRoute
+import com.wavesplatform.api.http.{ScriptWithImportsRequest, UtilsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.{V2, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -34,7 +38,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   )
 
   val dappVer = DApp(
-    meta = ByteStr.empty,
+    meta = DAppMeta(),
     decs = List.empty,
     callableFuncs = List.empty,
     verifierFuncOpt = Some(
@@ -71,9 +75,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "STDLIB_VERSION").as[Int] shouldBe 2
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-      "{-# STDLIB_VERSION 2 #-}\n" +
-      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
-      "true"
+        "{-# STDLIB_VERSION 2 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
     }
 
     //V3 Expression
@@ -82,15 +86,73 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-      "{-# STDLIB_VERSION 3 #-}\n" +
-      "{-# CONTENT_TYPE EXPRESSION #-}\n" +
-      "true"
+        "{-# STDLIB_VERSION 3 #-}\n" +
+        "{-# CONTENT_TYPE EXPRESSION #-}\n" +
+        "true"
     }
 
     val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
 
     testdAppDirective(dappVerBytesStr)
     testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
+  }
+
+  routePath("/script/meta") in {
+    //Expression
+    val exprBase64 = ExprScript(script).explicitGet().bytes().base64
+    Post(routePath("/script/meta"), exprBase64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      json.toString shouldBe "{}"
+    }
+
+    //DApp
+    val dApp = DApp(
+      DAppMeta(
+        version = 1,
+        List(
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 4, 8))),
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](8, 4, 2, 1))),
+          CallableFuncSignature(ByteString.EMPTY)
+        )
+      ),
+      List(
+        LET("letName", CONST_BOOLEAN(true)),
+        FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
+      ),
+      List(
+        CallableFunction(
+          CallableAnnotation("func1"),
+          FUNC("anotherFunc", List("a", "b", "c", "d"), CONST_BOOLEAN(true))
+        ),
+        CallableFunction(
+          CallableAnnotation("func2"),
+          FUNC("default", List("x", "y", "z", "w"), CONST_BOOLEAN(false))
+        ),
+        CallableFunction(
+          CallableAnnotation("func3"),
+          FUNC("default", List(), CONST_BOOLEAN(false))
+        )
+      ),
+      Some(
+        VerifierFunction(
+          VerifierAnnotation("hmmm"),
+          FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
+        )
+      )
+    )
+    val dappBase64 = ContractScript(V3, dApp).explicitGet().bytes().base64
+    Post(routePath("/script/meta"), dappBase64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      json.toString shouldBe
+        """{"callableFuncTypes":[
+          |{"a":"Int","b":"ByteVector","c":"Boolean","d":"String"},
+          |{"x":"String","y":"Boolean","z":"ByteVector","w":"Int"},
+          |{}
+          |]}
+          |"""
+          .stripMargin
+          .replace("\n", "")
+    }
   }
 
   private def testdAppDirective(str: String) =
@@ -112,7 +174,50 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+  }
+
+  routePath("/script/compileWithImports") in {
+    Post(routePath("/script/compileWithImports"), ScriptWithImportsRequest("(1 == 2)")) ~> route ~> check {
+      val json           = responseAs[JsValue]
+      val expectedScript = ExprScript(V2, script).explicitGet()
+
+      Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
+      (json \ "complexity").as[Long] shouldBe 3
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    val request = ScriptWithImportsRequest(
+      """
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# IMPORT dir/my/lib.ride #-}
+        | let a = 5
+        | inc(a) == a + 1
+      """.stripMargin,
+      Map(
+        "dir/my/lib.ride" ->
+          """
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin
+      )
+    )
+    Post(routePath("/script/compileWithImports"), request) ~> route ~> check {
+      val expectedScript =
+        """
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          | func inc(a: Int) = a + 1
+          | let a = 5
+          | inc(a) == a + 1
+        """.stripMargin
+      val compiled = ScriptCompiler.compile(expectedScript)
+
+      val json = responseAs[JsValue]
+      val base64Result = Script.fromBase64String((json \ "script").as[String])
+      base64Result shouldBe compiled.map(_._1)
+      (json \ "complexity").as[Long] shouldBe compiled.map(_._2).explicitGet()
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
@@ -124,7 +229,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "script").as[String] shouldBe base64
       (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(Native(0),List(1, 2))" // [WAIT] s"(1 == 2)"
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 

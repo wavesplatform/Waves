@@ -1,0 +1,10 @@
+{
+  funcs : [
+    {
+      name: "_isInstanceOf"
+      params: [ "T", "String" ]
+      doc: "Check value type"
+      paramsDoc: [ "The value", "The type name" ]
+    }
+  ]
+}
