@@ -99,7 +99,7 @@ object UserFunction {
       name = name,
       internalName = internalName,
       costByLibVersion = costByLibVersion,
-      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName)),
+      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName, name)),
       ev = ev,
       args = args.map(_._1).toArray
     )
@@ -113,7 +113,7 @@ object UserFunction {
       name = name,
       internalName = internalName,
       costByLibVersion = costByLibVersion,
-      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName)),
+      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName, name)),
       ev = ev,
       args = args.map(_._1).toArray
     ) { override def deprecated = true }
