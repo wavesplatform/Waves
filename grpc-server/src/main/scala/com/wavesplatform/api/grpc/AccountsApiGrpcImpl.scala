@@ -1,4 +1,6 @@
 package com.wavesplatform.api.grpc
+
+import cats.implicits._
 import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountApi
@@ -69,11 +71,9 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
 
   override def resolveAlias(request: StringValue): Future[BytesValue] =
     Future {
-      import cats.implicits._
-
       val addressEither = for {
         alias   <- Alias.create(request.value)
-        address <- concurrent.blocking(blockchain.resolveAlias(alias))
+        address <- blockchain.resolveAlias(alias)
       } yield BytesValue(address.bytes)
 
       Future.fromTry {
