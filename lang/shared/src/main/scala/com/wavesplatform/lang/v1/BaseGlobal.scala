@@ -96,9 +96,14 @@ trait BaseGlobal {
   def compileExpression(input: String,
                         context: CompilerContext,
                         restrictToLetBlockOnly: Boolean,
-                        stdLibVersion: StdLibVersion): Either[String, (Array[Byte], Terms.EXPR, Long)] =
+                        stdLibVersion: StdLibVersion,
+                        isDecl: Boolean
+                       ): Either[String, (Array[Byte], Terms.EXPR, Long)] = {
+    val compiler =
+      if (isDecl) ExpressionCompiler.compileDecls _
+      else ExpressionCompiler.compile _
     for {
-      ex <- ExpressionCompiler.compile(input, context)
+      ex <- compiler(input, context)
       illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
@@ -107,6 +112,7 @@ trait BaseGlobal {
       costs = utils.functionCosts(stdLibVersion)
       complexity <- ScriptEstimator(vars, costs, ex)
     } yield (x, ex, complexity)
+  }
 
   type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])
 
