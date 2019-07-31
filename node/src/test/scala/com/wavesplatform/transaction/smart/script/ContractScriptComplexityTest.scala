@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.values._
@@ -10,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -17,7 +17,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
 
   property("estimate contract script correctly") {
     val contract = DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -66,7 +66,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
 
   property("estimate contract script with context correctly") {
     val contract = DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List(
         LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
         LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet())))
@@ -118,7 +118,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
 
   property("estimate contract script with context correctly 2") {
     val contract = DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List(
         LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
         LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet())))

@@ -14,21 +14,20 @@ package object compiler {
 
   val pointType   = CASETYPEREF("Point", List("x" -> LONG, "y" -> LONG))
   val listOfLongs = LIST
-  val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "test id", ("p1", TYPEPARAM('T'), "p1")) {
+  val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), ("p1", TYPEPARAM('T'))) {
     case a :: Nil => Right(a)
   }
   val returnsListLong =
-    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE, "test undefinedOptionLong") { case _ => ??? }
+    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE) { case _ => ??? }
   val idOptionLong =
-    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, "test Some", ("opt", UNION(LONG, UNIT), "opt")) { case _ => Right(unit) }
+    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, ("opt", UNION(LONG, UNIT))) { case _ => Right(unit) }
   val functionWithTwoPrarmsOfTheSameType =
     NativeFunction("functionWithTwoPrarmsOfTheSameType",
                    1,
                    1005: Short,
                    TYPEPARAM('T'),
-                   "test same type params",
-                   ("p1", TYPEPARAM('T'), "p1"),
-                   ("p2", TYPEPARAM('T'), "p2")) { case l => Right(l.head) }
+                   ("p1", TYPEPARAM('T')),
+                   ("p2", TYPEPARAM('T'))) { case l => Right(l.head) }
 
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
   val testContext = Monoid
@@ -37,11 +36,11 @@ package object compiler {
       CTX(
         Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
         Map(
-          ("p", ((Common.AorB, "Test variable"), null)),
-          ("tv", ((Common.AorBorC, "Yet test variable"), null)),
-          ("l", ((LIST(LONG), "Test list"), LazyVal(EitherT.pure(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))))),
-          ("lpa", ((LIST(Common.pointTypeA), "Yet test list"), LazyVal(EitherT.pure(arr)))),
-          ("lpabc", ((LIST(Common.AorBorC), "Yet another test list"), LazyVal(EitherT.pure(arr))))
+          ("p", (Common.AorB, null)),
+          ("tv", (Common.AorBorC, null)),
+          ("l", (LIST(LONG), LazyVal(EitherT.pure(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))))),
+          ("lpa", (LIST(Common.pointTypeA), LazyVal(EitherT.pure(arr)))),
+          ("lpabc", (LIST(Common.AorBorC), LazyVal(EitherT.pure(arr))))
         ),
         Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
       )

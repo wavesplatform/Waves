@@ -2,9 +2,10 @@ package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
-import fastparse.{WhitespaceApi, core}
+import fastparse.{WhitespaceApi, core, noApi}
 
 object Parser {
 
@@ -287,7 +288,9 @@ object Parser {
           LET(Pos(start, end), name, value, Seq.empty)
       }
 
-  val block: P[EXPR] = {
+  val block: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
+
+  private def blockOr(otherExpr: Pos => EXPR): P[EXPR] = {
     val declaration = letP | funcP
 
     // Hack to force parse of "\n". Otherwise it is treated as a separator
@@ -309,7 +312,7 @@ object Parser {
         (
           ("" ~ ";") ~/ (baseExpr | invalid).? |
             newLineSep ~/ (baseExpr | invalid).? |
-            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(INVALID(Pos(pos, pos), "expected ';'")))
+            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(otherExpr(Pos(pos, pos))))
         ) ~~
         Index
     ).map {
@@ -322,11 +325,14 @@ object Parser {
     }
   }
 
-  val baseAtom = comment ~
-    P(ifP | matchP | block | maybeAccessP) ~
+  def baseAtom(ep: P[EXPR]) = comment ~
+    P(ifP | matchP | ep | maybeAccessP) ~
     comment
 
-  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority))
+  lazy val baseExpr = P(binaryOp(baseAtom(block), opsByPriority))
+
+  lazy val blockOrDecl = baseAtom(blockOr(p => REF(p, VALID(p, "unit"))))
+  lazy val baseExprOrDecl = P(binaryOp(baseAtom(blockOrDecl), opsByPriority))
 
   val singleBaseAtom = comment ~
     P(ifP | matchP | maybeAccessP) ~
@@ -369,6 +375,9 @@ object Parser {
   }
 
   def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End).parse(str)
+
+  def parseExprOrDecl(str: String): core.Parsed[EXPR, Char, String] =
+    P(Start ~ unusedText ~ (baseExprOrDecl | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[DAPP, Char, String] =
     P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(min = 1) ~ End ~~ Index)

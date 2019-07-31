@@ -88,7 +88,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
     Json.obj(
-      "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].name),
+      "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
       "args" -> JsArray(
         fc.args.map {
           case Terms.CONST_LONG(l)    => Json.obj("type" -> "integer", "value" -> l)
@@ -181,8 +181,9 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       )
       _ <- Either.cond(
         fc.isEmpty || (fc.get.function match {
-          case FunctionHeader.User(name) => name.getBytes("UTF-8").length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
-          case _                         => true
+          case FunctionHeader.User(internalName, _) =>
+            internalName.getBytes("UTF-8").length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
+          case _ => true
         }),
         (),
         GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
