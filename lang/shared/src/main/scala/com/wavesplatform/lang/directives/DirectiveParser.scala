@@ -41,7 +41,7 @@ object DirectiveParser {
 
   def apply(input: String): Either[ExecutionError, List[Directive]] =
     input.split("\n")
-      .filter(!_.matches("\\s*"))
+      .filter(_.matches(s"\\s*\\$start.*$end\\s*"))
       .map(parser.parse(_))
       .foldLeft(Map[DirectiveKey, Directive]().asRight[ExecutionError]) {
         case (err: Left[_, _], _)                                      => err
