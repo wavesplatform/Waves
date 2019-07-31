@@ -51,7 +51,7 @@ class HandshakeTimeoutHandler(handshakeTimeout: => FiniteDuration) extends Chann
           TimeUnit.MILLISECONDS
         ))
 
-    super.channelActive(ctx)
+    super.channelRegistered(ctx)
   }
 
   override def channelInactive(ctx: ChannelHandlerContext): Unit = {
