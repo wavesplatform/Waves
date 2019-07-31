@@ -8,9 +8,8 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-
 import cats.implicits._
 
 object RideFullContext {
@@ -28,6 +27,7 @@ object RideFullContext {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address] = ???
     override def tthis: Recipient.Address = ???
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader] = ???
   }
 
   def build(ver: StdLibVersion, wavesEnv: Environment = dummyEnv): CTX = {
