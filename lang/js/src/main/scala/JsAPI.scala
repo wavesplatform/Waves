@@ -1,5 +1,5 @@
 import cats.kernel.Monoid
-import com.wavesplatform.lang.Version
+import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.Global
@@ -8,6 +8,7 @@ import com.wavesplatform.lang.contract.meta.{Chain, Dic, RecKeyValue, RecKeyValu
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
+import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -15,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
@@ -148,8 +149,13 @@ object JsAPI {
     val info = DirectiveParser(input)
       .flatMap(extractDirectives)
       .map {
-        case DirectiveSet(ver, scriptType, contentType) =>
-          js.Dynamic.literal("stdLibVersion" -> ver.id, "contentType" -> contentType.id, "scriptType" -> scriptType.id)
+        case DirectiveSet(ver, scriptType, contentType, imports) =>
+          js.Dynamic.literal(
+            "stdLibVersion" -> ver.id,
+            "contentType"   -> contentType.id,
+            "scriptType"    -> scriptType.id,
+            "imports"       -> imports.fileNames
+          )
       }
     info.fold(
       err => js.Dynamic.literal("error" -> err),
@@ -158,52 +164,60 @@ object JsAPI {
   }
 
   @JSExportTopLevel("compile")
-  def compile(input: String): js.Dynamic = {
-    val compiled = DirectiveParser(input)
-      .flatMap(extractDirectives)
-      .map {
-        case DirectiveSet(ver, scriptType, contentType) =>
-          contentType match {
-            case Expression =>
-              val ctx = buildScriptContext(ver, scriptType == Asset, contentType == DAppType)
-              Global
-                .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver)
-                .fold(
-                  err => {
-                    js.Dynamic.literal("error" -> err)
-                  }, {
-                    case (bytes, ast, complexity) =>
-                      js.Dynamic.literal(
-                        "result"     -> Global.toBuffer(bytes),
-                        "ast"        -> toJs(ast),
-                        "complexity" -> complexity
-                      )
-                  }
-                )
-            case DAppType =>
-              // Just ignore stdlib version here
-              Global
-                .compileContract(input, fullContractContext.compilerContext, ver)
-                .fold(
-                  err => {
-                    js.Dynamic.literal("error" -> err)
-                  }, {
-                    case (bytes, ast, complexity, complexityByFunc) =>
-                      js.Dynamic.literal(
-                        "result"           -> Global.toBuffer(bytes),
-                        "ast"              -> toJs(ast),
-                        "complexity"       -> complexity,
-                        "complexityByFunc" -> complexityByFunc
-                      )
-                  }
-                )
-          }
-      }
-
-    compiled.fold(
-      err => js.Dynamic.literal("error" -> err),
+  def compile(
+    input:     String,
+    libraries: Map[String, String] = Map()
+  ): js.Dynamic = {
+    val r = for {
+      directives  <- DirectiveParser(input)
+      ds          <- extractDirectives(directives)
+      linkedInput <- ScriptPreprocessor(input, libraries, ds)
+      compiled    <- compileScript(ds, linkedInput)
+    } yield compiled
+    r.fold(
+      e => js.Dynamic.literal("error" -> e),
       identity
     )
+  }
+
+  private def compileScript(ds: DirectiveSet, input: String) = {
+    val ver = ds.stdLibVersion
+    ds.contentType match {
+      case Expression =>
+        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = false)
+          .map {
+            case (bytes, ast, complexity) =>
+              js.Dynamic.literal(
+                "result" -> Global.toBuffer(bytes),
+                "ast" -> toJs(ast),
+                "complexity" -> complexity
+              )
+          }
+      case Library =>
+        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = true)
+          .map {
+            case (bytes, ast, complexity) =>
+              js.Dynamic.literal(
+                "result" -> Global.toBuffer(bytes),
+                "ast" -> toJs(ast),
+                "complexity" -> complexity
+              )
+          }
+      case DAppType =>
+        // Just ignore stdlib version here
+        Global.compileContract(input, fullContractContext.compilerContext, ver)
+          .map {
+            case (bytes, ast, complexity, complexityByFunc) =>
+              js.Dynamic.literal(
+                "result" -> Global.toBuffer(bytes),
+                "ast" -> toJs(ast),
+                "complexity" -> complexity,
+                "complexityByFunc" -> complexityByFunc
+              )
+          }
+    }
   }
 
   @JSExportTopLevel("decompile")
@@ -229,4 +243,14 @@ object JsAPI {
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
+  val repl = Repl()
+
+  @JSExportTopLevel("repl")
+  def repl(expr: String): js.Dynamic = {
+    repl.execute(expr)
+      .fold(
+        e => js.Dynamic.literal("error" -> e),
+        r => js.Dynamic.literal("result" -> r)
+      )
+  }
 }

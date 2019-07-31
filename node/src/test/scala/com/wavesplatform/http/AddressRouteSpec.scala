@@ -164,7 +164,7 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
-      (response \ "scriptText").as[String] shouldBe "TRUE" // [WAIT] "true"
+      (response \ "scriptText").as[String] shouldBe "true"
       (response \ "complexity").as[Long] shouldBe 1
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -204,8 +204,8 @@ class AddressRouteSpec
         "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
         "List\\(\\)," +
         "List\\(\\)," +
-        "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),TRUE\\)\\)\\)" +
-        "\\)").r
+        "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
+      "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
