@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.UtxPoolSynchronizer.{BroadcastRequest, TxAddResult}
+import com.wavesplatform.network.UtxPoolSynchronizer.TxAddResult
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -12,59 +12,65 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
-import monix.reactive.Observable
+import monix.execution.{AsyncQueue, Cancelable, CancelableFuture, Scheduler}
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{Consumer, Observable}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])(
-    implicit val scheduler: Scheduler = Scheduler.global)
-    extends ScorexLogging {
+trait UtxPoolSynchronizer {
+  def settings: UtxSynchronizerSettings
+  def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult]
+}
 
+class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])(
+    implicit val scheduler: Scheduler)
+    extends UtxPoolSynchronizer
+    with ScorexLogging
+    with AutoCloseable {
+
+  private[this] case class BroadcastRequest(transaction: Transaction, source: Channel, promise: Promise[TxAddResult], forceBroadcast: Boolean)
   private[this] lazy val txSource = ConcurrentSubject.publishToOne[BroadcastRequest]
 
-  start(txSource, blockSource)
+  private[this] val future = start(txSource, blockSource)
 
   //noinspection ScalaStyle
-  def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] = {
+  override def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] = {
     val promise = Promise[TxAddResult]
     txSource.onNext(BroadcastRequest(tx, source, promise, forceBroadcast))
     promise.future
   }
 
-  def publishTransactions(obs: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
-    val dp = Promise[TxAddResult]
-    obs.foreach { case (c, t) => txSource.onNext(BroadcastRequest(t, c, dp, forceBroadcast = false)) }
-  }
+  override def close(): Unit =
+    future.cancel()
 
   private[this] def putAndBroadcastTask(source: Observable[BroadcastRequest]): Task[Unit] = {
     val queue = AsyncQueue.bounded[BroadcastRequest](settings.maxQueueSize)
 
-    val produceTask = source.foreachL { req =>
+    val produceTask = source.observeOn(scheduler).foreachL { req =>
       if (!queue.tryOffer(req))
         req.promise.tryFailure(new RuntimeException("UTX queue overflow"))
     }
 
     val consumeTask = Observable
-      .repeatEval(queue.poll())
-      .mapParallelUnordered(settings.parallelism) { futureReq =>
-        Task.fromFuture(futureReq).flatMap {
-          case BroadcastRequest(transaction, sender, promise, forceBroadcast) =>
-            Task {
-              val value = concurrent.blocking(utx.putIfNew(transaction))
-              promise.trySuccess(value)
+      .repeatEvalF(Task.deferFuture(queue.drain(1, (settings.maxQueueSize / 10) max 1)))
+      .observeOn(scheduler)
+      .flatMap(Observable.fromIterable)
+      .mapParallelUnordered(settings.parallelism) {
+        case BroadcastRequest(transaction, sender, promise, forceBroadcast) =>
+          Task {
+            val value = concurrent.blocking(utx.putIfNew(transaction))
+            promise.success(value)
 
-              value.resultE.toOption.filter(_ || forceBroadcast).map { _ =>
-                log.trace(s"Broadcasting ${transaction.id()} to ${allChannels.size()} peers except $sender")
-                allChannels.write(transaction, (_: Channel) != sender)
-              }
-            }.onErrorHandle { error =>
-              promise.tryFailure(error)
-              None
+            value.resultE.toOption.filter(_ || forceBroadcast).map { _ =>
+              log.trace(s"Broadcasting ${transaction.id()} to ${allChannels.size()} peers except $sender")
+              allChannels.write(transaction, (_: Channel) != sender)
             }
-        }
+          }.onErrorHandle { error =>
+            promise.tryFailure(error)
+            None
+          }
       }
       .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
       .filter(_.flatten.nonEmpty)
@@ -104,11 +110,25 @@ class UtxPoolSynchronizer(utx: UtxPool, settings: UtxSynchronizerSettings, allCh
     }
 
     synchronizerFuture.onComplete(_ => blockCacheCleaning.cancel())
-    synchronizerFuture
+
+    CancelableFuture(synchronizerFuture, { () =>
+      synchronizerFuture.cancel()
+      blockCacheCleaning.cancel()
+    })
   }
 }
 
 object UtxPoolSynchronizer {
   type TxAddResult = TracedResult[ValidationError, Boolean]
-  private final case class BroadcastRequest(transaction: Transaction, source: Channel, promise: Promise[TxAddResult], forceBroadcast: Boolean)
+
+  def apply(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])(
+      implicit sc: Scheduler): UtxPoolSynchronizer = new UtxPoolSynchronizerImpl(utx, settings, allChannels, blockSource)
+
+  implicit class UtxPoolSynchronizerExt(ups: UtxPoolSynchronizer)(implicit sc: Scheduler) {
+    def publishTransactions(obs: ChannelObservable[Transaction]): Cancelable =
+      obs
+        .consumeWith(
+          Consumer.foreachParallelTask(ups.settings.parallelism) { case (c, t) => Task.fromFuture(ups.publishTransaction(t, c)).map(_ => ()) })
+        .runAsyncLogErr
+  }
 }

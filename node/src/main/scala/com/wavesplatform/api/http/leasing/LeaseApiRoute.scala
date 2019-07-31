@@ -29,9 +29,9 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
     lease ~ cancel ~ active
   }
 
-  def lease: Route = processRequest("lease", (t: LeaseV1Request) => doBroadcast(TransactionFactory.leaseV1(t, wallet, time)))
+  def lease: Route = processRequest("lease", (t: LeaseV1Request) => broadcastIfSuccess(TransactionFactory.leaseV1(t, wallet, time)))
 
-  def cancel: Route = processRequest("cancel", (t: LeaseCancelV1Request) => doBroadcast(TransactionFactory.leaseCancelV1(t, wallet, time)))
+  def cancel: Route = processRequest("cancel", (t: LeaseCancelV1Request) => broadcastIfSuccess(TransactionFactory.leaseCancelV1(t, wallet, time)))
 
   @Path("/active/{address}")
   @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")

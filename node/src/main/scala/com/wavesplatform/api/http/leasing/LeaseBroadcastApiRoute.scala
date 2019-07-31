@@ -16,13 +16,13 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer
 
   def signedLease: Route = (path("lease") & post) {
     json[SignedLeaseV1Request] { leaseReq =>
-      doBroadcast(leaseReq.toTx)
+      broadcastIfSuccess(leaseReq.toTx)
     }
   }
 
   def signedLeaseCancel: Route = (path("cancel") & post) {
     json[SignedLeaseCancelV1Request] { leaseCancelReq =>
-      doBroadcast(leaseCancelReq.toTx)
+      broadcastIfSuccess(leaseCancelReq.toTx)
     }
   }
 }

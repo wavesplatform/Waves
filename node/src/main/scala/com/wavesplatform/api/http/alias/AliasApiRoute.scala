@@ -26,7 +26,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     alias ~ addressOfAlias ~ aliasOfAddress
   }
 
-  def alias: Route = processRequest("create", (t: CreateAliasV1Request) => doBroadcast(TransactionFactory.aliasV1(t, wallet, time)))
+  def alias: Route = processRequest("create", (t: CreateAliasV1Request) => broadcastIfSuccess(TransactionFactory.aliasV1(t, wallet, time)))
 
   @Path("/by-alias/{alias}")
   @ApiOperation(

@@ -216,9 +216,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     processRequest[TransferRequests](
       "transfer", { req =>
         req.eliminate(
-          x => doBroadcast(TransactionFactory.transferAssetV1(x, wallet, time)),
+          x => broadcastIfSuccess(TransactionFactory.transferAssetV1(x, wallet, time)),
           _.eliminate(
-            x => doBroadcast(TransactionFactory.transferAssetV2(x, wallet, time)),
+            x => broadcastIfSuccess(TransactionFactory.transferAssetV2(x, wallet, time)),
             _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
           )
         )
@@ -226,16 +226,16 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     )
 
   def massTransfer: Route =
-    processRequest("masstransfer", (t: MassTransferRequest) => doBroadcast(TransactionFactory.massTransferAsset(t, wallet, time)))
+    processRequest("masstransfer", (t: MassTransferRequest) => broadcastIfSuccess(TransactionFactory.massTransferAsset(t, wallet, time)))
 
   def issue: Route =
-    processRequest("issue", (r: IssueV1Request) => doBroadcast(TransactionFactory.issueAssetV1(r, wallet, time)))
+    processRequest("issue", (r: IssueV1Request) => broadcastIfSuccess(TransactionFactory.issueAssetV1(r, wallet, time)))
 
   def reissue: Route =
-    processRequest("reissue", (r: ReissueV1Request) => doBroadcast(TransactionFactory.reissueAssetV1(r, wallet, time)))
+    processRequest("reissue", (r: ReissueV1Request) => broadcastIfSuccess(TransactionFactory.reissueAssetV1(r, wallet, time)))
 
   def burnRoute: Route =
-    processRequest("burn", (b: BurnV1Request) => doBroadcast(TransactionFactory.burnAssetV1(b, wallet, time)))
+    processRequest("burn", (b: BurnV1Request) => broadcastIfSuccess(TransactionFactory.burnAssetV1(b, wallet, time)))
 
   def signOrder: Route =
     processRequest("order", (order: Order) => {
@@ -322,7 +322,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     }).left.map(m => CustomValidationError(m))
 
   def sponsorRoute: Route =
-    processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
+    processRequest("sponsor", (req: SponsorFeeRequest) => broadcastIfSuccess(TransactionFactory.sponsor(req, wallet, time)))
 }
 
 object AssetsApiRoute {

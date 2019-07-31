@@ -20,25 +20,25 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronize
 
   def issue: Route = (path("issue") & post) {
     json[SignedIssueV1Request] { issueReq =>
-      doBroadcast(issueReq.toTx)
+      broadcastIfSuccess(issueReq.toTx)
     }
   }
 
   def reissue: Route = (path("reissue") & post) {
     json[SignedReissueV1Request] { reissueReq =>
-      doBroadcast(reissueReq.toTx)
+      broadcastIfSuccess(reissueReq.toTx)
     }
   }
 
   def burnRoute: Route = (path("burn") & post) {
     json[SignedBurnV1Request] { burnReq =>
-      doBroadcast(burnReq.toTx)
+      broadcastIfSuccess(burnReq.toTx)
     }
   }
 
   def transfer: Route = (path("transfer") & post) {
     json[SignedTransferRequests] { transferReq =>
-      doBroadcast(
+      broadcastIfSuccess(
         transferReq.eliminate(
           _.toTx,
           _.eliminate(
@@ -52,7 +52,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronize
 
   def exchange: Route = (path("exchange") & post) {
     json[SignedExchangeRequest] { req =>
-      doBroadcast(req.toTx)
+      broadcastIfSuccess(req.toTx)
     }
   }
 }

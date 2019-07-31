@@ -263,7 +263,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def postData: Route = processRequest("data", (req: DataRequest) => doBroadcast(TransactionFactory.data(req, wallet, time)))
+  def postData: Route = processRequest("data", (req: DataRequest) => broadcastIfSuccess(TransactionFactory.data(req, wallet, time)))
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")

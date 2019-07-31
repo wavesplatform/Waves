@@ -16,7 +16,7 @@ case class AliasBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer
 
   def signedCreate: Route = (path("create") & post) {
     json[SignedCreateAliasV1Request] { aliasReq =>
-      doBroadcast(aliasReq.toTx)
+      broadcastIfSuccess(aliasReq.toTx)
     }
   }
 }

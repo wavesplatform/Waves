@@ -440,7 +440,7 @@ object AsyncHttpApi extends Assertions {
 
     def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       import SignedTransferV2Request.writes
-      Future.sequence(transfers.map(v => signedBroadcast(toJson(v))))
+      Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 
     def createAlias(targetAddress: String, alias: String, fee: Long, version: Byte = 2): Future[Transaction] =
