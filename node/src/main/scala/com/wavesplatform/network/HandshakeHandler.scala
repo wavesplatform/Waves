@@ -36,7 +36,7 @@ class HandshakeTimeoutHandler(handshakeTimeout: => FiniteDuration) extends Chann
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
 
-  override def channelActive(ctx: ChannelHandlerContext): Unit = {
+  override def channelRegistered(ctx: ChannelHandlerContext): Unit = {
     log.trace(s"${id(ctx)} Scheduling handshake timeout, timeout = $handshakeTimeout")
     timeout = Some(
       ctx
