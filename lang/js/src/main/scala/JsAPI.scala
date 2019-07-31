@@ -1,5 +1,5 @@
 import cats.kernel.Monoid
-import com.wavesplatform.lang.Version
+import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.Global
@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
@@ -229,4 +229,14 @@ object JsAPI {
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
+  val repl = Repl()
+
+  @JSExportTopLevel("repl")
+  def repl(expr: String): js.Dynamic = {
+    repl.execute(expr)
+      .fold(
+        e => js.Dynamic.literal("error" -> e),
+        r => js.Dynamic.literal("result" -> r)
+      )
+  }
 }
