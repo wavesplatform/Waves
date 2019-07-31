@@ -40,7 +40,7 @@ object RideFullContext {
   private def directives(v: StdLibVersion): DirectiveSet = {
     val contentType = v match {
       case V1 | V2 => Expression
-      case V3      => DApp
+      case V3 | V4 => DApp
     }
     DirectiveSet(v, Account, contentType).explicitGet()
   }
