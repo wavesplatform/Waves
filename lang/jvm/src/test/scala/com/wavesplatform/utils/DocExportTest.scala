@@ -1,7 +1,6 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import cats.implicits._
@@ -10,8 +9,7 @@ import com.wavesplatform.utils.doc.RideFullContext
 
 class DocExportTest extends PropSpec with PropertyChecks with Matchers {
   property("declared ride funcs and vars have doc for all versions") {
-    DirectiveDictionary[StdLibVersion]
-      .all
+    Set(V1, V2, V3)
       .map(ver => (RideFullContext.build(ver), ver))
       .flatMap { case (ctx, ver) =>
         val vars = ctx.vars.keys

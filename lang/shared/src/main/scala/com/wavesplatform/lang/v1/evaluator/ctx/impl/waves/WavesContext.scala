@@ -420,8 +420,7 @@ object WavesContext {
         100,
         BLOCKHEADER_FROM_BYTES,
         UNION.create(UNIT :: blockHeader :: Nil),
-        "parse block header from bytes",
-        ("blockHeaderBytes", BYTESTR, "block header bytes")
+        ("blockHeaderBytes", BYTESTR)
       ) {
         case CONST_BYTESTR(headerBytes) :: Nil =>
           val maybeHeaderObj =
