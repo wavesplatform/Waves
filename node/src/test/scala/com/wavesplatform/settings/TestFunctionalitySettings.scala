@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.utils.Implicits._
 
 import scala.concurrent.duration._
 

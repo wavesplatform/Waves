@@ -1,5 +1,6 @@
 package com.wavesplatform.utils
 
+import com.wavesplatform.features.BlockchainFeature
 import monix.execution.{Ack, Cancelable}
 import monix.reactive.observers.Subscriber
 import monix.reactive.subjects.Subject
@@ -15,5 +16,9 @@ object Implicits {
       override def onError(ex: Throwable): Unit                             = {}
       override def onComplete(): Unit                                       = {}
     }
+  }
+
+  final implicit class BlockchainFeatureExt(private val f: BlockchainFeature) extends AnyVal {
+    def at(height: Int): (Short, Int) = f.id -> height
   }
 }

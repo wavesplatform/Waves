@@ -2,12 +2,6 @@ package com.wavesplatform.features
 
 final case class BlockchainFeature private (id: Short, description: String)
 
-object BlockchainFeature {
-  implicit class BlockchainFeatureExt(private val f: BlockchainFeature) extends AnyVal {
-    def at(height: Int): (Short, Int) = f.id -> height
-  }
-}
-
 object BlockchainFeatures {
 
   val SmallerMinimalGeneratingBalance = BlockchainFeature(1, "Minimum Generating Balance of 1000 WAVES")

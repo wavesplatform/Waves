@@ -13,6 +13,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.utils.Implicits._
 import org.scalatest.{FreeSpecLike, Matchers}
 
 import scala.concurrent.duration._
