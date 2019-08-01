@@ -11,11 +11,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED, FUNCTION_CALL, TRUE}
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionParser
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.CloseableIterator
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -380,6 +383,47 @@ class TransactionsRouteSpec
           responseAs[JsValue] shouldEqual tx.json()
         }
       }
+    }
+  }
+
+  routePath("/sign") - {
+    "function call without args" in {
+      val blockchain = mock[Blockchain]
+      val acc1 = wallet.generateNewAccount().get
+      val acc2 = wallet.generateNewAccount().get
+      val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+
+      val funcName = "func"
+      val funcWithoutArgs   = Json.obj("function" -> funcName)
+      val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
+      val funcWithArgs = InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(
+        FunctionHeader.User(funcName),
+        List(CONST_LONG(1), CONST_BOOLEAN(true))
+      ))
+
+      def invoke(func: JsObject, expectedArgsLength: Int): Unit = {
+        val ist = Json.obj(
+          "type"       -> InvokeScriptTransaction.typeId,
+          "version"    -> 1,
+          "sender"     -> acc1.address,
+          "dApp"       -> acc2.address,
+          "call"       -> func,
+          "payment"    -> Seq[Payment](),
+          "fee"        -> 500000,
+          "feeAssetId" -> JsNull
+        )
+        Post(routePath("/sign"), ist) ~> ApiKeyHeader ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val jsObject = responseAs[JsObject]
+          (jsObject \ "senderPublicKey").as[String] shouldBe acc1.publicKey.toString
+          (jsObject \ "call" \ "function").as[String] shouldBe funcName
+          (jsObject \ "call" \ "args").as[JsArray].value.length shouldBe expectedArgsLength
+        }
+      }
+
+      invoke(funcWithoutArgs, 0)
+      invoke(funcWithEmptyArgs, 0)
+      invoke(funcWithArgs, 2)
     }
   }
 }
