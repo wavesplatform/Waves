@@ -1,6 +1,12 @@
 package com.wavesplatform.features
 
-case class BlockchainFeature private (id: Short, description: String)
+final case class BlockchainFeature private (id: Short, description: String)
+
+object BlockchainFeature {
+  implicit class BlockchainFeatureExt(private val f: BlockchainFeature) extends AnyVal {
+    def at(height: Int): (Short, Int) = f.id -> height
+  }
+}
 
 object BlockchainFeatures {
 
@@ -17,6 +23,7 @@ object BlockchainFeatures {
   val Ride4DApps                      = BlockchainFeature(11, "RIDE 4 DAPPS")
   val OrderV3                         = BlockchainFeature(12, "Order Version 3")
   val ReduceNFTFee                    = BlockchainFeature(13, "Reduce NFT fee")
+  val Inflation                       = BlockchainFeature(14, "Inflation")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val DummyFeature = BlockchainFeature(-1, "Non Votable!")
@@ -34,7 +41,8 @@ object BlockchainFeatures {
     SmartAssets,
     Ride4DApps,
     OrderV3,
-    ReduceNFTFee
+    ReduceNFTFee,
+    // Inflation
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

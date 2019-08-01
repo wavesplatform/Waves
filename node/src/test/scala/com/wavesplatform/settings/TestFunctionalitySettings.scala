@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.features.BlockchainFeatures
+
 import scala.concurrent.duration._
 
 object TestFunctionalitySettings {
@@ -16,15 +17,17 @@ object TestFunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
     resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
-    preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id -> 0,
-      BlockchainFeatures.SmartAssets.id   -> 0,
-      BlockchainFeatures.FairPoS.id       -> 0,
-      BlockchainFeatures.Ride4DApps.id    -> 0
-    ),
+    preActivatedFeatures = Seq(
+      BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.SmartAssets,
+      BlockchainFeatures.FairPoS,
+      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.Inflation
+    ).map(_ at 0).toMap,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes
+    maxTransactionTimeForwardOffset = 90.minutes,
+    inflationAmount = 100000000L
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

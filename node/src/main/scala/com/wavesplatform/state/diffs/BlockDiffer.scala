@@ -11,9 +11,9 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
 //noinspection VariablePatternShadow
@@ -54,13 +54,14 @@ object BlockDiffer extends ScorexLogging {
 
     for {
       _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
-      r <- apply(
+      r <- createDiff(
         CompositeBlockchain(blockchain, newBlock = Some(block)),
         constraint,
         maybePrevBlock.map(_.timestamp),
         prevBlockFeeDistr,
         currentBlockFeeDistr,
         block.transactionData,
+        fullBlock = true,
         verify
       )
     } yield r
@@ -89,25 +90,27 @@ object BlockDiffer extends ScorexLogging {
           ActivationError(s"MicroBlocks are not yet activated")
         ))
       _ <- TracedResult(micro.signaturesValid())
-      r <- apply(
+      r <- createDiff(
         blockchain,
         constraint,
         prevBlockTimestamp,
         None,
         None,
         micro.transactionData,
+        fullBlock = false,
         verify
       )
     } yield r
   }
 
-  private[this] def apply[Constraint <: MiningConstraint](blockchain: Blockchain,
-                                                          initConstraint: Constraint,
-                                                          prevBlockTimestamp: Option[Long],
-                                                          prevBlockFeeDistr: Option[Portfolio],
-                                                          currentBlockFeeDistr: Option[Portfolio],
-                                                          txs: Seq[Transaction],
-                                                          verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
+  private[this] def createDiff[Constraint <: MiningConstraint](blockchain: Blockchain,
+                                                               initConstraint: Constraint,
+                                                               prevBlockTimestamp: Option[Long],
+                                                               prevBlockFeeDistr: Option[Portfolio],
+                                                               currentBlockFeeDistr: Option[Portfolio],
+                                                               txs: Seq[Transaction],
+                                                               fullBlock: Boolean,
+                                                               verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
       constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
 
@@ -116,8 +119,17 @@ object BlockDiffer extends ScorexLogging {
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
-    val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
+    val initDiff = {
+      val generatorFeePf = currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty
+      val generatorPf =
+        if (fullBlock && blockchain.isFeatureActivated(BlockchainFeatures.Inflation))
+          generatorFeePf |+| Portfolio.build(Asset.Waves, blockchain.settings.functionalitySettings.inflationAmount)
+        else
+          generatorFeePf
+
+      Diff.empty.copy(portfolios = Map(blockGenerator -> generatorPf))
+    }
+
     val hasNg          = currentBlockFeeDistr.isEmpty
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
@@ -141,6 +153,7 @@ object BlockDiffer extends ScorexLogging {
       if (hasSponsorship) ngPf else ngPf.copy(_2 = 0L)
     }
 
+    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc

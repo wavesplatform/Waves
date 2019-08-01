@@ -23,7 +23,8 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  preActivatedFeatures: Map[Short, Int],
                                  doubleFeaturesPeriodsAfterHeight: Int,
                                  maxTransactionTimeBackOffset: FiniteDuration,
-                                 maxTransactionTimeForwardOffset: FiniteDuration) {
+                                 maxTransactionTimeForwardOffset: FiniteDuration,
+                                 inflationAmount: Long) {
   val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
@@ -65,7 +66,8 @@ object FunctionalitySettings {
     preActivatedFeatures = Map.empty,
     doubleFeaturesPeriodsAfterHeight = 810000,
     maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes
+    maxTransactionTimeForwardOffset = 90.minutes,
+    inflationAmount = 1L * Constants.UnitsInWave
   )
 
   val TESTNET = apply(
@@ -83,7 +85,8 @@ object FunctionalitySettings {
     preActivatedFeatures = Map.empty,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes
+    maxTransactionTimeForwardOffset = 90.minutes,
+    inflationAmount = 1L * Constants.UnitsInWave
   )
 
   val configPath = "waves.blockchain.custom.functionality"
