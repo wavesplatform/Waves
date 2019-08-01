@@ -22,7 +22,7 @@ object TestFunctionalitySettings {
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.FairPoS,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.Inflation
+      // BlockchainFeatures.Inflation
     ).map(_ at 0).toMap,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
