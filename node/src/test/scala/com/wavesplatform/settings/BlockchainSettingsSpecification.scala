@@ -9,47 +9,48 @@ import scala.concurrent.duration._
 class BlockchainSettingsSpecification extends FlatSpec with Matchers {
   "BlockchainSettings" should "read custom values" in {
     val config   = loadConfig(ConfigFactory.parseString("""waves {
-        |  directory = "/waves"
-        |  data-directory = "/waves/data"
-        |  blockchain {
-        |    type = CUSTOM
-        |    custom {
-        |      address-scheme-character = "C"
-        |      functionality {
-        |        feature-check-blocks-period = 10000
-        |        blocks-for-feature-activation = 9000
-        |        allow-temporary-negative-until = 1
-        |        generation-balance-depth-from-50-to-1000-after-height = 4
-        |        minimal-generating-balance-after = 5
-        |        allow-transactions-from-future-until = 6
-        |        allow-unissued-assets-until = 7
-        |        allow-invalid-reissue-in-same-block-until-timestamp = 12
-        |        allow-multiple-lease-cancel-transaction-until-timestamp = 14
-        |        reset-effective-balances-at-height = 15
-        |        block-version-3-after-height = 18
-        |        pre-activated-features {
-        |          19 = 100
-        |          20 = 200
-        |        }
-        |        double-features-periods-after-height = 21
-        |        max-transaction-time-back-offset = 55s
-        |        max-transaction-time-forward-offset = 12d
-        |      }
-        |      genesis {
-        |        timestamp = 1460678400000
-        |        block-timestamp = 1460678400000
-        |        signature = "BASE58BLKSGNATURE"
-        |        initial-balance = 100000000000000
-        |        initial-base-target = 153722867
-        |        average-block-delay = 60s
-        |        transactions = [
-        |          {recipient = "BASE58ADDRESS1", amount = 50000000000001},
-        |          {recipient = "BASE58ADDRESS2", amount = 49999999999999}
-        |        ]
-        |      }
-        |    }
-        |  }
-        |}""".stripMargin))
+                                                          |  directory = "/waves"
+                                                          |  data-directory = "/waves/data"
+                                                          |  blockchain {
+                                                          |    type = CUSTOM
+                                                          |    custom {
+                                                          |      address-scheme-character = "C"
+                                                          |      functionality {
+                                                          |        feature-check-blocks-period = 10000
+                                                          |        blocks-for-feature-activation = 9000
+                                                          |        allow-temporary-negative-until = 1
+                                                          |        generation-balance-depth-from-50-to-1000-after-height = 4
+                                                          |        minimal-generating-balance-after = 5
+                                                          |        allow-transactions-from-future-until = 6
+                                                          |        allow-unissued-assets-until = 7
+                                                          |        allow-invalid-reissue-in-same-block-until-timestamp = 12
+                                                          |        allow-multiple-lease-cancel-transaction-until-timestamp = 14
+                                                          |        reset-effective-balances-at-height = 15
+                                                          |        block-version-3-after-height = 18
+                                                          |        pre-activated-features {
+                                                          |          19 = 100
+                                                          |          20 = 200
+                                                          |        }
+                                                          |        double-features-periods-after-height = 21
+                                                          |        max-transaction-time-back-offset = 55s
+                                                          |        max-transaction-time-forward-offset = 12d
+                                                          |        inflation-amount = 100000000
+                                                          |      }
+                                                          |      genesis {
+                                                          |        timestamp = 1460678400000
+                                                          |        block-timestamp = 1460678400000
+                                                          |        signature = "BASE58BLKSGNATURE"
+                                                          |        initial-balance = 100000000000000
+                                                          |        initial-base-target = 153722867
+                                                          |        average-block-delay = 60s
+                                                          |        transactions = [
+                                                          |          {recipient = "BASE58ADDRESS1", amount = 50000000000001},
+                                                          |          {recipient = "BASE58ADDRESS2", amount = 49999999999999}
+                                                          |        ]
+                                                          |      }
+                                                          |    }
+                                                          |  }
+                                                          |}""".stripMargin))
     val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('C')
@@ -68,6 +69,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.doubleFeaturesPeriodsAfterHeight should be(21)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(55.seconds)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(12.days)
+    settings.functionalitySettings.inflationAmount should be(100000000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("BASE58BLKSGNATURE").toOption)
@@ -100,6 +102,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.blockVersion3AfterHeight should be(161700)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
+    settings.functionalitySettings.inflationAmount should be(100000000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1478000000000L)
     settings.genesisSettings.signature should be(
@@ -137,6 +140,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
+    settings.functionalitySettings.inflationAmount should be(100000000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)
     settings.genesisSettings.signature should be(
