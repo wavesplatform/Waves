@@ -2,15 +2,14 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 
 @Sharable
 final class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
-  private[this] implicit val scheduler = Scheduler.fixedPool("message-observer", 2)
+  private[this] implicit val scheduler = Schedulers.fixedPool(2, "message-observer")
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit =
     subjects.processMessage(ctx.channel()).applyOrElse(msg, super.channelRead(ctx, _))
