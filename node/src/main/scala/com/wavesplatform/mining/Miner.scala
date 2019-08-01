@@ -234,10 +234,9 @@ class MinerImpl(allChannels: ChannelGroup,
               }.asRight
             }
           case Retry =>
-            Task.delay {
-              log.trace(s"Skipping microBlock because utx is empty")
-              state.asLeft
-            }
+            state
+              .asLeft
+              .pure[Task]
 
           case Delay(d) =>
             Task.delay {
@@ -248,7 +247,7 @@ class MinerImpl(allChannels: ChannelGroup,
           case Error(e) =>
             Task {
               debugState = MinerDebugInfo.Error(e.toString)
-              log.warn("Error mining MicroBlock: " + e.toString)
+              log.warn(s"Error mining MicroBlock for account: ${account.address}: " + e.toString)
               ().asRight
             }
 
@@ -267,8 +266,7 @@ class MinerImpl(allChannels: ChannelGroup,
   private def generateMicroBlockTask(account: KeyPair,
                                      accumulatedBlock: Block,
                                      constraints: MiningConstraints,
-                                     restTotalConstraint: MiningConstraint): MiningResult = {
-    log.trace(s"Generating microBlock for $account, constraints: $restTotalConstraint")
+                                     restTotalConstraint: MiningConstraint): MicroblockMiningResult = {
     val pc = allChannels.size()
 
     if (pc < minerSettings.quorum) Delay(settings.minerSettings.noQuorumMiningDelay)
@@ -281,7 +279,7 @@ class MinerImpl(allChannels: ChannelGroup,
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
 
         forgeMicroBlock(account, accumulatedBlock, unconfirmed)
-          .fold[MiningResult](
+          .fold[MicroblockMiningResult](
             err => Error(err),
             blocks => Success(blocks._2, blocks._1, updatedTotalConstraint)
           )
@@ -429,11 +427,11 @@ object Miner {
     override val state                                                                          = MinerDebugInfo.Disabled
   }
 
-  sealed trait MiningResult
-  case object Stop                                                                                        extends MiningResult
-  case object Retry                                                                                       extends MiningResult
-  final case class Delay(d: FiniteDuration)                                                               extends MiningResult
-  final case class Error(e: ValidationError)                                                              extends MiningResult
-  final case class Success(accumulated: Block, microBlock: MicroBlock, totalConstraint: MiningConstraint) extends MiningResult
+  sealed trait MicroblockMiningResult
+  case object Stop                                                                                        extends MicroblockMiningResult
+  case object Retry                                                                                       extends MicroblockMiningResult
+  final case class Delay(d: FiniteDuration)                                                               extends MicroblockMiningResult
+  final case class Error(e: ValidationError)                                                              extends MicroblockMiningResult
+  final case class Success(accumulated: Block, microBlock: MicroBlock, totalConstraint: MiningConstraint) extends MicroblockMiningResult
 
 }
