@@ -166,26 +166,15 @@ class MinerImpl(allChannels: ChannelGroup,
   private def appendMicroBlock(microblock: MicroBlock): Task[ValidationError Either Unit] =
     MicroblockAppender(blockchainUpdater, utx, appenderScheduler, verify = false)(microblock)
 
-  private def appendMicroBlockLoop(blockVar: MVar[Option[MicroBlock]]): Task[Unit] = {
+  private def broadcastMicroblockLoop(miner: KeyPair, blockVar: MVar[Option[MicroBlock]]): Task[Unit] = {
     Task.tailRecM(blockVar) { bv =>
       bv.take
         .flatMap {
           case None => ().asRight.pure[Task]
           case Some(microBlock) =>
-            appendMicroBlock(microBlock)
-              .flatMap {
-                case Left(err) =>
-                  Task.delay {
-                    debugState = MinerDebugInfo.Error(err.toString)
-                    log.warn("Error mining MicroBlock: " + err.toString)
-
-                    ().asRight
-                  }
-                case _ =>
-                  bv.asLeft
-                    .pure[Task]
-                    .delayExecution(settings.minerSettings.microBlockInterval)
-              }
+            Task.delay {
+              allChannels.broadcast(MicroBlockInv(miner, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
+            } as Right({})
         }
     }
   }
@@ -200,7 +189,7 @@ class MinerImpl(allChannels: ChannelGroup,
     for {
       blockVar <- MVar.empty[Option[MicroBlock]]
       generateTask = generateMicroBlockLoop(blockVar, account, accumulatedBlock, constraints, restTotalConstraint)
-      appendTask   = appendMicroBlockLoop(blockVar)
+      appendTask   = broadcastMicroblockLoop(account, blockVar)
       raceResult <- Task.racePair(generateTask, appendTask)
       _ <- raceResult match {
         case Left((_, appendFiber)) =>
@@ -223,8 +212,7 @@ class MinerImpl(allChannels: ChannelGroup,
     val initialMiningState = MicroBlockMiningState(accumulatedBlock, restTotalConstraint)
 
     Task.tailRecM(initialMiningState) { state =>
-      Task
-        .delay(generateMicroBlockTask(account, state.accumulatedBlock, constraints, state.restTotalConstraint))
+      generateMicroBlockTask(account, state.accumulatedBlock, constraints, state.restTotalConstraint)
         .flatMap {
           case Stop =>
             Task.delay {
@@ -234,8 +222,7 @@ class MinerImpl(allChannels: ChannelGroup,
               }.asRight
             }
           case Retry =>
-            state
-              .asLeft
+            state.asLeft
               .pure[Task]
 
           case Delay(d) =>
@@ -266,20 +253,24 @@ class MinerImpl(allChannels: ChannelGroup,
   private def generateMicroBlockTask(account: KeyPair,
                                      accumulatedBlock: Block,
                                      constraints: MiningConstraints,
-                                     restTotalConstraint: MiningConstraint): MicroblockMiningResult = {
+                                     restTotalConstraint: MiningConstraint): Task[MicroblockMiningResult] = {
     val pc = allChannels.size()
 
-    if (pc < minerSettings.quorum) Delay(settings.minerSettings.noQuorumMiningDelay)
-    else if (utx.size == 0) Retry
+    if (pc < minerSettings.quorum) Delay(settings.minerSettings.noQuorumMiningDelay).pure[Task]
+    else if (utx.size == 0) Retry.pure[Task]
     else {
       val (unconfirmed, updatedTotalConstraint) = packTransactionsForMicroBlock(restTotalConstraint, constraints)
 
-      if (unconfirmed.isEmpty) Stop
+      if (unconfirmed.isEmpty) Stop.pure[Task]
       else {
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
 
-        forgeMicroBlock(account, accumulatedBlock, unconfirmed)
-          .fold[MicroblockMiningResult](
+        EitherT(Task.delay(forgeMicroBlock(account, accumulatedBlock, unconfirmed)))
+          .flatTap {
+            case (mb, _) =>
+              EitherT(appendMicroBlock(mb))
+          }
+          .fold(
             err => Error(err),
             blocks => Success(blocks._2, blocks._1, updatedTotalConstraint)
           )
