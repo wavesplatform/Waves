@@ -239,7 +239,7 @@ object NetworkServer extends ScorexLogging {
               .addField("n", all.size)
           )
 
-          scheduleConnectTask()
+          if (!shutdownInitiated) scheduleConnectTask()
         }
       }
     }
