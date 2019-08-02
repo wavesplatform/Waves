@@ -11,6 +11,8 @@ object FunctionHeader {
         case User(`internalName`, _) => true
         case _                       => false
       }
+
+    override def toString: String = s"User($internalName)"
   }
   object User {
     def apply(internalName: String): User = User(internalName, internalName)

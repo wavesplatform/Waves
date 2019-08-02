@@ -148,11 +148,14 @@ object CommonValidation {
           case Some(sc) => scriptActivation(sc)
         }
 
-      case it: SetAssetScriptTransaction =>
-        it.script match {
-          case None     => Left(GenericError("Cannot set empty script"))
-          case Some(sc) => scriptActivation(sc)
+      case sast: SetAssetScriptTransaction =>
+        activationBarrier(BlockchainFeatures.SmartAssets).flatMap { _ =>
+          sast.script match {
+            case None     => Left(GenericError("Cannot set empty script"))
+            case Some(sc) => scriptActivation(sc)
+          }
         }
+
 
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
