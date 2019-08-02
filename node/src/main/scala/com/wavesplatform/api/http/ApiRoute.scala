@@ -12,12 +12,18 @@ import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, depre
 import com.wavesplatform.lang.ValidationError.ValidationErrorException
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json.{JsResultException, Reads}
 
-trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
-  val route: Route
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+
+trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers with ScorexLogging {
+  protected val route: Route
 
   protected def apiKeyHash: Option[Array[Byte]]
+
+  def getRoute: Route = handleAnyExceptions(uncaughtExceptionHandler)(route)
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()
@@ -37,6 +43,19 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
     case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
   }
+
+  private val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
+    case e: StackOverflowError => log.error("Stack overflow error", e); complete(ApiError.Unknown)
+    case NonFatal(e)           => log.error("Uncaught error", e); complete(ApiError.Unknown)
+  }
+
+  private def handleAnyExceptions(handler: ExceptionHandler): Directive0 =
+    Directive { inner => ctx =>
+      try inner(())(ctx)
+      catch {
+        case thr: Throwable => handler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
+      }
+    }
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[api_key](()).flatMap {
