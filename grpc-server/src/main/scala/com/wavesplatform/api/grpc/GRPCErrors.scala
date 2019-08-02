@@ -27,4 +27,7 @@ object GRPCErrors {
     metadata.put(ErrorCodeKey, api.id)
     code.withDescription(api.message).asException(metadata)
   }
+
+  def toStatusException(exc: Throwable): StatusException =
+    new StatusException(Status.fromThrowable(exc).withDescription(exc.getMessage))
 }
