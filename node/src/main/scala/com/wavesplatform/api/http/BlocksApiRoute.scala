@@ -9,15 +9,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.execution.Scheduler
 import play.api.libs.json._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler)
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
     extends ApiRoute
     with WithSettings {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
@@ -36,23 +34,26 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     ))
-  def address: Route = (path("address" / Segment / IntNumber / IntNumber) & get) {
-    case (address, start, end) =>
-      if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-        val result = for {
-          address <- Address.fromString(address)
-          jsonBlocks = commonApi.blockHeadersRange(start, end).filter(_._1.signerData.generator.toAddress == address).map {
+  def address: Route =
+    extractScheduler(implicit sc =>
+      (path("address" / Segment / IntNumber / IntNumber) & get) {
+        case (address, start, end) =>
+          if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+            val result = for {
+              address <- Address.fromString(address)
+              jsonBlocks = commonApi.blockHeadersRange(start, end).filter(_._1.signerData.generator.toAddress == address)
+              .map {
             case (_, _, h) =>
               blockchain.blockAt(h).get.json().addBlockFields(h)
           }
-          result = jsonBlocks.toListL.map(JsArray(_))
-        } yield result.runAsync
+              result    = jsonBlocks.toListL.map(JsArray(_))
+            } yield result.runToFuture
 
-        complete(result)
-      } else {
-        complete(TooBigArrayAllocation)
-      }
-  }
+            complete(result)
+          } else {
+            complete(TooBigArrayAllocation)
+          }
+    })
 
   @Path("/child/{signature}")
   @ApiOperation(value = "Child block", notes = "Get successor of specified block", httpMethod = "GET")
@@ -173,7 +174,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     seq(start, end, includeTransactions = false)
   }
 
-  private def seq(start: Int, end: Int, includeTransactions: Boolean): StandardRoute = {
+  private def seq(start: Int, end: Int, includeTransactions: Boolean): Route = {
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
       val blocks = if (includeTransactions) {
         commonApi
@@ -185,7 +186,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
           .map { case (bh, size, height) => BlockHeader.json(bh, size).addBlockFields(height) }
       }
 
-      complete(blocks.toListL.map(JsArray(_)).runAsync)
+      extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
     } else {
       complete(TooBigArrayAllocation)
     }

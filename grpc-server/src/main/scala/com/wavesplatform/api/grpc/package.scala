@@ -4,6 +4,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
+import io.grpc.{Status, StatusException}
+import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
@@ -98,8 +100,8 @@ package object grpc extends PBImplicitConversions {
 
         case _ => // No back-pressure
           obs
-            .doOnError(exception => streamObserver.onError(GRPCErrors.toStatusException(exception)))
-            .doOnComplete(() => streamObserver.onCompleted())
+            .doOnError(exception => Task(streamObserver.onError(GRPCErrors.toStatusException(exception))))
+            .doOnComplete(Task(streamObserver.onCompleted()))
             .foreach(value => streamObserver.onNext(value))
       }
     }

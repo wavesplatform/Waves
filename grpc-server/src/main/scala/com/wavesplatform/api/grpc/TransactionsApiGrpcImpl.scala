@@ -2,6 +2,7 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
@@ -19,10 +20,11 @@ import scala.util.Try
 class TransactionsApiGrpcImpl(wallet: Wallet,
                               blockchain: Blockchain,
                               utx: UtxPool,
-                              broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
+                              utxPoolSynchronizer: UtxPoolSynchronizer,
+                              forceBroadcast: Boolean)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, _) => broadcast(tx))
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi
@@ -79,11 +81,11 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString)
   }
 
-  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future.either {
+  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
     commonApi
-      .broadcastTransaction(tx.toVanilla)
-      .map(_.toPB)
-      .resultE
+      .broadcastTransaction(tx.toVanilla, forceBroadcast)
+      .flatMap(v => Future.either(v.resultE))
+      .map(_ => tx)
   }
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {

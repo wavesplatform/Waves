@@ -6,7 +6,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.protobuf.transaction.VanillaTransaction
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.execution.Scheduler
@@ -26,15 +25,18 @@ import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(implicit sc: Scheduler)
+case class TransactionsApiRoute(settings: RestAPISettings,
+                                wallet: Wallet,
+                                blockchain: Blockchain,
+                                utx: UtxPool,
+                                utxPoolSynchronizer: UtxPoolSynchronizer,
+                                time: Time)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions
     with WithSettings {
 
-  import com.wavesplatform.network._
-
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, isNew) => if (isNew || settings.allowTxRebroadcasting) allChannels.broadcastTx(tx, None))
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -57,7 +59,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
     ))
   def addressLimit: Route = {
     (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
-      complete(transactionsByAddress(address, limit, maybeAfter))
+      extractScheduler(implicit sc => complete(transactionsByAddress(address, limit, maybeAfter)))
     }
   }
 
@@ -203,16 +205,19 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
       )
     ))
   def broadcast: Route =
-    (pathPrefix("broadcast") & post) {
+    (pathPrefix("broadcast") & post)(extractExecutionContext { implicit ec =>
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
-        val result: TracedResult[ApiError, VanillaTransaction] =
-          TracedResult(TransactionFactory.fromSignedRequest(transactionJson))
-            .flatMap(commonApi.broadcastTransaction)
-            .leftMap(ApiError.fromValidationError)
-
-        complete(result)
+        complete {
+          TracedResult
+            .foldFuture(
+              TransactionFactory
+                .fromSignedRequest(transactionJson)
+                .map(tx => commonApi.broadcastTransaction(tx, settings.allowTxRebroadcasting).map(_.map(_ => tx)))
+            )
+            .map(_.leftMap(ApiError.fromValidationError))
+        }
       }
-    }
+    })
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -228,7 +233,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(implicit sc: Scheduler): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
       lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 
@@ -249,7 +254,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
         .take(limit)
         .toListL
         .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
-        .runAsync
+        .runToFuture
     }
 
     for {
