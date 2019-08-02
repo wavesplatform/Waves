@@ -5,41 +5,32 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{RequestGen, TestTime}
-import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
-import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Writes
 
+import scala.concurrent.Future
+
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually with RestAPISettingsHelper {
 
-  private val wallet      = stub[Wallet]
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
-  private val state       = stub[Blockchain]
+  private val wallet = stub[Wallet]
+  private val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  private val state = stub[Blockchain]
 
   private val seed               = "seed".getBytes("UTF-8")
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
-
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((_: Transaction, _: Boolean) => TracedResult(Right(true)))
-    .anyNumberOfTimes()
-
-  (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   "/transfer" - {
-    val route: Route = AssetsApiRoute(restAPISettings, wallet, utx, allChannels, state, new TestTime())(Scheduler(executor)).route
+    val route: Route = AssetsApiRoute(restAPISettings, wallet, utxPoolSynchronizer, state, new TestTime()).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 

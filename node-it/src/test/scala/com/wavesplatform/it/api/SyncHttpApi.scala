@@ -448,14 +448,17 @@ object SyncHttpApi extends Assertions {
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
+    private[this] def withTxIdMessage[T](transactionId: String)(f: => T): T =
+      try f catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
+
     def height(implicit pos: Position): Seq[Int] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
-      sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+      withTxIdMessage(transactionId)(sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime))
 
     def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
-      sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime)
+      withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)

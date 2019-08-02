@@ -149,8 +149,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
           |{"x":"String","y":"Boolean","z":"ByteVector","w":"Int"},
           |{}
           |]}
-          |"""
-          .stripMargin
+          |""".stripMargin
           .replace("\n", "")
     }
   }

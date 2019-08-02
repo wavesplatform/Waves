@@ -6,13 +6,20 @@ import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}
 
-case class TracedResult[+E, +A](
-   resultE: Either[E, A],
-   trace:   List[TraceStep] = Nil
-) {
+import scala.concurrent.{ExecutionContext, Future}
+
+final case class TracedResult[+E, +A](
+                                       resultE: Either[E, A],
+                                       trace: List[TraceStep] = Nil
+                                     ) {
+  def transformE[B, E1](f: Either[E, A] => TracedResult[E1, B]): TracedResult[E1, B] = {
+    val newResultE = f(resultE)
+    newResultE.copy(trace = this.trace ::: newResultE.trace)
+  }
+
   def flatMap[B, E1 >: E](f: A => TracedResult[E1, B]): TracedResult[E1, B] = {
     resultE match {
-      case Left(_)      => this.asInstanceOf[TracedResult[E1, B]]
+      case Left(_) => this.asInstanceOf[TracedResult[E1, B]]
       case Right(value) =>
         val newResult = f(value)
         newResult.copy(trace = this.trace ::: newResult.trace)
@@ -23,7 +30,7 @@ case class TracedResult[+E, +A](
 
   def leftMap[E1](f: E => E1): TracedResult[E1, A] = copy(resultE.leftMap(f))
 
-  def json(implicit ev1: E <:< ApiError, ev2: A <:< Transaction): JsObject = {
+  def json(implicit ev1: E => ApiError, ev2: A => Transaction): JsObject = {
     val resultJson = resultE match {
       case Right(value) => value.json()
       case Left(e)      => e.json
@@ -34,11 +41,18 @@ case class TracedResult[+E, +A](
 
 object TracedResult {
   implicit def wrapE[A, E](e: Either[E, A]): TracedResult[E, A] = TracedResult(e)
+
   implicit def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
 
-  implicit def tracedResultSemigroup[A : Semigroup, E]: Semigroup[TracedResult[E, A]] = (a, b) =>
-    TracedResult(
-      a.resultE |+| b.resultE,
-      a.trace   |+| b.trace
-  )
+  implicit def tracedResultSemigroup[A: Semigroup, E]: Semigroup[TracedResult[E, A]] =
+    (a, b) =>
+      TracedResult(
+        a.resultE |+| b.resultE,
+        a.trace |+| b.trace
+      )
+
+  def foldFuture[LeftT, RightT](value: TracedResult[LeftT, Future[TracedResult[LeftT, RightT]]])(implicit ec: ExecutionContext): Future[TracedResult[LeftT, RightT]] = value.resultE match {
+    case Left(_) => Future.successful(value.map(_.asInstanceOf[RightT]))
+    case Right(r) => r.map(r => r.copy(trace = value.trace ::: r.trace))
+  }
 }
