@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
 import java.nio.channels.ClosedChannelException
-import java.util.concurrent.{ConcurrentHashMap, ScheduledFuture}
+import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
@@ -206,41 +206,37 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
-    @volatile var connectTask: Option[ScheduledFuture[_]] = None
-
     def scheduleConnectTask(): Unit = {
+      if (shutdownInitiated) return
+
       val delay = if (peerConnections.isEmpty) greedyHandshakeDelay else defaultHandshakeDelay
       log.trace(s"Scheduling handshake, delay = $delay")
 
-      connectTask = Some {
-        workerGroup.schedule(delay) {
-          import scala.collection.JavaConverters._
-          val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+      workerGroup.schedule(delay) {
+        import scala.collection.JavaConverters._
+        val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
-          def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
+        def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
-          val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-          val incoming = all.filterNot(outgoing.contains)
+        val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+        val incoming = all.filterNot(outgoing.contains)
 
-          def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
+        def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
-          log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-          if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
-            peerDatabase
-              .randomPeer(excluded = excludedAddresses ++ all)
-              .foreach(doConnect)
-          }
-
-          Metrics.write(
-            Point
-              .measurement("connections")
-              .addField("outgoing", outgoingStr)
-              .addField("incoming", incomingStr)
-              .addField("n", all.size)
-          )
-
-          if (!shutdownInitiated) scheduleConnectTask()
+        log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+        if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
+          peerDatabase
+            .randomPeer(excluded = excludedAddresses ++ all)
+            .foreach(doConnect)
         }
+
+        Metrics.write(
+          Point
+            .measurement("connections")
+            .addField("outgoing", outgoingStr)
+            .addField("incoming", incomingStr)
+            .addField("n", all.size)
+        )
       }
     }
 
@@ -249,7 +245,6 @@ object NetworkServer extends ScorexLogging {
     def doShutdown(): Unit =
       try {
         shutdownInitiated = true
-        connectTask.foreach(_.cancel(false))
         serverChannel.foreach(_.close().await())
         log.debug("Unbound server")
         allChannels.close().await()

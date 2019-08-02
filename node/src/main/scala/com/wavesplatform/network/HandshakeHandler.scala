@@ -103,7 +103,7 @@ abstract class HandshakeHandler(localHandshake: Handshake,
 
               ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
               Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
-                log.info(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
+                log.trace(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
               }
               ctx.channel().closeFuture().addListener { f: ChannelFuture =>
                 peerConnections.remove(key, f.channel())
