@@ -206,9 +206,7 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
-    def scheduleConnectTask(): Unit = {
-      if (shutdownInitiated) return
-
+    def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
       val delay = if (peerConnections.isEmpty) greedyHandshakeDelay else defaultHandshakeDelay
       log.trace(s"Scheduling handshake, delay = $delay")
 
