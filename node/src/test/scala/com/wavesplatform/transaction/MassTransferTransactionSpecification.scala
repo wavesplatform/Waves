@@ -19,7 +19,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       require(tx.bytes().head == MassTransferTransaction.typeId)
       val recovered = MassTransferTransaction.parseBytes(tx.bytes()).get
 
-      recovered.sender.address shouldEqual tx.sender.address
+      recovered.sender.addressString shouldEqual tx.sender.addressString
       recovered.assetId shouldBe tx.assetId
       recovered.timestamp shouldEqual tx.timestamp
       recovered.fee shouldEqual tx.fee

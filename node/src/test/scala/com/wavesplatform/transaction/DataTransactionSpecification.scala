@@ -19,7 +19,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   private def checkSerialization(tx: DataTransaction): Assertion = {
     val parsed = DataTransaction.parseBytes(tx.bytes()).get
 
-    parsed.sender.address shouldEqual tx.sender.address
+    parsed.sender.addressString shouldEqual tx.sender.addressString
     parsed.timestamp shouldEqual tx.timestamp
     parsed.fee shouldEqual tx.fee
 

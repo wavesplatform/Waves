@@ -36,7 +36,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   }
 
   private def assertTxs(first: TransferTransactionV2, second: TransferTransactionV2): Unit = {
-    first.sender.address shouldEqual second.sender.address
+    first.sender.addressString shouldEqual second.sender.addressString
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.amount shouldEqual second.amount

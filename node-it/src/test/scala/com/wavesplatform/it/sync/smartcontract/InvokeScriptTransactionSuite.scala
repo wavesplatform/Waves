@@ -22,7 +22,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender
       .transfer(
         sender.address,
-        recipient = contract.address,
+        recipient = contract.addressString,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -35,7 +35,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender
       .transfer(
         sender.address,
-        recipient = contract.address,
+        recipient = contract.addressString,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -68,9 +68,9 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptText).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId = sender.setScript(contract.addressString, Some(script), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(contract.address)
+    val acc0ScriptInfo = sender.addressScriptInfo(contract.addressString)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
@@ -83,8 +83,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     val arg               = ByteStr(Array(42: Byte))
 
     val _ = sender.invokeScript(
-      caller.address,
-      contract.address,
+      caller.addressString,
+      contract.addressString,
       func = Some("foo"),
       args = List(CONST_BYTESTR(arg).explicitGet()),
       payment = Seq(),
@@ -92,23 +92,23 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       waitForTx = true
     )
 
-    sender.getDataByKey(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
-    sender.getDataByKey(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+    sender.getDataByKey(contract.addressString, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getDataByKey(contract.addressString, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
   }
 
   test("contract caller invokes a default function on a contract") {
 
 
     val _ = sender.invokeScript(
-      caller.address,
-      contract.address,
+      caller.addressString,
+      contract.addressString,
       func = None,
       payment = Seq(),
       fee = 1.waves,
       waitForTx = true
     )
-    sender.getDataByKey(contract.address, "a") shouldBe StringDataEntry("a", "b")
-    sender.getDataByKey(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
+    sender.getDataByKey(contract.addressString, "a") shouldBe StringDataEntry("a", "b")
+    sender.getDataByKey(contract.addressString, "sender") shouldBe StringDataEntry("sender", "senderId")
   }
 
   test("verifier works") {
@@ -130,6 +130,6 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-    sender.getDataByKey(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
+    sender.getDataByKey(contract.addressString, "a") shouldBe StringDataEntry("a", "OOO")
   }
 }

@@ -14,7 +14,7 @@ object TestHelpers {
     val totalAmount = balances.values.sum
     val transactions = balances.map {
       case (account, amount) =>
-        GenesisTransactionSettings(account.address, amount)
+        GenesisTransactionSettings(account.addressString, amount)
     }.toSeq
 
     GenesisSettings(blockTimestamp, blockTimestamp, totalAmount, None, transactions, 1000, 60.seconds)

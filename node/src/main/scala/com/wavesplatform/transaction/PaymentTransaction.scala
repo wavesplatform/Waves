@@ -22,7 +22,7 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
   override val builder: TransactionParser = PaymentTransaction
   override val assetFee: (Asset, Long)    = (Waves, fee)
   override val id: Coeval[ByteStr]        = Coeval.evalOnce(signature)
-  override val json: Coeval[JsObject]     = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.addressString, "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Array(builder.typeId), Longs.toByteArray(timestamp), sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee)))

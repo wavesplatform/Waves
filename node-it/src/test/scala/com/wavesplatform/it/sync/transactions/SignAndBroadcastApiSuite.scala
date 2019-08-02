@@ -321,7 +321,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
     val signedRequest     = signedRequestJson.as[SignedTransferV1Request]
-    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().address == firstAddress)
+    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().addressString == firstAddress)
     assert(signedRequest.recipient == secondAddress)
     assert(signedRequest.fee == minFee)
     assert(signedRequest.amount == transferAmount)

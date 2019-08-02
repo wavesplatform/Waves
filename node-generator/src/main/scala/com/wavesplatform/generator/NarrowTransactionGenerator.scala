@@ -139,7 +139,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
           case ReissueTransactionV2 =>
             val reissuable = random.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
-              val sender = accounts.find(_.address == assetTx.sender.address).get
+              val sender = accounts.find(_.addressString == assetTx.sender.addressString).get
               logOption(
                 ReissueTransactionV2.selfSigned(AddressScheme.current.chainId,
                                                 sender,
@@ -151,7 +151,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             })
           case BurnTransactionV2 =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
-              val sender = accounts.find(_.address == assetTx.sender.address).get
+              val sender = accounts.find(_.addressString == assetTx.sender.addressString).get
               logOption(
                 BurnTransactionV2.selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(assetTx.id()), Random.nextInt(1000), 900000L, ts))
             })
@@ -181,7 +181,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             recipientOpt.flatMap(recipient => logOption(LeaseTransactionV2.selfSigned(sender, 1, moreThanStandardFee * 3, ts, recipient)))
           case LeaseCancelTransactionV2 =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
-              val sender = accounts.find(_.address == lease.sender.address).get
+              val sender = accounts.find(_.addressString == lease.sender.addressString).get
               logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThanStandardFee * 3, ts))
             })
           case CreateAliasTransactionV2 =>
@@ -238,7 +238,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             logOption(DataTransaction.selfSigned(sender, data.toList, fee, ts))
           case SponsorFeeTransaction =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
-              val sender = accounts.find(_.address == assetTx.sender.address).get
+              val sender = accounts.find(_.addressString == assetTx.sender.addressString).get
               logOption(SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, ts))
             })
 

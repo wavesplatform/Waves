@@ -47,8 +47,8 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
                     |
                     | match tx {
                     |   case ttx: TransferTransaction =>
-                    |      let king = Address(base58'${king.address}')
-                    |      let company = Address(base58'${company.address}')
+                    |      let king = Address(base58'${king.addressString}')
+                    |      let company = Address(base58'${company.addressString}')
                     |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
                     |      let txIdBase58String = toBase58String(ttx.id)
                     |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {

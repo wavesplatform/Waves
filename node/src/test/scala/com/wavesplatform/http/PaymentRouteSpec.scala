@@ -50,7 +50,7 @@ class PaymentRouteSpec
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 
-        val req = Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
+        val req = Json.obj("sender" -> sender.addressString, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
 
         Post(routePath(""), req) ~> route should produce(ApiKeyNotValid)
         Post(routePath(""), req) ~> ApiKeyHeader ~> route ~> check {
@@ -63,7 +63,7 @@ class PaymentRouteSpec
           (resp \ "fee").as[Int] shouldEqual fee
           (resp \ "amount").as[Long] shouldEqual amount
           (resp \ "timestamp").as[Long] shouldEqual tx.explicitGet().timestamp
-          (resp \ "sender").as[String] shouldEqual sender.address
+          (resp \ "sender").as[String] shouldEqual sender.addressString
           (resp \ "recipient").as[String] shouldEqual recipient.stringRepr
         }
     }

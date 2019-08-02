@@ -19,7 +19,7 @@ case class AccountVerifierTrace(
 ) extends TraceStep {
 
   override lazy val json: JsObject = Json.obj(
-    "address" -> address.address,
+    "address" -> address.addressString,
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")

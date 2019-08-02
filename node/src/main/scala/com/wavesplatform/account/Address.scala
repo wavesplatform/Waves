@@ -13,8 +13,8 @@ import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
-  lazy val address: String    = bytes.base58
-  lazy val stringRepr: String = address
+  lazy val addressString: String = bytes.base58
+  lazy val stringRepr: String    = addressString
 }
 
 //noinspection ScalaDeprecation

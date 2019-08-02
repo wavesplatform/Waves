@@ -28,7 +28,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     forAll(smartIssueTransactionGen()) { tx: IssueTransactionV2 =>
       val recovered = IssueTransactionV2.parseBytes(tx.bytes()).get
 
-      tx.sender.address shouldEqual recovered.sender.address
+      tx.sender.addressString shouldEqual recovered.sender.addressString
       tx.timestamp shouldEqual recovered.timestamp
       tx.decimals shouldEqual recovered.decimals
       tx.description shouldEqual recovered.description

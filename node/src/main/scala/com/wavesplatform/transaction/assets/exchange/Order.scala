@@ -113,7 +113,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     Json.obj(
       "version"          -> version,
       "id"               -> idStr(),
-      "sender"           -> senderPublicKey.address,
+      "sender"           -> senderPublicKey.addressString,
       "senderPublicKey"  -> Base58.encode(senderPublicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey),
       "assetPair"        -> assetPair.json,

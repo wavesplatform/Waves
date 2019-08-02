@@ -212,7 +212,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   property("data constructors") {
     forAll(transferV2Gen, longEntryGen(dataAsciiKeyGen)) { (t, entry) =>
       val compareClause = t.recipient match {
-        case addr: Address => s"tx.recipient == Address(base58'${addr.address}')"
+        case addr: Address => s"tx.recipient == Address(base58'${addr.addressString}')"
         case alias: Alias  => s"""tx.recipient == Alias("${alias.name}")"""
       }
       val transferResult = runScript(

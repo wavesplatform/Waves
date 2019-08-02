@@ -19,10 +19,10 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
   private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.address)
+    val (balance1, eff1) = miner.accountBalances(acc0.addressString)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee, waitForTx = true).id
+    sender.transfer(sender.address, acc0.addressString, 10 * transferAmount, minFee, waitForTx = true).id
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
@@ -39,7 +39,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-    sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(acc0.addressString, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
       LeaseTransactionV2

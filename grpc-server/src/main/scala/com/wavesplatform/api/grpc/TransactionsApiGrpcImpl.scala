@@ -70,13 +70,13 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
   override def sign(request: SignRequest): Future[PBSignedTransaction] = {
     def signTransactionWith(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBSignedTransaction] =
       for {
-        sender <- wallet.findPrivateKey(tx.sender.toString)
-        signer <- if (tx.sender.toString == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+        sender <- wallet.findPrivateKey(tx.sender.addressString)
+        signer <- if (tx.sender.addressString == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
         tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
       } yield tx
 
     val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKey
-    signTransactionWith(request.getTransaction, wallet, signerAddress.toString).toFuture
+    signTransactionWith(request.getTransaction, wallet, signerAddress.addressString).toFuture
   }
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {

@@ -21,7 +21,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         tx.amount shouldEqual amount
         tx.fee shouldEqual fee
         tx.sender shouldEqual sender.publicKey
-        tx.recipient.stringRepr shouldEqual recipient.address
+        tx.recipient.stringRepr shouldEqual recipient.addressString
     }
   }
 

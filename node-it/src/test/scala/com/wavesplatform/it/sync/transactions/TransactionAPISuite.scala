@@ -69,7 +69,7 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
 
       val received =
         sender
-          .transactionsByAddress(recipient.address, limit)
+          .transactionsByAddress(recipient.addressString, limit)
           .map(_.id)
 
       expected shouldEqual received
@@ -96,7 +96,7 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
 
       val received =
         sender
-          .transactionsByAddress(recipient.address, limit, afterParam)
+          .transactionsByAddress(recipient.addressString, limit, afterParam)
           .map(_.id)
 
       expected shouldEqual received
@@ -110,7 +110,7 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
   "should return all transactions" in {
     def checkForLimit(limit: Int): Unit = {
       val received =
-        loadAll(sender, recipient.address, limit, None, Nil)
+        loadAll(sender, recipient.addressString, limit, None, Nil)
           .map(_.id)
 
       received shouldEqual transactionIds

@@ -21,11 +21,11 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     val addresses     = nodes.map(_.privateKey.toAddress).filter(_ != issuer.toAddress).toList
     val initialHeight = node.height
 
-    val issueTx = node.issue(issuer.address, "TestCoin", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val issueTx = node.issue(issuer.addressString, "TestCoin", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 
     node.massTransfer(
-      issuer.address,
-      addresses.map(addr => MassTransferTransaction.Transfer(addr.address, transferAmount)),
+      issuer.addressString,
+      addresses.map(addr => MassTransferTransaction.Transfer(addr.addressString, transferAmount)),
       minFee + (minFee * addresses.size),
       Some(issueTx),
       waitForTx = true
@@ -71,12 +71,12 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   test("'Asset distribution' works properly") {
     val receivers = for (i <- 0 until 10) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
-    val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val issueTx = node.issue(issuer.addressString, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 
     node
       .massTransfer(
-        issuer.address,
-        receivers.map(rc => MassTransferTransaction.Transfer(rc.address, 10)).toList,
+        issuer.addressString,
+        receivers.map(rc => MassTransferTransaction.Transfer(rc.addressString, 10)).toList,
         minFee + minFee * receivers.length,
         Some(issueTx),
         waitForTx = true
@@ -95,12 +95,12 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   test("Correct last page and entry count") {
     val receivers = for (i <- 0 until 50) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
-    val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val issueTx = node.issue(issuer.addressString, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 
     node
       .massTransfer(
-        issuer.address,
-        receivers.map(rc => MassTransferTransaction.Transfer(rc.address, 10)).toList,
+        issuer.addressString,
+        receivers.map(rc => MassTransferTransaction.Transfer(rc.addressString, 10)).toList,
         minFee + minFee * receivers.length,
         Some(issueTx),
         waitForTx = true
