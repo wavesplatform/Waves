@@ -1,0 +1,28 @@
+{
+  funcs: [
+    {
+      name: "value"
+      params: [ "T|Unit" ]
+      doc: "Extract value from option or fail"
+      paramsDoc: [ "Optional value" ]
+    }
+	 {
+      name: "valueOrErrorMessage"
+      params: [ "T|Unit", "String" ]
+      doc: "Extract value from option or fail with message"
+      paramsDoc: [ "Optional value", "Error message" ]
+    }
+    {
+      name: "extract"
+      params: [ "T|Unit" ]
+      doc: "Extract value from option or fail"
+      paramsDoc: [ "Optional value" ]
+    }
+    {
+      name: "isDefined"
+      params: [ "T|Unit" ]
+      doc: "Checks if a value is not `Unit`"
+      paramsDoc: [ "Optional value" ]
+    }
+  ]
+}

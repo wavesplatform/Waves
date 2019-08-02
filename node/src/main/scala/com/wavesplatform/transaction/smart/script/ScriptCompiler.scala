@@ -6,7 +6,7 @@ import com.wavesplatform.lang.directives._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript._
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
@@ -26,10 +26,15 @@ object ScriptCompiler extends ScorexLogging {
     } yield (script, script.complexity)
   }
 
-  def compile(scriptText: String): Either[String, (Script, Long)] = {
+  def compile(
+    scriptText: String,
+    libraries:  Map[String, String] = Map()
+  ): Either[String, (Script, Long)] = {
     for {
-      directives <- DirectiveParser(scriptText)
-      result     <- apply(scriptText, extractValue(directives, SCRIPT_TYPE) == Asset)
+      directives  <- DirectiveParser(scriptText)
+      ds          <- Directive.extractDirectives(directives)
+      linkedInput <- ScriptPreprocessor(scriptText, libraries, ds)
+      result      <- apply(linkedInput, ds.scriptType == Asset)
     } yield result
   }
 
@@ -39,6 +44,7 @@ object ScriptCompiler extends ScorexLogging {
       cType match {
         case Expression => ExpressionCompiler.compile(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
         case DApp       => ContractCompiler.compile(src, ctx).flatMap(expr => ContractScript.apply(version, expr))
+        case Library    => ExpressionCompiler.compileDecls(src, ctx).flatMap(ExprScript(version, _))
       }
     } catch {
       case ex: Throwable =>

@@ -27,5 +27,6 @@ Seq(
 
 libraryDependencies ++= Seq(
   "com.fasterxml.jackson.module" % "jackson-module-scala_2.12" % "2.9.9",
+  "org.hjson" % "hjson" % "3.0.0",
   "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar")
 )

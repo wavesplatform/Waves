@@ -39,6 +39,7 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
       resolvers += Resolver.sbtPluginRepo("releases"),
+      //Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
       cleanFiles += langSharedSources / "com" / "wavesplatform" / "protobuf",
       inConfig(Compile)(Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources,
