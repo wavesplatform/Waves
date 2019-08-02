@@ -1,12 +1,12 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
-import com.google.protobuf.ByteString
 import java.net.{URLDecoder, URLEncoder}
+
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
@@ -198,13 +198,13 @@ class AddressRouteSpec
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAkIARIFCgMBAgMAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAYSVyVy"
       (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
-      "DAppMeta\\(" +
+        "DAppMeta\\(" +
         "1," +
         "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
         "List\\(\\)," +
         "List\\(\\)," +
         "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
-      "\\)").r
+        "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
