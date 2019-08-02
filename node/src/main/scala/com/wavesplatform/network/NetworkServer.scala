@@ -237,6 +237,8 @@ object NetworkServer extends ScorexLogging {
             .addField("incoming", incomingStr)
             .addField("n", all.size)
         )
+
+        scheduleConnectTask()
       }
     }
 
