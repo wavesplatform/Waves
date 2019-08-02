@@ -2,41 +2,47 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.reactive.subjects.ConcurrentSubject
 
 @Sharable
-class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
+final class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
+  private[this] implicit val scheduler = Schedulers.fixedPool(2, "message-observer")
 
-  implicit val scheduler = monix.execution.Scheduler.fixedPool("message-observer", 2)
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit =
+    subjects.processMessage(ctx.channel()).applyOrElse(msg, super.channelRead(ctx, _))
 
-  private val signatures          = ConcurrentSubject.publish[(Channel, Signatures)]
-  private val blocks              = ConcurrentSubject.publish[(Channel, Block)]
-  private val blockchainScores    = ConcurrentSubject.publish[(Channel, BigInt)]
-  private val microblockInvs      = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
-  private val microblockResponses = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
-  private val transactions        = ConcurrentSubject.publish[(Channel, Transaction)]
+  def shutdown(): Unit =
+    subjects.completeAll()
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case b: Block               => blocks.onNext((ctx.channel(), b))
-    case sc: BigInt             => blockchainScores.onNext((ctx.channel(), sc))
-    case s: Signatures          => signatures.onNext((ctx.channel(), s))
-    case mbInv: MicroBlockInv   => microblockInvs.onNext((ctx.channel(), mbInv))
-    case mb: MicroBlockResponse => microblockResponses.onNext((ctx.channel(), mb))
-    case tx: Transaction        => transactions.onNext((ctx.channel(), tx))
-    case _                      => super.channelRead(ctx, msg)
+  //noinspection ScalaStyle,TypeAnnotation
+  private object subjects {
+    val signatures = ConcurrentSubject.publish[(Channel, Signatures)]
+    val blocks = ConcurrentSubject.publish[(Channel, Block)]
+    val blockchainScores = ConcurrentSubject.publish[(Channel, BigInt)]
+    val microblockInvs = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
+    val microblockResponses = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
+    val transactions = ConcurrentSubject.publish[(Channel, Transaction)]
 
-  }
+    def processMessage(channel: Channel): PartialFunction[AnyRef, Unit] = {
+      case b: Block => subjects.blocks.onNext((channel, b))
+      case sc: BigInt => subjects.blockchainScores.onNext((channel, sc))
+      case s: Signatures => subjects.signatures.onNext((channel, s))
+      case mbInv: MicroBlockInv => subjects.microblockInvs.onNext((channel, mbInv))
+      case mb: MicroBlockResponse => subjects.microblockResponses.onNext((channel, mb))
+      case tx: Transaction => subjects.transactions.onNext((channel, tx))
+    }
 
-  def shutdown(): Unit = {
-    signatures.onComplete()
-    blocks.onComplete()
-    blockchainScores.onComplete()
-    microblockInvs.onComplete()
-    microblockResponses.onComplete()
-    transactions.onComplete()
+    def completeAll(): Unit = {
+      signatures.onComplete()
+      blocks.onComplete()
+      blockchainScores.onComplete()
+      microblockInvs.onComplete()
+      microblockResponses.onComplete()
+      transactions.onComplete()
+    }
   }
 }
 
@@ -50,6 +56,6 @@ object MessageObserver {
 
   def apply(): (MessageObserver, Messages) = {
     val mo = new MessageObserver()
-    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.microblockInvs, mo.microblockResponses, mo.transactions))
+    (mo, (mo.subjects.signatures, mo.subjects.blocks, mo.subjects.blockchainScores, mo.subjects.microblockInvs, mo.subjects.microblockResponses, mo.subjects.transactions))
   }
 }

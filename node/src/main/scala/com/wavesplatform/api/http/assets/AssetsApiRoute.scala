@@ -18,6 +18,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -28,9 +29,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.Task
@@ -42,8 +41,7 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)(
-  implicit ec: Scheduler)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -186,7 +184,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
     ))
-  def nft: Route = (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
+  def nft: Route = extractScheduler(implicit sc => (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
     val response: Either[ApiError, Future[JsArray]] = for {
       addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
       limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
@@ -207,19 +205,19 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         .map(_.json())
         .toListL
         .map(lst => JsArray(lst))
-        .runAsync
+        .runAsyncLogErr
     }
 
     complete(response)
-  }
+  })
 
   def transfer: Route =
     processRequest[TransferRequests](
       "transfer", { req =>
         req.eliminate(
-          x => doBroadcast(TransactionFactory.transferAssetV1(x, wallet, time)),
+          x => broadcastIfSuccess(TransactionFactory.transferAssetV1(x, wallet, time)),
           _.eliminate(
-            x => doBroadcast(TransactionFactory.transferAssetV2(x, wallet, time)),
+            x => broadcastIfSuccess(TransactionFactory.transferAssetV2(x, wallet, time)),
             _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
           )
         )
@@ -227,16 +225,16 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     )
 
   def massTransfer: Route =
-    processRequest("masstransfer", (t: MassTransferRequest) => doBroadcast(TransactionFactory.massTransferAsset(t, wallet, time)))
+    processRequest("masstransfer", (t: MassTransferRequest) => broadcastIfSuccess(TransactionFactory.massTransferAsset(t, wallet, time)))
 
   def issue: Route =
-    processRequest("issue", (r: IssueV1Request) => doBroadcast(TransactionFactory.issueAssetV1(r, wallet, time)))
+    processRequest("issue", (r: IssueV1Request) => broadcastIfSuccess(TransactionFactory.issueAssetV1(r, wallet, time)))
 
   def reissue: Route =
-    processRequest("reissue", (r: ReissueV1Request) => doBroadcast(TransactionFactory.reissueAssetV1(r, wallet, time)))
+    processRequest("reissue", (r: ReissueV1Request) => broadcastIfSuccess(TransactionFactory.reissueAssetV1(r, wallet, time)))
 
   def burnRoute: Route =
-    processRequest("burn", (b: BurnV1Request) => doBroadcast(TransactionFactory.burnAssetV1(b, wallet, time)))
+    processRequest("burn", (b: BurnV1Request) => broadcastIfSuccess(TransactionFactory.burnAssetV1(b, wallet, time)))
 
   def signOrder: Route =
     processRequest("order", (order: Order) => {
@@ -323,7 +321,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     }).left.map(m => CustomValidationError(m))
 
   def sponsorRoute: Route =
-    processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
+    processRequest("sponsor", (req: SponsorFeeRequest) => broadcastIfSuccess(TransactionFactory.sponsor(req, wallet, time)))
 }
 
 object AssetsApiRoute {

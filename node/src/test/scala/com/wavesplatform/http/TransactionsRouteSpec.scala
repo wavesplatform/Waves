@@ -12,13 +12,13 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
-import io.netty.channel.group.ChannelGroup
 import monix.execution.Scheduler
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -39,11 +39,11 @@ class TransactionsRouteSpec
 
   implicit def scheduler = Scheduler.global
 
-  private val wallet      = Wallet(WalletSettings(None, Some("qwerty"), None))
-  private val blockchain  = mock[Blockchain]
-  private val utx         = mock[UtxPool]
-  private val allChannels = mock[ChannelGroup]
-  private val route       = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+  private val wallet = Wallet(WalletSettings(None, Some("qwerty"), None))
+  private val blockchain = mock[Blockchain]
+  private val utx = mock[UtxPool]
+  private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
+  private val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -68,7 +68,7 @@ class TransactionsRouteSpec
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -104,7 +104,7 @@ class TransactionsRouteSpec
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -116,7 +116,7 @@ class TransactionsRouteSpec
 
     "transfer with Asset fee" - {
       "without sponsorship" in {
-        val assetId: ByteStr         = issueGen.sample.get.assetId()
+        val assetId: ByteStr = issueGen.sample.get.assetId()
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -136,7 +136,7 @@ class TransactionsRouteSpec
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -146,7 +146,7 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship" in {
-        val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
+        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId())
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -179,7 +179,7 @@ class TransactionsRouteSpec
           )))
           .anyNumberOfTimes()
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -189,7 +189,7 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship, smart token and smart account" in {
-        val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
+        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId())
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -223,7 +223,7 @@ class TransactionsRouteSpec
           )))
           .anyNumberOfTimes()
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, allChannels, new TestTime).route
+        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK

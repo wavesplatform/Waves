@@ -4,13 +4,11 @@ import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.leasing.LeaseBroadcastApiRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -18,22 +16,19 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
+import scala.concurrent.Future
+
 class LeaseBroadcastRouteSpec
     extends RouteSpec("/leasing/broadcast/")
     with RequestGen
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
-
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
 
   "returns StateCheckFailed" - {
-    val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route
+    val route = LeaseBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
@@ -56,7 +51,7 @@ class LeaseBroadcastRouteSpec
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route
+    val route = LeaseBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("lease"), v) ~> route
