@@ -172,9 +172,11 @@ class MinerImpl(allChannels: ChannelGroup,
         .flatMap {
           case None => ().asRight.pure[Task]
           case Some(microBlock) =>
-            Task.delay {
-              allChannels.broadcast(MicroBlockInv(miner, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
-            } as Right({})
+            Task
+              .delay {
+                allChannels.broadcast(MicroBlockInv(miner, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
+              }
+              .delayExecution(minerSettings.microBlockInterval) as Left(bv)
         }
     }
   }
@@ -188,17 +190,17 @@ class MinerImpl(allChannels: ChannelGroup,
 
     for {
       blockVar <- MVar.empty[Option[MicroBlock]]
-      generateTask = generateMicroBlockLoop(blockVar, account, accumulatedBlock, constraints, restTotalConstraint)
-      appendTask   = broadcastMicroblockLoop(account, blockVar)
-      raceResult <- Task.racePair(generateTask, appendTask)
+      generateTask  = generateMicroBlockLoop(blockVar, account, accumulatedBlock, constraints, restTotalConstraint)
+      broadcastTask = broadcastMicroblockLoop(account, blockVar)
+      raceResult <- Task.racePair(generateTask, broadcastTask)
       _ <- raceResult match {
-        case Left((_, appendFiber)) =>
+        case Left((_, broadcastFiber)) =>
           Task.delay {
-            log.trace("Microblock mining stopped, stopping append fiber")
-          } *> blockVar.put(none) *> appendFiber.cancel
+            log.trace("Microblock mining stopped, stopping broadcast fiber")
+          } *> blockVar.put(none) *> broadcastFiber.cancel
         case Right((generateFiber, _)) =>
           Task.delay {
-            log.trace("Microblock appending stopped, stopping generate fiber")
+            log.trace("Microblock broadcast stopped, stopping generate fiber")
           } *> generateFiber.cancel
       }
     } yield ()
@@ -216,6 +218,7 @@ class MinerImpl(allChannels: ChannelGroup,
         .flatMap {
           case Stop =>
             Task.delay {
+              debugState = MinerDebugInfo.MiningBlocks
               log.trace {
                 if (state.restTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: ${state.restTotalConstraint}"
                 else "Stopping forging microBlocks, because all transactions are too big"
@@ -227,8 +230,11 @@ class MinerImpl(allChannels: ChannelGroup,
 
           case Delay(d) =>
             Task.delay {
-              log.trace(s"Quorum not available (${allChannels
-                .size()}/${minerSettings.quorum}), not forging microblock with ${account.address}, next attempt in ${d.toSeconds} seconds")
+              log.trace {
+                s"Quorum not available (${allChannels.size()}/${minerSettings.quorum}), " +
+                  s"not forging microblock with ${account.address}, " +
+                  s"next attempt in ${d.toSeconds} seconds"
+              }
             } *> state.asLeft.pure[Task].delayExecution(d)
 
           case Error(e) =>
@@ -266,9 +272,9 @@ class MinerImpl(allChannels: ChannelGroup,
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
 
         EitherT(Task.delay(forgeMicroBlock(account, accumulatedBlock, unconfirmed)))
-          .flatTap {
-            case (mb, _) =>
-              EitherT(appendMicroBlock(mb))
+          .flatMap {
+            case blocks @ (mb, _) =>
+              EitherT(appendMicroBlock(mb)) as blocks
           }
           .fold(
             err => Error(err),
