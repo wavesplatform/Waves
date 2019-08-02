@@ -4,12 +4,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
-import io.grpc.{Status, StatusException}
 import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
-
-import scala.concurrent.{ExecutionContext, Future}
 
 package object grpc extends PBImplicitConversions {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
@@ -111,8 +108,7 @@ package object grpc extends PBImplicitConversions {
     }
   }
 
-  implicit class FutureFactoryExt(private val _f: Future.type) extends AnyVal {
-    def either[A, B](f: => Either[A, B])(implicit ec: ExecutionContext, ev: A => Throwable): Future[B] =
-      Future(f).map(_.fold(e => throw GRPCErrors.toStatusException(e), identity))
+  implicit class EitherApiErrorExt[A, B](e: Either[A, B])(implicit ev: A => ApiError) {
+    def explicitGetErr(): B = e.fold(e => throw GRPCErrors.toStatusException(e), identity)
   }
 }

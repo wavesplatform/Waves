@@ -45,7 +45,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     responseObserver.completeWith(filteredStream)
   }
 
-  override def getBlock(request: BlockRequest): Future[BlockWithHeight] = Future.either {
+  override def getBlock(request: BlockRequest): Future[BlockWithHeight] = Future {
     val result = request.request match {
       case Request.BlockId(blockId) =>
         commonApi
@@ -68,6 +68,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
         Right(BlockWithHeight.defaultInstance)
     }
 
-    if (request.includeTransactions) result else result.map(_.update(_.block.transactions := Nil))
+    val finalResult = if (request.includeTransactions) result else result.map(_.update(_.block.transactions := Nil))
+    finalResult.explicitGetErr()
   }
 }

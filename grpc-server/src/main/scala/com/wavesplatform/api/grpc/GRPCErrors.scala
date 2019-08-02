@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc
 
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.lang.ValidationError.ValidationErrorException
 import io.grpc.Metadata.AsciiMarshaller
 import io.grpc.{Metadata, Status, StatusException}
 
@@ -14,22 +13,18 @@ object GRPCErrors {
 
   val ErrorCodeKey = Metadata.Key.of("Error-Code", IntMarshaller)
 
-  private[this] def errorToStatusException(api: ApiError): StatusException = {
+  def toStatusException(api: ApiError): StatusException = {
     val code = api match {
-      case WalletNotExist | WalletAddressDoesNotExist | TransactionDoesNotExist => Status.NOT_FOUND
-      case WalletAlreadyExists                                            => Status.ALREADY_EXISTS
-      case WalletLocked                                                   => Status.PERMISSION_DENIED
-      case _                                                              => Status.INVALID_ARGUMENT
+      case WalletNotExist | WalletAddressDoesNotExist | TransactionDoesNotExist | AliasDoesNotExist(_) | BlockDoesNotExist | MissingSenderPrivateKey |
+          DataKeyDoesNotExist =>
+        Status.NOT_FOUND
+      case WalletAlreadyExists => Status.ALREADY_EXISTS
+      case WalletLocked        => Status.PERMISSION_DENIED
+      case _                   => Status.INVALID_ARGUMENT
     }
 
     val metadata = new Metadata()
     metadata.put(ErrorCodeKey, api.id)
     code.withDescription(api.message).asException(metadata)
-  }
-
-  def toStatusException(exc: Throwable): StatusException = exc match {
-    case a: ApiErrorException        => errorToStatusException(a.error)
-    case v: ValidationErrorException => errorToStatusException(ApiError.fromValidationError(v.error))
-    case _                           => new StatusException(Status.fromThrowable(exc).withDescription(exc.getMessage))
   }
 }

@@ -69,8 +69,12 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
   }
 
   override def resolveAlias(request: StringValue): Future[BytesValue] =
-    Future.either(for {
-      alias   <- Alias.create(request.value)
-      address <- blockchain.resolveAlias(alias)
-    } yield BytesValue(address.bytes))
+    Future {
+      val result = for {
+        alias   <- Alias.create(request.value)
+        address <- blockchain.resolveAlias(alias)
+      } yield BytesValue(address.bytes)
+
+      result.explicitGetErr()
+    }
 }
