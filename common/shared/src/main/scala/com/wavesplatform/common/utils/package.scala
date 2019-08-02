@@ -9,11 +9,6 @@ package object utils {
       case Right(value) => value
     }
 
-    def explicitGetErr()(implicit ev: A => Throwable): B = ei match {
-      case Left(value)  => throw makeException(value: Throwable)
-      case Right(value) => value
-    }
-
     def foldToTry: Try[B] = ei.fold(
       left => Failure(makeException(left)),
       right => Success(right)
@@ -21,7 +16,7 @@ package object utils {
 
     @inline
     private[this] def makeException(value: Any): Throwable = value match {
-      case err: Throwable => new RuntimeException(err)
+      case err: Throwable => err
       case _              => new RuntimeException(value.toString)
     }
   }

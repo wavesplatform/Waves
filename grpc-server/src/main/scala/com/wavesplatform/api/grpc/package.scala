@@ -4,11 +4,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
-import io.grpc.{Status, StatusException}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 package object grpc extends PBImplicitConversions {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
@@ -110,29 +109,8 @@ package object grpc extends PBImplicitConversions {
     }
   }
 
-  implicit class OptionToFutureConversionOps[T](opt: Option[T]) {
-    def toFuture: Future[T] = opt match {
-      case Some(value) => Future.successful(value)
-      case None        => Future.failed(new StatusException(Status.NOT_FOUND))
-    }
-
-    def toFuture(apiError: ApiError): Future[T] = opt match {
-      case Some(value) => Future.successful(value)
-      case None        => Future.failed(GRPCErrors.toStatusException(apiError))
-    }
-  }
-
-  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit toThrowable: E => Throwable) {
-    def toFuture: Future[T] = {
-      val result = either.left
-        .map(e => GRPCErrors.toStatusException(toThrowable(e)))
-        .toTry
-
-      Future.fromTry(result)
-    }
-  }
-
-  implicit class ObservableExtensionOps[T](observable: Observable[T]) {
-    def optionalLimit(limit: Long): Observable[T] = if (limit > 0) observable.take(limit) else observable
+  implicit class FutureFactoryExt(private val _f: Future.type) extends AnyVal {
+    def either[A, B](f: => Either[A, B])(implicit ec: ExecutionContext, ev: A => Throwable): Future[B] =
+      Future(f).map(_.fold(e => throw GRPCErrors.toStatusException(e), identity))
   }
 }
