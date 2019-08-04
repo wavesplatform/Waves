@@ -26,7 +26,7 @@ object BaseTargetChecker {
     val settings          = WavesSettings.fromRootConfig(sharedConfig)
     val db                = openDB("/tmp/tmp-db")
     val ntpTime           = new NTP("ntp.pool.org")
-    val portfolioChanges  = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+    val portfolioChanges  = Observer.empty(UncaughtExceptionReporter.default)
     val blockchainUpdater = StorageFactory(settings, db, ntpTime, portfolioChanges)
     val poSSelector       = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
 

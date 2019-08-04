@@ -5,20 +5,19 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.api.http.ApiError.AliasDoesNotExist
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.{Format, Json}
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, blockchain: Blockchain)
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -27,7 +26,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
     alias ~ addressOfAlias ~ aliasOfAddress
   }
 
-  def alias: Route = processRequest("create", (t: CreateAliasV1Request) => doBroadcast(TransactionFactory.aliasV1(t, wallet, time)))
+  def alias: Route = processRequest("create", (t: CreateAliasV1Request) => broadcastIfSuccess(TransactionFactory.aliasV1(t, wallet, time)))
 
   @Path("/by-alias/{alias}")
   @ApiOperation(

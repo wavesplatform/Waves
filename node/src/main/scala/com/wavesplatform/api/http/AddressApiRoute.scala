@@ -11,14 +11,13 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.execution.Scheduler
@@ -28,8 +27,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(
-    implicit ec: Scheduler)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with WithSettings
     with BroadcastRoute {
@@ -265,7 +263,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def postData: Route = processRequest("data", (req: DataRequest) => doBroadcast(TransactionFactory.data(req, wallet, time)))
+  def postData: Route = processRequest("data", (req: DataRequest) => broadcastIfSuccess(TransactionFactory.data(req, wallet, time)))
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
@@ -280,20 +278,22 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         paramType = "query"
       )
     ))
-  def getData: Route = (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
-    maybeRegex match {
-      case None => complete(accountData(address))
-      case Some(regex) =>
-        complete(
-          Try(regex.r)
-            .fold(
-              _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
-              r => accountData(address, r.pattern)
+  def getData: Route =
+    extractScheduler(implicit sc =>
+      (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
+        maybeRegex match {
+          case None => complete(accountData(address))
+          case Some(regex) =>
+            complete(
+              Try(regex.r)
+                .fold(
+                  _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+                  r => accountData(address, r.pattern)
+                )
             )
-        )
 
-    }
-  }
+        }
+    })
 
   @Path("/data/{address}/{key}")
   @ApiOperation(value = "Data by Key", notes = "Read data associated with an account and a key", httpMethod = "GET")
@@ -393,7 +393,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String): ToResponseMarshallable = {
+  private def accountData(address: String)(implicit sc: Scheduler): ToResponseMarshallable = {
     Address
       .fromString(address)
       .map { acc =>
@@ -402,7 +402,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String, regex: Pattern): ToResponseMarshallable = {
+  private def accountData(address: String, regex: Pattern)(implicit sc: Scheduler): ToResponseMarshallable = {
     Address
       .fromString(address)
       .map { addr =>
