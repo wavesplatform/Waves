@@ -31,7 +31,7 @@ class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void
 
 case object HandshakeTimeoutExpired
 
-class HandshakeTimeoutHandler(handshakeTimeout: => FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var timeout: Option[ScheduledFuture[_]] = None
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
