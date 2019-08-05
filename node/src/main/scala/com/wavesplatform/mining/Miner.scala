@@ -167,9 +167,9 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def generateOneMicroBlockTask(account: KeyPair,
                                         accumulatedBlock: Block,
-                                        constraints: MiningConstraints,
-                                        restTotalConstraint: MiningConstraint): Task[MicroblockMiningResult] = {
-    log.trace(s"Generating microBlock for $account, constraints: $restTotalConstraint")
+                                        unconfirmed: Seq[Transaction],
+                                        updatedConstraint: MiningConstraint): Task[MicroblockMiningResult] = {
+    log.trace(s"Generating microBlock for $account, constraints: $updatedConstraint")
     val pc = allChannels.size()
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}), not forging microblock with ${account.address}, next attempt in 5 seconds")
@@ -177,28 +177,26 @@ class MinerImpl(allChannels: ChannelGroup,
     } else if (utx.size == 0) {
       log.trace(s"Skipping microBlock because utx is empty")
       Task.now(Retry)
-    } else {
-      packTransactionsForMicroblock(constraints, restTotalConstraint) match {
-        case Left(stopReason) =>
-          Task.delay {
-            log.trace(s"Stopping forging microblocks. ${stopReason.reason}")
-          } as Stop
-        case Right((unconfirmed, updatedTotalConstraint)) => {
-          log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-          (for {
-            start  <- EitherT.liftF[Task, ValidationError, Long](Task.clock.realTime(TimeUnit.MILLISECONDS))
-            blocks <- forgeMicroBlock(account, accumulatedBlock, unconfirmed)
-            (signedBlock, microBlock) = blocks
-            _ = EitherT.liftF[Task, ValidationError, Unit] {
-              Task.delay {
-                metrics.microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-              }
-            }
-            _ <- appendMicroBlock(microBlock)
-            _ <- EitherT.liftF[Task, ValidationError, Unit](broadcastMicroBlock(account, microBlock))
-          } yield Success(signedBlock, updatedTotalConstraint)).valueOr(Error)
-        }
+    } else if (unconfirmed.isEmpty) {
+      log.trace {
+        if (updatedConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedConstraint"
+        else "Stopping forging microBlocks, because all transactions are too big"
       }
+      Task.now(Stop)
+    } else {
+      log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
+      (for {
+        start  <- EitherT.liftF[Task, ValidationError, Long](Task.clock.realTime(TimeUnit.MILLISECONDS))
+        blocks <- forgeMicroBlock(account, accumulatedBlock, unconfirmed)
+        (signedBlock, microBlock) = blocks
+        _ = EitherT.liftF[Task, ValidationError, Unit] {
+          Task.delay {
+            metrics.microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
+          }
+        }
+        _ <- appendMicroBlock(microBlock)
+        _ <- EitherT.liftF[Task, ValidationError, Unit](broadcastMicroBlock(account, microBlock))
+      } yield Success(signedBlock, updatedConstraint)).valueOr(Error)
     }
   }
 
@@ -237,20 +235,18 @@ class MinerImpl(allChannels: ChannelGroup,
   private def packTransactionsForMicroblock(
       constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint
-  ): Either[MicroBlockMiningStopReason, (Seq[Transaction], MiningConstraint)] = {
+  ): (Seq[Transaction], MiningConstraint, FiniteDuration) = {
+    val start = System.currentTimeMillis()
+
     val (unconfirmed, updatedTotalConstraint) = metrics.measureLog("packing unconfirmed transactions for microblock") {
       val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
       val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime)
       (unconfirmed, updatedMdConstraint.constraints.head)
     }
 
-    Either
-      .cond(
-        unconfirmed.nonEmpty,
-        (unconfirmed, updatedTotalConstraint),
-        if (updatedTotalConstraint.isFull) ConstraintIsFull(updatedTotalConstraint)
-        else TransactionsTooBig
-      )
+    val packTime = (System.currentTimeMillis() - start).millis
+
+    (unconfirmed, updatedTotalConstraint, packTime)
   }
 
   private def generateMicroBlockSequence(account: KeyPair,
@@ -260,9 +256,11 @@ class MinerImpl(allChannels: ChannelGroup,
                                          restTotalConstraint: MiningConstraint): Task[Unit] = {
     debugState = MinerDebugInfo.MiningMicroblocks
     log.info(s"Generate MicroBlock sequence, delay = $delay")
-    generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint)
+    val (txs, updatedConstraint, packTime) = packTransactionsForMicroblock(constraints, restTotalConstraint)
+
+    generateOneMicroBlockTask(account, accumulatedBlock, txs, updatedConstraint)
       .asyncBoundary(minerScheduler)
-      .delayExecution(delay)
+      .delayExecution(delay - packTime)
       .flatMap {
         case Error(e) =>
           Task {
