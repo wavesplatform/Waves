@@ -35,14 +35,15 @@ class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper {
     new ApiRouteWithSettings("taskFromFutureRe", Task.deferFuture(Future(throw new RuntimeException())).runToFuture).getRoute
   )
 
-  //noinspection ScalaUnusedSymbol
   // Any of this route cause JVM exit in case of "akka.jvm-exit-on-fatal-error" is turned on
+  /*
   private val brokenRoute = concat(
     new ApiRouteWithSettings("future", Future(throw new StackOverflowError())).getRoute,
     new ApiRouteWithSettings("taskExecuteAsync", Task(throw new StackOverflowError()).executeAsync.runToFuture).getRoute,
     new ApiRouteWithSettings("taskEvalAsync", Task.evalAsync(throw new StackOverflowError()).runToFuture).getRoute,
     new ApiRouteWithSettings("taskFromFuture", Task.deferFuture(Future(throw new StackOverflowError())).runToFuture).getRoute
   )
+  */
 
   "StackOverflowError in API should be caught" in {
     Get("/soe") ~> compositeRoute ~> check {
