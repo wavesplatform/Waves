@@ -89,12 +89,12 @@ object Explorer extends ScorexLogging {
   )
 
   def main(args: Array[String]): Unit = {
-    val configFilename = args.sliding(2).collectFirst {
+    val configFileOption = args.sliding(2).collectFirst {
       case Array("-c" | "--config", config) if config.nonEmpty =>
-        config
+        new File(config)
     }
 
-    val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
+    val settings = WavesSettings.fromRootConfig(loadConfig(configFileOption.map(ConfigFactory.parseFile)))
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
@@ -103,7 +103,7 @@ object Explorer extends ScorexLogging {
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
     val db               = openDB(settings.dbSettings.directory)
-    val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
