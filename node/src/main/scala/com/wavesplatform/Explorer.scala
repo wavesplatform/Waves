@@ -89,7 +89,10 @@ object Explorer extends ScorexLogging {
   )
 
   def main(args: Array[String]): Unit = {
-    val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
+    val configFilename = args.sliding(2).collectFirst {
+      case Array("-c" | "--config", config) if config.nonEmpty =>
+        config
+    }
 
     val settings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
     AddressScheme.current = new AddressScheme {
@@ -105,12 +108,11 @@ object Explorer extends ScorexLogging {
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
     try {
-
-      val flag = args(1).toUpperCase
+      val flag = args.headOption.getOrElse(throw new IllegalArgumentException("Failed to resolve second startup argument")).toUpperCase
 
       flag match {
         case "B" =>
-          val maybeBlockId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
+          val maybeBlockId = Base58.tryDecodeWithLimit(args(1)).toOption.map(ByteStr.apply)
           if (maybeBlockId.isDefined) {
             val kBlockHeight     = Keys.heightOf(maybeBlockId.get)
             val blockHeightBytes = db.get(kBlockHeight.keyBytes)
@@ -123,7 +125,7 @@ object Explorer extends ScorexLogging {
           } else log.error("No block ID was provided")
 
         case "O" =>
-          val orderId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
+          val orderId = Base58.tryDecodeWithLimit(args(1)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
             val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get)(blockchainHeight)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
@@ -143,7 +145,7 @@ object Explorer extends ScorexLogging {
           } else log.error("No order ID was provided")
 
         case "A" =>
-          val address   = Address.fromString(args(2)).explicitGet()
+          val address   = Address.fromString(args(1)).explicitGet()
           val aid       = Keys.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
@@ -180,9 +182,9 @@ object Explorer extends ScorexLogging {
           }
 
         case "AA" =>
-          val secondaryId = args(3)
+          val secondaryId = args(2)
 
-          val address   = Address.fromString(args(2)).explicitGet()
+          val address   = Address.fromString(args(1)).explicitGet()
           val asset     = IssuedAsset(ByteStr.decodeBase58(secondaryId).get)
           val ai        = Keys.addressId(address)
           val addressId = ai.parse(db.get(ai.keyBytes)).get
@@ -224,7 +226,7 @@ object Explorer extends ScorexLogging {
         case "TXBH" =>
           val txs = new ListBuffer[(TxNum, Transaction)]
 
-          val h = Height(args(2).toInt)
+          val h = Height(args(1).toInt)
 
           val prefix = ByteBuffer
             .allocate(6)
@@ -254,7 +256,7 @@ object Explorer extends ScorexLogging {
           txs.foreach(println)
 
         case "AP" =>
-          val address   = Address.fromString(args(2)).explicitGet()
+          val address   = Address.fromString(args(1)).explicitGet()
           val portfolio = reader.portfolio(address)
           log.info(s"$address : ${portfolio.balance} WAVES, ${portfolio.lease}, ${portfolio.assets.size} assets")
           portfolio.assets.toSeq.sortBy(_._1.toString) foreach {
