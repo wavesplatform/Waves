@@ -3,6 +3,7 @@ package com.wavesplatform.api
 import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.lang.ValidationError
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
@@ -108,7 +109,11 @@ package object grpc extends PBImplicitConversions {
     }
   }
 
-  implicit class EitherApiErrorExt[A, B](e: Either[A, B])(implicit ev: A => ApiError) {
-    def explicitGetErr(): B = e.fold(e => throw GRPCErrors.toStatusException(e), identity)
+  implicit class EitherVEExt[T](e: Either[ValidationError, T]) {
+    def explicitGetErr(): T = e.fold(e => throw GRPCErrors.toStatusException(e), identity)
+  }
+
+  implicit class OptionErrExt[T](e: Option[T]) {
+    def explicitGetErr(err: ApiError): T = e.getOrElse(throw GRPCErrors.toStatusException(err))
   }
 }

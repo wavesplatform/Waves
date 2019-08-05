@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.common.CommonAssetsApi
-import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.execution.Scheduler
@@ -12,7 +12,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   private[this] val commonApi = new CommonAssetsApi(blockchain)
 
   override def getInfo(request: AssetRequest): Future[AssetInfoResponse] = Future {
-    val result = for (info <- commonApi.fullInfo(IssuedAsset(request.assetId)).toRight(ApiError.TransactionDoesNotExist))
+    val result = for (info <- commonApi.fullInfo(IssuedAsset(request.assetId)))
       yield
         AssetInfoResponse(
           info.description.issuer,
@@ -32,6 +32,6 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           Some(info.issueTransaction.toPB),
           info.sponsorBalance.getOrElse(0)
         )
-    result.explicitGetErr()
+    result.explicitGetErr(TransactionDoesNotExist)
   }
 }
