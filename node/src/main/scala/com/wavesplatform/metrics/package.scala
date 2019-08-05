@@ -1,12 +1,17 @@
 package com.wavesplatform
 
 import kamon.metric.{Histogram, Timer}
+import monix.eval.Task
 
 import scala.concurrent.{ExecutionContext, Future}
 
 package object metrics {
   final implicit class HistogramExt(private val histogram: Histogram) extends AnyVal {
     def safeRecord(value: Long): Unit = histogram.record(Math.max(value, 0L))
+
+    def safeRecordT(value: Long): Task[Unit] = Task.delay {
+      histogram.safeRecord(value)
+    }
   }
 
   final implicit class TimerExt(private val timer: Timer) extends AnyVal {
