@@ -108,7 +108,7 @@ object Explorer extends ScorexLogging {
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
     try {
-      val flag = args.headOption.getOrElse(throw new IllegalArgumentException("Failed to resolve second startup argument")).toUpperCase
+      val flag = args.headOption.getOrElse(throw new IllegalArgumentException("Failed to resolve command")).toUpperCase
 
       flag match {
         case "B" =>
