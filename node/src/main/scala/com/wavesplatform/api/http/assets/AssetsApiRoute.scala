@@ -248,7 +248,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         (for {
           acc <- Address.fromString(address)
         } yield
-          Json.obj("address" -> acc.addressString,
+          Json.obj("address" -> acc.stringRepr,
                    "assetId" -> assetIdStr,
                    "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, IssuedAsset(assetId)))))).left
           .map(ApiError.fromValidationError)
@@ -261,7 +261,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       acc <- Address.fromString(address)
     } yield {
       Json.obj(
-        "address" -> acc.addressString,
+        "address" -> acc.stringRepr,
         "balances" -> JsArray(
           (for {
             (asset @ IssuedAsset(assetId), balance) <- commonAccountApi.portfolio(acc) if balance > 0
@@ -300,7 +300,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
           "assetId"        -> JsString(id.base58),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
-          "issuer"         -> JsString(tx.sender.addressString),
+          "issuer"         -> JsString(tx.sender.stringRepr),
           "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
           "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
           "decimals"       -> JsNumber(tx.decimals.toInt),

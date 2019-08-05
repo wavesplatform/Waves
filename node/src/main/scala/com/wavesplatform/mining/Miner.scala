@@ -135,7 +135,7 @@ class MinerImpl(allChannels: ChannelGroup,
         .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
         .leftMap(_.toString)
         .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
-      _ = log.debug(s"Forging with ${account.addressString}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
+      _ = log.debug(s"Forging with ${account.stringRepr}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
       _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
@@ -170,7 +170,7 @@ class MinerImpl(allChannels: ChannelGroup,
     log.trace(s"Generating microBlock for $account, constraints: $restTotalConstraint")
     val pc = allChannels.size()
     if (pc < minerSettings.quorum) {
-      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}), not forging microblock with ${account.addressString}, next attempt in 5 seconds")
+      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}), not forging microblock with ${account.stringRepr}, next attempt in 5 seconds")
       Task.now(Delay(settings.minerSettings.noQuorumMiningDelay))
     } else if (utx.size == 0) {
       log.trace(s"Skipping microBlock because utx is empty")
@@ -268,7 +268,7 @@ class MinerImpl(allChannels: ChannelGroup,
           s"Invalid next block generation time: $expectedTS"
         )
       } yield result
-    } else Left(s"Balance $balance of ${account.addressString} is lower than required for generation")
+    } else Left(s"Balance $balance of ${account.stringRepr} is lower than required for generation")
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
@@ -303,7 +303,7 @@ class MinerImpl(allChannels: ChannelGroup,
               .map {
                 case Left(err) => log.warn("Error mining Block: " + err.toString)
                 case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block by ${account.addressString} with cumulative score $score")
+                  log.debug(s"Forged and applied $block by ${account.stringRepr} with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()

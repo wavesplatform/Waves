@@ -25,7 +25,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   test("setup acc0 with 1 waves") {
     sender.transfer(
       sender.address,
-      acc0.addressString,
+      acc0.stringRepr,
       assetId = None,
       amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
       fee = minFee,
@@ -49,9 +49,9 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       """.stripMargin
 
     val script      = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(acc0.addressString, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId = sender.setScript(acc0.stringRepr, Some(script), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(acc0.addressString)
+    val acc0ScriptInfo = sender.addressScriptInfo(acc0.stringRepr)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
@@ -64,8 +64,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   test("can't send from acc0 using old pk") {
     assertBadRequest(
       sender.transfer(
-        acc0.addressString,
-        recipient = acc3.addressString,
+        acc0.stringRepr,
+        recipient = acc3.stringRepr,
         assetId = None,
         amount = transferAmount,
         fee = minFee + 0.00001.waves + 0.00002.waves,
@@ -120,8 +120,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   test("can send using old pk of acc0") {
     sender.transfer(
-      acc0.addressString,
-      recipient = acc3.addressString,
+      acc0.stringRepr,
+      recipient = acc3.stringRepr,
       assetId = None,
       amount = transferAmount,
       fee = minFee,

@@ -48,7 +48,7 @@ case class TransactionBlockField(override val name: String, override val value: 
 case class SignerData(generator: PublicKey, signature: ByteStr)
 
 case class SignerDataBlockField(override val name: String, override val value: SignerData) extends BlockField[SignerData] {
-  protected override def j = Json.obj("generator" -> value.generator.addressString, "signature" -> value.signature.base58)
+  protected override def j = Json.obj("generator" -> value.generator.stringRepr, "signature" -> value.signature.base58)
 
   protected override def b = value.generator.arr ++ value.signature.arr
 }

@@ -56,7 +56,7 @@ object Gen {
 
     val src =
       s"""
-         |let oracle = Address(base58'${oracle.addressString}')
+         |let oracle = Address(base58'${oracle.stringRepr}')
          |
          |match tx {
          |  case _: SetScriptTransaction => true

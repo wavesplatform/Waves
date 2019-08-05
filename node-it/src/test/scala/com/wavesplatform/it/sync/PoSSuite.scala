@@ -229,7 +229,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         .calculateDelay(
           hit(genSig.arr),
           lastBlockCData.baseTarget,
-          nodes.head.accountBalances(signerPK.addressString)._2
+          nodes.head.accountBalances(signerPK.stringRepr)._2
         )
     )
 

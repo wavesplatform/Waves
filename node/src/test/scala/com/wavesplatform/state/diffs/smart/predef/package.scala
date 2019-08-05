@@ -167,7 +167,7 @@ package object predef {
        |
        | let aFromPK = addressFromPublicKey(tx.senderPublicKey) == tx.sender
        | let aFromStrOrRecip = match tx {
-       |   case _: DataTransaction => addressFromString("${tx.sender.addressString}") == Address(base58'${tx.sender.bytes.base58}')
+       |   case _: DataTransaction => addressFromString("${tx.sender.stringRepr}") == Address(base58'${tx.sender.bytes.base58}')
        |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient.bytes.base58}')
        |   case _ => false
        | }

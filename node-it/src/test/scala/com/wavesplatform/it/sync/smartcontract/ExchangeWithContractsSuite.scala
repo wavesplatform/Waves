@@ -37,7 +37,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     super.beforeAll()
 
     exchAsset = sender
-      .issue(acc0.addressString,
+      .issue(acc0.stringRepr,
              "ExchangeCoin",
              "ExchangeCoin for tests with exchange transaction",
              someAssetAmount,

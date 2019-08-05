@@ -29,7 +29,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
 
       val scriptText = s"""true""".stripMargin
       val script               = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
-      i.setScript(acc.addressString, Some(script), setScriptFee, waitForTx = true)
+      i.setScript(acc.stringRepr, Some(script), setScriptFee, waitForTx = true)
 
       acc
     })
@@ -37,8 +37,8 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     assertBadRequestAndMessage(
       nodeA
         .transfer(
-          accounts.head.addressString,
-          recipient = accounts.head.addressString,
+          accounts.head.stringRepr,
+          recipient = accounts.head.stringRepr,
           assetId = None,
           amount = 1.waves,
           fee = minFee + 0.004.waves,
@@ -50,8 +50,8 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val txBId =
       nodeB
         .transfer(
-          accounts(1).addressString,
-          recipient = accounts(1).addressString,
+          accounts(1).stringRepr,
+          recipient = accounts(1).stringRepr,
           assetId = None,
           amount = 1.01.waves,
           fee = minFee + 0.004.waves,

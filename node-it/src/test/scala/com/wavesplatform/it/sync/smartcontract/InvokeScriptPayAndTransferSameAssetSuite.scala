@@ -13,9 +13,9 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val dApp     = pkByAddress(firstAddress).addressString
-  private val caller   = pkByAddress(secondAddress).addressString
-  private val receiver = pkByAddress(thirdAddress).addressString
+  private val dApp     = pkByAddress(firstAddress).stringRepr
+  private val caller   = pkByAddress(secondAddress).stringRepr
+  private val receiver = pkByAddress(thirdAddress).stringRepr
 
   var dAppInitBalance: Long     = 0
   var callerInitBalance: Long   = 0

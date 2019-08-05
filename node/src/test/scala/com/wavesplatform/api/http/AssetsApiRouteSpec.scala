@@ -47,7 +47,7 @@ class AssetsApiRouteSpec
       (response \ "assetId").as[String] shouldBe smartAssetTx.id().base58
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe smartAssetTx.timestamp
-      (response \ "issuer").as[String] shouldBe smartAssetTx.sender.addressString
+      (response \ "issuer").as[String] shouldBe smartAssetTx.sender.stringRepr
       (response \ "name").as[String] shouldBe new String(smartAssetTx.name, StandardCharsets.UTF_8)
       (response \ "description").as[String] shouldBe new String(smartAssetTx.description, StandardCharsets.UTF_8)
       (response \ "decimals").as[Int] shouldBe smartAssetTx.decimals
@@ -76,7 +76,7 @@ class AssetsApiRouteSpec
       (response \ "assetId").as[String] shouldBe sillyAssetTx.id().base58
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe sillyAssetTx.timestamp
-      (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.addressString
+      (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.stringRepr
       (response \ "name").as[String] shouldBe new String(sillyAssetTx.name, StandardCharsets.UTF_8)
       (response \ "description").as[String] shouldBe new String(sillyAssetTx.description, StandardCharsets.UTF_8)
       (response \ "decimals").as[Int] shouldBe sillyAssetTx.decimals

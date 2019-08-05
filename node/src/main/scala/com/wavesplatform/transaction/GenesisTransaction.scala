@@ -30,7 +30,7 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
       "fee"       -> 0,
       "timestamp" -> timestamp,
       "signature" -> this.signature.base58,
-      "recipient" -> recipient.addressString,
+      "recipient" -> recipient.stringRepr,
       "amount"    -> amount
     ))
 

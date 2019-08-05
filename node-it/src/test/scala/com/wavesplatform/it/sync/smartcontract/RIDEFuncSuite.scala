@@ -25,13 +25,13 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("assetBalance() verification") {
     val asset = sender
-      .issue(acc0.addressString, "SomeCoin", "SomeDescription", someAssetAmount, 0, reissuable = false, issueFee, 2, waitForTx = true)
+      .issue(acc0.stringRepr, "SomeCoin", "SomeDescription", someAssetAmount, 0, reissuable = false, issueFee, 2, waitForTx = true)
       .id
 
     val newAddress   = sender.createAddress()
     val pkNewAddress = pkByAddress(newAddress)
 
-    sender.transfer(acc0.addressString, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val scriptSrc =
       s"""
@@ -148,7 +148,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val newAddress   = sender.createAddress()
     val pkNewAddress = pkByAddress(newAddress)
-    sender.transfer(acc0.addressString, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val scriptSet = SetScriptTransaction.selfSigned(
       pkNewAddress,
@@ -192,7 +192,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
       """.stripMargin).explicitGet()._1
 
     val newAddress = sender.createAddress()
-    sender.transfer(acc0.addressString, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val setScript = sender.setScript(newAddress, Some(script.bytes().base64), setScriptFee)
     nodes.waitForHeightAriseAndTxPresent(setScript.id)

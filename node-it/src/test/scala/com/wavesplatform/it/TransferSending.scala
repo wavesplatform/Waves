@@ -42,7 +42,7 @@ trait TransferSending extends ScorexLogging {
 
     val sourceAndDest = (1 to n).map { _ =>
       val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      Address.fromPublicKey(PublicKey(destPk)).addressString
+      Address.fromPublicKey(PublicKey(destPk)).stringRepr
     }
 
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
@@ -64,7 +64,7 @@ trait TransferSending extends ScorexLogging {
 
     val sourceAndDest = (1 to n).map { _ =>
       val Seq((srcConfig, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
-      (srcConfig, destPrivateKey.addressString)
+      (srcConfig, destPrivateKey.stringRepr)
     }
 
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
@@ -90,7 +90,7 @@ trait TransferSending extends ScorexLogging {
     val sourceAndDest = (1 to n).map { _ =>
       val srcSeed  = Random.shuffle(seeds).head
       val destPk   = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      val destAddr = Address.fromPublicKey(PublicKey(destPk)).addressString
+      val destAddr = Address.fromPublicKey(PublicKey(destPk)).stringRepr
 
       (srcSeed, destAddr)
     }
