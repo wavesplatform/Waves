@@ -60,7 +60,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       restTotalConstraint: MiningConstraint
   ): Task[Unit] = {
 
-    val minigResult = for {
+    val miningResult = for {
       _          <- debugState.set(MinerDebugInfo.MiningMicroblocks)
       packResult <- packTransactionsForMicroblock(constraints, restTotalConstraint)
       result <- generateOneMicroBlockTask(account, accumulatedBlock, packResult.transactions, restTotalConstraint)
@@ -68,7 +68,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
         .delayExecution(delay - packResult.timeSpent)
     } yield result
 
-    minigResult.flatMap {
+    miningResult.flatMap {
       case Success(newTotal, updatedTotalConstraint) =>
         generateMicroBlockSequence(account, newTotal, settings.microBlockInterval, constraints, updatedTotalConstraint)
       case Delay(d) =>
@@ -124,7 +124,10 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
             (signedBlock, microBlock) = blocks
             _ <- appendMicroBlock(microBlock)
             _ <- broadcastMicroBlock(account, microBlock)
-          } yield Success(signedBlock, updatedConstraint)).valueOr(Error)
+          } yield {
+            if (updatedConstraint.isFull) Stop
+            else Success(signedBlock, updatedConstraint)
+          }).valueOr(Error)
         }
       }
   }
@@ -178,10 +181,6 @@ object MicroBlockMinerImpl {
   final case class Delay(d: FiniteDuration)                             extends MicroBlockMiningResult
   final case class Error(e: ValidationError)                            extends MicroBlockMiningResult
   final case class Success(b: Block, totalConstraint: MiningConstraint) extends MicroBlockMiningResult
-
-  sealed abstract class MicroBlockMiningStopReason(val reason: String)
-  case class ConstraintIsFull(constraint: MiningConstraint) extends MicroBlockMiningStopReason(s"The block is full: $constraint")
-  case object TransactionsTooBig                            extends MicroBlockMiningStopReason("All transactions are too big")
 
   def measureLogF[F[_]: Sync: Clock, A](log: LoggerFacade, action: String)(fa: => A): F[A] =
     for {
