@@ -108,7 +108,8 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       .delay(allChannels.size())
       .flatMap { pc =>
         if (pc < settings.quorum) Task.now(Delay(settings.noQuorumMiningDelay))
-        else if (unconfirmed.isEmpty) Task.now(Stop)
+        else if (unconfirmed.isEmpty && updatedConstraint.isFull) Task.now(Stop)
+        else if (unconfirmed.isEmpty) Task.now(Retry)
         else {
           log.trace(s"Generating microBlock for $account, constraints: $updatedConstraint")
 
