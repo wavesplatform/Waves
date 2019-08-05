@@ -52,7 +52,8 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
 
   private def handleAnyExceptions(handler: ExceptionHandler): Directive0 =
     Directive { inner => ctx =>
-      try inner(())(ctx)
+      val handleExceptions = handler.andThen(_(ctx))
+      try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
       catch {
         case thr: Throwable => handler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
       }
