@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
@@ -11,7 +12,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -408,5 +409,16 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       }
     }
 
+    "dont parse irrelevant transactions in transferById" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, _) =>
+        val transactionId = TransactionId(ByteStr(Array[Byte](0)))
+
+        writer.readWrite(_.put(Keys.transactionHNById(transactionId), ByteStr(Array[Byte](1, 2, 3, 4, 5, 6))))
+        writer.transferById(transactionId) shouldBe None
+
+        writer.readWrite(_.put(Keys.transactionHNById(transactionId), ByteStr(Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))))
+        intercept[IllegalArgumentException](writer.transferById(transactionId) )
+      }
+    }
   }
 }

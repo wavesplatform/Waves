@@ -34,7 +34,7 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 object LevelDBWriter {
 
@@ -87,7 +87,7 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
+  private[database] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
 
@@ -639,12 +639,11 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
         }.getOrElse(false)
 
         if (isTransfer)
-          TransactionParsers
-            .parseBytes(txBytes)
-            .collect {
-              case ttx: TransferTransaction => (height, ttx)
-            }
-            .toOption
+          TransactionParsers.parseBytes(txBytes) match {
+            case Success(ttx: TransferTransaction) => Some(height -> ttx)
+            case Failure(exception) => throw exception
+            case _ => ???
+          }
         else None
       }
     } yield result
