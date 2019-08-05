@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -413,11 +413,13 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       baseTest(time => preconditions(time.correctedTime())) { (writer, _) =>
         val transactionId = TransactionId(ByteStr(Array[Byte](0)))
 
-        writer.readWrite(_.put(Keys.transactionHNById(transactionId), ByteStr(Array[Byte](1, 2, 3, 4, 5, 6))))
+        writer.readWrite(_.put(Keys.transactionHNById(transactionId), Some((Height @@ 1, TxNum @@ 0.toShort))))
+        writer.readWrite(_.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort), Some(Array[Byte](1, 2, 3, 4, 5, 6))))
         writer.transferById(transactionId) shouldBe None
 
-        writer.readWrite(_.put(Keys.transactionHNById(transactionId), ByteStr(Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))))
-        intercept[IllegalArgumentException](writer.transferById(transactionId) )
+        writer.readWrite(
+          _.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort), Some(Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))))
+        intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
       }
     }
   }
