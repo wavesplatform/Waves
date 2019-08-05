@@ -1,4 +1,7 @@
 package com.wavesplatform.api.grpc
+
+import com.google.protobuf.wrappers.{BytesValue, StringValue}
+import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.{AssetAmount, AssetId, PBTransactions}
@@ -10,8 +13,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler)
-    extends AccountsApiGrpc.AccountsApi {
+class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
   private[this] val commonApi = new CommonAccountApi(blockchain)
 
   override def getBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = {
@@ -65,4 +67,14 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler)
 
     responseObserver.completeWith(stream)
   }
+
+  override def resolveAlias(request: StringValue): Future[BytesValue] =
+    Future {
+      val result = for {
+        alias   <- Alias.create(request.value)
+        address <- blockchain.resolveAlias(alias)
+      } yield BytesValue(address.bytes)
+
+      result.explicitGetErr()
+    }
 }

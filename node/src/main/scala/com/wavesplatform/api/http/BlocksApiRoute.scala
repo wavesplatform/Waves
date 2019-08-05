@@ -233,7 +233,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
           .toOption
           .toRight(InvalidSignature)
 
-        block <- commonApi.blockBySignature(blockId)
+        block <- commonApi.blockBySignature(blockId).toRight(BlockDoesNotExist)
       } yield block.json().addBlockFields(block.uniqueId)
 
       complete(result)
