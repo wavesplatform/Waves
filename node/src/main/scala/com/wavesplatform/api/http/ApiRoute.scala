@@ -24,7 +24,7 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
 
   protected def apiKeyHash: Option[Array[Byte]]
 
-  def getRoute: Route = handleAnyExceptions(uncaughtExceptionHandler)(route)
+  def getRoute: Route = handleAllExceptions(uncaughtExceptionHandler)(route)
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()
@@ -50,15 +50,30 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
     case NonFatal(e)           => log.error("Uncaught error", e); complete(ApiError.Unknown)
   }
 
-  private def handleAnyExceptions(handler: ExceptionHandler): Directive0 =
-    Directive { inner => ctx =>
-      val handleExceptions = handler.andThen(_(ctx))
-      try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
-      catch {
-        case thr: Throwable => handler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
-      }
+  /** Handles all [[scala.util.control.NonFatal non-fatal]] exceptions and tries to handle fatal errors.
+    *
+    * This directive can't handle __fatal__ errors from:
+    *
+    *   - Monix [[monix.eval.Task tasks]] with async boundaries:
+    *     {{{
+    *       get(complete(Task(throw new StackOverflowError()).executeAsync.runToFuture))
+    *       get(complete(Task.evalAsync(throw new StackOverflowError()).runToFuture))
+    *       get(complete(Task.deferFuture(Future(throw new StackOverflowError())).runToFuture))
+    *     }}}
+    *   - Async futures (i.e. which are not available at the time of handling):
+    *     {{{
+    *       get(complete(Future(throw new StackOverflowException())))
+    *     }}}
+    */
+  private def handleAllExceptions(handler: ExceptionHandler): Directive0 =
+    Directive { inner =>
+      ctx =>
+        val handleExceptions = handler.andThen(_ (ctx))
+        try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
+        catch {
+          case thr: Throwable => handler.andThen(_ (ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
+        }
     }
-
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[`X-Api-Key`](()).flatMap {
