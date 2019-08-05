@@ -58,12 +58,6 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .toRight(BlockDoesNotExist)
           .map(block => BlockWithHeight(Some(block.toPB), height))
 
-      case Request.Reference(reference) =>
-        commonApi
-          .childBlock(reference)
-          .toRight(BlockDoesNotExist)
-          .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
-
       case Request.Empty =>
         Right(BlockWithHeight.defaultInstance)
     }
