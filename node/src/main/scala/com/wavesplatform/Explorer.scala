@@ -89,6 +89,11 @@ object Explorer extends ScorexLogging {
   )
 
   def main(args: Array[String]): Unit = {
+    if (args.isEmpty) {
+      System.err.println("Usage: waves explore <command> [args] [--config|-c <cfg file>]")
+      return
+    }
+
     val configFileOption = args.sliding(2).collectFirst {
       case Array("-c" | "--config", config) if config.nonEmpty =>
         new File(config)
