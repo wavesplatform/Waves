@@ -66,6 +66,7 @@ object Expressions {
     def allowShadowing: Boolean
   }
 
+  // TODO remove types
   case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
   case class FUNC(position: Pos, name: PART[String], args: Seq[(PART[String], Seq[PART[String]])], expr: EXPR) extends Declaration {
     val allowShadowing = false
