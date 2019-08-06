@@ -25,6 +25,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
   private val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
   private def sender: Node         = nodes.last
+  private def miner: Node          = nodes.head
   private def firstAddress: String = sender.address
 
   test("Apply the same transfer transactions twice with return to UTX") {
@@ -101,7 +102,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
   test("Data transaction rollback") {
     val node       = nodes.head
     val entry1     = IntegerDataEntry("1", 0)
-    val entry2     = BooleanDataEntry("2", true)
+    val entry2     = BooleanDataEntry("2", value = true)
     val entry3     = IntegerDataEntry("1", 1)
     val txsBefore0 = sender.transactionsByAddress(firstAddress, 10)
 
@@ -191,10 +192,16 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val dtx    = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1)) + smartFee).id
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
-    val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, version = 2, waitForTx = true).id
+    val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, waitForTx = true).id
     nodes.waitForHeightAriseAndTxPresent(tx)
 
+    //as rollback is too fast, we should blacklist nodes from each other before rollback
+    sender.blacklist(miner.networkAddress)
+    miner.blacklist(sender.networkAddress)
     nodes.rollback(height)
+    sender.connect(miner.networkAddress)
+    miner.connect(sender.networkAddress)
+
     nodes.waitForSameBlockHeadesAt(height)
 
     nodes.waitForHeightArise()
@@ -210,7 +217,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
       (1, "1 of N"),
       (nodes.size, "N of N")
     )) { (num, name) =>
-    test(s"generate more blocks and resynchronise after rollback ${name}") {
+    test(s"generate more blocks and resynchronise after rollback $name") {
       val baseHeight = nodes.map(_.height).max + 5
       nodes.waitForHeight(baseHeight)
       val rollbackNodes = Random.shuffle(nodes).take(num)
