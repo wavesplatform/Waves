@@ -57,11 +57,6 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .blockAtHeight(if (height > 0) height else blockchain.height + height)
           .map(block => BlockWithHeight(Some(block.toPB), height))
 
-      case Request.Reference(reference) =>
-        commonApi
-          .childBlock(reference)
-          .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
-
       case Request.Empty =>
         None
     }
