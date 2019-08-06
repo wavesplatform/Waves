@@ -60,13 +60,15 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       restTotalConstraint: MiningConstraint
   ): Task[Unit] = {
 
-    val miningResult = for {
-      _          <- debugState.set(MinerDebugInfo.MiningMicroblocks)
-      packResult <- packTransactionsForMicroblock(constraints, restTotalConstraint)
-      result <- generateOneMicroBlockTask(account, accumulatedBlock, packResult.transactions, restTotalConstraint)
-        .asyncBoundary(minerScheduler)
-        .delayExecution(delay - packResult.timeSpent)
-    } yield result
+    val miningResult = {
+      for {
+        _          <- debugState.set(MinerDebugInfo.MiningMicroblocks)
+        packResult <- packTransactionsForMicroblock(constraints, restTotalConstraint)
+        result <- generateOneMicroBlockTask(account, accumulatedBlock, packResult.transactions, packResult.updatedConstraint)
+          .asyncBoundary(minerScheduler)
+          .delayExecution(delay - packResult.timeSpent)
+      } yield result
+    }
 
     miningResult.flatMap {
       case Success(newTotal, updatedTotalConstraint) =>
