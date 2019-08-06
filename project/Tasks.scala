@@ -7,44 +7,46 @@ import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.hjson.JsonValue
 import sbt.{Def, IO}
 import sbt._
-import sbt.Keys.{sourceManaged, version}
+import sbt.Keys.{sourceManaged, version, baseDirectory}
 
 import scala.collection.JavaConverters._
 
 object Tasks {
-  lazy val versionSource = (path: String) => Def.task {
-    // WARNING!!!
-    // Please, update the fallback version every major and minor releases.
-    // This version is used then building from sources without Git repository
-    // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-    val FallbackVersion = (1, 0, 2)
+  lazy val versionSource = (path: String) =>
+    Def.task {
+      // WARNING!!!
+      // Please, update the fallback version every major and minor releases.
+      // This version is used then building from sources without Git repository
+      // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+      val FallbackVersion = (1, 0, 2)
 
-    val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
-    val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-    val (major, minor, patch) = version.value match {
-      case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-      case _                            => FallbackVersion
-    }
-    IO.write(
-      versionFile,
-      s"""package $path
+      val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
+      val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
+      val (major, minor, patch) = version.value match {
+        case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+        case _                            => FallbackVersion
+      }
+      IO.write(
+        versionFile,
+        s"""package $path
          |
          |object Version {
          |  val VersionString = "${version.value}"
          |  val VersionTuple = ($major, $minor, $patch)
          |}
          |""".stripMargin
-    )
-    Seq(versionFile)
+      )
+      Seq(versionFile)
   }
 
   lazy val docSource = Def.task {
     val mapper = new ObjectMapper() with ScalaObjectMapper
     mapper.registerModule(DefaultScalaModule)
 
+    val baseLangDir = baseDirectory.value.getParentFile.getAbsolutePath
+
     def toMapChecked[K, V](data: Seq[V], key: V => K): Map[K, V] =
-      data
-        .distinct
+      data.distinct
         .groupBy(key)
         .ensuring(_.forall { case (_, v) => if (v.size == 1) true else { println(v); false } }, "Duplicate detected")
         .mapValues(_.head)
@@ -61,14 +63,14 @@ object Tasks {
         .map(tupleStr)
       "Map" + tupleStr(inner.toSeq)
     }
-    
+
     def sumMapStr(m1: String, m2: String): String = s"$m1 ++ $m2"
-    
+
     def kvStr[K, V](
-      seq:      Seq[V],
-      key:      V => K,
-      keyStr:   V => Seq[String],
-      valueStr: V => Seq[String]
+        seq: Seq[V],
+        key: V => K,
+        keyStr: V => Seq[String],
+        valueStr: V => Seq[String]
     ): String =
       mapStr(
         toMapChecked(seq, key).map { case (_, v) => (keyStr(v), valueStr(v)) }
@@ -81,7 +83,7 @@ object Tasks {
         v => Seq(str(v.name), ver),
         v => Seq(str(v.doc))
       )
-    
+
     def buildFuncsStr(funcs: Seq[FuncSourceData], ver: String): String =
       kvStr[(String, List[String]), FuncSourceData](
         funcs,
@@ -93,9 +95,9 @@ object Tasks {
     def readV1V2Data(): (String, String) =
       Seq("1", "2")
         .map { ver =>
-          val DocSourceData(vars, funcs) = mapper.readValue[DocSourceData](new File(s"lang/doc/v$ver/data.json"))
-          val varDataStr = buildVarsStr(vars, ver)
-          val funcDataStr = buildFuncsStr(funcs, ver)
+          val DocSourceData(vars, funcs) = mapper.readValue[DocSourceData](new File(s"$baseLangDir/doc/v$ver/data.json"))
+          val varDataStr                 = buildVarsStr(vars, ver)
+          val funcDataStr                = buildFuncsStr(funcs, ver)
           (varDataStr, funcDataStr)
         }
         .reduce { (a, b) =>
@@ -112,31 +114,33 @@ object Tasks {
         funcs,
         f => (f._1.name, f._1.params),
         f => Seq(str(f._1.name), listStr(f._1.params.map(str)), ver),
-        f => Seq(
-          str(f._1.doc.replace("\n", "\\n")),
-          listStr(f._1.paramsDoc.map(str).map(_.replace("\n", "\\n"))),
-          str(f._2)
+        f =>
+          Seq(
+            str(f._1.doc.replace("\n", "\\n")),
+            listStr(f._1.paramsDoc.map(str).map(_.replace("\n", "\\n"))),
+            str(f._2)
         )
       )
 
     def readV3Data(): (String, String) = {
       val ver = "3"
+
       val funcs = for {
-        path  <- Files.list(Paths.get("lang/doc/v3/funcs")).iterator.asScala
-        json  = JsonValue.readHjson(Files.newBufferedReader(path)).asObject().toString
+        path <- Files.list(Paths.get(s"$baseLangDir/doc/v3/funcs")).iterator.asScala
+        json = JsonValue.readHjson(Files.newBufferedReader(path)).asObject().toString
         funcs <- mapper.readValue[Map[String, List[FuncSourceData]]](json).head._2
         category = path.getName(path.getNameCount - 1).toString.split('.').head
       } yield (funcs, category)
 
       val funcsStr = buildCategorizedFuncsStr(funcs.toSeq, ver)
 
-      val vars = mapper.readValue[Map[String, List[VarSourceData]]](new File("lang/doc/v3/vars.json")).head._2
+      val vars    = mapper.readValue[Map[String, List[VarSourceData]]](new File(s"$baseLangDir/doc/v3/vars.json")).head._2
       val varsStr = buildVarsStr(vars, ver)
 
       (varsStr, funcsStr)
     }
 
-    val (vars, funcs) = readV1V2Data()
+    val (vars, funcs)     = readV1V2Data()
     val (varsV3, funcsV3) = readV3Data()
 
     val sourceStr =
