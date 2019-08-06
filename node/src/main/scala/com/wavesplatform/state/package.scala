@@ -40,15 +40,14 @@ package object state {
       d.transactions.get(id).map(_._2)
     }
 
-    def assetStreamFromDiff(d: Diff): Iterator[IssuedAsset] = {
+    def assetStreamFromDiff(d: Diff): Iterable[IssuedAsset] = {
       d.portfolios
         .get(address)
-        .toIterator
-        .flatMap(_.assets.keysIterator)
-
+        .toIterable
+        .flatMap(_.assets.keys)
     }
 
-    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]) = Observable.fromIterator {
+    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
       after
         .fold(assetStreamFromDiff(diff)) { after =>
           assetStreamFromDiff(diff)
@@ -65,7 +64,7 @@ package object state {
         }
     }
 
-    def nftFromBlockchain =
+    def nftFromBlockchain: Observable[IssueTransaction] =
       b.nftObservable(address, after)
         .filter { itx =>
           val asset = IssuedAsset(itx.assetId())
@@ -87,9 +86,6 @@ package object state {
     address: Address,
     types: Set[TransactionParser],
     fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
-
-    def transactionsFromDiff(d: Diff): Iterator[(Height, Transaction, Set[Address])] =
-      d.transactions.values.toSeq.reverseIterator.map(v => (Height(v._1), v._2, v._3))
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {

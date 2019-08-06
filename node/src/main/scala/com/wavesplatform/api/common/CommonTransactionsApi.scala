@@ -1,20 +1,18 @@
 package com.wavesplatform.api.common
 
-import cats.effect.Resource
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
+import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import monix.eval.Task
 import monix.reactive.Observable
-import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 
 import scala.concurrent.Future
 

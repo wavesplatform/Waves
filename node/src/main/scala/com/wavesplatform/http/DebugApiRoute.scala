@@ -60,7 +60,7 @@ case class DebugApiRoute(ws: WavesSettings,
                          extLoaderStateReporter: Coeval[RxExtensionLoader.State],
                          mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
                          scoreReporter: Coeval[RxScoreObserver.Stats],
-                         configRoot: ConfigObject)(implicit sc: Scheduler)
+                         configRoot: ConfigObject)
     extends ApiRoute
     with WithSettings
     with ScorexLogging {
@@ -198,7 +198,7 @@ case class DebugApiRoute(ws: WavesSettings,
     Array(
       new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
     ))
-  def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes)) {
+  def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
     json[RollbackParams] { params =>
       ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
@@ -293,7 +293,7 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
     ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
-    (delete & withAuth) {
+    (delete & withAuth & extractScheduler) { implicit sc =>
       val signatureEi: Either[ValidationError, ByteStr] =
         ByteStr
           .decodeBase58(signature)
@@ -411,7 +411,7 @@ case class DebugApiRoute(ws: WavesSettings,
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?) & handleExceptions(jsonExceptionHandler)) {
       (address, limit, afterOpt) =>
-        validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
+        (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) { implicit sc =>
           import cats.implicits._
 
           val result = blockchain

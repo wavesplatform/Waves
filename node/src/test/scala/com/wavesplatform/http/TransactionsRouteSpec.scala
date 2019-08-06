@@ -269,7 +269,7 @@ class TransactionsRouteSpec
       def routeGen: Gen[Route] =
         Gen.const({
           val b = mock[Blockchain]
-          TransactionsApiRoute(restAPISettings, wallet, b, utx, allChannels, new TestTime).route
+          TransactionsApiRoute(restAPISettings, wallet, b, utx, utxPoolSynchronizer, new TestTime).route
         })
 
       "address and limit" in {

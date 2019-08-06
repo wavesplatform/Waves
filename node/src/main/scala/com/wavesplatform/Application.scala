@@ -252,11 +252,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot
-        )(apiScheduler),
+        ),
         AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         assets.AssetsBroadcastApiRoute(settings.restAPISettings, utxSynchronizer),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time)(apiScheduler),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxSynchronizer),
         AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
         AliasBroadcastApiRoute(settings.restAPISettings, utxSynchronizer)

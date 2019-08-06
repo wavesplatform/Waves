@@ -1,5 +1,4 @@
 package com.wavesplatform.api.common
-import cats.effect.Resource
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
@@ -9,7 +8,6 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
-import monix.eval.Task
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {

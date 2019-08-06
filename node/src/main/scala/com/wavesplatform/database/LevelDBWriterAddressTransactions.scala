@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import java.io.IOException
 
+import cats.effect.Resource
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -9,6 +10,7 @@ import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.{Transaction, TransactionParser, TransactionParsers}
+import monix.eval.Task
 import monix.reactive.Observable
 
 import scala.util.Success
@@ -24,7 +26,7 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
     db.get(Keys.addressId(address)).fold(Observable.empty[(Height, Transaction)]) { id =>
-      val (heightAndTxs, close) = if (dbSettings.storeTransactionsByAddress) {
+      val (heightAndTxs, closeF) = if (dbSettings.storeTransactionsByAddress) {
         def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
           if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 
@@ -43,11 +45,11 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
             db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
               case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
               case None                   => Nil
-            })
+          })
 
         (takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
-          .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
-          () => ())
+           .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
+         () => ())
       } else {
         def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
           case None => txNums
@@ -61,10 +63,12 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
         (takeAfter(iter, maybeAfter), close)
       }
 
-      Observable.fromIterator(heightAndTxs.map { case (height, _, tx) => (height, tx) }, { () =>
-        close()
+      val resource = Resource(Task((heightAndTxs.map { case (height, _, tx) => (height, tx) }, Task {
+        closeF()
         snapshot.close()
-      })
+      })))
+
+      Observable.fromIterator(resource)
     }
   }
 
@@ -93,7 +97,7 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
           val heightNumBytes = kv.getValue
 
           val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-          val txNum = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+          val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
           (height, txNum)
         }

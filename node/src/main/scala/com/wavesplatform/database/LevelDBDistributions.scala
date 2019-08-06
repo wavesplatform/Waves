@@ -1,5 +1,6 @@
 package com.wavesplatform.database
 
+import cats.effect.Resource
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -9,6 +10,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.Paged
+import monix.eval.Task
 import monix.reactive.Observable
 
 private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends Distributions {
@@ -35,7 +37,7 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
         }
     }
 
-    val result = from
+    val resultIter = from
       .flatMap(ia => transactionInfo(ia.id))
       .fold(issueTxIterator) {
         case (_, afterTx) =>
@@ -44,7 +46,8 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
             .drop(1)
       }
 
-    Observable.fromIterator(result, () => snapshot.close())
+    val resource = Resource(Task((resultIter, Task(snapshot.close()))))
+    Observable.fromIterator(resource)
   }
 
   override def assetDistribution(asset: IssuedAsset): AssetDistribution = readOnly { db =>
