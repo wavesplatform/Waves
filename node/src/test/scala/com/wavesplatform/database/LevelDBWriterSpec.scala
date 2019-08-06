@@ -1,9 +1,9 @@
 package com.wavesplatform.database
 
+import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
@@ -22,11 +22,12 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.util.Random
 
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen with ScalaCheckDrivenPropertyChecks {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -410,15 +411,16 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     }
 
     "dont parse irrelevant transactions in transferById" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, _) =>
-        val transactionId = TransactionId(ByteStr(Array[Byte](0)))
+      val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
-        writer.readWrite(_.put(Keys.transactionHNById(transactionId), Some((Height @@ 1, TxNum @@ 0.toShort))))
-        writer.readWrite(_.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort), Some(Array[Byte](1, 2, 3, 4, 5, 6))))
+      forAll(randomTransactionGen) { tx =>
+        val transactionId = tx.id()
+        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
+        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+
         writer.transferById(transactionId) shouldBe None
 
-        writer.readWrite(
-          _.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort), Some(Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))))
+        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
       }
     }

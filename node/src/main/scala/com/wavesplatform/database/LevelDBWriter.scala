@@ -34,7 +34,7 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 object LevelDBWriter {
 
@@ -632,21 +632,8 @@ class LevelDBWriter(writableDB: DB, spendableBalanceChanged: Observer[(Address, 
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
       txBytes       <- db.get(Keys.transactionBytesAt(height, num))
-      result <- {
-        val isTransfer = Try {
-          txBytes.head == TransferTransaction.typeId ||
-          txBytes(1) == TransferTransaction.typeId
-        }.getOrElse(false)
-
-        if (isTransfer)
-          TransactionParsers.parseBytes(txBytes) match {
-            case Success(ttx: TransferTransaction) => Some(height -> ttx)
-            case Failure(exception) => throw exception
-            case _ => ???
-          }
-        else None
-      }
-    } yield result
+      isTransfer <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
+    } yield height -> TransactionParsers.parseBytes(txBytes).get.asInstanceOf[TransferTransaction]
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
