@@ -6,19 +6,19 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
+import monix.execution.Scheduler
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
-import shapeless.Coproduct
+
+import scala.concurrent.Future
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
@@ -26,18 +26,15 @@ class AssetsBroadcastRouteSpec
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
 
+  private[this] implicit def scheduler: Scheduler = Scheduler(this.executor)
 
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
 
   "returns StateCheckFailed" - {
 
-    val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
@@ -67,7 +64,7 @@ class AssetsBroadcastRouteSpec
 
   "returns appropriate error code when validation fails for" - {
     "issue transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastIssueReq) { ir =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
@@ -96,7 +93,7 @@ class AssetsBroadcastRouteSpec
     }
 
     "reissue transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastReissueReq) { rr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
@@ -111,7 +108,7 @@ class AssetsBroadcastRouteSpec
     }
 
     "burn transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastBurnReq) { br =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
@@ -128,7 +125,7 @@ class AssetsBroadcastRouteSpec
     }
 
     "transfer transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utx, allChannels).route
+      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastTransferReq) { tr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
@@ -158,17 +155,10 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val alwaysApproveUtx = stub[UtxPool]
-    (alwaysApproveUtx.putIfNew _).when(*, *).onCall((_: Transaction, _: Boolean) => TracedResult(Right(true))).anyNumberOfTimes()
+    val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+    (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
-    val alwaysSendAllChannels = stub[ChannelGroup]
-    (alwaysSendAllChannels
-      .writeAndFlush(_: Any, _: ChannelMatcher))
-      .when(*, *)
-      .onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture])
-      .anyNumberOfTimes()
-
-    val route = AssetsBroadcastApiRoute(restAPISettings, alwaysApproveUtx, alwaysSendAllChannels).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -220,43 +210,6 @@ class AssetsBroadcastRouteSpec
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
-        status shouldBe StatusCodes.BadRequest
-      }
-    }
-
-    "/batch-transfer" - {
-      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("batch-transfer"), v).addHeader(ApiKeyHeader) ~> route
-
-      "accepts TransferRequest" in posting(List(transferRequest)) ~> check {
-        status shouldBe StatusCodes.OK
-        val xs = responseAs[Seq[TransferTransactions]]
-        xs.size shouldBe 1
-        xs.head.select[TransferTransactionV1] shouldBe defined
-      }
-
-      "accepts VersionedTransferRequest" in posting(List(versionedTransferRequest)) ~> check {
-        status shouldBe StatusCodes.OK
-        val xs = responseAs[Seq[TransferTransactions]]
-        xs.size shouldBe 1
-        xs.head.select[TransferTransactionV2] shouldBe defined
-      }
-
-      "accepts both TransferRequest and VersionedTransferRequest" in {
-        val reqs = List(
-          Coproduct[SignedTransferRequests](transferRequest),
-          Coproduct[SignedTransferRequests](versionedTransferRequest)
-        )
-
-        posting(reqs) ~> check {
-          status shouldBe StatusCodes.OK
-          val xs = responseAs[Seq[TransferTransactions]]
-          xs.size shouldBe 2
-          xs.flatMap(_.select[TransferTransactionV1]) shouldNot be(empty)
-          xs.flatMap(_.select[TransferTransactionV2]) shouldNot be(empty)
-        }
-      }
-
-      "returns a error if it is not a transfer request" in posting(List(issueReq.sample.get)) ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }

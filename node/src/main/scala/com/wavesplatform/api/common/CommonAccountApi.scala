@@ -1,4 +1,5 @@
 package com.wavesplatform.api.common
+import cats.effect.Resource
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
@@ -8,6 +9,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import monix.eval.Task
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {
@@ -43,8 +45,11 @@ class CommonAccountApi(blockchain: Blockchain) {
   }
 
   def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    val iterator = blockchain.nftList(address, from)
-    Observable.fromIterator(iterator, () => iterator.close())
+    val resource = Resource(Task {
+      val iterator = blockchain.nftList(address, from)
+      (iterator: Iterator[IssueTransaction], Task(iterator.close()))
+    })
+    Observable.fromIterator(resource)
   }
 
   def script(address: Address): AddressScriptInfo = {

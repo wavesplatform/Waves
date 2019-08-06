@@ -3,11 +3,10 @@ package com.wavesplatform.api.http.alias
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 
-case class AliasBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup)
+case class AliasBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -17,7 +16,7 @@ case class AliasBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
 
   def signedCreate: Route = (path("create") & post) {
     json[SignedCreateAliasV1Request] { aliasReq =>
-      doBroadcast(aliasReq.toTx)
+      broadcastIfSuccess(aliasReq.toTx)
     }
   }
 }

@@ -1,21 +1,22 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
-import com.google.protobuf.ByteString
 import java.net.{URLDecoder, URLEncoder}
+
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
-import monix.execution.Scheduler
 
+import scala.concurrent.Future
 import scala.util.Random
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
@@ -26,9 +27,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
-import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -42,12 +41,14 @@ class AddressRouteSpec
     with TestWallet
     with NoShrink {
 
-  private val allAccounts  = testWallet.privateKeyAccounts
-  private val allAddresses = allAccounts.map(_.address)
-  private val blockchain   = stub[Blockchain]
+  private val allAccounts               = testWallet.privateKeyAccounts
+  private val allAddresses              = allAccounts.map(_.address)
+  private val blockchain                = stub[Blockchain]
+  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
+  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   private val route =
-    AddressApiRoute(restAPISettings, testWallet, blockchain, mock[UtxPool], mock[ChannelGroup], new TestTime)(Scheduler.global).route
+    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -198,13 +199,13 @@ class AddressRouteSpec
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAkIARIFCgMBAgMAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAYSVyVy"
       (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
-      "DAppMeta\\(" +
+        "DAppMeta\\(" +
         "1," +
         "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
         "List\\(\\)," +
         "List\\(\\)," +
         "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
-      "\\)").r
+        "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
