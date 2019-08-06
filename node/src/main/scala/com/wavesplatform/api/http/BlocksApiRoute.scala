@@ -55,12 +55,6 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
           }
     })
 
-  @Path("/child/{signature}")
-  @ApiOperation(value = "Child block", notes = "Get successor of specified block", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
-    ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
       val childJson = for ((child, height) <- commonApi.childBlock(block.uniqueId))
@@ -233,7 +227,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
           .toOption
           .toRight(InvalidSignature)
 
-        block <- commonApi.blockBySignature(blockId)
+        block <- commonApi.blockBySignature(blockId).toRight(BlockDoesNotExist)
       } yield block.json().addBlockFields(block.uniqueId)
 
       complete(result)

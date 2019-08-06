@@ -132,6 +132,10 @@ object NetworkServer extends ScorexLogging {
 
     val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
+    val averageHandshakePeriod = 1.second
+    val defaultHandshakeDelay  = 5.seconds
+    val greedyHandshakeDelay   = averageHandshakePeriod + 20.millis
+
     val bootstrap = new Bootstrap()
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
       .group(workerGroup)
@@ -139,7 +143,7 @@ object NetworkServer extends ScorexLogging {
       .handler(new PipelineInitializer[SocketChannel](Seq(
         new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
-        new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
+        new HandshakeTimeoutHandler(if (peerConnections.isEmpty) averageHandshakePeriod else settings.networkSettings.handshakeTimeout),
         clientHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
@@ -202,37 +206,45 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
-    val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
-      import scala.collection.JavaConverters._
-      val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+    def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
+      val delay = if (peerConnections.isEmpty) greedyHandshakeDelay else defaultHandshakeDelay
+      log.trace(s"Scheduling handshake, delay = $delay")
 
-      def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
+      workerGroup.schedule(delay) {
+        import scala.collection.JavaConverters._
+        val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
-      val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-      val incoming = all.filterNot(outgoing.contains)
+        def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
-      def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
+        val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+        val incoming = all.filterNot(outgoing.contains)
 
-      log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-      if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
-        peerDatabase
-          .randomPeer(excluded = excludedAddresses ++ all)
-          .foreach(doConnect)
+        def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
+
+        log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+        if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
+          peerDatabase
+            .randomPeer(excluded = excludedAddresses ++ all)
+            .foreach(doConnect)
+        }
+
+        Metrics.write(
+          Point
+            .measurement("connections")
+            .addField("outgoing", outgoingStr)
+            .addField("incoming", incomingStr)
+            .addField("n", all.size)
+        )
+
+        scheduleConnectTask()
       }
-
-      Metrics.write(
-        Point
-          .measurement("connections")
-          .addField("outgoing", outgoingStr)
-          .addField("incoming", incomingStr)
-          .addField("n", all.size)
-      )
     }
+
+    scheduleConnectTask()
 
     def doShutdown(): Unit =
       try {
         shutdownInitiated = true
-        connectTask.cancel(false)
         serverChannel.foreach(_.close().await())
         log.debug("Unbound server")
         allChannels.close().await()

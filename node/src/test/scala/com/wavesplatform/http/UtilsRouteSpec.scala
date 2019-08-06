@@ -13,10 +13,10 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -211,7 +211,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         """.stripMargin
       val compiled = ScriptCompiler.compile(expectedScript)
 
-      val json = responseAs[JsValue]
+      val json         = responseAs[JsValue]
       val base64Result = Script.fromBase64String((json \ "script").as[String])
       base64Result shouldBe compiled.map(_._1)
       (json \ "complexity").as[Long] shouldBe compiled.map(_._2).explicitGet()

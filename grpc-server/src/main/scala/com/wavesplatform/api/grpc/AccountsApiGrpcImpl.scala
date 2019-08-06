@@ -1,4 +1,7 @@
 package com.wavesplatform.api.grpc
+
+import com.google.protobuf.wrappers.{BytesValue, StringValue}
+import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.{AssetAmount, AssetId, PBTransactions}
@@ -60,4 +63,14 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
 
     responseObserver.completeWith(stream)
   }
+
+  override def resolveAlias(request: StringValue): Future[BytesValue] =
+    Future {
+      val result = for {
+        alias   <- Alias.create(request.value)
+        address <- blockchain.resolveAlias(alias)
+      } yield BytesValue(address.bytes)
+
+      result.explicitGetErr()
+    }
 }

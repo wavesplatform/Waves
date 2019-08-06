@@ -354,8 +354,4 @@ object ApiError {
         "transaction" -> tx.json()
       )
   }
-
-  implicit class ApiErrorException(val error: ApiError) extends IllegalArgumentException(error.message) {
-    def toException = this
-  }
 }
