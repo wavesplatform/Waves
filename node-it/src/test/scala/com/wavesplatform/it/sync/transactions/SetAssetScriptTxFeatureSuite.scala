@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
-import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueFee, scriptBase64, setAssetScriptFee, someAssetAmount}
@@ -39,8 +39,6 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
       .id
 
     nodes.waitForHeightAriseAndTxPresent(assetId)
-
-    sender.featureActivationStatus(BlockchainFeatures.SmartAssets.id).blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
 
     assertBadRequestAndResponse(
       sender.setAssetScript(assetId, firstAddress, setAssetScriptFee, Some(scriptBase64)).id,
