@@ -4,12 +4,11 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.parser.Parser
 import monix.execution.atomic.{Atomic, AtomicAny}
 import cats.implicits._
 import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Expressions.{BLOCK, EXPR}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
