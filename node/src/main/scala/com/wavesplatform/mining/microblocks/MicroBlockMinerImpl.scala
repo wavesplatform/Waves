@@ -75,7 +75,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
 
         if (unconfirmed.isEmpty && updatedTotalConstraint.isFull) {
           log.trace {
-            if (restTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $restTotalConstraint"
+            if (updatedTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
             else "Stopping forging microBlocks, because all transactions are too big"
           }
           Task.now(Stop)
@@ -83,7 +83,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
           log.trace(s"Skipping microBlock because utx is empty")
           Task.now(Retry)
         } else {
-          log.trace(s"Generating microBlock for $account, constraints: $restTotalConstraint")
+          log.trace(s"Generating microBlock for $account, constraints: $updatedTotalConstraint")
 
           val miningTask = for {
             blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
@@ -96,7 +96,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
 
           miningTask.map { accumulatedBlock =>
             if (updatedTotalConstraint.isFull) Stop
-            else Success(accumulatedBlock, restTotalConstraint)
+            else Success(accumulatedBlock, updatedTotalConstraint)
           }
         }
       }
