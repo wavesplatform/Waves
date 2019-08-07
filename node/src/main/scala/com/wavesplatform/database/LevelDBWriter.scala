@@ -618,22 +618,8 @@ class LevelDBWriter(private[database] val writableDB: DB,
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
       txBytes       <- db.get(Keys.transactionBytesAt(height, num))
-      result <- {
-        val isTransfer = Try {
-          txBytes.head == TransferTransaction.typeId ||
-          txBytes(1) == TransferTransaction.typeId
-        }.getOrElse(false)
-
-        if (isTransfer)
-          TransactionParsers
-            .parseBytes(txBytes)
-            .collect {
-              case ttx: TransferTransaction => (height, ttx)
-            }
-            .toOption
-        else None
-      }
-    } yield result
+      isTransfer <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
+    } yield height -> TransactionParsers.parseBytes(txBytes).get.asInstanceOf[TransferTransaction]
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
