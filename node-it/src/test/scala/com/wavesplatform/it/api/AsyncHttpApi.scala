@@ -143,6 +143,8 @@ object AsyncHttpApi extends Assertions {
 
     def blockSeq(from: Int, to: Int): Future[Seq[Block]] = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
 
+    def blockSeqByAddress(address: String, from: Int, to: Int): Future[Seq[Block]] = get(s"/blocks/address/$address/$from/$to").as[Seq[Block]]
+
     def blockHeadersAt(height: Int): Future[BlockHeaders] = get(s"/blocks/headers/at/$height").as[BlockHeaders]
 
     def blockHeadersSeq(from: Int, to: Int): Future[Seq[BlockHeaders]] = get(s"/blocks/headers/seq/$from/$to").as[Seq[BlockHeaders]]
