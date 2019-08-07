@@ -21,32 +21,39 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
   def portfolio(a: Address): Portfolio =
     portfolioCache.get(a, () => loadPortfolio(a))
 
-  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = readOnlyNoClose { (snapshot, db) =>
-    def issueTxIterator = {
-      val assetIds = db
-        .get(Keys.addressId(address))
-        .fold(Seq.empty[IssuedAsset]) { id =>
-          val addressId = AddressId @@ id
-          db.get(Keys.assetList(addressId))
-        }
+  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
+    def openIterator() = readOnlyNoClose { (snapshot, db) =>
+      def issueTxIterator = {
+        val assetIds = db
+          .get(Keys.addressId(address))
+          .fold(Seq.empty[IssuedAsset]) { id =>
+            val addressId = AddressId @@ id
+            db.get(Keys.assetList(addressId))
+          }
 
-      assetIds.iterator
-        .flatMap(ia => transactionInfo(ia.id).map(_._2))
-        .collect {
-          case itx: IssueTransaction if itx.isNFT => itx
-        }
-    }
-
-    val resultIter = from
-      .flatMap(ia => transactionInfo(ia.id))
-      .fold(issueTxIterator) {
-        case (_, afterTx) =>
-          issueTxIterator
-            .dropWhile(_.id() != afterTx.id())
-            .drop(1)
+        assetIds.iterator
+          .flatMap(ia => transactionInfo(ia.id).map(_._2))
+          .collect {
+            case itx: IssueTransaction if itx.isNFT => itx
+          }
       }
 
-    val resource = Resource(Task((resultIter, Task(snapshot.close()))))
+      val result = from
+        .flatMap(ia => transactionInfo(ia.id))
+        .fold(issueTxIterator) {
+          case (_, afterTx) =>
+            issueTxIterator
+              .dropWhile(_.id() != afterTx.id())
+              .drop(1)
+        }
+
+      (result, snapshot)
+    }
+
+    val resource = Resource(Task {
+      val (iter, snapshot) = openIterator()
+      (iter, Task(snapshot.close()))
+    })
     Observable.fromIterator(resource)
   }
 

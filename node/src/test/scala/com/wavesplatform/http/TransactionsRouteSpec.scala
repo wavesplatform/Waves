@@ -116,7 +116,7 @@ class TransactionsRouteSpec
 
     "transfer with Asset fee" - {
       "without sponsorship" in {
-        val assetId: ByteStr = issueGen.sample.get.assetId()
+        val assetId: ByteStr = issueGen.sample.get.assetId
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -146,7 +146,7 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship" in {
-        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId())
+        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -189,7 +189,7 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship, smart token and smart account" in {
-        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId())
+        val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
