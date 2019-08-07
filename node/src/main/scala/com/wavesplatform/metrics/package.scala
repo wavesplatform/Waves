@@ -31,6 +31,16 @@ package object metrics {
     def measureSuccessful[T](f: => Option[T]): Option[T] =
       measureWithFilter(f)(_.isDefined)
 
+    def measureTask[T](f: Task[T]): Task[T] = {
+      Task
+        .delay(timer.start())
+        .flatMap { startedTimer =>
+          f.guarantee(Task.delay {
+            startedTimer.stop()
+          })
+        }
+    }
+
     def measureFuture[T](f: => Future[T])(implicit ec: ExecutionContext): Future[T] = {
       val startedTimer = timer.start()
       val future       = f

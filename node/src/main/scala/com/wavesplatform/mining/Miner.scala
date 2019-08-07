@@ -148,7 +148,7 @@ class MinerImpl(allChannels: ChannelGroup,
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(
+      (unconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
         utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime))
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
@@ -266,12 +266,6 @@ class MinerImpl(allChannels: ChannelGroup,
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
   private[this] object metrics {
-    def measureLog[R](s: String)(f: => R): R = {
-      val (result, time) = Instrumented.withTimeMillis(f)
-      log.trace(s"$s took ${time}ms")
-      result
-    }
-
     val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
     val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
   }
