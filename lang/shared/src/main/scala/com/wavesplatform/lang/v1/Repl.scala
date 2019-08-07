@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import monix.execution.atomic.Atomic
+import monix.execution.atomic.{Atomic, AtomicAny}
 import cats.implicits._
 import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
@@ -41,12 +41,18 @@ case class Repl(ver: StdLibVersion = V3) {
   private val scriptAcc = Atomic(initialState)
 
   def execute(expr: String): Either[String, String] =
-    scriptAcc.transformAndExtract(acc => {
+    transformAndExtract(scriptAcc, (acc: EXPR => EXPR) => {
       evalExpr(expr, acc) match {
         case Left(e)            => (Left(e), acc)
         case Right((r, newAcc)) => (Right(r), newAcc)
       }
     })
+
+  private def transformAndExtract[S <: AnyRef, R](s: AtomicAny[S], f: S => (R, S)): R = {
+    val (result, nextState) = f(s.get)
+    s.set(nextState)
+    result
+  }
 
   private def evalExpr(expr: String, acc: EXPR => EXPR): Either[String, (String, EXPR => EXPR)] =
     for {
