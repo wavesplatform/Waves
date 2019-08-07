@@ -243,14 +243,18 @@ object JsAPI {
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
-  val repl = Repl()
-
   @JSExportTopLevel("repl")
-  def repl(expr: String): js.Dynamic = {
-    repl.execute(expr)
-      .fold(
-        e => js.Dynamic.literal("error" -> e),
-        r => js.Dynamic.literal("result" -> r)
-      )
-  }
+  def repl(): js.Dynamic = asJs(Repl())
+
+  private def asJs(repl: Repl): js.Dynamic =
+    jObj(
+      "evaluate" -> (repl.execute _ andThen mapResult),
+      "clear"    -> repl.clear _
+    )
+
+  private def mapResult(eval: Either[String, String]): js.Dynamic =
+    eval.fold(
+      e => jObj("error" -> e),
+      r => jObj("result" -> r)
+    )
 }
