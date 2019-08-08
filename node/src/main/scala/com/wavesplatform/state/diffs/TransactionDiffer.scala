@@ -11,9 +11,8 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.ScorexLogging
 
-object TransactionDiffer extends ScorexLogging {
+object TransactionDiffer {
 
   private val stats = TxProcessingStats
 
@@ -25,16 +24,16 @@ object TransactionDiffer extends ScorexLogging {
 
   def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
       blockchain: Blockchain,
-      tx: Transaction): TracedResult[ValidationError, Diff] = {
+      tx: Transaction
+  ): TracedResult[ValidationError, Diff] = {
     val func =
       if (verify) verified(prevBlockTimestamp, currentBlockTimestamp) _
       else unverified(currentBlockTimestamp) _
     func(blockchain, tx)
   }
 
-  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long)(
-      blockchain: Blockchain,
-      tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long)(blockchain: Blockchain,
+                                                                              tx: Transaction): TracedResult[ValidationError, Diff] = {
     for {
       _ <- Verifier(blockchain)(tx)
       _ <- TracedResult(
@@ -46,9 +45,10 @@ object TransactionDiffer extends ScorexLogging {
               _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)
               _ <- CommonValidation.disallowDuplicateIds(blockchain, tx)
               _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTimestamp, tx)
-              _ <- CommonValidation.checkFee(blockchain, tx)
+              _ <- FeeValidation(blockchain, tx)
             } yield ()
-          })
+          }
+      )
       diff <- unverified(currentBlockTimestamp)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
         .measureForType(tx.builder.typeId) {
@@ -62,7 +62,7 @@ object TransactionDiffer extends ScorexLogging {
       tx match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction =>
-          PaymentTransactionDiff(blockchain.settings.functionalitySettings, blockchain.height, currentBlockTimestamp)(ptx)
+          PaymentTransactionDiff(blockchain)(ptx)
         case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain)(itx)
         case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
         case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain)(btx)

@@ -2,6 +2,7 @@ package com.wavesplatform.api.http.alias
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Alias
+import com.wavesplatform.api.http.ApiError.AliasDoesNotExist
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
@@ -43,7 +44,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
       case Right(alias) =>
         blockchain.resolveAlias(alias) match {
           case Right(addr) => Right(Address(addr.stringRepr))
-          case _           => Left(AliasDoesNotExist(alias))
+          case _ => Left(AliasDoesNotExist(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }

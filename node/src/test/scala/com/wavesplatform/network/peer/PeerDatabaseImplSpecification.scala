@@ -12,6 +12,11 @@ import org.scalatest.{Matchers, path}
 
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
+  val host1     = "1.1.1.1"
+  val host2     = "2.2.2.2"
+  val address1  = new InetSocketAddress(host1, 1)
+  val address2  = new InetSocketAddress(host2, 2)
+
   private val config1   = ConfigFactory.parseString("""waves.network {
       |  file = null
       |  known-peers = []
@@ -26,12 +31,17 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
   private val settings2 = config2.as[NetworkSettings]("waves.network")
 
+  private val config3   = ConfigFactory.parseString(s"""waves.network {
+                                                      |  file = null
+                                                      |  known-peers = ["$host1:1"]
+                                                      |  peers-data-residence-time: 2s
+                                                      |  enable-peers-exchange: no
+                                                      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings3 = config3.as[NetworkSettings]("waves.network")
+
   val database  = new PeerDatabaseImpl(settings1)
   val database2 = new PeerDatabaseImpl(settings2)
-  val host1     = "1.1.1.1"
-  val host2     = "2.2.2.2"
-  val address1  = new InetSocketAddress(host1, 1)
-  val address2  = new InetSocketAddress(host2, 2)
+  val database3 = new PeerDatabaseImpl(settings3)
 
   "Peer database" - {
     "new peer should not appear in internal buffer but does not appear in database" in {
@@ -55,6 +65,14 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       sleepLong()
       database.knownPeers shouldBe empty
       database.randomPeer(Set()) shouldBe empty
+    }
+
+    "known-peers should be always in database" in {
+      database3.knownPeers.keys should contain(address1)
+      sleepLong()
+      database3.knownPeers.keys should contain(address1)
+      sleepShort()
+      database3.knownPeers.keys should contain(address1)
     }
 
     "touching peer prevent it from obsoleting" in {

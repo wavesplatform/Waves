@@ -1,5 +1,5 @@
 syntax = "proto3";
-package waves;
+package waves.events;
 option java_package = "com.wavesplatform.events.protobuf";
 
 import "block.proto";

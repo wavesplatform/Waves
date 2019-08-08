@@ -13,7 +13,7 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.reader.CompositeBlockchain.composite
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
@@ -24,7 +24,6 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
 
@@ -52,7 +51,7 @@ class UtxPoolImpl(time: Time,
     else putNewTx(tx, verify)
   }
 
-  protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -141,7 +140,7 @@ class UtxPoolImpl(time: Time,
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
     tracedIsNew.resultE match {
       case Left(err)    => log.debug(s"UTX putIfNew(${tx.id()}) failed with $err")
-      case Right(isNew)  => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
     }
     tracedIsNew
   }
@@ -205,7 +204,7 @@ class UtxPoolImpl(time: Time,
               remove(tx.id())
               bumpIterations(r)
             } else {
-              val updatedBlockchain = composite(blockchain, diff)
+              val updatedBlockchain = CompositeBlockchain(blockchain, Some(diff))
               differ(updatedBlockchain, tx).resultE match {
                 case Right(newDiff) =>
                   val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
@@ -253,12 +252,12 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[UtxPoolImpl] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
+  private[this] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
-  val cleanupTask: Task[Unit] = Task
-    .eval[Unit](packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf))
-    .onErrorRecover { case t => log.error("Error cleaning up UTX pool", t) }
-    .executeOn(scheduler)
+  def addAndCleanup(transactions: Seq[Transaction], verify: Boolean = true): Unit = scheduler.executeAsync { () =>
+    transactions.foreach(putIfNew(_, verify))
+    packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+  }
 
   override def close(): Unit = {
     scheduler.shutdown()

@@ -11,6 +11,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser, TransactionParsers}
 import com.wavesplatform.utils.CloseableIterator
 
@@ -19,7 +20,6 @@ trait Blockchain {
 
   def height: Int
   def score: BigInt
-  def scoreOf(blockId: ByteStr): Option[BigInt]
 
   def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
   def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
@@ -48,6 +48,7 @@ trait Blockchain {
 
   def portfolio(a: Address): Portfolio
 
+  def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
 

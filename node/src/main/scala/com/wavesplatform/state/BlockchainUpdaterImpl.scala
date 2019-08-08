@@ -14,7 +14,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
-import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
+import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -23,9 +23,10 @@ import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, Generi
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.utils.{CloseableIterator, Schedulers, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.utils.{CloseableIterator, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
@@ -58,8 +59,15 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
   private var ngState: Option[NgState]              = Option.empty
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
 
-  private val service               = Schedulers.singleThread("last-block-info-publisher")
-  private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
+  private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
+
+  private def publishLastBlockInfo(): Unit =
+    for (id <- lastBlockId; ts <- ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)) {
+      val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
+      internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
+    }
+
+  publishLastBlockInfo()
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
@@ -67,18 +75,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
   }
 
-  override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
-  lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
-
-  private def blockchainReady: Boolean = {
-    val lastBlock = ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp).get
-    lastBlock + maxBlockReadinessAge > time.correctedTime()
-  }
-
-  // Store last block information in a cache
-  lastBlockId.foreach { id =>
-    internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
-  }
+  override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
@@ -205,7 +202,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
 
                     val diff = BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
+                        CompositeBlockchain(blockchain, Some(referencedLiquidDiff), Some(referencedForgedBlock), carry),
                         Some(referencedForgedBlock),
                         block,
                         constraint,
@@ -231,7 +228,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
               notifyChangedSpendable(prevNgState, ngState)
-              lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
+              publishLastBlockInfo()
 
               if ((block.timestamp > time
                     .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
@@ -266,7 +263,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, blockchainReady))
+    publishLastBlockInfo()
     result
   }
 
@@ -306,14 +303,12 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
             for {
               _ <- microBlock.signaturesValid()
               blockDifferResult <- {
-                val constraints  = MiningConstraints(blockchain, blockchain.height)
-                val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-                BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint, verify)
+                BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, restTotalConstraint, verify)
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
               BlockchainUpdateNotifier.notifyProcessMicroBlock(blockchainUpdated, microBlock, detailedDiff, blockchain)
-              restTotalConstraint = updatedMdConstraint.constraints.head
+              restTotalConstraint = updatedMdConstraint
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
@@ -329,7 +324,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
 
   def shutdown(): Unit = {
     internalLastBlockInfo.onComplete()
-    service.shutdown()
   }
 
   private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
@@ -371,12 +365,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     blockchain
       .blockBytes(height)
       .orElse(ngState.collect { case ng if height == blockchain.height + 1 => ng.bestLiquidBlock.bytes() })
-  }
-
-  override def scoreOf(blockId: BlockId): Option[BigInt] = readLock {
-    blockchain
-      .scoreOf(blockId)
-      .orElse(ngState.collect { case ng if ng.contains(blockId) => blockchain.score + ng.base.blockScore() })
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
@@ -489,6 +477,17 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
 
+  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
+    ngState
+      .fold(Diff.empty)(_.bestLiquidDiff)
+      .transactions
+      .get(id)
+      .collect {
+        case (tx: TransferTransaction, _) => (height, tx)
+      }
+      .orElse(blockchain.transferById(id))
+  }
+
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
     ngState
       .fold(Diff.empty)(_.bestLiquidDiff)
@@ -527,14 +526,13 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
 
   override def assetDescription(id: IssuedAsset): Option[AssetDescription] = readLock {
     ngState.fold(blockchain.assetDescription(id)) { ng =>
-      val diff = ng.bestLiquidDiff
-      CompositeBlockchain.composite(blockchain, diff).assetDescription(id)
+      CompositeBlockchain(blockchain, Some(ng.bestLiquidDiff)).assetDescription(id)
     }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readLock {
     ngState.fold(blockchain.resolveAlias(alias)) { ng =>
-      CompositeBlockchain.composite(blockchain, ng.bestLiquidDiff).resolveAlias(alias)
+      CompositeBlockchain(blockchain, Some(ng.bestLiquidDiff)).resolveAlias(alias)
     }
   }
 

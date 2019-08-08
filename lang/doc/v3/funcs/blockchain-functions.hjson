@@ -1,0 +1,28 @@
+{
+  funcs: [
+    {
+      name: "assetInfo"
+      params: [ "ByteVector" ]
+      doc: "Gets the information about a [token](/blockchain/token.md)."
+      paramsDoc: [ "ID of the [token](/blockchain/token.md)." ]
+    }
+    {
+      name: "blockInfoByHeight"
+      params: [ "Int" ]
+      doc: "Gets the information about a [block](/blockchain/block.md) by the [block height](/blockchain/block-height.md)"
+      paramsDoc: [ "Block height." ]
+    }
+    {
+      name: "transactionHeightById"
+      params: [ "ByteVector" ]
+      doc: "Gets the [block height](/blockchain/block-height.md) of a transaction."
+      paramsDoc: [ "ID of the transaction." ]
+    }
+    {
+      name: "transferTransactionById"
+      params: [ "ByteVector" ]
+      doc: "Gets the data of a transfer transaction."
+      paramsDoc: [ "ID of the transfer transaction." ]
+    }
+  ]
+}

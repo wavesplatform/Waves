@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
@@ -58,7 +59,7 @@ class AssetsBroadcastRouteSpec
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { t: Transaction =>
-          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(CustomValidationError("foo"), t))
         }
       }
     }

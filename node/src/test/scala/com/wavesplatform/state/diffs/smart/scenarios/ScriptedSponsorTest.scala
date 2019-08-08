@@ -49,7 +49,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val contract             = transfer.sender
 
         val contractSpent: Long = ENOUGH_FEE + 1
-        val sponsorSpent: Long  = ENOUGH_FEE * 3 - 1 + ENOUGH_FEE * CommonValidation.FeeUnit
+        val sponsorSpent: Long  = ENOUGH_FEE * 3 - 1 + ENOUGH_FEE * FeeValidation.FeeUnit
 
         val sponsor = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
 
@@ -73,7 +73,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val contract             = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
         val recipient            = transfer.sender
 
-        val contractSpent: Long  = ENOUGH_FEE * 4 + ENOUGH_FEE * CommonValidation.FeeUnit
+        val contractSpent: Long  = ENOUGH_FEE * 4 + ENOUGH_FEE * FeeValidation.FeeUnit
         val recipientSpent: Long = 1
 
         assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>

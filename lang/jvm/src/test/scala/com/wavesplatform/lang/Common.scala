@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
@@ -35,7 +35,7 @@ object Common {
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
   val multiplierFunction: NativeFunction =
-    NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, "test ultiplication", ("x1", LONG, "x1"), ("x2", LONG, "x2")) {
+    NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {
       case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
       case _                                                   => ??? // suppress pattern match warning
     }
@@ -78,6 +78,7 @@ object Common {
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
   }
 

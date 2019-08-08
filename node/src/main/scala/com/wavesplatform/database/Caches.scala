@@ -10,8 +10,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
+import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
@@ -40,14 +41,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def lastBlock: Option[Block] = current._3
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = {
-    val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
-      Some(c._2)
-    } else {
-      loadScoreOf(blockId)
-    }
-  }
 
   def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
@@ -195,8 +188,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def doAppend(block: Block,
                          carry: Long,
                          newAddresses: Map[Address, BigInt],
-                         wavesBalances: Map[BigInt, Long],
-                         assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
+                         balances: Map[BigInt, Map[Asset, Long]],
                          leaseBalances: Map[BigInt, LeaseBalance],
                          addressTransactions: Map[AddressId, List[TransactionId]],
                          leaseStates: Map[ByteStr, Boolean],
@@ -230,17 +222,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     log.trace(s"CACHE newAddressIds = $newAddressIds")
     log.trace(s"CACHE lastAddressId = $lastAddressId")
 
-    val newBalances = DiffToStateApplier.balances(this, diff)
+    val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
-    val wavesBalances = newBalances.collect { case ((address, Waves), balance) => addressId(address) -> balance }
-
-    val assetBalances = newBalances
-      .collect { case ((address, asset: IssuedAsset), balance) => (addressId(address), asset) -> balance }
-      .groupBy { case ((address, _), _) => address }
-      .mapValues(_.map { case ((_, asset), balance) => asset -> balance })
-
-    val updatedLeaseBalances = DiffToStateApplier.leases(this, diff)
-    val leaseBalances        = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
+    val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
 
     val newPortfolios = diff.portfolios.keys.toSet
 
@@ -277,8 +261,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       block,
       carryFee,
       newAddressIds,
-      wavesBalances,
-      assetBalances,
+      updatedBalances.map { case (a, v) => addressId(a) -> v },
       leaseBalances,
       addressTransactions,
       diff.leaseState,
@@ -295,9 +278,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
-    balancesCache.putAll(newBalances.mapValues(long2Long).asJava)
-    for (address <- newPortfolios) portfolioCache.invalidate(address)
-    for (id      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
+    for (address                 <- newPortfolios) portfolioCache.invalidate(address)
+    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)

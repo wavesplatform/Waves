@@ -1,5 +1,6 @@
 package com.wavesplatform.api.http
 
+import cats.Applicative
 import cats.implicits._
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -15,7 +16,7 @@ import scala.annotation.meta.field
 
 object InvokeScriptRequest {
 
-  case class FunctionCallPart(function: String, args: List[EVALUATED])
+  case class FunctionCallPart(function: String, @(ApiModelProperty @field)(required = false) args: List[EVALUATED])
 
   implicit val EvaluatedReads = new Reads[EVALUATED] {
     def reads(jv: JsValue): JsResult[EVALUATED] = {
@@ -50,7 +51,33 @@ object InvokeScriptRequest {
     }
   }
 
-  implicit val functionCallReads                = Json.reads[FunctionCallPart]
+  implicit val ap: Applicative[JsResult] = new Applicative[JsResult] {
+    override def pure[A](x: A): JsResult[A] = JsSuccess(x)
+    override def ap[A, B](ff: JsResult[A => B])(fa: JsResult[A]): JsResult[B] =
+      (ff, fa) match {
+        case (e@JsError(_), _)                  => e
+        case (_, e@JsError(_))                  => e
+        case (JsSuccess(f, _), JsSuccess(a, _)) => JsSuccess(f(a))
+      }
+  }
+
+  implicit val functionCallReads: Reads[FunctionCallPart] = (jv: JsValue) => {
+    val argsR = jv \ "args" match {
+      case JsDefined(JsArray(value)) => value.toList.traverse(EvaluatedReads.reads)
+      case JsDefined(_)              => JsError("Unexpected args format")
+      case _: JsUndefined            => JsSuccess(Nil)
+    }
+    val funcNameR = jv \ "function" match {
+      case JsDefined(JsString(value)) => JsSuccess(value)
+      case JsDefined(_)               => JsError("Unexpected call function name format")
+      case _: JsUndefined             => JsError("Undefined call function name")
+    }
+    for {
+      args     <- argsR
+      funcName <- funcNameR
+    } yield FunctionCallPart(funcName, args)
+  }
+
   implicit val unsignedInvokeScriptRequestReads = Json.reads[InvokeScriptRequest]
   implicit val signedInvokeScriptRequestReads   = Json.reads[SignedInvokeScriptRequest]
 
