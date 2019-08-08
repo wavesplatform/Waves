@@ -10,21 +10,20 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
-import com.wavesplatform.utils.CloseableIterator
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carry: Long = 0)
     extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
-
-  override def portfolio(a: Address): Portfolio = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
 
   override def balance(address: Address, assetId: Asset): Long =
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
@@ -106,29 +105,22 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
 
   override def height: Int = inner.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
 
-  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
-    nftListFromDiff(inner, maybeDiff)(address, from)
-  }
-
-  override def addressTransactions(address: Address,
-                                   types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
-    addressTransactionsFromDiff(inner, maybeDiff)(address, types, fromId)
-
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = {
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keysIterator
+    val fromDiff = active.keys
       .map(id => diff.transactions(id)._2)
-      .collect { case lt: LeaseTransaction => lt }
+      .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
 
-    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
-    CloseableIterator.seq(fromDiff, fromInner)
+    val fromInner = inner.collectActiveLeases {
+      case lt if !canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt)
+    }
+    fromDiff.toVector ++ fromInner
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
@@ -196,34 +188,6 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
     diffData.data.get(key).orElse(inner.accountData(acc, key))
   }
 
-  private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] =
-    for {
-      (address, p) <- diff.portfolios
-      if pred(p)
-    } yield address -> f(address)
-
-  override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {
-    val fromInner = inner.assetDistribution(assetId)
-    val fromDiff  = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, assetId)))
-
-    fromInner |+| fromDiff
-  }
-
-  override def assetDistributionAtHeight(asset: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
-    inner.assetDistributionAtHeight(asset, height, count, fromAddress)
-  }
-
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = {
-    val innerDistribution = inner.wavesDistribution(height)
-    if (height < this.height) innerDistribution
-    else {
-      innerDistribution.map(_ ++ changedBalances(_.balance != 0, balance(_)))
-    }
-  }
-
   override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)
 
   override def carryFee: Long = carry
@@ -266,4 +230,12 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
+}
+
+object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
+  def addressTransactions(bu: CompositeBlockchain): AddressTransactions =
+    new CompositeAddressTransactions(bu.inner, Height @@ bu.height, () => bu.maybeDiff)
+
+  def distributions(bu: CompositeBlockchain): Distributions =
+    new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
 }

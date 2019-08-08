@@ -53,7 +53,7 @@ trait BaseGlobal {
     }
   }
 
-  def base16Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]] = {
+  def base16Decode(input: String): Either[String, Array[Byte]] = {
     val size = input.size
     if(size % 2 == 1) {
       Left("Need internal bytes number")
