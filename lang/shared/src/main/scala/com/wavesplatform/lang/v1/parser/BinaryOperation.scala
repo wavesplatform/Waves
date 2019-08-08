@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.parser
 import com.wavesplatform.lang.v1.parser.Expressions._
 import fastparse.all._
 
-sealed abstract class BinaryOperation {
+sealed abstract class BinaryOperation extends BinaryOp {
   val func: String
   val parser: P[BinaryOperation] = P(func).map(_ => this)
   def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
@@ -24,7 +24,11 @@ object BinaryOperation {
     Left(List(MUL_OP, DIV_OP, MOD_OP))
   )
 
-  def opsToFunctions(op: BinaryOperation): String = op.func
+  def opsToFunctions(op: BinaryOp): String = if(op.isInstanceOf[BinaryOperation]) {
+    op.asInstanceOf[BinaryOperation].func
+  }else {
+    ""
+  }
 
   case object OR_OP extends BinaryOperation {
     val func = "||"

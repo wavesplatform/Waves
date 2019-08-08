@@ -38,7 +38,7 @@ object Expressions {
 
   sealed trait PART[+T] extends Positioned
   object PART {
-    case class VALID[T](position: Pos, v: T)           extends PART[T] {
+    case class VALID[T](position: Pos, v: T) extends PART[T] {
       override def equals(obj: Any): Boolean =
         obj match {
           case VALID(_, value) => value.equals(this.v)
@@ -81,7 +81,7 @@ object Expressions {
   case class GETTER(position: Pos, ref: EXPR, field: PART[String])              extends EXPR
   case class CONST_BYTESTR(position: Pos, value: PART[ByteStr])                 extends EXPR
   case class CONST_STRING(position: Pos, value: PART[String])                   extends EXPR
-  case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOperation, b: EXPR)  extends EXPR
+  case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOp, b: EXPR)         extends EXPR
   case class BLOCK(position: Pos, let: Declaration, body: EXPR)                 extends EXPR
   case class IF(position: Pos, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)         extends EXPR
   case class REF(position: Pos, key: PART[String])                              extends EXPR

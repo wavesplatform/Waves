@@ -26,21 +26,22 @@ case class NOTOP() extends UnaryOp {
   def name = "!"
 }
 
-sealed trait BinaryOperation
-case class OROP() extends BinaryOperation
-case class ANDOP() extends BinaryOperation
-case class EQOP() extends BinaryOperation
-case class NEOP() extends BinaryOperation
-case class GEOP() extends BinaryOperation
-case class GTOP() extends BinaryOperation
-case class SUMOP() extends BinaryOperation
-case class SUBOP() extends BinaryOperation
-case class MULOP() extends BinaryOperation
-case class DIVOP() extends BinaryOperation
-case class MODOP() extends BinaryOperation
-case class LEOP() extends BinaryOperation
-case class LTOP() extends BinaryOperation
-case class CONSOP() extends BinaryOperation
+// TODO fix type
+trait BinaryOp
+case class OROP() extends BinaryOp
+case class ANDOP() extends BinaryOp
+case class EQOP() extends BinaryOp
+case class NEOP() extends BinaryOp
+case class GEOP() extends BinaryOp
+case class GTOP() extends BinaryOp
+case class SUMOP() extends BinaryOp
+case class SUBOP() extends BinaryOp
+case class MULOP() extends BinaryOp
+case class DIVOP() extends BinaryOp
+case class MODOP() extends BinaryOp
+case class LEOP() extends BinaryOp
+case class LTOP() extends BinaryOp
+case class CONSOP() extends BinaryOp
 
 
 class Parser2() extends Parser {
@@ -51,7 +52,7 @@ class Parser2() extends Parser {
 
   def DAppRoot: Rule1[DAPP] = rule{WS ~>> IDX ~ zeroOrMore(WS ~ Decl) ~ zeroOrMore(WS ~ AnnotatedFunc) ~ WS ~ EOI ~>> IDX ~~> parseDAppRoot _}
 
-  def ScriptRoot: Rule1[EXPR] = rule{WS ~ Expr ~ WS ~ EOI ~~> parseScriptRoot _}
+  def ScriptRoot: Rule1[EXPR] = rule{WS ~>> IDX ~ zeroOrMore(WS ~ Decl) ~ Expr ~ WS ~ EOI ~>> IDX ~~> parseScriptRoot _}
 
   def Decl: Rule1[Declaration] = rule{Func | Let}
 
@@ -160,13 +161,16 @@ class Parser2() extends Parser {
     DAPP(Pos(startPos.start, endPos.end), decList, annFuncList)
   }
 
-  def parseScriptRoot(expr: EXPR): EXPR = {
-    expr
+  def parseScriptRoot(startPos: Pos, decList: List[Declaration], expr: EXPR, endPos: Pos): EXPR = {
+    decList.foldRight(expr) {
+      (dec, resExpr) =>
+        BLOCK(dec.position, dec, resExpr)
+    }
   }
 
   def parseBlock(startPos: Pos, decList: List[Declaration], expr: EXPR, endPos: Pos): EXPR = {
-    decList.reverse.foldLeft(expr) {
-      (resultBlock, dec) =>
+    decList.foldRight(expr) {
+      (dec, resultBlock) =>
         BLOCK(dec.position, dec, resultBlock)
     }
   }
@@ -248,9 +252,9 @@ class Parser2() extends Parser {
     MATCH_CASE(Pos(startPos.start, endPos.end), newVarName, types, expr)
   }
 
-  def parseBinaryOperationAtom(leftExpr: EXPR, startPos: Pos, opAndExprList: List[(BinaryOperation, EXPR)], endPos: Pos): EXPR = {
+  def parseBinaryOperationAtom(leftExpr: EXPR, startPos: Pos, opAndExprList: List[(BinaryOp, EXPR)], endPos: Pos): EXPR = {
     opAndExprList.foldLeft(leftExpr){
-      (exprLeft: EXPR, opAndExprRight: (BinaryOperation, EXPR)) => {
+      (exprLeft: EXPR, opAndExprRight: (BinaryOp, EXPR)) => {
         val pos = Pos(exprLeft.position.start, opAndExprRight._2.position.end)
         opAndExprRight._1 match {
           case LTOP() => BINARY_OP(pos, opAndExprRight._2, GTOP(), exprLeft)
