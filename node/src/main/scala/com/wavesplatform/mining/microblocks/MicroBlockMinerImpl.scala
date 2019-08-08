@@ -45,13 +45,15 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint
   ): Task[Unit] = {
-    generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint).timed
+    generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint)
+      .asyncBoundary(minerScheduler)
+      .timed
       .delayExecution(delay)
       .flatMap {
         case (t, Success(newTotal, updatedTotalConstraint)) =>
           generateMicroBlockSequence(account, newTotal, settings.microBlockInterval - t, constraints, updatedTotalConstraint)
-        case (t, Retry) =>
-          generateMicroBlockSequence(account, accumulatedBlock, settings.microBlockInterval - t, constraints, restTotalConstraint)
+        case (_, Retry) =>
+          generateMicroBlockSequence(account, accumulatedBlock, settings.microBlockInterval, constraints, restTotalConstraint)
         case (_, Stop) =>
           debugState
             .set(MinerDebugInfo.MiningBlocks) >>
@@ -65,41 +67,42 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
                                         accumulatedBlock: Block,
                                         constraints: MiningConstraints,
                                         restTotalConstraint: MiningConstraint): Task[MicroBlockMiningResult] = {
-    Task
-      .defer {
-        val (unconfirmed, updatedTotalConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock") {
-          val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-          val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.maxPackTime)
-          (unconfirmed, updatedMdConstraint.constraints.head)
-        }
+    Task.delay(utx.size) >>= { utxSize =>
+      Task
+        .defer {
+          if (utxSize == 0) Task.now(Retry)
+          else {
+            val (unconfirmed, updatedTotalConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock") {
+              val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
+              val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.maxPackTime)
+              (unconfirmed, updatedMdConstraint.constraints.head)
+            }
 
-        if (unconfirmed.isEmpty && updatedTotalConstraint.isFull) {
-          log.trace {
-            if (updatedTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
-            else "Stopping forging microBlocks, because all transactions are too big"
+            if (unconfirmed.isEmpty) {
+              log.trace {
+                if (updatedTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
+                else "Stopping forging microBlocks, because all transactions are too big"
+              }
+              Task.now(Stop)
+            } else {
+              log.trace(s"Generating microBlock for $account, constraints: $updatedTotalConstraint")
+
+              for {
+                blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
+                  .leftWiden[Throwable]
+                  .raiseOrPure[Task]
+                (signedBlock, microBlock) = blocks
+                _ <- appendMicroBlock(microBlock)
+                _ <- broadcastMicroBlock(account, microBlock)
+              } yield {
+                if (updatedTotalConstraint.isFull) Stop
+                else Success(signedBlock, updatedTotalConstraint)
+              }
+            }
           }
-          Task.now(Stop)
-        } else if (unconfirmed.isEmpty) {
-          log.trace(s"Skipping microBlock because utx is empty")
-          Task.now(Retry)
-        } else {
-          log.trace(s"Generating microBlock for $account, constraints: $updatedTotalConstraint")
-
-          val miningTask = for {
-            blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
-              .leftWiden[Throwable]
-              .raiseOrPure[Task]
-            (signedBlock, microBlock) = blocks
-            _ <- appendMicroBlock(microBlock)
-            _ <- broadcastMicroBlock(account, microBlock)
-          } yield signedBlock
-
-          miningTask.map { accumulatedBlock =>
-            if (updatedTotalConstraint.isFull) Stop
-            else Success(accumulatedBlock, updatedTotalConstraint)
-          }
         }
-      }
+    }
+
   }
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock): Task[Unit] =
