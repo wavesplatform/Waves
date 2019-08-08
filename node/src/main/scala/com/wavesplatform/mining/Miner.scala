@@ -259,7 +259,7 @@ class MinerImpl(allChannels: ChannelGroup,
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
       .generateMicroBlockSequence(account, lastBlock, Duration.Zero, constraints, restTotalConstraint)
-      .runAsyncLogErr //generateMicroBlockSequence(account, lastBlock, Duration.Zero, constraints, restTotalConstraint).runAsyncLogErr
+      .runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 

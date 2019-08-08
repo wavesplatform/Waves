@@ -1,10 +1,6 @@
 package com.wavesplatform.mining.microblocks
 
-import java.util.concurrent.TimeUnit
-
-import cats.data.EitherT
 import cats.effect.concurrent.Ref
-import cats.effect.{Clock, Sync}
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -16,7 +12,7 @@ import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -50,8 +46,9 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       .timed
       .delayExecution(delay)
       .flatMap {
-        case (t, Success(newTotal, updatedTotalConstraint)) =>
-          generateMicroBlockSequence(account, newTotal, settings.microBlockInterval - t, constraints, updatedTotalConstraint)
+        case (t, Success(newBlock, newConstraint)) =>
+          log.info(s"Next mining scheduled: ${settings.microBlockInterval - t}")
+          generateMicroBlockSequence(account, newBlock, settings.microBlockInterval - t, constraints, newConstraint)
         case (_, Retry) =>
           generateMicroBlockSequence(account, accumulatedBlock, settings.microBlockInterval, constraints, restTotalConstraint)
         case (_, Stop) =>
@@ -61,48 +58,53 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
               log.debug("MicroBlock mining completed, block is full")
             }
       }
+      .onError {
+        case err =>
+          Task.delay {
+            log.error(s"Error mining microblock: $err")
+          }
+      }
   }
 
   private def generateOneMicroBlockTask(account: KeyPair,
                                         accumulatedBlock: Block,
                                         constraints: MiningConstraints,
                                         restTotalConstraint: MiningConstraint): Task[MicroBlockMiningResult] = {
-    Task.delay(utx.size) >>= { utxSize =>
-      Task
-        .defer {
-          if (utxSize == 0) Task.now(Retry)
-          else {
-            val (unconfirmed, updatedTotalConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock") {
-              val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-              val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.maxPackTime)
-              (unconfirmed, updatedMdConstraint.constraints.head)
+    Task
+      .defer {
+        if (utx.size == 0) {
+          log.trace(s"Skipping microblock mining because utx is empty")
+          Task.now(Retry)
+        } else {
+          val (unconfirmed, updatedTotalConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock") {
+            val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
+            val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.maxPackTime)
+            (unconfirmed, updatedMdConstraint.constraints.head)
+          }
+
+          if (unconfirmed.isEmpty) {
+            log.trace {
+              if (updatedTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
+              else "Stopping forging microBlocks, because all transactions are too big"
             }
+            Task.now(Stop)
+          } else {
+            log.trace(s"Generating microBlock for $account, constraints: $updatedTotalConstraint")
 
-            if (unconfirmed.isEmpty) {
-              log.trace {
-                if (updatedTotalConstraint.isFull) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
-                else "Stopping forging microBlocks, because all transactions are too big"
-              }
-              Task.now(Stop)
-            } else {
-              log.trace(s"Generating microBlock for $account, constraints: $updatedTotalConstraint")
-
-              for {
-                blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
-                  .leftWiden[Throwable]
-                  .raiseOrPure[Task]
-                (signedBlock, microBlock) = blocks
-                _ <- appendMicroBlock(microBlock)
-                _ <- broadcastMicroBlock(account, microBlock)
-              } yield {
-                if (updatedTotalConstraint.isFull) Stop
-                else Success(signedBlock, updatedTotalConstraint)
-              }
+            for {
+              blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
+                .leftWiden[Throwable]
+                .raiseOrPure[Task]
+              (signedBlock, microBlock) = blocks
+              _ <- appendMicroBlock(microBlock)
+              _ <- broadcastMicroBlock(account, microBlock)
+            } yield {
+              if (updatedTotalConstraint.isFull) Stop
+              else Success(signedBlock, updatedTotalConstraint)
             }
           }
         }
-    }
-
+      }
   }
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock): Task[Unit] =
@@ -148,25 +150,9 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
 }
 
 object MicroBlockMinerImpl {
-  case class TransactionPackResult(
-      transactions: Seq[Transaction],
-      updatedConstraint: MiningConstraint,
-      timeSpent: FiniteDuration
-  )
-
   sealed trait MicroBlockMiningResult
 
   case object Stop                                                      extends MicroBlockMiningResult
   case object Retry                                                     extends MicroBlockMiningResult
   final case class Success(b: Block, totalConstraint: MiningConstraint) extends MicroBlockMiningResult
-
-  def measureLogF[F[_]: Sync: Clock, A](log: LoggerFacade, action: String)(fa: => A): F[A] =
-    for {
-      start  <- Clock[F].realTime(TimeUnit.MILLISECONDS)
-      result <- Sync[F].delay(fa)
-      finish <- Clock[F].realTime(TimeUnit.MILLISECONDS)
-      _ <- Sync[F].delay {
-        log.trace(s"$action took ${finish - start}ms")
-      }
-    } yield result
 }
