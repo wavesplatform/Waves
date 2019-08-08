@@ -51,11 +51,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
   }
 
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
-    val transactions = Observable.defer(commonApi.activeLeases(request.address.toAddress) match {
-      case Right(txs)  => Observable.fromIterable(txs)
-      case Left(error) => Observable.raiseError(new IllegalArgumentException(error))
-    })
-
+    val transactions = commonApi.activeLeases(request.address.toAddress)
     val result = transactions.map { case (height, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB)) }
     responseObserver.completeWith(result)
   }

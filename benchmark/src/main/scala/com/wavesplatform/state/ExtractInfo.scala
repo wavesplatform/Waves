@@ -92,7 +92,7 @@ object ExtractInfo extends App with ScorexLogging {
     val assets = nonEmptyBlocks(benchSettings.assetsFromHeight)
       .flatMap { b =>
         b.transactionData.collect {
-          case tx: IssueTransaction => tx.assetId()
+          case tx: IssueTransaction => tx.assetId
         }
       }
       .map(_.base58)
