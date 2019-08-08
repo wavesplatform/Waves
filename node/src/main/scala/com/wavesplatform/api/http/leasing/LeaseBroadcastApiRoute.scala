@@ -3,11 +3,10 @@ package com.wavesplatform.api.http.leasing
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 
-case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup)
+case class LeaseBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronizer: UtxPoolSynchronizer)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -17,13 +16,13 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
 
   def signedLease: Route = (path("lease") & post) {
     json[SignedLeaseV1Request] { leaseReq =>
-      doBroadcast(leaseReq.toTx)
+      broadcastIfSuccess(leaseReq.toTx)
     }
   }
 
   def signedLeaseCancel: Route = (path("cancel") & post) {
     json[SignedLeaseCancelV1Request] { leaseCancelReq =>
-      doBroadcast(leaseCancelReq.toTx)
+      broadcastIfSuccess(leaseCancelReq.toTx)
     }
   }
 }

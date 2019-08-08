@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.compiler
 
 import cats.kernel.Monoid
+import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
@@ -18,6 +19,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -60,7 +63,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
-        ByteStr.empty,
+        DAppMeta(
+          version = 1,
+          List(
+            CallableFuncSignature(ByteString.copyFrom(Array[Byte](2))),
+            CallableFuncSignature(ByteString.EMPTY)
+          )
+        ),
         List.empty,
         List(
           CallableFunction(
@@ -137,7 +146,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     val expectedResult = Right(
       DApp(
-        ByteStr.empty,
+        DAppMeta(
+          version = 1,
+          List(
+            CallableFuncSignature(ByteString.EMPTY)
+          )
+        ),
         List.empty,
         List(
           CallableFunction(

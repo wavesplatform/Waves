@@ -81,8 +81,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransactionV1.selfSigned(other, IssuedAsset(issue.assetId()), quantity, reissuable2, fee, timestamp).explicitGet()
-      burn    = BurnTransactionV1.selfSigned(other, IssuedAsset(issue.assetId()), quantity, fee, timestamp).explicitGet()
+      reissue = ReissueTransactionV1.selfSigned(other, IssuedAsset(issue.assetId), quantity, reissuable2, fee, timestamp).explicitGet()
+      burn    = BurnTransactionV1.selfSigned(other, IssuedAsset(issue.assetId), quantity, fee, timestamp).explicitGet()
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {
@@ -103,9 +103,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
-      assetTransfer <- transferGeneratorP(issuer, burner, IssuedAsset(issue.assetId()), Waves)
+      assetTransfer <- transferGeneratorP(issuer, burner, IssuedAsset(issue.assetId), Waves)
       wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
-      burn = BurnTransactionV1.selfSigned(burner, IssuedAsset(issue.assetId()), assetTransfer.amount, wavesTransfer.amount, timestamp).explicitGet()
+      burn = BurnTransactionV1.selfSigned(burner, IssuedAsset(issue.assetId), assetTransfer.amount, wavesTransfer.amount, timestamp).explicitGet()
     } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
 
     val fs =
@@ -134,7 +134,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
-      assetId = IssuedAsset(issue.assetId())
+      assetId = IssuedAsset(issue.assetId)
       reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
@@ -163,7 +163,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
-      assetId = IssuedAsset(issue.assetId())
+      assetId = IssuedAsset(issue.assetId)
       reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
@@ -190,7 +190,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
-      assetId = IssuedAsset(issue.assetId())
+      assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransactionV1.selfSigned(assetId, issuer, holder, quantity - 1, timestamp, Waves, fee, attachment).explicitGet()
       reissue  = ReissueTransactionV1.selfSigned(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).explicitGet()

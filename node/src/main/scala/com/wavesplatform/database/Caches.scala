@@ -122,12 +122,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
-  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, loadPortfolio)
-  protected def loadPortfolio(address: Address): Portfolio
+  private[database] val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, _ => ???)
   protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
-  override def portfolio(a: Address): Portfolio = {
-    portfolioCache.get(a)
-  }
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
@@ -171,7 +167,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
-  protected def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
+
+  private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -309,7 +306,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     balancesCache.putAll(newBalances.result().asJava)
-    for (address <- newPortfolios.result()) portfolioCache.invalidate(address)
+    for (address <- newPortfolios.result()) discardPortfolio(address)
     for (id      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.result().asJava)
     scriptCache.putAll(diff.scripts.asJava)

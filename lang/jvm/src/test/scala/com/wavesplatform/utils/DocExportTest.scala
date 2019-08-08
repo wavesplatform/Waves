@@ -1,45 +1,39 @@
 package com.wavesplatform.utils
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Common, ExecutionError, Global}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.directives.values.{Account, DApp, Expression, StdLibVersion, V1, V2, V3}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.directives.values.{Account, ContentType, DApp, Expression, StdLibVersion}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import cats.implicits._
 import com.wavesplatform.DocSource
+import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.utils.doc.RideFullContext
 
 class DocExportTest extends PropSpec with PropertyChecks with Matchers {
-  property("declared ride funcs and vars have doc for all versions") {
-    DirectiveDictionary[StdLibVersion]
-      .all
-      .map(v => {
-        val cryptoCtx = CryptoContext.build(Global, v)
-        val wavesCtx = WavesContext.build(directives(v).explicitGet(), Common.emptyBlockchainEnvironment())
-        val pureCtx = PureContext.build(Global, v)
-        (cryptoCtx |+| wavesCtx |+| pureCtx, v)
-      })
-      .flatMap { case (ctx, ver) =>
-        val vars = ctx.vars.keys
-          .map(k => DocSource.varData.get((k, ver.value.asInstanceOf[Int])))
+  property("declared ride funcs and vars have doc for all contexts") {
+    val totalDocs = for {
+      ds <- directives
+      ctx = RideFullContext.build(ds)
+      doc <- varsDoc(ctx, ds.stdLibVersion) ++ funcDoc(ctx, ds.stdLibVersion)
+    } yield doc
 
-        val funcs = ctx.functions
-          .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
-          .map(k => DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])))
-
-        vars ++ funcs
-      }
-      .toList
-      .sequence shouldBe defined
+    totalDocs.toList.sequence shouldBe defined
   }
 
-  private def directives(v: StdLibVersion): Either[ExecutionError, DirectiveSet] = {
-    val contentType = v match {
-      case V1 | V2 => Expression
-      case V3      => DApp
-    }
-    DirectiveSet(v, Account, contentType)
-  }
+  lazy val directives: Seq[DirectiveSet] =
+    DirectiveSet.contractDirectiveSet +:
+      DirectiveDictionary[StdLibVersion].all
+        .map(DirectiveSet(_, Account, Expression).explicitGet())
+        .toSeq
+
+
+  def varsDoc(ctx: CTX, ver: StdLibVersion): Iterable[Option[String]] =
+    ctx.vars.keys
+      .map(k => DocSource.varData.get((k, ver.value.asInstanceOf[Int])))
+
+  def funcDoc(ctx: CTX, ver: StdLibVersion): Array[Option[(String, List[String])]] =
+    ctx.functions
+      .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
+      .map(k => DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])))
 }

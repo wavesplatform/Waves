@@ -142,7 +142,7 @@ object CryptoContext {
 
     def fromBase16StringF: BaseFunction =
       NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, global.MaxBase64String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented("fromBase16String(str: String)", xs)
       }
 

@@ -18,6 +18,7 @@ import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
+import scala.concurrent.duration.Duration
 import scala.io.Codec
 
 /**
@@ -52,7 +53,8 @@ class LevelDBWriterBenchmark {
 
   @Benchmark
   def transactionByAddress_test(st: TransactionByAddressSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.addressTransactions(st.txsAddresses.random, Set.empty, 1, None).right.get)
+    import monix.execution.Scheduler.Implicits.global
+    bh.consume(st.db.addressTransactionsObservable(st.txsAddresses.random, Set.empty, None).firstL.runSyncUnsafe(Duration.Inf))
   }
 
 }

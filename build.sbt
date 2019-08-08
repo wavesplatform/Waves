@@ -22,12 +22,14 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
+lazy val langSharedSources = settingKey[File]("Shared scala sources of lang module")
+lazy val langProtoModels   = settingKey[File]("Protobuf sources of lang module")
+
 lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += Tasks.versionSource(path)))
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
       coverageExcludedPackages := ".*",
@@ -35,8 +37,19 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
       resolvers += Resolver.sbtPluginRepo("releases"),
-      inConfig(Compile)(Seq(sourceGenerators += Tasks.docSource)),
-      Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
+      //Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
+      cleanFiles += langSharedSources.value / "com" / "wavesplatform" / "protobuf",
+      inConfig(Compile)(
+        Seq(
+          PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources.value,
+          PB.protoSources := Seq(langProtoModels.value),
+          PB.deleteTargetDirectory := false,
+          sourceGenerators += Tasks.docSource
+        )
+      ),
+      langSharedSources := baseDirectory.value.getParentFile / "shared" / "src" / "main" / "scala",
+      langProtoModels := baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"
+      // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
 lazy val langJS  = lang.js.settings(versionSourceSetting("com.wavesplatform.lang"))

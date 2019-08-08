@@ -29,6 +29,14 @@ object ExpressionCompiler {
     }
   }
 
+  def compileDecls(input: String, ctx: CompilerContext): Either[String, EXPR] = {
+    val adjustedDecls = s"$input\n${PureContext.unitVarName}"
+    Parser.parseExpr(adjustedDecls) match {
+      case fastparse.core.Parsed.Success(xs, _)     => ExpressionCompiler(ctx, xs).map(_._1)
+      case f@fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+    }
+  }
+
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
 
     def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) = {

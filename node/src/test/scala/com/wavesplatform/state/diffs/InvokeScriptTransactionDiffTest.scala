@@ -22,8 +22,10 @@ import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
 import com.wavesplatform.transaction._
@@ -32,6 +34,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import monix.eval.Coeval
@@ -86,7 +89,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         )
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -131,7 +134,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -171,7 +174,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -556,7 +559,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
-            newState.addressTransactions(acc.toAddress, Set.empty, None).toList.head._2 shouldBe ci
+            newState.addressTransactions(acc.toAddress, Set.empty, Int.MaxValue, None).right.get.head._2 shouldBe ci
         }
     }
   }

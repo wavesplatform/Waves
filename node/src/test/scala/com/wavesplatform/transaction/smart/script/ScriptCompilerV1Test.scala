@@ -48,11 +48,10 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
-        | {-# STDLIB_VERSION 3 #-}
         | let a = 1000
         | a > b
       """.stripMargin
-    ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 72-73")
+    ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 46-47")
   }
 
   property("fails with contract for asset") {
@@ -265,6 +264,22 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     }
 
     transactionByIdComplexity(2) shouldBe 100
+  }
+
+  property("library") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# CONTENT_TYPE LIBRARY #-}
+        |
+        | let a = 1
+        | let b = 2
+        |
+        | func sq(a: Int) = a * a
+      """.stripMargin
+
+    ScriptCompiler.compile(script) shouldBe 'right
   }
 
   private val expectedExpr = LET_BLOCK(

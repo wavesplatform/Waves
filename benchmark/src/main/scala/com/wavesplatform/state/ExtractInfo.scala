@@ -51,7 +51,7 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   try {
-    val state = new LevelDBWriter(db, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
+    val state = new LevelDBWriter(db, Observer.empty(UncaughtExceptionReporter.default), wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {
@@ -92,7 +92,7 @@ object ExtractInfo extends App with ScorexLogging {
     val assets = nonEmptyBlocks(benchSettings.assetsFromHeight)
       .flatMap { b =>
         b.transactionData.collect {
-          case tx: IssueTransaction => tx.assetId()
+          case tx: IssueTransaction => tx.assetId
         }
       }
       .map(_.base58)

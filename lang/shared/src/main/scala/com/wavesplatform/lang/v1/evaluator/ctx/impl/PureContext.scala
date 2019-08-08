@@ -605,8 +605,10 @@ object PureContext {
     }
   }
 
+  lazy val unitVarName = "unit"
+
   private lazy val vars: Map[String, (FINAL, LazyVal)] = Map(
-    ("unit", (UNIT, LazyVal(EitherT.pure(unit)))),
+    (unitVarName, (UNIT, LazyVal(EitherT.pure(unit)))),
     ("UP", (roundUp, LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
     ("HALFUP", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
     ("HALFDOWN", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundHalfDown, Map.empty))))),
