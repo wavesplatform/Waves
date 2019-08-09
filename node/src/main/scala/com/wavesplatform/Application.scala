@@ -20,7 +20,7 @@ import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute
 import com.wavesplatform.api.http.{assets, _}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory

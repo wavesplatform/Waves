@@ -4,7 +4,7 @@ import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.Address
-import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.BlockchainUpdaterImpl

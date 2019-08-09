@@ -1,18 +1,14 @@
 package com.wavesplatform.lang
 
-import cats.data.EitherT
 import cats.kernel.Monoid
-import cats.implicits._
-import com.wavesplatform.lang.Common.{AorBorC, NoShrink, addCtx, sampleTypes}
+import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CaseObj, EVALUATED}
-import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
@@ -29,9 +25,9 @@ class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers 
     } yield r
 
   private def eval(code: String): Either[String, EVALUATED] = {
-    val untyped = Parser.parseExpr(code).get.value
+    val untyped  = Parser.parseExpr(code).get.value
     val ctx: CTX = Monoid.combineAll(Seq(PureContext.build(Global, V3)))
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
+    val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[EVALUATED](ctx.evaluationContext, v._1))
   }
 
