@@ -163,9 +163,9 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
-  val foldP: P[EXPR] = (Index ~~ P("FOLD<") ~~ digit.repX(min = 1).! ~~ ">(" ~/ refP ~ refP ~ refP ~ ")" ~~ Index)
+  val foldP: P[EXPR] = (Index ~~ P("FOLD<") ~~ digit.repX(min = 1).! ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
     .map { case (start, limit, list, acc, f, end) =>
-      MacroProcessor.unwrapFold(Pos(start, end), limit.toInt, list, acc, f)
+      Macro.unwrapFold(Pos(start, end), limit.toInt, list, acc, f)
     }
 
   val list: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {

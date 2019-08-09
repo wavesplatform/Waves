@@ -1315,8 +1315,4 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
     Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
   }
-
-  property("fold") {
-    parse("FOLD<5>(list, acc, f)")
-  }
 }
