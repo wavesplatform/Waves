@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
 
 import scala.scalajs.js
-import scala.scalajs.js.Any
+import scala.scalajs.js.{Any, Dictionary}
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
@@ -166,12 +166,12 @@ object JsAPI {
   @JSExportTopLevel("compile")
   def compile(
     input:     String,
-    libraries: Map[String, String] = Map()
+    libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries, ds)
+      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds)
       compiled    <- compileScript(ds, linkedInput)
     } yield compiled
     r.fold(
