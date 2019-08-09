@@ -17,10 +17,10 @@ object Macro {
     val id = s"${pos.start}${pos.end}"
 
     implicit def valid(v: String): VALID[String] = VALID(pos, v)
-    implicit def ref(v: String): REF             = REF(pos, v + id)
+    implicit def ref(v: String): REF             = REF(pos, "$" + v + id)
     implicit def long(l: Long): CONST_LONG       = CONST_LONG(pos, l)
 
-    def let(name: String, value: EXPR)              = LET(pos, name + id, value, Nil)
+    def let(name: String, value: EXPR)              = LET(pos, "$" + name + id, value, Nil)
     def block(decl: Declaration, expr: EXPR)        = BLOCK(pos, decl, expr)
     def call(func: PART[String], args: List[EXPR])  = FUNCTION_CALL(pos, func, args)
 
@@ -33,12 +33,12 @@ object Macro {
         case n if n >= 0 =>
           val next = (expr: EXPR) => {
             val nextAcc = let(
-              "$acc" + (n + 1),
-              call(func.key, List("$acc" + n, call("getElement", List("$list", n))))
+              "acc" + (n + 1),
+              call(func.key, List("acc" + n, call("getElement", List("list", n))))
             )
             IF(pos,
-              call("==", List("$size", n)),
-              "$acc" + n,
+              call("==", List("size", n)),
+              "acc" + n,
               block(nextAcc, expr)
             )
           }
@@ -48,9 +48,9 @@ object Macro {
 
     if (limit < 1) INVALID(pos, "FOLD limit should be natural")
     else {
-      val listL = let("$list", list)
-      val sizeL = let("$size", call("size", List("$list")))
-      val accL  = let("$acc0", acc)
+      val listL = let("list", list)
+      val sizeL = let("size", call("size", List("list")))
+      val accL  = let("acc0", acc)
       block(listL, block(sizeL, block(accL, stepRec(limit, 0, identity))))
     }
   }
