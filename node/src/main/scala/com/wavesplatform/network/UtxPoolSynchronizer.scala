@@ -12,7 +12,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import monix.eval.Task
-import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Consumer, Observable}
 
@@ -114,7 +114,7 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
             isNew = true; dummy
           })
           val result = isNew || forceBroadcast
-          if (!result) putPromise.tryFailure(new RuntimeException("Transaction already seen"))
+          if (!result) putPromise.trySuccess(Right(false))
           result
       }
 
