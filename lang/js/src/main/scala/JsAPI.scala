@@ -171,7 +171,7 @@ object JsAPI {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds)
+      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
       compiled    <- compileScript(ds, linkedInput)
     } yield compiled
     r.fold(

@@ -33,7 +33,7 @@ object ScriptCompiler extends ScorexLogging {
     for {
       directives  <- DirectiveParser(scriptText)
       ds          <- Directive.extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(scriptText, libraries, ds)
+      linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
       result      <- apply(linkedInput, ds.scriptType == Asset)
     } yield result
   }
