@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo, TransfersInfoResponse}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo, TransfersInfoResponse}
 import com.wavesplatform.it.sync.setScriptFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -201,8 +201,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
   test("Error on wrong tx type") {
     val tx = nodes.head.transfer(
-      caller.address,
-      recipient.address,
+      caller.stringRepr,
+      recipient.stringRepr,
       100000000,
       1000000,
       None,
