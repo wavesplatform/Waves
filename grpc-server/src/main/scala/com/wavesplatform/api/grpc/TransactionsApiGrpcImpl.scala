@@ -69,7 +69,7 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
     responseObserver.completeWith(result)
   }
 
-  override def sign(request: SignRequest): Future[PBSignedTransaction] = {
+  override def sign(request: SignRequest): Future[PBSignedTransaction] = Future {
     def signTransactionWith(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBSignedTransaction] =
       for {
         sender <- wallet.findPrivateKey(tx.sender.stringRepr)
@@ -78,13 +78,13 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
       } yield tx
 
     val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKey
-    signTransactionWith(request.getTransaction, wallet, signerAddress.stringRepr).toFuture
+    signTransactionWith(request.getTransaction, wallet, signerAddress.stringRepr).explicitGetErr()
   }
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
     commonApi
       .broadcastTransaction(tx.toVanilla, forceBroadcast)
-      .flatMap(_.resultE.fold(Future.failed(_), _ => Future.successful(tx)))
+      .map(_.resultE.map(_ => tx).explicitGetErr())
   }
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {

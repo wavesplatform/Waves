@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -36,7 +36,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     } yield {
       val issue = IssueTransactionV1.selfSigned(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).explicitGet()
       val reissue1 = ReissueTransactionV2
-        .selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(issue.assetId()), quantity, reissuable = reissuable, fee, timestamp)
+        .selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(issue.assetId), quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()
       (Seq(issue), reissue1)
     }

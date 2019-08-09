@@ -39,15 +39,15 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
     Array(
       new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
     ))
-  def active: Route = (pathPrefix("active") & get) {
+  def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
     pathPrefix(Segment) { address =>
       complete(Address.fromString(address) match {
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
-          commonAccountApi.activeLeases(a).map(_.collect {
+          commonAccountApi.activeLeases(a).collect {
             case (height, leaseTransaction: LeaseTransaction) =>
               leaseTransaction.json() + ("height" -> JsNumber(height))
-          })
+          }.toListL.runToFuture
       })
     }
   }

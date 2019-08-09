@@ -205,7 +205,7 @@ class AddressRouteSpec
         "List\\(\\)," +
         "List\\(\\)," +
         "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
-      "\\)").r
+        "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)

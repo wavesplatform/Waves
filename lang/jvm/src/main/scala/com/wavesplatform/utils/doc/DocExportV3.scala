@@ -4,8 +4,10 @@ import java.io.FileWriter
 import java.nio.file.{Files, Paths}
 
 import com.github.mustachejava.DefaultMustacheFactory
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, DApp, Expression, V3}
 
 import scala.collection.JavaConverters._
 
@@ -15,7 +17,8 @@ object DocExportV3 {
       val path = Paths.get("target/funcs")
       Files.createDirectories(path)
 
-      RideFullContext.build(V3)
+      val ds = DirectiveSet(V3, Account, Expression).explicitGet()
+      RideFullContext.build(ds)
         .functions
         .map(
           f => {
