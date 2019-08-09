@@ -5,7 +5,6 @@ import java.security.SecureRandom
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
-import com.wavesplatform.db.{Storage, VersionedStorage}
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
@@ -27,17 +26,6 @@ package object utils extends ScorexLogging {
   val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
-
-  def createWithVerification[A <: Storage with VersionedStorage](storage: => A): Try[A] = Try {
-    if (storage.isVersionValid) storage
-    else {
-      log.info(s"Re-creating storage")
-      val b = storage.createBatch()
-      storage.removeEverything(b)
-      storage.commit(b)
-      storage
-    }
-  }
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
     new Thread(() => {
