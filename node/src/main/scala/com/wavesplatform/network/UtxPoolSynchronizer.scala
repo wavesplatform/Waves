@@ -114,7 +114,7 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
             isNew = true; dummy
           })
           val result = isNew || forceBroadcast
-          if (!result) putPromise.tryFailure(new RuntimeException("Transaction already seen"))
+          if (!result) putPromise.trySuccess(Right(false))
           result
       }
 
