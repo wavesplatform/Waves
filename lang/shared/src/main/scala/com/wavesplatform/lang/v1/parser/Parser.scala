@@ -180,10 +180,14 @@ object Parser {
   case class Method(name: PART[String], args: Seq[EXPR]) extends Accessor
   case class Getter(name: PART[String])                  extends Accessor
   case class ListIndex(index: EXPR)                      extends Accessor
+
   val typesP: P[Seq[PART[String]]] = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
+  val genericTypesP: P[Seq[(PART[String], Option[PART[String]])]] =
+    (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).rep(min = 1, sep = comment ~ "|" ~ comment)
+
   val funcP: P[FUNC] = {
     val funcname    = anyVarName
-    val argWithType = anyVarName ~ ":" ~ typesP ~ comment
+    val argWithType = anyVarName ~ ":" ~ genericTypesP ~ comment
     val args        = "(" ~ comment ~ argWithType.rep(sep = "," ~ comment) ~ ")" ~ comment
     val funcHeader  = Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {

@@ -51,7 +51,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         Expressions.FUNC(
           AnyPos,
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
           Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
         ),
         Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.TRUE(AnyPos)))
@@ -62,7 +62,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         Expressions.FUNC(
           AnyPos,
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
           Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
         ),
         Expressions.FUNCTION_CALL(
@@ -78,8 +78,8 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
           AnyPos,
           Expressions.PART.VALID(AnyPos, "id"),
           Seq(
-            (Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int"))),
-            (Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))
+            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None))),
+            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))
           ),
           Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
         ),
