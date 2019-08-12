@@ -1,4 +1,4 @@
-package com.wavesplatform.database
+package com.wavesplatform.database.extensions.impl
 
 import java.io.IOException
 
@@ -6,6 +6,7 @@ import cats.effect.Resource
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
@@ -16,7 +17,7 @@ import monix.reactive.Observable
 import scala.util.Success
 import scala.util.control.NonFatal
 
-private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: LevelDBWriter) extends AddressTransactions {
+private final class LevelDBWriterAddressTransactions(levelDBWriter: LevelDBWriter) extends AddressTransactions {
 
   import levelDBWriter.{dbSettings, readOnlyNoClose}
 
@@ -118,4 +119,8 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
 
       (result, close)
     }
+}
+
+object LevelDBWriterAddressTransactions {
+  def apply(ldb: LevelDBWriter): AddressTransactions = new LevelDBWriterAddressTransactions(ldb)
 }

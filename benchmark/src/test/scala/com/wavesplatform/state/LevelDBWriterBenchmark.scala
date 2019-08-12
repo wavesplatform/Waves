@@ -53,6 +53,7 @@ class LevelDBWriterBenchmark {
 
   @Benchmark
   def transactionByAddress_test(st: TransactionByAddressSt, bh: Blackhole): Unit = {
+    import com.wavesplatform.utils.Implicits._
     import monix.execution.Scheduler.Implicits.global
     bh.consume(st.db.addressTransactionsObservable(st.txsAddresses.random, Set.empty, None).firstL.runSyncUnsafe(Duration.Inf))
   }

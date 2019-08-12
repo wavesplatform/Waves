@@ -21,6 +21,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -41,12 +42,12 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, ae: ApiExtensions, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain, ae)
   private[this] val commonAssetsApi = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {
@@ -75,7 +76,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     val (asset, height, limit, maybeAfter) = params
 
     val distributionTask = Task.eval(
-      blockchain.assetDistributionAtHeight(asset, height, limit, maybeAfter)
+      ae.assetDistributionAtHeight(asset, height, limit, maybeAfter)
     )
 
     distributionTask.map {
@@ -100,7 +101,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         case Left(err) => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
         case Right(asset) =>
           Task
-            .eval(blockchain.assetDistribution(asset))
+            .eval(ae.assetDistribution(asset))
             .map(dst => Json.toJson(dst)(com.wavesplatform.state.dstWrites): ToResponseMarshallable)
       }
 

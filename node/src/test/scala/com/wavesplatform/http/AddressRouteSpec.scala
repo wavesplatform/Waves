@@ -15,6 +15,7 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.utils.Implicits._
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -48,7 +49,7 @@ class AddressRouteSpec
   (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   private val route =
-    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime).route
+    AddressApiRoute(restAPISettings, testWallet, blockchain, blockchain, utxPoolSynchronizer, new TestTime).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

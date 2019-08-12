@@ -7,6 +7,7 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -16,9 +17,9 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer) {
+private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTransactions: AddressTransactions, utx: UtxPool, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer) {
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] =
-    blockchain.addressTransactionsObservable(address, Set.empty, fromId)
+    addressTransactions.addressTransactionsObservable(address, Set.empty, fromId)
 
   def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] =
     blockchain.transactionInfo(transactionId)

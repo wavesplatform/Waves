@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.Paged
 import monix.reactive.Observable
 
-trait Distributions {
+trait   Distributions {
   def portfolio(a: Address): Portfolio
 
   def assetDistribution(asset: IssuedAsset): AssetDistribution
@@ -24,13 +24,7 @@ trait Distributions {
 }
 
 object Distributions {
-  def apply[T](value: T)(implicit ev: T => Distributions): Distributions = value
-
-  trait Prov[T] {
-    def distributions(value: T): Distributions
-  }
-
-  case object Empty extends Distributions {
+  val empty: Distributions = new Distributions {
     override def portfolio(a: Address): Portfolio = Portfolio.empty
 
     override def assetDistribution(asset: IssuedAsset): AssetDistribution = AssetDistribution @@ Map.empty[Address, Long]

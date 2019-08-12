@@ -8,6 +8,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Time
@@ -18,12 +19,12 @@ import play.api.libs.json.JsNumber
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, apiExtensions: ApiExtensions, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain, apiExtensions)
 
   override val route = pathPrefix("leasing") {
     lease ~ cancel ~ active

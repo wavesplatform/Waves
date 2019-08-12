@@ -6,6 +6,7 @@ import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.{AssetAmount, AssetId, PBTransactions}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
@@ -13,8 +14,8 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
-  private[this] val commonApi = new CommonAccountApi(blockchain)
+class AccountsApiGrpcImpl(blockchain: Blockchain, ae: ApiExtensions)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
+  private[this] val commonApi = new CommonAccountApi(blockchain, ae)
 
   override def getBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = {
     val wavesOption = if (request.assets.exists(_.asset.isWaves)) {

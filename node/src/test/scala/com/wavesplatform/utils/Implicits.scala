@@ -1,5 +1,7 @@
 package com.wavesplatform.utils
 
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.{ApiExtensions, ApiExtensionsImpl}
 import monix.execution.{Ack, Cancelable}
 import monix.reactive.observers.Subscriber
 import monix.reactive.subjects.Subject
@@ -16,4 +18,6 @@ object Implicits {
       override def onComplete(): Unit                                       = {}
     }
   }
+
+  implicit def blockchainToApiExtensions(b: Blockchain): ApiExtensions = ApiExtensionsImpl(b)
 }

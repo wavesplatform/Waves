@@ -9,6 +9,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -28,6 +29,7 @@ import scala.util.Success
 case class TransactionsApiRoute(settings: RestAPISettings,
                                 wallet: Wallet,
                                 blockchain: Blockchain,
+                                addressTransactions: AddressTransactions,
                                 utx: UtxPool,
                                 utxPoolSynchronizer: UtxPoolSynchronizer,
                                 time: Time)
@@ -36,7 +38,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     with CommonApiFunctions
     with WithSettings {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, addressTransactions, utx, wallet, utxPoolSynchronizer)
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -235,7 +237,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(implicit sc: Scheduler): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
+      lazy val addressesCached = concurrent.blocking(addressTransactions.aliasesOfAddress(address).toVector :+ address).toSet
 
       /**
         * Produces compact representation for large transactions by stripping unnecessary data.

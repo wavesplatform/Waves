@@ -3,6 +3,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -10,7 +11,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import monix.reactive.Observable
 
-class CommonAccountApi(blockchain: Blockchain) {
+private[api] class CommonAccountApi(blockchain: Blockchain, ae: ApiExtensions) {
   import CommonAccountApi._
 
   def balance(address: Address, confirmations: Int = 0): Long = {
@@ -38,12 +39,12 @@ class CommonAccountApi(blockchain: Blockchain) {
   }
 
   def portfolio(address: Address): Map[Asset, Long] = {
-    val portfolio = blockchain.portfolio(address)
+    val portfolio = ae.portfolio(address)
     portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
   }
 
   def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
-    blockchain.nftObservable(address, from)
+    ae.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain.accountScript(address)
@@ -69,7 +70,7 @@ class CommonAccountApi(blockchain: Blockchain) {
   }
 
   def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
-    blockchain
+    ae
       .addressTransactionsObservable(address, Set(LeaseTransactionV1, LeaseTransactionV2))
       .collect {
         case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>

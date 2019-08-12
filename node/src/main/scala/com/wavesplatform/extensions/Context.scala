@@ -5,6 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
@@ -17,8 +18,8 @@ trait Context {
   def time: Time
   def wallet: Wallet
   def utx: UtxPool
-
   def utxPoolSynchronizer: UtxPoolSynchronizer
   def spendableBalanceChanged: Observable[(Address, Asset)]
   def actorSystem: ActorSystem
+  def apiExtensions: ApiExtensions
 }

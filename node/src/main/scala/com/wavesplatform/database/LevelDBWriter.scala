@@ -15,7 +15,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -35,8 +34,7 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
 import scala.util.Try
 
-object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distributions.Prov[LevelDBWriter] {
-
+object LevelDBWriter {
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
 
@@ -68,12 +66,6 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
   }
-
-  def addressTransactions(ldb: LevelDBWriter): AddressTransactions =
-    new LevelDBWriterAddressTransactions(ldb)
-
-  def distributions(ldb: LevelDBWriter): Distributions =
-    new LevelDBDistributions(ldb)
 }
 
 class LevelDBWriter(private[database] val writableDB: DB,

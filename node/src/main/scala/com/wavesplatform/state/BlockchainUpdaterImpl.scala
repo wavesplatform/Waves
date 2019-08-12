@@ -17,8 +17,6 @@ import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -30,7 +28,7 @@ import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
+class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
                             spendableBalanceChanged: Observer[(Address, Asset)],
                             wavesSettings: WavesSettings,
                             time: Time)
@@ -40,6 +38,8 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
 
   import com.wavesplatform.state.BlockchainUpdaterImpl._
   import wavesSettings.blockchainSettings.functionalitySettings
+
+  def stableBloclkchain: LevelDBWriter = blockchain
 
   private def inLock[R](l: Lock, f: => R) = {
     try {
@@ -657,16 +657,10 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
   }
 }
 
-object BlockchainUpdaterImpl extends ScorexLogging with AddressTransactions.Prov[BlockchainUpdaterImpl] with Distributions.Prov[BlockchainUpdaterImpl] {
+object BlockchainUpdaterImpl extends ScorexLogging {
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
       b1.reference == b2.reference &&
       b1.timestamp == b2.timestamp
-
-  def addressTransactions(bu: BlockchainUpdaterImpl): AddressTransactions =
-    new CompositeAddressTransactions(bu.blockchain, Height @@ bu.height, () => bu.bestLiquidDiff)
-
-  def distributions(bu: BlockchainUpdaterImpl): Distributions =
-    new CompositeDistributions(bu, bu.blockchain, () => bu.bestLiquidDiff)
 }

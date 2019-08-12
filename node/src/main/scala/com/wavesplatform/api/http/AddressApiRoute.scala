@@ -14,6 +14,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
@@ -27,14 +28,14 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, apiExtensions: ApiExtensions, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with WithSettings
     with BroadcastRoute {
 
   import AddressApiRoute._
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
+  private[this] val commonAccountApi = new CommonAccountApi(blockchain, apiExtensions)
   val MaxAddressesPerRequest         = 1000
 
   override lazy val route =

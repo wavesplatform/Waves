@@ -4,6 +4,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -19,12 +20,13 @@ import scala.util.Try
 
 class TransactionsApiGrpcImpl(wallet: Wallet,
                               blockchain: Blockchain,
+                              addressTransactions: AddressTransactions,
                               utx: UtxPool,
                               utxPoolSynchronizer: UtxPoolSynchronizer,
                               forceBroadcast: Boolean)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, addressTransactions, utx, wallet, utxPoolSynchronizer)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi

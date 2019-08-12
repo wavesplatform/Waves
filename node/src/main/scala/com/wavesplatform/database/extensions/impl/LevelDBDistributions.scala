@@ -1,7 +1,8 @@
-package com.wavesplatform.database
+package com.wavesplatform.database.extensions.impl
 
 import cats.effect.Resource
 import com.wavesplatform.account.Address
+import com.wavesplatform.database.{Keys, LevelDBWriter, ReadOnlyDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
@@ -13,7 +14,7 @@ import com.wavesplatform.utils.Paged
 import monix.eval.Task
 import monix.reactive.Observable
 
-private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends Distributions {
+private final class LevelDBWriterDistributions(ldb: LevelDBWriter) extends Distributions {
   import LevelDBWriter._
   import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
   import ldb._
@@ -170,4 +171,8 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
       else loadFullPortfolio(db, addressId)
     }
   }
+}
+
+object LevelDBWriterDistributions {
+  def apply(ldb: LevelDBWriter): Distributions = new LevelDBWriterDistributions(ldb)
 }

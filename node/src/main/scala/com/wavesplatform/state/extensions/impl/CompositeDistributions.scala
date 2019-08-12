@@ -1,4 +1,4 @@
-package com.wavesplatform.state.extensions.composite
+package com.wavesplatform.state.extensions.impl
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address

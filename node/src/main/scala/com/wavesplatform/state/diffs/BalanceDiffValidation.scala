@@ -1,10 +1,8 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
@@ -42,14 +40,13 @@ object BalanceDiffValidation extends ScorexLogging {
          }
        } else {
          None
-       }) orElse (portfolioDiff.assets find {
-        case (a, c) =>
-          // Tokens it can produce overflow are exist.
-          val oldB = b.balance(acc, a)
-          val newB = oldB + c
-          newB < 0
-      } map { _ =>
-        acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(Distributions(b).portfolio(acc).combine(portfolioDiff))}"
+       }) orElse (portfolioDiff.assets.map { case (a, diff) =>
+        val oldB = b.balance(acc, a)
+        val newB = oldB + diff
+        (a, newB)
+      }.collectFirst {
+        case (a, balance) if balance < 0 =>
+          acc -> s"negative asset balance: $acc, new balance: $a -> $balance"
       })
     }
 

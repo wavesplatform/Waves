@@ -8,6 +8,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.Implicits._
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{RequestGen, TestTime}
 import org.scalamock.scalatest.PathMockFactory
@@ -30,7 +31,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   "/transfer" - {
-    val route: Route = AssetsApiRoute(restAPISettings, wallet, utxPoolSynchronizer, state, new TestTime()).route
+    val route: Route = AssetsApiRoute(restAPISettings, wallet, utxPoolSynchronizer, state, state, new TestTime()).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 

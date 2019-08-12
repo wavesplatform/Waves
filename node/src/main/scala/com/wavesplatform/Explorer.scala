@@ -12,6 +12,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.state.extensions.ApiExtensionsImpl
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -101,6 +102,7 @@ object Explorer extends ScorexLogging {
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
     val db               = openDB(settings.dbSettings.directory)
     val reader = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val ae = ApiExtensionsImpl(reader)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -255,7 +257,7 @@ object Explorer extends ScorexLogging {
 
         case "AP" =>
           val address   = Address.fromString(args(2)).explicitGet()
-          val portfolio = reader.portfolio(address)
+          val portfolio = ae.portfolio(address)
           log.info(s"$address : ${portfolio.balance} WAVES, ${portfolio.lease}, ${portfolio.assets.size} assets")
           portfolio.assets.toSeq.sortBy(_._1.toString) foreach {
             case (assetId, balance) => log.info(s"$assetId : $balance")
@@ -303,7 +305,7 @@ object Explorer extends ScorexLogging {
 
           println(s"\nAddress balances (${addrs.size} addresses)")
           addrs.toSeq.sortBy(_.toString).foreach { addr =>
-            val p = reader.portfolio(addr)
+            val p = ae.portfolio(addr)
             println(s"\n$addr : ${p.balance} ${p.lease}:")
             p.assets.toSeq.sortBy(_._1.id).foreach {
               case (IssuedAsset(assetId), bal) =>

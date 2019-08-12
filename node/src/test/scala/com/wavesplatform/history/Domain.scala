@@ -5,8 +5,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state._
-import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.utils.Implicits._
 import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.duration.Duration
@@ -21,7 +21,7 @@ case class Domain(blockchainUpdater: BlockchainUpdater with NG) {
 
   def lastBlockId = blockchainUpdater.lastBlockId.get
 
-  def portfolio(address: Address) = Distributions(blockchainUpdater).portfolio(address)
+  def portfolio(address: Address) = blockchainUpdater.portfolio(address)
 
   def addressTransactions(address: Address): Seq[(Height, Transaction)] =
     blockchainUpdater.addressTransactionsObservable(address, Set.empty).take(128).toListL.runSyncUnsafe(Duration.Inf)

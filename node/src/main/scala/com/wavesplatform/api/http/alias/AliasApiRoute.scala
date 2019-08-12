@@ -8,6 +8,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
@@ -17,7 +18,7 @@ import play.api.libs.json.{Format, Json}
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain, addressTransactions: AddressTransactions)
     extends ApiRoute
     with BroadcastRoute
     with WithSettings {
@@ -56,13 +57,15 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     ))
-  def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    val result: Either[ApiError, Seq[String]] = com.wavesplatform.account.Address
-      .fromString(addressString)
-      .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr).toVector)
-      .left
-      .map(ApiError.fromValidationError)
-    complete(result)
+  def aliasOfAddress: Route = extractScheduler { implicit sc =>
+    (get & path("by-address" / Segment)) { addressString =>
+      val result: Either[ApiError, Seq[String]] = com.wavesplatform.account.Address
+        .fromString(addressString)
+        .map(acc => addressTransactions.aliasesOfAddress(acc).map(_.stringRepr).toVector)
+        .left
+        .map(ApiError.fromValidationError)
+      complete(result)
+    }
   }
 
   case class Address(address: String)

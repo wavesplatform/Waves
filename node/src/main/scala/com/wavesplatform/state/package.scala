@@ -6,8 +6,10 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -17,12 +19,18 @@ import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
 
-import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+
+  private[state] def extractLevelDB(b: Blockchain): LevelDBWriter = b match {
+    case ldb: LevelDBWriter => ldb
+    case cb: CompositeBlockchain => extractLevelDB(cb.stableBlockchain)
+    case bu: BlockchainUpdaterImpl => bu.stableBloclkchain
+    case _ => ???
+  }
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
       address: Address,
@@ -159,18 +167,6 @@ package object state {
       val block       = blockchain.blockAt(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, block.uniqueId)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
-    }
-
-    def aliasesOfAddress(address: Address): Seq[Alias] = {
-      import monix.execution.Scheduler.Implicits.global
-
-      blockchain
-        .addressTransactionsObservable(address, Set(CreateAliasTransactionV1, CreateAliasTransactionV2), None)
-        .collect {
-          case (_, a: CreateAliasTransaction) => a.alias
-        }
-        .toListL
-        .runSyncUnsafe(Duration.Inf)
     }
 
     def unsafeHeightOf(id: ByteStr): Int =

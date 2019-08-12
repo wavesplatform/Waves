@@ -21,7 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.extensions.Distributions
+import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
 import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
@@ -50,6 +50,7 @@ case class DebugApiRoute(ws: WavesSettings,
                          blockchain: Blockchain,
                          wallet: Wallet,
                          ng: NG,
+                         apiExtensions: ApiExtensions,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
@@ -67,7 +68,6 @@ case class DebugApiRoute(ws: WavesSettings,
 
   import DebugApiRoute._
 
-  private[this] val dst = Distributions(ng)
   private lazy val configStr             = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
@@ -146,7 +146,7 @@ case class DebugApiRoute(ws: WavesSettings,
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val base = dst.portfolio(address)
+          val base = apiExtensions.portfolio(address)
           val portfolio = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
           complete(Json.toJson(portfolio))
       }
@@ -157,7 +157,7 @@ case class DebugApiRoute(ws: WavesSettings,
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get & withAuth) {
-    complete(dst.wavesDistribution(ng.height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    complete(apiExtensions.wavesDistribution(ng.height).map(_.map { case (a, b) => a.stringRepr -> b }))
   }
 
   @Path("/stateWaves/{height}")
@@ -167,7 +167,7 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
     ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
-    complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    complete(apiExtensions.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit ec: ExecutionContext): Future[Either[ValidationError, JsObject]] = {
@@ -414,7 +414,7 @@ case class DebugApiRoute(ws: WavesSettings,
         (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) { implicit sc =>
           import cats.implicits._
 
-          val result = blockchain
+          val result = apiExtensions
             .addressTransactionsObservable(address, Set.empty, afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption))
             .map {
               case (height, tx: InvokeScriptTransaction) =>

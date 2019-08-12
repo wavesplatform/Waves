@@ -7,10 +7,13 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
+import com.wavesplatform.utils.Implicits._
 import com.wavesplatform.{NoShrink, TransactionGen}
+import monix.execution.Scheduler
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -49,7 +52,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             val senderAcc = anotherAliasTx.sender.toAddress
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-            newState.aliasesOfAddress(senderAcc).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
+            (newState: AddressTransactions).aliasesOfAddress(senderAcc)(Scheduler.global).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
             newState.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
             newState.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
         }
