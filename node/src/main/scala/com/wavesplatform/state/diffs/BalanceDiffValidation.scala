@@ -1,9 +1,8 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.utils.ScorexLogging
@@ -58,9 +57,4 @@ object BalanceDiffValidation extends ScorexLogging {
       Left(AccountBalanceError(positiveBalanceErrors))
     }
   }
-
-  private def negativeAssetsInfo(p: Portfolio): Map[ByteStr, Long] =
-    p.assets.collect {
-      case (asset, balance) if balance < 0 => (asset.id, balance)
-    }
 }
