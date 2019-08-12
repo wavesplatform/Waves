@@ -433,4 +433,11 @@ object ExpressionCompiler {
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
   }
+
+  def applyWithCtx(c: CompilerContext, expr: Expressions.EXPR): Either[String, (EXPR, FINAL)] = {
+    compileExpr(expr)
+      .run(c)
+      .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
+      .value
+  }
 }

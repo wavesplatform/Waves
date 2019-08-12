@@ -248,8 +248,10 @@ object JsAPI {
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
-      "evaluate" -> (repl.execute _ andThen mapResult),
-      "clear"    -> repl.clear _
+      "evaluate"  -> (repl.execute _ andThen mapResult),
+      "info"      -> repl.info _,
+      "totalInfo" -> repl.totalInfo _,
+      "clear"     -> repl.clear _
     )
 
   private def mapResult(eval: Either[String, String]): js.Dynamic =

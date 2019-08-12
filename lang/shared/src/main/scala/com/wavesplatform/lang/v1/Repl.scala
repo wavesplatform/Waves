@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
@@ -9,6 +9,7 @@ import monix.execution.atomic.{Atomic, AtomicAny}
 import cats.implicits._
 import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Expressions.{BLOCK, EXPR}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
@@ -35,13 +36,16 @@ case class Repl(ver: StdLibVersion = V3) {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = unavailable
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
   }
-  private val ctx = CryptoContext.build(Global, ver) |+| PureContext.build(Global, ver) |+| WavesContext.build(contractDirectiveSet, emptyBlockchainEnv)
-  private val initialState = (e: EXPR) => e
-  private val scriptAcc = Atomic(initialState)
+  private val initialCtx =
+    CryptoContext.build(Global, ver) |+|
+    PureContext.build(Global, ver)   |+|
+    WavesContext.build(contractDirectiveSet, emptyBlockchainEnv)
+
+  private val acc = Atomic((initialCtx.compilerContext, initialCtx.evaluationContext))
 
   def execute(expr: String): Either[String, String] =
-    transformAndExtract(scriptAcc, (acc: EXPR => EXPR) => {
-      evalExpr(expr, acc) match {
+    transformAndExtract(acc, (a: (CompilerContext, EvaluationContext)) => {
+      evalExpr(expr, a._1, a._2) match {
         case Left(e)            => (Left(e), acc)
         case Right((r, newAcc)) => (Right(r), newAcc)
       }
@@ -53,16 +57,19 @@ case class Repl(ver: StdLibVersion = V3) {
     result
   }
 
-  private def evalExpr(expr: String, acc: EXPR => EXPR): Either[String, (String, EXPR => EXPR)] =
+  private def evalExpr(
+    expr: String,
+    compileCtx: CompilerContext,
+    evalCtx: EvaluationContext
+  ): Either[String, (String, EXPR => EXPR)] =
     for {
       parsed <- Parser.parseExprOrDecl(expr).fold(
         { case (_, _, err) => Left(err.traced.toString) },
         { case (result, _) => Right(result) }
       )
-      exprWithState = acc(parsed)
-      (compiled, _) <- tryEi(ExpressionCompiler(ctx.compilerContext, exprWithState))
-      eval          <- tryEi(EvaluatorV1[EVALUATED](ctx.evaluationContext, compiled))
-    } yield (eval.prettyString(0), extractDecl(exprWithState, identity))
+      (compiled, _) <- tryEi(ExpressionCompiler(compileCtx, parsed))
+      eval          <- tryEi(EvaluatorV1[EVALUATED](evalCtx, compiled))
+    } yield eval
 
   private def extractDecl(expr: EXPR, decl: EXPR => EXPR): EXPR => EXPR =
     expr match {
@@ -76,5 +83,9 @@ case class Repl(ver: StdLibVersion = V3) {
       .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
       .flatten
 
-  def clear(): Unit = scriptAcc.set(initialState)
+  def info(str: String): String = ???
+
+  def totalInfo: String = ???
+
+  def clear(): Unit = acc.set((initialCtx.compilerContext, initialCtx.evaluationContext))
 }

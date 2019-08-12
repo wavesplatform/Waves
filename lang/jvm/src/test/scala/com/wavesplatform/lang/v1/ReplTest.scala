@@ -74,6 +74,5 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
         | main()
       """.stripMargin
     ) shouldBe Right("3")
-    repl.execute("main()") shouldBe Right("3")
   }
 }
