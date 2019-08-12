@@ -102,8 +102,8 @@ object ExpressionCompiler {
     pos:             Pos,
     typeDefs:        Map[String, FINAL],
     definedTypesStr: List[String],
-    expectedTypes:   List[String] = List(),
-    varName:         Option[String] = None,
+    expectedTypes:   List[String],
+    varName:         Option[String],
     typeName:        String
   ): Either[CompilationError, List[FINAL]] =
     typeDefs.get(typeName) match {
