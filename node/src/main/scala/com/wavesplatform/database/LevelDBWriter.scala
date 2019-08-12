@@ -76,7 +76,7 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
     new LevelDBDistributions(ldb)
 }
 
-class LevelDBWriter(val writableDB: DB,
+class LevelDBWriter(private[database] val writableDB: DB,
                     spendableBalanceChanged: Observer[(Address, Asset)],
                     val settings: BlockchainSettings,
                     val dbSettings: DBSettings)

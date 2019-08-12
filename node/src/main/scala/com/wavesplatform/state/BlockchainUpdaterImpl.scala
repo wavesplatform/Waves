@@ -30,7 +30,7 @@ import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(val blockchain: LevelDBWriter,
+class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
                             spendableBalanceChanged: Observer[(Address, Asset)],
                             wavesSettings: WavesSettings,
                             time: Time)
