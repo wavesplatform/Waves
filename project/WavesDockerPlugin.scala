@@ -14,7 +14,7 @@ object WavesDockerPlugin extends AutoPlugin {
       Seq(
         additionalFiles := Seq.empty,
         exposedPorts := Set.empty,
-        baseImage := "anapsix/alpine-java:8_server-jre",
+        baseImage := "openjdk:8",
         dockerfile := {
           val yourKitArchive = "YourKit-JavaProfiler-2019.1-docker.zip"
           val bin            = "/opt/waves/start-waves.sh"
@@ -23,8 +23,8 @@ object WavesDockerPlugin extends AutoPlugin {
             from(baseImage.value)
 
             runRaw(s"""mkdir -p /opt/waves && \\
-                    |apk update && \\
-                    |apk add --no-cache openssl ca-certificates && \\
+                    |apt-get update && \\
+                    |apt-get install -y openssl ca-certificates && \\
                     |wget --quiet "https://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar" -O /opt/waves/aspectjweaver.jar && \\
                     |wget --quiet "https://www.yourkit.com/download/docker/$yourKitArchive" -P /tmp/ && \\
                     |unzip /tmp/$yourKitArchive -d /usr/local && \\
