@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.compiler
 import cats.Show
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
+import com.wavesplatform.lang.v1.parser.Expressions.Pos
 
 sealed trait CompilationError {
   def start: Int
@@ -93,6 +94,11 @@ object CompilationError {
       s"Undefined type: `$name`" + varStr + expectedTypesStr
     }
   }
+
+  final case class GenericTypeNotFound(start: Int, end: Int, t: String) extends CompilationError {
+    val message = s"Undefined generic type `$t`"
+  }
+
   final case class FieldNotFound(start: Int, end: Int, name: String, typeName: String) extends CompilationError {
     val message = s"Undefined field `$name` of variable of type `$typeName`"
   }
