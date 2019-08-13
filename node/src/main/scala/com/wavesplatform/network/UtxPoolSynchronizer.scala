@@ -23,7 +23,10 @@ import scala.util.{Failure, Success}
 trait UtxPoolSynchronizer {
   def settings: UtxSynchronizerSettings
 
-  def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult]
+  def queueAndPublishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): (Future[Boolean], Future[TxAddResult])
+
+  def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] =
+    queueAndPublishTransaction(tx, source, forceBroadcast)._2
 }
 
 class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[_])(
@@ -32,16 +35,16 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
     with ScorexLogging
     with AutoCloseable {
 
-  private[this] case class BroadcastRequest(transaction: Transaction, source: Channel, putPromise: Promise[TxAddResult], forceBroadcast: Boolean)
+  private[this] case class BroadcastRequest(transaction: Transaction, source: Channel, queuePromise: Promise[Boolean], putPromise: Promise[TxAddResult], forceBroadcast: Boolean)
   private[this] lazy val txSource = ConcurrentSubject.publishToOne[BroadcastRequest]
 
   private[this] val future = start(txSource, blockSource)
 
   //noinspection ScalaStyle
-  override def publishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): Future[TxAddResult] = {
-    val request = BroadcastRequest(tx, source, Promise[TxAddResult], forceBroadcast)
+  override def queueAndPublishTransaction(tx: Transaction, source: Channel = null, forceBroadcast: Boolean = false): (Future[Boolean], Future[TxAddResult]) = {
+    val request = BroadcastRequest(tx, source, Promise[Boolean], Promise[TxAddResult], forceBroadcast)
     txSource.onNext(request)
-    request.putPromise.future
+    (request.queuePromise.future, request.putPromise.future)
   }
 
   override def close(): Unit = {
@@ -54,6 +57,7 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
 
     val produceTask = source.observeOn(scheduler).foreachL { req =>
       val queueResult = queue.tryOffer(req)
+      req.queuePromise.trySuccess(queueResult)
       if (!queueResult) req.putPromise.tryFailure(new RuntimeException("UTX queue overflow"))
     }
 
@@ -65,7 +69,7 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
     val consumeTask = createQueueObs(queue)
       .observeOn(scheduler)
       .mapParallelUnordered(settings.parallelism) {
-        case BroadcastRequest(transaction, sender, putPromise, forceBroadcast) =>
+        case BroadcastRequest(transaction, sender, _, putPromise, forceBroadcast) =>
           Task {
             val value = concurrent.blocking(utx.putIfNew(transaction))
 
@@ -78,7 +82,7 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
                 result
 
               case None =>
-                putPromise.success(value)
+                putPromise.trySuccess(value)
                 None
             }
           }.onErrorHandle { error =>
@@ -108,13 +112,16 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
     val newTxSource = txSource
       .observeOn(scheduler)
       .filter {
-        case BroadcastRequest(tx, _, putPromise, forceBroadcast) =>
+        case BroadcastRequest(tx, _, queuePromise, putPromise, forceBroadcast) =>
           var isNew = false
           knownTransactions.get(tx.id(), { () =>
             isNew = true; dummy
           })
           val result = isNew || forceBroadcast
-          if (!result) putPromise.trySuccess(Right(false))
+          if (!result) {
+            queuePromise.trySuccess(false)
+            putPromise.trySuccess(Right(false))
+          }
           result
       }
 
@@ -146,8 +153,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
         .consumeWith(Consumer.foreachParallelTask(ups.settings.parallelism) {
           case (channel, tx) =>
             Task
-              .deferFuture(ups.publishTransaction(tx, channel))
-              .onErrorHandle(log.error(s"Failed to process tx ${tx.id()}", _))
+              .deferFuture(ups.queueAndPublishTransaction(tx, channel)._1)
               .map(_ => ())
         })
         .runAsyncLogErr
