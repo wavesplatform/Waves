@@ -143,6 +143,7 @@ object Dependencies {
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
       // "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
+      "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger
       jacksonModule("core", "databind"),
       jacksonModuleScala,
       akkaHttp,
