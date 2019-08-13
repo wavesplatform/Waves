@@ -163,6 +163,11 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
+  val foldP: P[EXPR] = (Index ~~ P("FOLD<") ~~ digit.repX(min = 1).! ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+    .map { case (start, limit, list, acc, f, end) =>
+      Macro.unwrapFold(Pos(start, end), limit.toInt, list, acc, f)
+    }
+
   val list: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
     case (s, e, f) =>
       val pos = Pos(s, f)
@@ -326,7 +331,7 @@ object Parser {
   }
 
   def baseAtom(ep: P[EXPR]) = comment ~
-    P(ifP | matchP | ep | maybeAccessP) ~
+    P(foldP | ifP | matchP | ep | maybeAccessP) ~
     comment
 
   lazy val baseExpr = P(binaryOp(baseAtom(block), opsByPriority))
