@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.{Matchers, PropSpec}
 
@@ -74,5 +75,56 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
         | main()
       """.stripMargin
     ) shouldBe Right("3")
+  }
+
+  property("ctx leak") {
+    val repl = Repl()
+    repl.execute(
+      """
+         func f() = {
+           let a = 3
+           a
+         }
+      """
+    )
+    repl.execute(
+      """
+         let b = {
+           let a = 3
+           a
+         }
+      """
+    )
+    repl.execute("f()") shouldBe Right("3")
+    repl.execute("b")   shouldBe Right("3")
+    repl.execute("a") shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
+  }
+
+  property("type info") {
+    val repl = Repl()
+    repl.info("AttachedPayment") shouldBe "type AttachedPayment { assetId: ByteVector|Unit, amount: Int }"
+    repl.info("String")          shouldBe "type String"
+  }
+
+  property("func info") {
+    val repl = Repl()
+    repl.info("getInteger").split("\n") shouldBe Array(
+      "func getInteger(addressOrAlias: Address|Alias, key: String): Int|Unit",
+      "func getInteger(data: List[DataEntry], key: String): Int|Unit",
+      "func getInteger(data: List[DataEntry], index: Int): Int|Unit"
+    )
+    repl.execute("func my(a: Int) = toString(a)")
+    repl.info("my") shouldBe "func my(a: Int): String"
+  }
+
+  property("let info") {
+    val repl = Repl()
+    repl.execute("let a = 5")
+    repl.info("a")    shouldBe "let a: Int"
+    repl.info("unit") shouldBe "let unit: Unit"
+  }
+
+  property("info not found") {
+    Repl().info("unexisted") shouldBe "unexisted not found in context"
   }
 }
