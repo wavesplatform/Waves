@@ -12,7 +12,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import monix.eval.{Coeval, Task}
-import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
+import monix.execution.{AsyncQueue, BufferCapacity, CancelableFuture, ChannelType, Scheduler}
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Consumer, Observable, OverflowStrategy}
 
@@ -56,7 +56,7 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
   }
 
   private[this] def putAndBroadcastTask(source: Observable[BroadcastRequest]): Task[Unit] = {
-    val queue = AsyncQueue.bounded[BroadcastRequest](settings.maxQueueSize)
+    val queue = AsyncQueue.withConfig[BroadcastRequest](BufferCapacity.Bounded(settings.maxQueueSize), ChannelType.SPSC)
 
     val produceTask = source.observeOn(scheduler).foreachL { req =>
       val queueResult = queue.tryOffer(req)
