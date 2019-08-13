@@ -154,7 +154,7 @@ object JsAPI {
             "stdLibVersion" -> ver.id,
             "contentType"   -> contentType.id,
             "scriptType"    -> scriptType.id,
-            "imports"       -> imports.fileNames
+            "imports"       -> imports.fileNames.toJSArray
           )
       }
     info.fold(
