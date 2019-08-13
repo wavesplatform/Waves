@@ -10,7 +10,6 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, Blockchain, BlockchainUpdaterImpl, Height, Portfolio}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
-import com.wavesplatform.utils.EmptyBlockchain
 import monix.reactive.Observable
 
 object ApiExtensionsImpl {
@@ -32,10 +31,8 @@ object ApiExtensionsImpl {
       val distributions = new CompositeDistributions(cb, baseDistributions, () => cb.maybeDiff)
       fromAddressTransactionsAndDistributions(addressTransactions, distributions)
 
-    case EmptyBlockchain =>
+    case _ =>
       fromAddressTransactionsAndDistributions(AddressTransactions.empty, Distributions.empty)
-
-    case _ => ???
   }
 
   private[this] def fromAddressTransactionsAndDistributions(at: AddressTransactions, d: Distributions): ApiExtensions = {
