@@ -11,10 +11,10 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
-import monix.eval.Task
+import monix.eval.{Coeval, Task}
 import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{Consumer, Observable}
+import monix.reactive.{Consumer, Observable, OverflowStrategy}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
@@ -36,7 +36,10 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
     with AutoCloseable {
 
   private[this] case class BroadcastRequest(transaction: Transaction, source: Channel, queuePromise: Promise[Boolean], putPromise: Promise[TxAddResult], forceBroadcast: Boolean)
-  private[this] lazy val txSource = ConcurrentSubject.publishToOne[BroadcastRequest]
+  private[this] lazy val txSource = ConcurrentSubject.publishToOne[BroadcastRequest](OverflowStrategy.DropNewAndSignal(settings.maxQueueSize * 2, dropped => Coeval {
+    log.trace(s"$dropped transactions dropped")
+    None
+  }))
 
   private[this] val future = start(txSource, blockSource)
 
