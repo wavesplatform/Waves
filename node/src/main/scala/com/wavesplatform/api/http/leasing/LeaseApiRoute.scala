@@ -29,25 +29,30 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
     lease ~ cancel ~ active
   }
 
-  def lease: Route = processRequest("lease", (t: LeaseV1Request) => broadcastIfSuccess(TransactionFactory.leaseV1(t, wallet, time)))
+  def lease: Route = broadcastWithAuth[LeaseV1Request]("lease", t => TransactionFactory.leaseV1(t, wallet, time))
 
-  def cancel: Route = processRequest("cancel", (t: LeaseCancelV1Request) => broadcastIfSuccess(TransactionFactory.leaseCancelV1(t, wallet, time)))
+  def cancel: Route = broadcastWithAuth[LeaseCancelV1Request]("cancel", t => TransactionFactory.leaseCancelV1(t, wallet, time))
 
   @Path("/active/{address}")
   @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
     pathPrefix(Segment) { address =>
       complete(Address.fromString(address) match {
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
-          commonAccountApi.activeLeases(a).collect {
-            case (height, leaseTransaction: LeaseTransaction) =>
-              leaseTransaction.json() + ("height" -> JsNumber(height))
-          }.toListL.runToFuture
+          commonAccountApi
+            .activeLeases(a)
+            .collect {
+              case (height, leaseTransaction: LeaseTransaction) =>
+                leaseTransaction.json() + ("height" -> JsNumber(height))
+            }
+            .toListL
+            .runToFuture
       })
     }
   }

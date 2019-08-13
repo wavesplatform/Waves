@@ -11,7 +11,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -36,7 +35,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     with CommonApiFunctions
     with WithSettings {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer)
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -78,7 +77,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case Success(id) =>
             commonApi.transactionById(id) match {
               case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None => complete(ApiError.TransactionDoesNotExist)
+              case None          => complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }
@@ -207,14 +206,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route =
     (pathPrefix("broadcast") & post)(extractExecutionContext { implicit ec =>
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
-        complete {
-          TracedResult
-            .foldFuture(
-              TransactionFactory
-                .fromSignedRequest(transactionJson)
-                .map(tx => commonApi.broadcastTransaction(tx, settings.allowTxRebroadcasting).map(_.map(_ => tx)))
-            )
-            .map(_.leftMap(ApiError.fromValidationError))
+        TransactionFactory.fromSignedRequest(transactionJson) match {
+          case Left(error) => complete(ApiError.fromValidationError(error))
+          case Right(tx)   => complete(commonApi.broadcastTransaction(tx))
         }
       }
     })
@@ -233,7 +227,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(implicit sc: Scheduler): Either[ApiError, Future[JsArray]] = {
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
+      implicit sc: Scheduler): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
       lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 

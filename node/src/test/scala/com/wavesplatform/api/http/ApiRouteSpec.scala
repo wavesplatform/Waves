@@ -64,7 +64,6 @@ class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper {
 
   "NonFatal error from Task in API should be caught" in {
     Get("/taskRe") ~> compositeRoute ~> check {
-      println(responseAs[String])
       val response = responseAs[JsObject]
       status shouldBe StatusCodes.InternalServerError
       (response \ "error").as[Int] shouldBe ApiError.Unknown.id

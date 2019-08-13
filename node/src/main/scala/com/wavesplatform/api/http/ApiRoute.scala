@@ -63,13 +63,12 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
     *     }}}
     */
   private def handleAllExceptions(handler: ExceptionHandler): Directive0 =
-    Directive { inner =>
-      ctx =>
-        val handleExceptions = handler.andThen(_ (ctx))
-        try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
-        catch {
-          case thr: Throwable => handler.andThen(_ (ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
-        }
+    Directive { inner => ctx =>
+      val handleExceptions = handler.andThen(_(ctx))
+      try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
+      catch {
+        case thr: Throwable => handler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
+      }
     }
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
@@ -78,7 +77,7 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
       case _ =>
         optionalHeaderValueByType[api_key](()).flatMap {
           case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes("UTF-8")), hashFromSettings) => pass
-          case _                                                                                           => complete(ApiKeyNotValid)
+          case _                                                                                                  => complete(ApiKeyNotValid)
         }
     }
   }

@@ -18,15 +18,14 @@ import play.api.libs.json.{Format, Json}
 @Path("/alias")
 @Api(value = "/alias")
 case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
-    extends ApiRoute
-    with BroadcastRoute
+    extends BroadcastRoute
     with WithSettings {
 
   override val route = pathPrefix("alias") {
     alias ~ addressOfAlias ~ aliasOfAddress
   }
 
-  def alias: Route = processRequest("create", (t: CreateAliasV1Request) => broadcastIfSuccess(TransactionFactory.aliasV1(t, wallet, time)))
+  def alias: Route = broadcastWithAuth[CreateAliasV1Request]("create", t => TransactionFactory.aliasV1(t, wallet, time))
 
   @Path("/by-alias/{alias}")
   @ApiOperation(
@@ -37,13 +36,14 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     val result = Alias.create(aliasName) match {
       case Right(alias) =>
         blockchain.resolveAlias(alias) match {
           case Right(addr) => Right(Address(addr.stringRepr))
-          case _ => Left(AliasDoesNotExist(alias))
+          case _           => Left(AliasDoesNotExist(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }
@@ -55,7 +55,8 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, Seq[String]] = com.wavesplatform.account.Address
       .fromString(addressString)

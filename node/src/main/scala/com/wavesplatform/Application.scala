@@ -28,11 +28,12 @@ import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
+import com.wavesplatform.network.UtxPoolSynchronizer.TxAddResult
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils.{LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -187,7 +188,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
         utxSynchronizerScheduler)
 
-    utxSynchronizer.publishTransactions(transactions)
+    transactions.foreach {
+      case (channel, transaction) => utxSynchronizer.tryPublish(transaction, channel)
+    }
 
     val microBlockSink = microblockData
       .mapEval(scala.Function.tupled(processMicroBlock))
@@ -213,7 +216,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def wallet: Wallet          = app.wallet
       override def utx: UtxPool            = utxStorage
 
-      override def utxPoolSynchronizer: UtxPoolSynchronizer              = utxSynchronizer
+      override def broadcastTransaction(tx: Transaction): Future[TxAddResult] = utxSynchronizer.publish(tx)
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
     }

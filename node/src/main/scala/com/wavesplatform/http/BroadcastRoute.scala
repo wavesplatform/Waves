@@ -1,33 +1,31 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.{ApiError, WithSettings}
+import akka.http.scaladsl.server.Route
+import com.wavesplatform.api.http.{ApiError, ApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import monix.execution.Scheduler
+import play.api.libs.json.Reads
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
-trait BroadcastRoute { self: WithSettings =>
+trait BroadcastRoute extends ApiRoute {
   def utxPoolSynchronizer: UtxPoolSynchronizer
 
-  protected def broadcastIfSuccess(v: TracedResult[ValidationError, Transaction])(
-      implicit ec: ExecutionContext = Scheduler.global): Future[TracedResult[ApiError, Transaction]] = {
-
-    @inline
-    def doBroadcastTx(transaction: Transaction)(implicit ec: ExecutionContext): Future[TracedResult[ValidationError, Transaction]] =
-      utxPoolSynchronizer
-        .publishTransaction(transaction, forceBroadcast = settings.allowTxRebroadcasting)
-        .map(_.map(_ => transaction))
-
-    @inline
-    def doBroadcastEitherTx(v: TracedResult[ValidationError, Transaction])(
-        implicit ec: ExecutionContext): Future[TracedResult[ValidationError, Transaction]] = v.resultE match {
-      case Left(_)      => Future.successful(v)
-      case Right(value) => doBroadcastTx(value).map(tr => tr.copy(trace = v.trace ::: tr.trace))
+  private def internalBroadcast[A: Reads](pathMatcher: String, f: A => Either[ValidationError, Transaction]): Route = extractExecutionContext { implicit ec =>
+    json[A] { a =>
+      f(a) match {
+        case Left(error) => Future.successful[Either[ApiError, Transaction]](Left(ApiError.fromValidationError(error)))
+        case Right(tx)   => utxPoolSynchronizer.publish(tx).map(_.left.map(ApiError.fromValidationError))
+      }
     }
+  }
 
-    doBroadcastEitherTx(v).map(_.leftMap(ApiError.fromValidationError))
+  def broadcastWithAuth[A: Reads](pathMatcher: String, f: A => Either[ValidationError, Transaction]): Route = (path(pathMatcher) & post) {
+    withAuth(internalBroadcast(pathMatcher, f))
+  }
+
+  def broadcast[A: Reads](pathMatcher: String, f: A => Either[ValidationError, Transaction]): Route = (path(pathMatcher) & post) {
+    internalBroadcast(pathMatcher, f)
   }
 }

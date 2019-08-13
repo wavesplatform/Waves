@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
@@ -18,8 +17,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 
-import scala.concurrent.Future
-
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
     with RequestGen
@@ -29,8 +26,7 @@ class AssetsBroadcastRouteSpec
 
   private[this] implicit def scheduler: Scheduler = Scheduler(this.executor)
 
-  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
+  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
   "returns StateCheckFailed" - {
 
@@ -155,10 +151,7 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-    (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
-
-    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
+    val route = AssetsBroadcastApiRoute(restAPISettings, DummyUtxPoolSynchronizer.accepting).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

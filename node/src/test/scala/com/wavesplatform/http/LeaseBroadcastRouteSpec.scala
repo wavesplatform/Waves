@@ -4,7 +4,6 @@ import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.leasing.LeaseBroadcastApiRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -16,16 +15,13 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
-import scala.concurrent.Future
-
 class LeaseBroadcastRouteSpec
     extends RouteSpec("/leasing/broadcast/")
     with RequestGen
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
+  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(t => TransactionValidationError(GenericError("foo"), t))
 
   "returns StateCheckFailed" - {
     val route = LeaseBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route

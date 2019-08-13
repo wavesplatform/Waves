@@ -18,41 +18,22 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utxPoolSynchronize
     issue ~ reissue ~ transfer ~ burnRoute ~ exchange
   }
 
-  def issue: Route = (path("issue") & post) {
-    json[SignedIssueV1Request] { issueReq =>
-      broadcastIfSuccess(issueReq.toTx)
-    }
-  }
+  def issue: Route = broadcast[SignedIssueV1Request]("issue", _.toTx)
 
-  def reissue: Route = (path("reissue") & post) {
-    json[SignedReissueV1Request] { reissueReq =>
-      broadcastIfSuccess(reissueReq.toTx)
-    }
-  }
+  def reissue: Route = broadcast[SignedReissueV1Request]("reissue", _.toTx)
 
-  def burnRoute: Route = (path("burn") & post) {
-    json[SignedBurnV1Request] { burnReq =>
-      broadcastIfSuccess(burnReq.toTx)
-    }
-  }
+  def burnRoute: Route = broadcast[SignedBurnV1Request]("burn", _.toTx)
 
-  def transfer: Route = (path("transfer") & post) {
-    json[SignedTransferRequests] { transferReq =>
-      broadcastIfSuccess(
-        transferReq.eliminate(
+  def transfer: Route =
+    broadcast[SignedTransferRequests]("transfer", { transferReq =>
+      transferReq.eliminate(
+        _.toTx,
+        _.eliminate(
           _.toTx,
-          _.eliminate(
-            _.toTx,
-            _ => Left(UnsupportedTransactionType)
-          )
+          _ => Left(UnsupportedTransactionType)
         )
       )
-    }
-  }
+    })
 
-  def exchange: Route = (path("exchange") & post) {
-    json[SignedExchangeRequest] { req =>
-      broadcastIfSuccess(req.toTx)
-    }
-  }
+  def exchange: Route = broadcast[SignedExchangeRequest]("exchange", _.toTx)
 }
