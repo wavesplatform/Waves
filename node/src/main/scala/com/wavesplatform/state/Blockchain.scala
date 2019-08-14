@@ -77,7 +77,6 @@ trait Blockchain {
 
   // the following methods are used exclusively by patches
   def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T]
-  final def allActiveLeases: Seq[LeaseTransaction] = collectActiveLeases { case lt => lt }
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
