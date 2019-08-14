@@ -567,7 +567,6 @@ class LevelDBWriter(private[database] val writableDB: DB,
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
-        portfoliosToInvalidate.result().foreach(discardPortfolio)
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)

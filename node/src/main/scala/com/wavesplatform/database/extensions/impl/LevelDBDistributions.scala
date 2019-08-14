@@ -20,7 +20,7 @@ private final class LevelDBWriterDistributions(ldb: LevelDBWriter) extends Distr
   import ldb._
 
   def portfolio(a: Address): Portfolio =
-    portfolioCache.get(a, () => loadPortfolio(a))
+    loadPortfolio(a)
 
   def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
     def openIterator() = readOnlyNoClose { (snapshot, db) =>

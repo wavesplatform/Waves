@@ -122,9 +122,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
-  private[database] val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, _ => ???)
-  protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
-
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
@@ -306,7 +303,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     balancesCache.putAll(newBalances.result().asJava)
-    for (address <- newPortfolios.result()) discardPortfolio(address)
     for (id      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.result().asJava)
     scriptCache.putAll(diff.scripts.asJava)
