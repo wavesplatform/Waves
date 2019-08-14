@@ -3,7 +3,7 @@ name: Bug report
 about: Create a report to help us improve
 title: "[BUG]"
 labels: bug, help wanted, question
-assignees: ''
+assignees: phearnot
 
 ---
 
