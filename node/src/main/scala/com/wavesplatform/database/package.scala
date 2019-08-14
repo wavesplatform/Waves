@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
@@ -16,13 +17,29 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
-import org.iq80.leveldb.{DB, ReadOptions}
+import com.wavesplatform.utils.ScorexLogging
+import org.iq80.leveldb.{DB, Options, ReadOptions}
 
-package object database {
+package object database extends ScorexLogging {
+  def openDB(path: String, recreate: Boolean = false): DB = {
+    log.debug(s"Open DB at $path")
+    val file = new File(path)
+    val options = new Options()
+      .createIfMissing(true)
+      .paranoidChecks(true)
+
+    if (recreate) {
+      LevelDBFactory.factory.destroy(file, options)
+    }
+
+    file.getAbsoluteFile.getParentFile.mkdirs()
+    LevelDBFactory.factory.open(file, options)
+  }
+
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
 
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
-    def writeByteStr(s: ByteStr) = {
+    def writeByteStr(s: ByteStr): Unit = {
       output.write(s.arr)
     }
 
@@ -177,7 +194,7 @@ package object database {
 
   def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
 
-  def writeTransactionInfo(txInfo: (Int, Transaction)) = {
+  def writeTransactionInfo(txInfo: (Int, Transaction)): Array[Byte] = {
     val (h, tx) = txInfo
     val txBytes = tx.bytes()
     ByteBuffer.allocate(4 + txBytes.length).putInt(h).put(txBytes).array()

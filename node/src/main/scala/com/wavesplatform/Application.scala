@@ -20,7 +20,7 @@ import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute
 import com.wavesplatform.api.http.{assets, _}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
@@ -364,6 +364,7 @@ object Application {
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
+    if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
     val settings = WavesSettings.fromRootConfig(config)
 
