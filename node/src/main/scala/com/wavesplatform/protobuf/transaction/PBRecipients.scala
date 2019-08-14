@@ -7,8 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
-  val CompressedAddressLength: Int = Address.AddressLength - 6
-
   def create(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
     case a: Address => Recipient().withAddress(ByteString.copyFrom(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
     case a: Alias   => Recipient().withAlias(a.name)
@@ -16,10 +14,10 @@ object PBRecipients {
   }
 
   def toAddress(bytes: ByteStr): Either[ValidationError, Address] = {
-    if (bytes.length == Address.AddressLength) {
+    if (bytes.length == Address.HashLength) {
       val withHeader = Bytes.concat(Array(Address.AddressVersion, AddressScheme.current.chainId), bytes)
       Address.fromBytes(Bytes.concat(withHeader, Address.calcCheckSum(withHeader)))
-    } else if (bytes.length == CompressedAddressLength) Address.fromBytes(bytes)
+    } else if (bytes.length == Address.AddressLength) Address.fromBytes(bytes)
     else Left(GenericError(s"Invalid address length: ${bytes.length}"))
   }
 
