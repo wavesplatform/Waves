@@ -29,7 +29,6 @@ package object state {
   private[state] def extractLevelDB(b: Blockchain): LevelDBWriter = b match {
     case ldb: LevelDBWriter => ldb
     case cb: CompositeBlockchain => extractLevelDB(cb.stableBlockchain)
-    case bu: BlockchainUpdaterImpl => bu.stableBloclkchain
     case _ => ???
   }
 

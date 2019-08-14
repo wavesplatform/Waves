@@ -260,7 +260,7 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiResponse(code = 200, message = "Json state")
     ))
   def historyInfo: Route = (path("historyInfo") & get & withAuth) {
-    val a = ng.lastPersistedBlockIds(10)
+    val a = ng.lastBlockIds(10)
     val b = ng.microblockIds
     complete(HistoryInfo(a, b))
 

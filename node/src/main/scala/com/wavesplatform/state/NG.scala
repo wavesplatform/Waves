@@ -9,7 +9,5 @@ trait NG extends Blockchain {
 
   def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo]
 
-  def lastPersistedBlockIds(count: Int): Seq[BlockId]
-
   def microblockIds: Seq[BlockId]
 }

@@ -17,11 +17,16 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carry: Long = 0)
-    extends Blockchain {
-  override val settings: BlockchainSettings = stableBlockchain.settings
+trait CompositeBlockchain extends Blockchain {
+  def stableBlockchain: Blockchain
 
-  def diff: Diff = maybeDiff.getOrElse(Diff.empty)
+  def newBlock: Option[Block]
+
+  def maybeDiff: Option[Diff]
+
+  final def diff: Diff = maybeDiff.getOrElse(Diff.empty)
+
+  override val settings: BlockchainSettings = stableBlockchain.settings
 
   override def balance(address: Address, assetId: Asset): Long =
     stableBlockchain.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
@@ -34,7 +39,7 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
-    case None    => stableBlockchain.hasAssetScript(asset)
+    case None => stableBlockchain.hasAssetScript(asset)
   }
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
@@ -45,7 +50,7 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
           .get(asset)
           .map { newAssetInfo =>
             val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume)
-            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
+            val combination = Monoid.combine(oldAssetInfo, newAssetInfo)
             ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
           }
           .orElse(Some(ad.copy(script = script)))
@@ -60,7 +65,7 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
       case None =>
         val sponsorship = diff.sponsorship.get(asset).fold(0L) {
           case SponsorshipValue(sp) => sp
-          case SponsorshipNoInfo    => 0L
+          case SponsorshipNoInfo => 0L
         }
         diff.transactions
           .get(asset.id)
@@ -104,9 +109,9 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
   override def height: Int = stableBlockchain.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = stableBlockchain.resolveAlias(alias) match {
-    case l @ Left(AliasIsDisabled(_)) => l
-    case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
-    case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
+    case l@Left(AliasIsDisabled(_)) => l
+    case Right(addr) => Right(diff.aliases.getOrElse(alias, addr))
+    case Left(_) => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
   override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
@@ -147,37 +152,37 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
       stableBlockchain.balanceSnapshots(address, from, to)
     } else {
       val balance = this.balance(address)
-      val lease   = this.leaseBalance(address)
-      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
+      val lease = this.leaseBalance(address)
+      val bs = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
       if (stableBlockchain.height > 0 && from < this.height) bs +: stableBlockchain.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
 
   override def accountScript(address: Address): Option[Script] = {
     diff.scripts.get(address) match {
-      case None            => stableBlockchain.accountScript(address)
-      case Some(None)      => None
+      case None => stableBlockchain.accountScript(address)
+      case Some(None) => None
       case Some(Some(scr)) => Some(scr)
     }
   }
 
   override def hasScript(address: Address): Boolean = {
     diff.scripts.get(address) match {
-      case None          => stableBlockchain.hasScript(address)
-      case Some(None)    => false
+      case None => stableBlockchain.hasScript(address)
+      case Some(None) => false
       case Some(Some(_)) => true
     }
   }
 
   override def accountDataKeys(acc: Address): Seq[String] = {
     val fromInner = stableBlockchain.accountDataKeys(acc)
-    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    val fromDiff = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
     (fromInner ++ fromDiff).distinct
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = stableBlockchain.accountData(acc)
-    val fromDiff  = diff.accountData.get(acc).orEmpty
+    val fromDiff = diff.accountData.get(acc).orEmpty
     fromInner.combine(fromDiff)
   }
 
@@ -188,21 +193,22 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
 
   override def lastBlock: Option[Block] = newBlock.orElse(stableBlockchain.lastBlock)
 
-  override def carryFee: Long = carry
-
   override def score: BigInt = newBlock.fold(BigInt(0))(_.blockScore()) + stableBlockchain.score
 
   private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.uniqueId == blockId)
-  private def filterByHeight(height: Int): Option[Block]  = newBlock.filter(_ => this.height == height)
+
+  private def filterByHeight(height: Int): Option[Block] = newBlock.filter(_ => this.height == height)
 
   private def headerAndSize(block: Block): (BlockHeader, Int) = block -> block.bytes().length
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] =
     filterByHeight(height).map(headerAndSize) orElse stableBlockchain.blockHeaderAndSize(height)
+
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] =
     filterById(blockId).map(headerAndSize) orElse stableBlockchain.blockHeaderAndSize(blockId)
 
-  override def blockBytes(height: Int): Option[Array[Byte]]      = filterByHeight(height).map(_.bytes()) orElse stableBlockchain.blockBytes(height)
+  override def blockBytes(height: Int): Option[Array[Byte]] = filterByHeight(height).map(_.bytes()) orElse stableBlockchain.blockBytes(height)
+
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = filterById(blockId).map(_.bytes()) orElse stableBlockchain.blockBytes(blockId)
 
   override def heightOf(blockId: ByteStr): Option[Int] = filterById(blockId).map(_ => height) orElse stableBlockchain.heightOf(blockId)
@@ -228,4 +234,11 @@ final case class CompositeBlockchain(stableBlockchain: Blockchain, maybeDiff: Op
   override def activatedFeatures: Map[Short, Int] = stableBlockchain.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = stableBlockchain.featureVotes(height)
+}
+
+object CompositeBlockchain {
+  private[this] final class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
+
+  def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Long = 0): CompositeBlockchain =
+    new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee)
 }
