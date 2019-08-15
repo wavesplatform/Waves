@@ -62,7 +62,9 @@ class UtxPoolSynchronizerImpl(utx: UtxPool, val settings: UtxSynchronizerSetting
 
   private def pollTransactions(): CancelableFuture[Unit] = queue.poll().flatMap { req =>
     scheduler.execute { () =>
-      utx.putIfNew(req.transaction).resultE match {
+      val result = utx.putIfNew(req.transaction)
+      req.putPromise.trySuccess(result.resultE.map(_ => req.transaction))
+      result.resultE match {
         case Right(isNew) =>
           if (isNew || req.forceBroadcast) {
             allChannels
