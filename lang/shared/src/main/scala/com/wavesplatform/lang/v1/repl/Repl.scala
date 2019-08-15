@@ -18,7 +18,7 @@ case class Repl(ver: StdLibVersion = V3) {
   private val initialCtx =
     CryptoContext.build(Global, ver) |+|
     PureContext.build(Global, ver)   |+|
-    WavesContext.build(contractDirectiveSet, emptyBlockchainEnv)
+    WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
 
   private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext), view)
   private val currentState = Atomic(initialState)

@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 
 package object repl {
   val Global: BaseGlobal = com.wavesplatform.lang.Global
-  val emptyBlockchainEnv = new Environment {
+  val failFastBlockchainEnv = new Environment {
     lazy val unavailable = throw new RuntimeException(s"Blockchain state is unavailable from REPL")
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 0
