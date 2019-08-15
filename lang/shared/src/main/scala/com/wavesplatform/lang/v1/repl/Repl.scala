@@ -24,7 +24,7 @@ case class Repl(ver: StdLibVersion = V3) {
   private val currentState = Atomic(initialState)
 
   private def state[S, V](s: S, view: S => V): (S, V) = (s, view(s))
-  private def view(ctx: (CompilerContext, EvaluationContext)) = StateView(ctx._1, ctx._2)
+  private def view(ctx: (CompilerContext, EvaluationContext)) = StateView(ctx._1)
 
   def clear(): Unit = currentState.set(initialState)
 

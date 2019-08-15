@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeS
 
 import scala.collection.immutable.ListMap
 
-case class StateView(compileCtx: CompilerContext, evalCtx: EvaluationContext) {
+case class StateView(ctx: CompilerContext) {
   lazy val totalCtx: String =
     declMap.values.mkString("\n")
 
@@ -14,7 +14,7 @@ case class StateView(compileCtx: CompilerContext, evalCtx: EvaluationContext) {
      (ListMap() ++ funcs ++ values ++ types).withDefault(s => s"$s not found in context")
 
   private lazy val funcs: Map[String, String] =
-    compileCtx.functionDefs
+    ctx.functionDefs
       .map { case (name, signatures) => (name, funcsStr(name, signatures))}
 
 
@@ -29,11 +29,11 @@ case class StateView(compileCtx: CompilerContext, evalCtx: EvaluationContext) {
       .mkString("\n")
 
   private lazy val values: Map[String, String] =
-    compileCtx.varDefs
+    ctx.varDefs
       .map { case (name, t) => (name, s"let $name: ${typeStrRec(t)}") }
 
   private lazy val types: Map[String, String] =
-    evalCtx.typeDefs
+    ctx.predefTypes
       .mapValues(t => s"type ${typeStrRec(t)}")
 
   private def typeStrRec(t: FINAL): String =

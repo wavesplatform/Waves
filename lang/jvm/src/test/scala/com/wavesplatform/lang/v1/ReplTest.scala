@@ -117,6 +117,13 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     repl.info("my") shouldBe "func my(a: Int): String"
   }
 
+  property("let info") {
+    val repl = Repl()
+    repl.execute("let a = 5")
+    repl.info("a")    shouldBe "let a: Int"
+    repl.info("unit") shouldBe "let unit: Unit"
+  }
+
   property("state reassign") {
     val repl = Repl()
     repl.execute("let a = 5")
