@@ -63,6 +63,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
+  override def lastBlockIds(howMany: Int): Seq[BlockId] = readLock {
+    ngState.fold(blockchain.lastBlockIds(howMany))(_.bestLiquidBlockId +: blockchain.lastBlockIds(howMany - 1))
+  }
+
   override def isLastBlockId(id: ByteStr): Boolean = readLock {
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
   }
