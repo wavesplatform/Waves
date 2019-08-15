@@ -6,7 +6,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
@@ -62,10 +62,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
-
-  override def lastBlockIds(howMany: Int): Seq[BlockId] = readLock {
-    ngState.fold(blockchain.lastBlockIds(howMany))(_.bestLiquidBlockId +: blockchain.lastBlockIds(howMany - 1))
-  }
 
   override def isLastBlockId(id: ByteStr): Boolean = readLock {
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
@@ -331,8 +327,14 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     }
   }
 
-  def lastBlockId: Option[ByteStr] = readLock {
-    ngState.map(_.bestLiquidBlockId).orElse(blockchain.lastBlockId)
+  override def heightOf(blockId: BlockId): Option[Int] = readLock {
+    blockchain
+      .heightOf(blockId)
+      .orElse(ngState.collect { case ng if ng.contains(blockId) => this.height })
+  }
+
+  override def lastBlockIds(howMany: Int): Seq[BlockId] = readLock {
+    ngState.fold(blockchain.lastBlockIds(howMany))(_.bestLiquidBlockId +: blockchain.lastBlockIds(howMany - 1))
   }
 
   override def microBlock(id: BlockId): Option[MicroBlock] = readLock {
@@ -340,6 +342,14 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
       ng <- ngState
       mb <- ng.microBlock(id)
     } yield mb
+  }
+
+  def lastBlockTimestamp: Option[Long] = readLock {
+    ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)
+  }
+
+  def lastBlockId: Option[ByteStr] = readLock {
+    ngState.map(_.bestLiquidBlockId).orElse(blockchain.lastBlockId)
   }
 
   override def microblockIds: Seq[BlockId] = readLock {
@@ -352,10 +362,6 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
       .orElse(blockchain.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def lastBlock: Option[Block] = readLock {
-    ngState.map(_.bestLiquidBlock).orElse(blockchain.lastBlock)
-  }
-
   override def carryFee: Long = readLock {
     ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
   }
@@ -365,6 +371,25 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
       ng <- ngState
       (block, _, _, _, _) <- ng.totalDiffOf(blockId)
     } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
+  }
+
+  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readLock {
+    ngState match {
+      case Some(ng) if ng.contains(parentSignature) => Some(Seq.empty[ByteStr])
+      case maybeNg =>
+        blockchain.blockIdsAfter(parentSignature, howMany).map { ib =>
+          if (ib.lengthCompare(howMany) < 0) ib ++ maybeNg.map(_.bestLiquidBlockId) else ib
+        }
+    }
+  }
+
+  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
+    ngState match {
+      case Some(ng) if ng.contains(block.reference) =>
+        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
+      case _ =>
+        blockchain.parentHeader(block, back)
+    }
   }
 
   override def totalFee(height: Int): Option[Long] = readLock {

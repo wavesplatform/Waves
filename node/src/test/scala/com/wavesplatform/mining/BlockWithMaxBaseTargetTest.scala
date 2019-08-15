@@ -38,10 +38,11 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     "node should stop if base target greater than maximum in block creation " in {
       withEnv {
         case Env(settings, pos, bcu, utxPoolStub, scheduler, account, lastBlock) =>
+          @volatile
           var stopReasonCode = 0
 
           val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-          val wallet      = Wallet(WalletSettings(None, Some("123"), None))
+          val wallet = Wallet(WalletSettings(None, Some("123"), None))
           val miner =
             new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
 
@@ -76,6 +77,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     "node should stop if base target greater than maximum in block append" in {
       withEnv {
         case Env(settings, pos, bcu, utxPoolStub, scheduler, _, lastBlock) =>
+          @volatile
           var stopReasonCode = 0
 
           val signal = new Semaphore(1)
@@ -110,7 +112,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   def withEnv(f: Env => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
-    val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+    val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
     val blockchainSettings0 = settings0.blockchainSettings.copy(
       functionalitySettings = settings0.blockchainSettings.functionalitySettings.copy(
@@ -128,7 +130,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
-    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
+    val utxPoolStub = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {
@@ -139,7 +141,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
           .map(bs => KeyPair(bs))
           .map { account =>
-            val tx           = GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()
+            val tx = GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
             val secondBlock = TestBlock.create(
               ts + 3,
@@ -173,4 +175,5 @@ object BlockWithMaxBaseTargetTest {
                        schedulerService: SchedulerService,
                        miner: KeyPair,
                        lastBlock: Block)
+
 }
