@@ -111,7 +111,7 @@ object EvaluatorV1 {
           case f: FUNC => evalFuncBlock(f, inner)
         }
       case REF(str)                    => evalRef(str)
-      case c: EVALUATED                => implicitly[Monad[EvalM]].pure((EvaluationContext.empty, c))
+      case c: EVALUATED                => get.map(ctx => (ctx.ec, c))
       case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
       case GETTER(expr, field)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)

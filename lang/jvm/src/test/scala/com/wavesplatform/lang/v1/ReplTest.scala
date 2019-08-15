@@ -97,7 +97,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     )
     repl.execute("f()") shouldBe Right("3")
     repl.execute("b")   shouldBe Right("3")
-    repl.execute("a") shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
+    repl.execute("a")   shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
   }
 
   property("type info") {
@@ -117,14 +117,10 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     repl.info("my") shouldBe "func my(a: Int): String"
   }
 
-  property("let info") {
+  property("state reassign") {
     val repl = Repl()
     repl.execute("let a = 5")
-    repl.info("a")    shouldBe "let a: Int"
-    repl.info("unit") shouldBe "let unit: Unit"
-  }
-
-  property("info not found") {
-    Repl().info("unexisted") shouldBe "unexisted not found in context"
+    repl.execute("1")
+    repl.execute("a") shouldBe Right("5")
   }
 }

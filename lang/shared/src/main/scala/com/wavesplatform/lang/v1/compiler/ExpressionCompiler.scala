@@ -42,39 +42,38 @@ object ExpressionCompiler {
     compileExprWithCtx(expr).map(r => (r._2, r._3))
 
   def compileExprWithCtx(expr: Expressions.EXPR): CompileM[(CompilerContext, Terms.EXPR, FINAL)] = {
-    val ctx = CompilerContext.empty
+    get[CompilerContext, CompilationError].flatMap { ctx =>
 
-    def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) = {
-      CONST_BYTESTR(b)
-        .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
-        .map((ctx, _, BYTESTR))
-    }
+      def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
+        CONST_BYTESTR(b)
+          .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
+          .map((ctx, _, BYTESTR))
 
-    def adjustStr(expr: Expressions.CONST_STRING, str: String) = {
-      CONST_STRING(str)
-        .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
-        .map((ctx, _, STRING))
-    }
+      def adjustStr(expr: Expressions.CONST_STRING, str: String) =
+        CONST_STRING(str)
+          .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
+          .map((ctx, _, STRING))
 
-    expr match {
-      case x: Expressions.CONST_LONG                => (ctx, CONST_LONG(x.value): EXPR, LONG: FINAL).pure[CompileM]
-      case x: Expressions.CONST_BYTESTR             => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
-      case x: Expressions.CONST_STRING              => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
-      case _: Expressions.TRUE                      => (ctx, TRUE: EXPR, BOOLEAN: FINAL).pure[CompileM]
-      case _: Expressions.FALSE                     => (ctx, FALSE: EXPR, BOOLEAN: FINAL).pure[CompileM]
-      case Expressions.GETTER(p, ref, field)        => compileGetter(p, field, ref)
-      case Expressions.BLOCK(p, dec, body)          => compileBlock(p, dec, body)
-      case Expressions.IF(p, cond, ifTrue, ifFalse) => compileIf(p, cond, ifTrue, ifFalse).map(r => (ctx, r._1, r._2))
-      case Expressions.REF(p, key)                  => compileRef(p, key)
-      case Expressions.FUNCTION_CALL(p, name, args) => compileFunctionCall(p, name, args)
-      case Expressions.MATCH(p, ex, cases)          => compileMatch(p, ex, cases.toList)
-      case Expressions.INVALID(p, message)          => raiseError(Generic(p.start, p.end, message))
-      case Expressions.BINARY_OP(p, a, op, b) =>
-        op match {
-          case AND_OP => compileIf(p, a, b, Expressions.FALSE(p)).map(r => (ctx, r._1, r._2))
-          case OR_OP  => compileIf(p, a, Expressions.TRUE(p), b).map(r => (ctx, r._1, r._2))
-          case _      => compileFunctionCall(p, PART.VALID(p, BinaryOperation.opsToFunctions(op)), List(a, b))
-        }
+      expr match {
+        case x: Expressions.CONST_LONG                => (ctx, CONST_LONG(x.value): EXPR, LONG: FINAL).pure[CompileM]
+        case x: Expressions.CONST_BYTESTR             => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
+        case x: Expressions.CONST_STRING              => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
+        case _: Expressions.TRUE                      => (ctx, TRUE: EXPR, BOOLEAN: FINAL).pure[CompileM]
+        case _: Expressions.FALSE                     => (ctx, FALSE: EXPR, BOOLEAN: FINAL).pure[CompileM]
+        case Expressions.GETTER(p, ref, field)        => compileGetter(p, field, ref)
+        case Expressions.BLOCK(p, dec, body)          => compileBlock(p, dec, body)
+        case Expressions.IF(p, cond, ifTrue, ifFalse) => compileIf(p, cond, ifTrue, ifFalse).map(r => (ctx, r._1, r._2))
+        case Expressions.REF(p, key)                  => compileRef(p, key)
+        case Expressions.FUNCTION_CALL(p, name, args) => compileFunctionCall(p, name, args)
+        case Expressions.MATCH(p, ex, cases)          => compileMatch(p, ex, cases.toList)
+        case Expressions.INVALID(p, message)          => raiseError(Generic(p.start, p.end, message))
+        case Expressions.BINARY_OP(p, a, op, b) =>
+          op match {
+            case AND_OP => compileIf(p, a, b, Expressions.FALSE(p)).map(r => (ctx, r._1, r._2))
+            case OR_OP  => compileIf(p, a, Expressions.TRUE(p), b).map(r => (ctx, r._1, r._2))
+            case _      => compileFunctionCall(p, PART.VALID(p, BinaryOperation.opsToFunctions(op)), List(a, b))
+          }
+      }
     }
   }
 
