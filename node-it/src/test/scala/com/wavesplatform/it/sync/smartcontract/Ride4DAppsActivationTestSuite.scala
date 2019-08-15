@@ -36,30 +36,6 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
                                           |isTrue()
                                         """.stripMargin).explicitGet()._1.bytes().base64
 
-  test("send waves to accounts") {
-    sender
-      .transfer(
-        sender.address,
-        recipient = smartAcc.address,
-        assetId = None,
-        amount = 5.waves,
-        fee = minFee,
-        waitForTx = true
-      )
-      .id
-
-    sender
-      .transfer(
-        sender.address,
-        recipient = callerAcc.address,
-        assetId = None,
-        amount = 5.waves,
-        fee = minFee,
-        waitForTx = true
-      )
-      .id
-  }
-
   test("can't set contract to account before Ride4DApps activation") {
     assertBadRequestAndMessage(sender.setScript(smartAcc.address, Some(scriptV3), setScriptFee + smartFee),
                                "RIDE 4 DAPPS feature has not been activated yet")
@@ -117,10 +93,11 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
         1000,
         0,
         script = Some(scriptV2),
-        fee = issueFee,
-        waitForTx = true
+        fee = issueFee
       )
       .id
+
+    nodes.waitForTransaction(issueTxId)
 
     sender
       .setAssetScript(
