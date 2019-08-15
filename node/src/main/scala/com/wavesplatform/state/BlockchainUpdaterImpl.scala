@@ -388,21 +388,23 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
     }
   }
 
-  // Locks
-  private[this] def inLock[R](l: Lock, f: => R) = {
+  // Locks\
+  @inline
+  private[this] def inLock[R](l: => Lock, f: => R) = {
+    val lockInstance = l
     try {
-      l.lock()
+      lockInstance.lock()
       val res = f
       res
-    } finally {
-      l.unlock()
-    }
+    } finally lockInstance.unlock()
   }
 
   private[this] lazy val lock = new ReentrantReadWriteLock
 
+  @noinline
   protected def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
 
+  @noinline
   protected def readLock[B](f: => B): B = inLock(lock.readLock(), f)
 
   //noinspection ScalaStyle
