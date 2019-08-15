@@ -4,12 +4,14 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeSignature}
 
+import scala.collection.immutable.ListMap
+
 case class StateView(compileCtx: CompilerContext, evalCtx: EvaluationContext) {
   lazy val totalCtx: String =
     declMap.values.mkString("\n")
 
   lazy val declMap: Map[String, String] =
-    (funcs ++ values ++ types).withDefault(s => s"$s not found in context")
+     (ListMap() ++ funcs ++ values ++ types).withDefault(s => s"$s not found in context")
 
   private lazy val funcs: Map[String, String] =
     compileCtx.functionDefs
