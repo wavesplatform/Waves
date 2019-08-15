@@ -12,12 +12,11 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.{FatalDBError, ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
 import kamon.Kamon
 import monix.eval.Task
-import org.iq80.leveldb.DBException
 
 import scala.util.{Left, Right}
 
@@ -86,18 +85,12 @@ package object appender extends ScorexLogging {
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
       block: Block): Either[ValidationError, Option[Int]] =
-    try {
-      metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
-        metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
-        maybeDiscardedTxs.map { discarded =>
-          metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded, verify = false))
-          blockchainUpdater.height
-        }
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
+      metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
+      maybeDiscardedTxs.map { discarded =>
+        metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded, verify = false))
+        blockchainUpdater.height
       }
-    } catch {
-      case e: DBException =>
-        com.wavesplatform.utils.forceStopApplication(FatalDBError)
-        throw new RuntimeException("Fatal DB error on block append, force stopping node", e)
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(

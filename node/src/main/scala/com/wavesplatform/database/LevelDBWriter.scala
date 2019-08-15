@@ -26,9 +26,9 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{FatalDBError, ScorexLogging}
 import monix.reactive.Observer
-import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
+import org.iq80.leveldb.{DB, DBException, ReadOptions, Snapshot}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -90,14 +90,26 @@ class LevelDBWriter(private[database] val writableDB: DB,
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
-  private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
+  @inline
+  private[this] def withNodeStopOnError[A](f: => A): A = {
+    try f
+    catch { case e: DBException =>
+      val message = "Fatal DB error, force stopping node"
+      log.error(message, e)
+      com.wavesplatform.utils.forceStopApplication(FatalDBError)
+      throw new RuntimeException(message, e)
+    }
+  }
 
-  private[database] def readOnlyNoClose[A](f: (Snapshot, ReadOnlyDB) => A): A = {
+  private[database] def readOnly[A](f: ReadOnlyDB => A): A =
+    withNodeStopOnError(writableDB.readOnly(f))
+
+  private[database] def readOnlyNoClose[A](f: (Snapshot, ReadOnlyDB) => A): A = withNodeStopOnError {
     val snapshot = writableDB.getSnapshot
     f(snapshot, new ReadOnlyDB(writableDB, new ReadOptions().snapshot(snapshot)))
   }
 
-  private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
+  private[this] def readWrite[A](f: RW => A): A = withNodeStopOnError(writableDB.readWrite(f))
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
 
