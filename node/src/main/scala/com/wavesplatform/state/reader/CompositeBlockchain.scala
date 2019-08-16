@@ -240,13 +240,13 @@ trait CompositeBlockchain extends Blockchain {
 object CompositeBlockchain {
   private[this] final class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
 
-  def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Long = 0): CompositeBlockchain = stableBlockchain match {
+  def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Option[Long] = None): CompositeBlockchain = stableBlockchain match {
     case cb: CompositeBlockchain =>
       val diff = cb.maybeDiff |+| maybeDiff
       val block = newBlock.orElse(cb.newBlock)
-      new CompositeBlockchainImpl(cb.stableBlockchain, diff, block, carryFee)
+      new CompositeBlockchainImpl(cb.stableBlockchain, diff, block, carryFee.getOrElse(cb.carryFee))
 
     case _ =>
-      new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee)
+      new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee.getOrElse(0L))
   }
 }
