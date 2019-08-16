@@ -317,11 +317,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
   override def featureVotes(height: Int): Map[Short, Int] = readLock {
     val innerVotes = blockchain.featureVotes(height)
     ngState match {
-      case Some(ng) if this.height <= height =>
-        val ngVotes = ng.base.featureVotes.map { featureId =>
-          featureId -> (innerVotes.getOrElse(featureId, 0) + 1)
-        }.toMap
-
+      case Some(ng) if height >= this.height =>
+        def ngVotes = ng.base.featureVotes.iterator.map(ftId => ftId -> (innerVotes.getOrElse(ftId, 0) + 1))
         innerVotes ++ ngVotes
       case _ => innerVotes
     }

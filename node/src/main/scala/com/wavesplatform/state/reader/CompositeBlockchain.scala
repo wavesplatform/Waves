@@ -106,7 +106,8 @@ trait CompositeBlockchain extends Blockchain {
       .map(_._1)
       .orElse(stableBlockchain.transactionHeight(id))
 
-  override def height: Int = stableBlockchain.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
+  override def height: Int =
+    stableBlockchain.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = stableBlockchain.resolveAlias(alias) match {
     case l@Left(AliasIsDisabled(_)) => l
@@ -239,6 +240,13 @@ trait CompositeBlockchain extends Blockchain {
 object CompositeBlockchain {
   private[this] final class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
 
-  def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Long = 0): CompositeBlockchain =
-    new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee)
+  def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Long = 0): CompositeBlockchain = stableBlockchain match {
+    case cb: CompositeBlockchain =>
+      val diff = cb.maybeDiff |+| maybeDiff
+      val block = newBlock.orElse(cb.newBlock)
+      new CompositeBlockchainImpl(cb.stableBlockchain, diff, block, carryFee)
+
+    case _ =>
+      new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee)
+  }
 }
