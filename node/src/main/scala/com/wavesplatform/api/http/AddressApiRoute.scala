@@ -29,8 +29,8 @@ import scala.util.{Failure, Success, Try}
 @Api(value = "/addresses/")
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
-    with AuthRoute
-    with BroadcastRoute {
+    with BroadcastRoute
+    with AuthRoute {
 
   import AddressApiRoute._
 

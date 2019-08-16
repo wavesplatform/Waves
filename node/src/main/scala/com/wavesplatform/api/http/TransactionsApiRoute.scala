@@ -33,7 +33,6 @@ case class TransactionsApiRoute(
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
-    with CommonApiFunctions
     with AuthRoute {
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
