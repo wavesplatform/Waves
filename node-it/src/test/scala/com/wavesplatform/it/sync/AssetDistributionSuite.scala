@@ -15,11 +15,13 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   val issuer = node.privateKey
 
   test("'Asset distribution at height' method works properly") {
-    val transferAmount = 1000000l
-    val issueAmount    = 1000000000l
+    val transferAmount = 1000000L
+    val issueAmount    = 1000000000L
 
     val addresses     = nodes.map(_.privateKey.toAddress).filter(_ != issuer.toAddress).toList
     val initialHeight = node.height
+
+    nodes.waitForHeightArise()
 
     val issueTx = node.issue(issuer.address, "TestCoin", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 

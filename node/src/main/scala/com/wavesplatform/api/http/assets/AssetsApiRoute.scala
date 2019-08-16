@@ -44,7 +44,7 @@ import scala.util.Success
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with WithSettings {
+    with AuthRoute {
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   private[this] val commonAssetsApi  = new CommonAssetsApi(blockchain)
@@ -56,7 +56,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ nft ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
+      balance ~ balances ~ nft ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ deprecatedRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -221,27 +221,43 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         }
     )
 
-  def transfer: Route =
-    broadcastWithAuth[TransferRequests](
-      "transfer",
-      _.eliminate(
-        v1 => TransactionFactory.transferAssetV1(v1, wallet, time),
-        _.eliminate(v2 => TransactionFactory.transferAssetV2(v2, wallet, time), _ => Left(TxValidationError.UnsupportedTransactionType))
+  private def deprecatedRoute: Route =
+    (path("transfer") & withAuth) {
+      broadcast[TransferRequests](
+        _.eliminate(
+          v1 => TransactionFactory.transferAssetV1(v1, wallet, time),
+          _.eliminate(v2 => TransactionFactory.transferAssetV2(v2, wallet, time), _ => Left(TxValidationError.UnsupportedTransactionType))
+        )
       )
-    )
-
-  def massTransfer: Route = broadcastWithAuth[MassTransferRequest]("masstransfer", t => TransactionFactory.massTransferAsset(t, wallet, time))
-
-  def issue: Route = broadcastWithAuth[IssueV1Request]("issue", r => TransactionFactory.issueAssetV1(r, wallet, time))
-
-  def reissue: Route = broadcastWithAuth[ReissueV1Request]("reissue", r => TransactionFactory.reissueAssetV1(r, wallet, time))
-
-  def burnRoute: Route = broadcastWithAuth[BurnV1Request]("burn", b => TransactionFactory.burnAssetV1(b, wallet, time))
-
-  def signOrder: Route =
-    processRequest("order", (order: Order) => {
+    } ~ (path("masstransfer") & withAuth) {
+      broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
+    } ~ (path("issue") & withAuth) {
+      broadcast[IssueV1Request](TransactionFactory.issueAssetV1(_, wallet, time))
+    } ~ (path("reissue") & withAuth) {
+      broadcast[ReissueV1Request](TransactionFactory.reissueAssetV1(_, wallet, time))
+    } ~ (path("burn") & withAuth) {
+      broadcast[BurnV1Request](TransactionFactory.burnAssetV1(_, wallet, time))
+    } ~ (path("sponsor") & withAuth) {
+      broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
+    } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
       wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
-    })
+    }) ~ pathPrefix("broadcast")(
+      path("issue")(broadcast[SignedIssueV1Request](_.toTx)) ~
+        path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
+        path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
+        path("exchange")(broadcast[SignedExchangeRequest](_.toTx)) ~
+        path("transfer")(
+          broadcast[SignedTransferRequests](
+            _.eliminate(
+              _.toTx,
+              _.eliminate(
+                _.toTx,
+                _ => Left(TxValidationError.UnsupportedTransactionType)
+              )
+            )
+          )
+        )
+    )
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     ByteStr.decodeBase58(assetIdStr) match {
@@ -322,8 +338,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         }
       )
     }).left.map(m => CustomValidationError(m))
-
-  def sponsorRoute: Route = broadcastWithAuth[SponsorFeeRequest]("sponsor", req => TransactionFactory.sponsor(req, wallet, time))
 }
 
 object AssetsApiRoute {

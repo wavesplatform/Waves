@@ -17,7 +17,7 @@ class ApiRouteSpec extends RouteSpec("/test") with RestAPISettingsHelper {
 
   class ApiRouteWithSettings(prefix: String, action: => ToResponseMarshallable, val settings: RestAPISettings = restAPISettings)
       extends ApiRoute
-      with WithSettings
+      with AuthRoute
       with RestAPISettingsHelper {
     override protected val route: Route = path(prefix)(get(complete(action)))
   }

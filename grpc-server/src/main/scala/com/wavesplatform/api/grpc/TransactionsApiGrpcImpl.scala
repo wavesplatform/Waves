@@ -6,6 +6,7 @@ import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTrans
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -16,7 +17,12 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(wallet: Wallet, blockchain: Blockchain, utx: UtxPool, publishTransaction: VanillaTransaction => Future[Either[ValidationError, VanillaTransaction]])(
+class TransactionsApiGrpcImpl(
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utx: UtxPool,
+    publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
+)(
     implicit sc: Scheduler
 ) extends TransactionsApiGrpc.TransactionsApi {
 
@@ -77,10 +83,12 @@ class TransactionsApiGrpcImpl(wallet: Wallet, blockchain: Blockchain, utx: UtxPo
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString).explicitGetErr()
   }
 
-  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
+  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
     commonApi
       .broadcastTransaction(tx.toVanilla)
-      .map(_.map(_ => tx).explicitGetErr())
+      .resultE
+      .map(_ => tx)
+      .explicitGetErr()
   }
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {

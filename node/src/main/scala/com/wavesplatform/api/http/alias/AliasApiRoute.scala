@@ -19,13 +19,18 @@ import play.api.libs.json.{Format, Json}
 @Api(value = "/alias")
 case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
     extends BroadcastRoute
-    with WithSettings {
+    with AuthRoute {
 
   override val route = pathPrefix("alias") {
-    alias ~ addressOfAlias ~ aliasOfAddress
+    addressOfAlias ~ aliasOfAddress ~ deprecatedRoute
   }
 
-  def alias: Route = broadcastWithAuth[CreateAliasV1Request]("create", t => TransactionFactory.aliasV1(t, wallet, time))
+  private def deprecatedRoute: Route =
+    path("broadcast" / "create") {
+      broadcast[SignedCreateAliasV1Request](_.toTx)
+    } ~ (path("create") & withAuth) {
+      broadcast[CreateAliasV1Request](TransactionFactory.aliasV1(_, wallet, time))
+    }
 
   @Path("/by-alias/{alias}")
   @ApiOperation(

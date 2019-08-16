@@ -8,17 +8,16 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
-
-import scala.concurrent.Future
 
 private[api] class CommonTransactionsApi(
     blockchain: Blockchain,
     utx: UtxPool,
     wallet: Wallet,
-    publishTransaction: VanillaTransaction => Future[Either[ValidationError, VanillaTransaction]]
+    publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
 ) {
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] =
     blockchain.addressTransactionsObservable(address, Set.empty, fromId)
@@ -40,5 +39,5 @@ private[api] class CommonTransactionsApi(
           (asset, feeInAsset, feeInWaves)
       }
 
-  def broadcastTransaction(tx: VanillaTransaction): Future[Either[ValidationError, VanillaTransaction]] = publishTransaction(tx)
+  def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }

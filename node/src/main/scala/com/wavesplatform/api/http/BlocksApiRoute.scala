@@ -17,7 +17,7 @@ import play.api.libs.json._
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
     extends ApiRoute
-    with WithSettings {
+    with AuthRoute {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
   private[this] val commonApi           = new CommonBlocksApi(blockchain)
 

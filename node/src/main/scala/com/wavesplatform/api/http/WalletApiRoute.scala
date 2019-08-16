@@ -10,7 +10,7 @@ import com.wavesplatform.wallet.Wallet
 
 @Path("/wallet")
 @Api(value = "/wallet")
-case class WalletApiRoute(settings: RestAPISettings, wallet: Wallet) extends ApiRoute with WithSettings {
+case class WalletApiRoute(settings: RestAPISettings, wallet: Wallet) extends ApiRoute with AuthRoute {
 
   override lazy val route = seed
 

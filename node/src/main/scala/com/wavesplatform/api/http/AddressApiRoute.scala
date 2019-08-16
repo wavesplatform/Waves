@@ -28,7 +28,8 @@ import scala.util.{Failure, Success, Try}
 @Path("/addresses")
 @Api(value = "/addresses/")
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
-    extends WithSettings
+    extends ApiRoute
+    with AuthRoute
     with BroadcastRoute {
 
   import AddressApiRoute._
@@ -136,10 +137,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       )
     )
   )
-  def verify: Route = {
-    path("verify" / Segment) { address =>
-      verifyPath(address, decode = true)
-    }
+  def verify: Route = path("verify" / Segment) { address =>
+    verifyPath(address, decode = true)
   }
 
   @Path("/verifyText/{address}")
@@ -280,7 +279,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     )
   )
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def postData: Route = broadcastWithAuth[DataRequest]("data", data => TransactionFactory.data(data, wallet, time))
+  def postData: Route = (path("data") & withAuth) {
+    broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
+  }
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
@@ -456,8 +457,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     }
   }
 
-  private def verifyPath(address: String, decode: Boolean) = withAuth {
-    json[SignedMessage] { m =>
+  private def verifyPath(address: String, decode: Boolean): Route = withAuth {
+    jsonPost[SignedMessage] { m =>
       if (Address.fromString(address).isLeft) {
         InvalidAddress
       } else {

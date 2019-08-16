@@ -21,7 +21,7 @@ case class PeersApiRoute(settings: RestAPISettings,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo])
     extends ApiRoute
-    with WithSettings {
+    with AuthRoute {
 
   import PeersApiRoute._
 
@@ -89,8 +89,8 @@ case class PeersApiRoute(settings: RestAPISettings,
         dataType = "com.wavesplatform.api.http.ConnectReq"
       )
     ))
-  def connect: Route = (path("connect") & post & withAuth) {
-    json[ConnectReq] { req =>
+  def connect: Route = (path("connect") & withAuth) {
+    jsonPost[ConnectReq] { req =>
       val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
       connectToPeer(add)
 

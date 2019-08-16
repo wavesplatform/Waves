@@ -1,7 +1,7 @@
 package com.wavesplatform.features.api
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
+import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, AuthRoute}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.settings.{FeaturesSettings, RestAPISettings}
@@ -16,7 +16,7 @@ import play.api.libs.json.Json
 case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: FeaturesSettings, blockchain: Blockchain)
     extends ApiRoute
     with CommonApiFunctions
-    with WithSettings
+    with AuthRoute
     with ScorexLogging {
 
   override lazy val route: Route = pathPrefix("activation") {

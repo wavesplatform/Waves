@@ -4,6 +4,7 @@ import java.util.NoSuchElementException
 import java.util.concurrent.ExecutionException
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server._
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, WrongJson}
 import com.wavesplatform.common.utils.Base58
@@ -21,8 +22,6 @@ import scala.util.control.NonFatal
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers with ScorexLogging {
   protected val route: Route
 
-  protected def apiKeyHash: Option[Array[Byte]]
-
   def getRoute: Route = handleAllExceptions(uncaughtExceptionHandler)(route)
 
   private val jsonRejectionHandler = RejectionHandler
@@ -30,10 +29,7 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
     .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
     .result()
 
-  def jsonEntity[A: Reads]: Directive1[A]                   = handleRejections(jsonRejectionHandler) & entity(as[A])
-  def json[A: Reads](f: A => ToResponseMarshallable): Route = jsonEntity.apply(a => complete(f(a)))
-
-  val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
+  private val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
@@ -41,6 +37,13 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
     case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
     case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
   }
+
+  def jsonPost[A: Reads](f: A => ToResponseMarshallable): Route =
+    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
+      entity(as[A]) { a =>
+        complete(f(a))
+      }
+    }) ~ get(complete(StatusCodes.MethodNotAllowed))
 
   private val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
     case e: StackOverflowError => log.error("Stack overflow error", e); complete(ApiError.Unknown)
@@ -71,6 +74,14 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
       }
     }
 
+  def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
+}
+
+trait AuthRoute { this: ApiRoute =>
+  def settings: RestAPISettings
+
+  protected lazy val apiKeyHash: Option[Array[Byte]] = Base58.tryDecode(settings.apiKeyHash).toOption
+
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[`X-Api-Key`](()).flatMap {
       case Some(k) if java.util.Arrays.equals(crypto.secureHash(k.value.getBytes("UTF-8")), hashFromSettings) => pass
@@ -81,16 +92,4 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers wi
         }
     }
   }
-
-  def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable): Route =
-    (path(pathMatcher) & post & withAuth) {
-      json[A](f)
-    }
-
-  def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
-}
-
-trait WithSettings { this: ApiRoute =>
-  def settings: RestAPISettings
-  protected override lazy val apiKeyHash: Option[Array[Byte]] = Base58.tryDecode(settings.apiKeyHash).toOption
 }

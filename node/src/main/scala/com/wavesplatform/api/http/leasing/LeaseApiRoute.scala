@@ -21,17 +21,23 @@ import play.api.libs.json.JsNumber
 case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with WithSettings {
+    with AuthRoute {
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
 
   override val route = pathPrefix("leasing") {
-    lease ~ cancel ~ active
+    active ~ deprecatedRoute
   }
 
-  def lease: Route = broadcastWithAuth[LeaseV1Request]("lease", t => TransactionFactory.leaseV1(t, wallet, time))
-
-  def cancel: Route = broadcastWithAuth[LeaseCancelV1Request]("cancel", t => TransactionFactory.leaseCancelV1(t, wallet, time))
+  private def deprecatedRoute: Route =
+    (path("lease") & withAuth) {
+      broadcast[LeaseV1Request](TransactionFactory.leaseV1(_, wallet, time))
+    } ~ (path("cancel") & withAuth) {
+      broadcast[LeaseCancelV1Request](TransactionFactory.leaseCancelV1(_, wallet, time))
+    } ~ pathPrefix("broadcast") {
+      path("lease")(broadcast[SignedLeaseV1Request](_.toTx)) ~
+        path("cancel")(broadcast[SignedLeaseCancelV1Request](_.toTx))
+    }
 
   @Path("/active/{address}")
   @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")
