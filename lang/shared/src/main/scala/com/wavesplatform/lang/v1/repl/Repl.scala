@@ -1,21 +1,12 @@
 package com.wavesplatform.lang.v1.repl
 
-import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-
-import cats.implicits._
 import monix.execution.atomic.Atomic
 
 case class Repl(ver: StdLibVersion = V3) {
-  private val initialCtx =
-    CryptoContext.build(Global, ver) |+|
-    PureContext.build(Global, ver)   |+|
-    WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
-
+  private val initialCtx = buildInitialCtx(ver)
   private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext), view)
   private val currentState = Atomic(initialState)
 

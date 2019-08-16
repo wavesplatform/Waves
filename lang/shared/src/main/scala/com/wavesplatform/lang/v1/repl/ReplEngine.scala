@@ -25,10 +25,9 @@ object ReplEngine {
       )
       (newCompileCtx, compiled, exprType) <- tryEi(ExpressionCompiler.applyWithCtx(compileCtx, parsed))
       (newEvalCtx, eval)                  <- tryEi(EvaluatorV1.applyWithCtx(evalCtx, compiled))
-      (resultNameO, newCtx) = assignResult(exprType, eval, newCompileCtx, newEvalCtx)
-      (lets, funcs) = declsDiff(compileCtx, newCompileCtx)
-      resultO = resultNameO.map((_, exprType, eval))
-      output = mkOutput(resultO, lets, funcs)
+      resultO = assignedResult(exprType, eval, newCompileCtx)
+      output = mkOutput(resultO, compileCtx, newCompileCtx)
+      newCtx = resultO.fold((newCompileCtx, newEvalCtx))(r => addResultToCtx(r, newCompileCtx, newEvalCtx))
     } yield (output, newCtx)
 
   private def tryEi[R](r: => Either[String, R]): Either[String, R] =
@@ -36,6 +35,55 @@ object ReplEngine {
       .toEither
       .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
       .flatten
+
+  private val assignPrefix = "res"
+  private val assignedR = s"^$assignPrefix([1-9][0-9]*)".r
+
+  private def assignedResult(
+    exprType:   FINAL,
+    value:      EVALUATED,
+    compileCtx: CompilerContext
+  ): Option[(String, FINAL, EVALUATED)] =
+    if (exprType == UNIT) None
+    else {
+      val count =
+        compileCtx.varDefs.keys
+          .flatMap(assignedR.findPrefixMatchOf(_).toSeq)
+          .map(_.group(1).toInt)
+          .toList
+          .maximumOption
+          .getOrElse(0)
+
+      val name = assignPrefix + (count + 1)
+      Some((name, exprType, value))
+    }
+
+  private val declPrefix = "defined "
+
+  private def mkOutput(
+    resultO:       Option[(String, FINAL, EVALUATED)],
+    compileCtx:    CompilerContext,
+    newCompileCtx: CompilerContext
+  ): String = {
+    val (lets, funcs) = declsDiff(compileCtx, newCompileCtx)
+
+    val mappedFuncs =
+      for {
+        (name, overloads) <- funcs
+        signature         <- overloads
+      } yield declPrefix + DeclPrinter.funcStr(name, signature)
+
+    val mappedLets =
+      lets.map { case (name, t) => declPrefix + DeclPrinter.letStr(name, t) }
+
+    val evalStr =
+      resultO.fold("") { case (name, t, result) => s"$name: $t = $result" }
+
+    val delim1 = if (mappedLets.nonEmpty && mappedFuncs.nonEmpty) "\n" else ""
+    val delim2 = if ((mappedLets.nonEmpty || mappedFuncs.nonEmpty) && resultO.isDefined) "\n" else ""
+
+    mappedFuncs.mkString("\n") + delim1 + mappedLets.mkString("\n") + delim2 + evalStr
+  }
 
   private def declsDiff(
     compileCtx:    CompilerContext,
@@ -52,54 +100,15 @@ object ReplEngine {
     (newLets, newFuncs)
   }
 
-  private val assignPrefix = "res"
-  private val assignedR = s"^$assignPrefix([1-9][0-9]*)".r
-
-  private def assignResult(
-    exprType:   FINAL,
-    value:      EVALUATED,
+  private def addResultToCtx(
+    result:     (String, FINAL, EVALUATED),
     compileCtx: CompilerContext,
     evalCtx:    EvaluationContext
-  ): (Option[String], (CompilerContext, EvaluationContext)) =
-    if (exprType == UNIT) (None, (compileCtx, evalCtx))
-    else {
-      val count =
-        compileCtx.varDefs.keys
-          .flatMap(assignedR.findPrefixMatchOf(_).toSeq)
-          .map(_.group(1).toInt)
-          .toList
-          .maximumOption
-          .getOrElse(0)
-
-      val nextName = assignPrefix + (count + 1)
-      val newCtx = (
-        compileCtx.copy(varDefs = compileCtx.varDefs + (nextName -> exprType)),
-        evalCtx.copy(letDefs = evalCtx.letDefs + (nextName -> LazyVal(EitherT.pure(value))))
-      )
-      (Some(nextName), newCtx)
-    }
-
-  private val declPrefix = "defined "
-
-  private def mkOutput(
-    resultO: Option[(String, FINAL, EVALUATED)],
-    lets:    Set[(String, FINAL)],
-    funcs:   Set[(String, List[FunctionTypeSignature])]
-  ): String = {
-    val mappedFuncs = for {
-      (name, overloads) <- funcs
-      signature         <- overloads
-    } yield declPrefix + DeclPrinter.funcStr(name, signature)
-
-    val mappedLets =
-      lets.map { case (name, t) => declPrefix + DeclPrinter.letStr(name, t) }
-
-    val evalStr =
-      resultO.fold("") { case (name, t, result) => s"$name: $t = $result" }
-
-    val delim1 = if (mappedLets.nonEmpty && mappedFuncs.nonEmpty) "\n" else ""
-    val delim2 = if ((mappedLets.nonEmpty || mappedFuncs.nonEmpty) && resultO.isDefined) "\n" else ""
-
-    mappedFuncs.mkString("\n") + delim1 + mappedLets.mkString("\n") + delim2 + evalStr
+  ): (CompilerContext, EvaluationContext) = {
+    val (name, t, value) = result
+    (
+      compileCtx.copy(varDefs = compileCtx.varDefs + (name -> t)),
+      evalCtx.copy(letDefs = evalCtx.letDefs + (name -> LazyVal(EitherT.pure(value))))
+    )
   }
 }
