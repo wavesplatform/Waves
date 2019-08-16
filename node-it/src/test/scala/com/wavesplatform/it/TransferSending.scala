@@ -13,6 +13,8 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.Suite
+import play.api.libs.json.Json.toJson
+import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -125,13 +127,20 @@ trait TransferSending extends ScorexLogging {
                 } else Array.emptyByteArray
               )
               .right
-              .get)
+              .get
+          )
       }
       .grouped(requests.size / nodes.size)
       .toSeq
 
     Future
-      .traverse(nodes.zip(requestGroups)) { case (node, request) => node.batchSignedTransfer(request) }
+      .traverse(nodes.zip(requestGroups)) {
+        case (node, request) =>
+          request.foldLeft(Future.successful(Seq.empty[Transaction])) {
+            case (f, r) =>
+              f.flatMap(ts => node.signedBroadcast(toJson(r).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt)).map(_ +: ts))
+          }
+      }
       .map(_.flatten)
   }
 

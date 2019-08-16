@@ -25,7 +25,7 @@ import scala.concurrent.ExecutionContext
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with WithSettings {
+case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with AuthRoute {
 
   import UtilsApiRoute._
 
@@ -53,11 +53,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         value = "Script code",
         example = "true"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "string or error")
-    ))
+    )
+  )
   def decompile: Route = path("script" / "decompile") {
     import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
@@ -95,11 +97,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         value = "Script code",
         example = "true"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "base64 or error")
-    ))
+    )
+  )
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
@@ -131,11 +135,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         value = "Script code",
         example = "true"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "base64 or error")
-    ))
+    )
+  )
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
       complete(
@@ -166,19 +172,21 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         paramType = "body",
         value = "Script code with imports"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "base64 or error")
-    ))
+    )
+  )
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
       complete(
-        ScriptCompiler.compile(req.script, req.imports)
+        ScriptCompiler
+          .compile(req.script, req.imports)
           .fold(
-            e => ScriptCompilerError(e),
-            {
+            e => ScriptCompilerError(e), {
               case (script, complexity) =>
                 Json.obj(
                   "script"     -> script.bytes().base64,
@@ -203,11 +211,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         value = "A compiled Base64 code",
         example = "AQa3b8tH"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "base64 or error")
-    ))
+    )
+  )
   def estimate: Route = path("script" / "estimate") {
     (post & entity(as[String])) { code =>
       complete(
@@ -258,7 +268,8 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         & entity(as[String])
         & withExecutionContext(decompilerExecutionContext)
     ) { code =>
-      val result: ToResponseMarshallable = Global.scriptMeta(code)
+      val result: ToResponseMarshallable = Global
+        .scriptMeta(code)
         .map(metaConverter.foldRoot)
         .fold(e => e, r => r)
       complete(result)
@@ -277,7 +288,8 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with time or error")
-    ))
+    )
+  )
   def time: Route = (path("time") & get) {
     complete(Json.obj("system" -> System.currentTimeMillis(), "NTP" -> timeService.correctedTime()))
   }
@@ -287,7 +299,8 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with peer list or error")
-    ))
+    )
+  )
   def seedRoute: Route = (path("seed") & get) {
     complete(seed(DefaultSeedSize))
   }
@@ -297,7 +310,8 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   @ApiResponse(code = 200, message = "Json with error message")
   def length: Route = (path("seed" / IntNumber) & get) { length =>
     if (length <= MaxSeedSize) complete(seed(length))
@@ -315,11 +329,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         paramType = "body",
         dataType = "string"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
-    ))
+    )
+  )
   def hashSecure: Route = (path("hash" / "secure") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.secureHash(message))))
@@ -337,11 +353,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         paramType = "body",
         dataType = "string"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
-    ))
+    )
+  )
   def hashFast: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.fastHash(message))))
@@ -366,17 +384,22 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         paramType = "body",
         dataType = "string"
       )
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
-    ))
+    )
+  )
   def sign: Route = (path("sign" / Segment) & post) { pk =>
     entity(as[String]) { message =>
       complete(
-        Json.obj("message" -> message,
-                 "signature" ->
-                   Base58.encode(crypto.sign(PrivateKey(Base58.tryDecodeWithLimit(pk).get), Base58.tryDecodeWithLimit(message).get))))
+        Json.obj(
+          "message" -> message,
+          "signature" ->
+            Base58.encode(crypto.sign(PrivateKey(Base58.tryDecodeWithLimit(pk).get), Base58.tryDecodeWithLimit(message).get))
+        )
+      )
     }
   }
 
@@ -391,14 +414,12 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         dataType = "string",
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
-    ))
-  def transactionSerialize: Route = (pathPrefix("transactionSerialize") & post) {
-    handleExceptions(jsonExceptionHandler) {
-      json[JsObject] { jsv =>
-        parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
-      }
-    }
-  }
+    )
+  )
+  def transactionSerialize: Route =
+    path("transactionSerialize")(jsonPost[JsObject] { jsv =>
+      parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
+    })
 }
 
 object UtilsApiRoute {
