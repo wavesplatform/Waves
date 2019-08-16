@@ -74,8 +74,10 @@ case class DebugApiRoute(
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override val settings = ws.restAPISettings
-  override lazy val route: Route = (pathPrefix("debug") & withAuth) {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate ~ stateChanges
+  override lazy val route: Route = pathPrefix("debug") {
+    stateChanges ~ withAuth {
+      blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
+    }
   }
 
   @Path("/blocks/{howMany}")
@@ -364,25 +366,26 @@ case class DebugApiRoute(
       new ApiImplicitParam(name = "transaction", value = "Signed transaction", required = true, dataType = "string", paramType = "body")
     )
   )
-  def validate: Route = path("validate")(jsonPost[JsObject] { jsv =>
-    val h  = blockchain.height
-    val t0 = System.nanoTime
-    val tracedDiff = for {
-      tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-      _  <- Verifier(blockchain, h)(tx)
-      ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
-    } yield ei
-    val timeSpent = (System.nanoTime - t0) * 1e-6
-    val response = Json.obj(
-      "valid"          -> tracedDiff.resultE.isRight,
-      "validationTime" -> timeSpent,
-      "trace"          -> tracedDiff.trace.map(_.toString)
-    )
-    tracedDiff.resultE.fold(
-      err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
-      _ => response
-    )
-  })
+  def validate: Route =
+    path("validate")(jsonPost[JsObject] { jsv =>
+      val h  = blockchain.height
+      val t0 = System.nanoTime
+      val tracedDiff = for {
+        tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
+        _  <- Verifier(blockchain, h)(tx)
+        ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
+      } yield ei
+      val timeSpent = (System.nanoTime - t0) * 1e-6
+      val response = Json.obj(
+        "valid"          -> tracedDiff.resultE.isRight,
+        "validationTime" -> timeSpent,
+        "trace"          -> tracedDiff.trace.map(_.toString)
+      )
+      tracedDiff.resultE.fold(
+        err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
+        _ => response
+      )
+    })
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
@@ -430,29 +433,28 @@ case class DebugApiRoute(
     )
   )
   def stateChangesByAddress: Route =
-    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) {
-      (address, limit, afterOpt) =>
-        (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) {
-          implicit sc =>
-            import cats.implicits._
+    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, afterOpt) =>
+      (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) {
+        implicit sc =>
+          import cats.implicits._
 
-            val result = blockchain
-              .addressTransactionsObservable(address, Set.empty, afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption))
-              .map {
-                case (height, tx: InvokeScriptTransaction) =>
-                  blockchain
-                    .invokeScriptResult(TransactionId(tx.id()))
-                    .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
+          val result = blockchain
+            .addressTransactionsObservable(address, Set.empty, afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption))
+            .map {
+              case (height, tx: InvokeScriptTransaction) =>
+                blockchain
+                  .invokeScriptResult(TransactionId(tx.id()))
+                  .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
 
-                case (height, tx) =>
-                  Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
-              }
-              .take(limit)
-              .toListL
-              .map(_.sequence)
+              case (height, tx) =>
+                Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
+            }
+            .take(limit)
+            .toListL
+            .map(_.sequence)
 
-            complete(result.runAsyncLogErr)
-        }
+          complete(result.runAsyncLogErr)
+      }
     }
 }
 
