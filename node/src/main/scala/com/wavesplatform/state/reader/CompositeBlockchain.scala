@@ -80,8 +80,8 @@ trait CompositeBlockchain extends Blockchain {
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     stableBlockchain.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (h, lt: LeaseTransaction, _) =>
-          LeaseDetails(lt.sender, lt.recipient, h, lt.amount, diff.leaseState(lt.id()))
+        case (txHeight, lt: LeaseTransaction, _) =>
+          LeaseDetails(lt.sender, lt.recipient, txHeight, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
@@ -97,17 +97,20 @@ trait CompositeBlockchain extends Blockchain {
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (this.height, t._2))
       .orElse(stableBlockchain.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
     diff.transactions
       .get(id)
-      .map(_._1)
+      .map(_ => this.height)
       .orElse(stableBlockchain.transactionHeight(id))
 
+  def heightOffset: Int =
+    (newBlock orElse maybeDiff).fold(0)(_ => 1)
+
   override def height: Int =
-    stableBlockchain.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
+    stableBlockchain.height + heightOffset
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = stableBlockchain.resolveAlias(alias) match {
     case l@Left(AliasIsDisabled(_)) => l
@@ -238,13 +241,12 @@ trait CompositeBlockchain extends Blockchain {
 }
 
 object CompositeBlockchain {
-  private[this] final class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
+  private[this] class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
 
   def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Option[Long] = None): CompositeBlockchain = stableBlockchain match {
-    case cb: CompositeBlockchain =>
+    case cb: CompositeBlockchain if cb.newBlock.isEmpty =>
       val diff = cb.maybeDiff |+| maybeDiff
-      val block = newBlock.orElse(cb.newBlock)
-      new CompositeBlockchainImpl(cb.stableBlockchain, diff, block, carryFee.getOrElse(cb.carryFee))
+      new CompositeBlockchainImpl(cb.stableBlockchain, diff, newBlock, carryFee.getOrElse(cb.carryFee))
 
     case _ =>
       new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee.getOrElse(0L))

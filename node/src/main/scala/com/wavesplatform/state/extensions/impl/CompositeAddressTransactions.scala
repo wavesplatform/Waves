@@ -7,7 +7,7 @@ import com.wavesplatform.state.{Diff, Height}
 import com.wavesplatform.transaction.{Transaction, TransactionParser}
 import monix.reactive.Observable
 
-private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, height: Height, getDiff: () => Option[Diff]) extends AddressTransactions {
+private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, getDiff: () => Option[Diff]) extends AddressTransactions {
   override def addressTransactionsObservable(address: Address,
                                              types: Set[TransactionParser],
                                              fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
