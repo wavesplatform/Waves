@@ -244,7 +244,7 @@ object CompositeBlockchain {
   private[this] class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
 
   def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Option[Long] = None): CompositeBlockchain = stableBlockchain match {
-    case cb: CompositeBlockchain if cb.newBlock.isEmpty =>
+    case cb: CompositeBlockchain if cb.newBlock.isEmpty || cb.newBlock == newBlock =>
       val diff = cb.maybeDiff |+| maybeDiff
       new CompositeBlockchainImpl(cb.stableBlockchain, diff, newBlock, carryFee.getOrElse(cb.carryFee))
 
