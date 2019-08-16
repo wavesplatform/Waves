@@ -48,7 +48,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     val gen      = sponsorAndSetScriptGen(sponsorship = true, smartToken = false, smartAccount = false, feeInAssets, feeAmount)
     forAll(gen) {
       case (genesisBlock, transferTx) =>
-        withStateAndHistory(settings) { blockchain =>
+        withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
@@ -71,7 +71,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
     forAll(gen) {
       case (genesisBlock, transferTx) =>
-        withStateAndHistory(settings) { blockchain =>
+        withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
@@ -189,7 +189,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
     forAll(gen) {
       case (genesisBlock, transferTx) =>
-        withStateAndHistory(settings) { blockchain =>
+        withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, genesisBlock)
