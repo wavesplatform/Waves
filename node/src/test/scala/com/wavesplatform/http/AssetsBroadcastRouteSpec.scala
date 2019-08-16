@@ -6,19 +6,17 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import monix.execution.Scheduler
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
-
-import scala.concurrent.Future
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
@@ -27,15 +25,15 @@ class AssetsBroadcastRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper {
 
-  private[this] implicit def scheduler: Scheduler = Scheduler(this.executor)
-
-  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
+  private[this] val route = AssetsApiRoute(
+    restAPISettings,
+    stub[Wallet],
+    DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
+    stub[Blockchain],
+    stub[Time]
+  ).route
 
   "returns StateCheckFailed" - {
-
-    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
-
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("issue", issueGen.retryUntil(_.version == 1), identity),
@@ -64,7 +62,6 @@ class AssetsBroadcastRouteSpec
 
   "returns appropriate error code when validation fails for" - {
     "issue transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastIssueReq) { ir =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
@@ -93,7 +90,6 @@ class AssetsBroadcastRouteSpec
     }
 
     "reissue transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastReissueReq) { rr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
@@ -108,7 +104,6 @@ class AssetsBroadcastRouteSpec
     }
 
     "burn transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastBurnReq) { br =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
@@ -125,7 +120,6 @@ class AssetsBroadcastRouteSpec
     }
 
     "transfer transaction" in {
-      val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
       forAll(broadcastTransferReq) { tr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
@@ -155,10 +149,7 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-    (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
-
-    val route = AssetsBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
+    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[Time]).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -194,7 +185,8 @@ class AssetsBroadcastRouteSpec
           proofs = Proofs(Seq.empty)
         )
         .right
-        .get)
+        .get
+    )
 
     "/transfer" - {
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v).addHeader(ApiKeyHeader) ~> route

@@ -23,9 +23,7 @@ object SynchronizationSettings {
   case class HistoryReplierSettings(maxMicroBlockCacheSize: Int, maxBlockCacheSize: Int)
 
   case class UtxSynchronizerSettings(networkTxCacheSize: Int,
-                                     maxBufferSize: Int,
-                                     maxBufferTime: FiniteDuration,
-                                     parallelism: Int,
                                      maxThreads: Int,
-                                     maxQueueSize: Int)
+                                     maxQueueSize: Int,
+                                     allowTxRebroadcasting: Boolean)
 }

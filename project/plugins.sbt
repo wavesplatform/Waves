@@ -20,13 +20,13 @@ Seq(
   "org.scala-js"       % "sbt-scalajs"              % "0.6.26",
   "org.portable-scala" % "sbt-crossproject"         % "0.3.1",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "0.3.1",
-  "com.lucidchart"     % "sbt-scalafmt"             % "1.15",
+  "org.scalameta"      % "sbt-scalafmt"             % "2.0.1",
   "pl.project13.scala" % "sbt-jmh"                  % "0.3.3",
   "com.jsuereth"       % "sbt-pgp"                  % "1.1.1"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
   "com.fasterxml.jackson.module" % "jackson-module-scala_2.12" % "2.9.9",
-  "org.hjson" % "hjson" % "3.0.0",
-  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar")
+  "org.hjson"                    % "hjson"                     % "3.0.0",
+  "org.vafer"                    % "jdeb"                      % "1.5" artifacts Artifact("jdeb", "jar", "jar")
 )

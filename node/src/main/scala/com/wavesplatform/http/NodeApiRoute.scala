@@ -4,20 +4,19 @@ import java.time.Instant
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
+import com.wavesplatform.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
-import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, WithSettings}
-import com.wavesplatform.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
 case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, application: Shutdownable)
     extends ApiRoute
-    with CommonApiFunctions
-    with WithSettings
+    with AuthRoute
     with ScorexLogging {
 
   override lazy val route = pathPrefix("node") {
@@ -29,7 +28,8 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json Waves node version")
-    ))
+    )
+  )
   def version: Route = (get & path("version")) {
     complete(Json.obj("version" -> Constants.AgentName))
   }
@@ -52,6 +52,7 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
         "stateHeight"      -> blockchain.height,
         "updatedTimestamp" -> lastUpdated,
         "updatedDate"      -> Instant.ofEpochMilli(lastUpdated).toString
-      ))
+      )
+    )
   }
 }

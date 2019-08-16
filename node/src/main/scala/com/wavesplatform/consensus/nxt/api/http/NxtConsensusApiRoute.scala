@@ -2,7 +2,7 @@ package com.wavesplatform.consensus.nxt.api.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.{ApiError, ApiRoute, CommonApiFunctions, WithSettings}
+import com.wavesplatform.api.http.{ApiError, ApiRoute, CommonApiFunctions}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
@@ -14,8 +14,7 @@ import play.api.libs.json.Json
 @Api(value = "/consensus")
 case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain)
     extends ApiRoute
-    with CommonApiFunctions
-    with WithSettings {
+    with CommonApiFunctions {
 
   override val route: Route =
     pathPrefix("consensus") {
