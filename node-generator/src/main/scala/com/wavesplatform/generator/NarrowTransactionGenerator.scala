@@ -7,7 +7,7 @@ import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.generator.NarrowTransactionGenerator.{ScriptSettings, Settings}
-import com.wavesplatform.generator.utils.Universe
+import com.wavesplatform.generator.utils.{Gen, Universe}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -18,7 +18,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.LoggerFacade
@@ -108,7 +108,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                             Random.nextInt(9).toByte,
                             reissuable,
                             None,
-                       100400000L,
+                            100400000L,
                             ts))
           case TransferTransactionV2 =>
             val useAlias  = random.nextBoolean()
@@ -146,7 +146,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                                                 IssuedAsset(assetTx.id()),
                                                 Random.nextInt(Int.MaxValue),
                                                 reissuable,
-                                           100400000L,
+                                                100400000L,
                                                 ts))
             })
           case BurnTransactionV2 =>
@@ -273,6 +273,36 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                 Waves,
                 ts
               ))
+
+          case SetScriptTransaction =>
+            val script = Gen.script()
+            val sender = randomFrom(accounts).get
+
+            logOption(
+              SetScriptTransaction.selfSigned(
+                sender,
+                Some(script),
+                1800000L,
+                ts
+              )
+            )
+
+          case SetAssetScriptTransaction =>
+            for {
+              assetTx <- randomFrom(validIssueTxs)
+              sender  <- accounts.find(_.address == assetTx.sender.address && assetTx.script.isDefined)
+              script = Gen.script()
+              tx <- logOption(
+                SetAssetScriptTransaction.selfSigned(
+                  AddressScheme.current.chainId,
+                  sender,
+                  IssuedAsset(assetTx.id()),
+                  Some(script),
+                  100400000L,
+                  ts
+                )
+              )
+            } yield tx
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
