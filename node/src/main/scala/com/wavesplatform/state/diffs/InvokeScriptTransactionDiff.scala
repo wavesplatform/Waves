@@ -6,7 +6,6 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -150,21 +149,16 @@ object InvokeScriptTransactionDiff {
               (if (blockchain.hasScript(tx.sender)) 1 else 0)
           }
           _ <- TracedResult {
-            import com.wavesplatform.features.FeatureProvider._
-            if (blockchain.isFeatureActivated(BlockchainFeatures.FlatFee)) {
-              Right(())
-            } else {
-              val minWaves = scriptsInvoked * ScriptExtraFee + OldFeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-              val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-              Either.cond(
-                minWaves <= wavesFee,
-                (),
-                GenericError(s"Fee in ${
-                  tx.assetFee._1
-                    .fold("WAVES")(_.toString)
-                } for $txName with $scriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
-              )
-            }
+            val minWaves = scriptsInvoked * ScriptExtraFee + FeeValidation.feeUnits(blockchain)(InvokeScriptTransaction.typeId) * FeeUnit
+            val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            Either.cond(
+              minWaves <= wavesFee,
+              (),
+              GenericError(s"Fee in ${
+                tx.assetFee._1
+                  .fold("WAVES")(_.toString)
+              } for $txName with $scriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+            )
           }
 
           scriptsComplexity = {

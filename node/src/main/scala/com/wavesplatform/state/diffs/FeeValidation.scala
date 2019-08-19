@@ -1,10 +1,10 @@
 package com.wavesplatform.state.diffs
 
+import cats.data.Chain
 import cats.implicits._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -16,17 +16,15 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
 
-import cats.data.Chain
-
 object FeeValidation {
 
   case class FeeDetails(asset: Asset, requirements: Chain[String], minFeeInAsset: Long, minFeeInWaves: Long)
 
   val ScriptExtraFee = 400000L
-  val FeeUnit        = 100000
-  val NFTMultiplier  = 0.001
+  val FeeUnit        = 100000L
+  val NFTUnits  = 1
 
-  val OldFeeConstants: Map[Byte, Long] = Map(
+  val OldFeeUnits: Map[Byte, Long] = Map(
     GenesisTransaction.typeId        -> 0,
     PaymentTransaction.typeId        -> 1,
     IssueTransaction.typeId          -> 1000,
@@ -45,18 +43,23 @@ object FeeValidation {
     InvokeScriptTransaction.typeId   -> 5
   )
 
-  val FlatFeeDefault = 2
-  val FlatFeeConstants: Map[Byte, Long] = Map(
-    IssueTransaction.typeId -> 10000L
-  ).withDefaultValue(FlatFeeDefault: Long)
+  val FeeUnits = {
+    val patches = Map[Byte, Long](
+      CreateAliasTransaction.typeId -> 1000, // 1 Waves
+      IssueTransaction.typeId -> 10000, // 10 Waves
+      ReissueTransaction.typeId -> 1 // 0.001 Waves
+    )
+    OldFeeUnits ++ patches
+  }
+
+  def feeUnits(blockchain: Blockchain): Map[Byte, Long] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.IncreaseIssueFee)) OldFeeUnits else FeeUnits
 
   def apply(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
     if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         feeDetails <- getMinFee(blockchain, height, tx)
-        minWaves   = feeDetails.minFeeInWaves
         minFee     = feeDetails.minFeeInAsset
-        feeAssetId = feeDetails.asset
         _ <- Either.cond(
           minFee <= tx.assetFee._2,
           (),
@@ -81,46 +84,22 @@ object FeeValidation {
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)
 
   private[this] def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = {
-    if (blockchain.isFeatureActivated(BlockchainFeatures.FlatFee, height))
-      FlatFeeConstants
-        .get(tx.builder.typeId)
-        .map { baseFee =>
-          tx match {
-            case tx: MassTransferTransaction =>
-              baseFee + (tx.transfers.size + 1) / 2
-            case tx: DataTransaction =>
-              val base = tx.data.map(_.toBytes.length).sum
-              baseFee + base / 1024
-            case itx: IssueTransaction =>
-              lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
-              if (itx.isNFT && nftActivated) FlatFeeDefault else baseFee
-            case _ =>
-              baseFee
-          }
+    feeUnits(blockchain)
+      .get(tx.builder.typeId)
+      .map { units =>
+        tx match {
+          case tx: MassTransferTransaction =>
+            units + (tx.transfers.size + 1) / 2
+          case tx: DataTransaction =>
+            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
+            units + (base.length - 1) / 1024
+          case itx: IssueTransaction =>
+            lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+            if (itx.isNFT && nftActivated) NFTUnits else units
+          case _ => units
         }
-        .toRight(UnsupportedTransactionType)
-    else
-      OldFeeConstants
-        .get(tx.builder.typeId)
-        .map { baseFee =>
-          tx match {
-            case tx: MassTransferTransaction =>
-              baseFee + (tx.transfers.size + 1) / 2
-            case tx: DataTransaction =>
-              val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
-              baseFee + (base.length - 1) / 1024
-            case itx: IssueTransaction =>
-              lazy val nftActivated = blockchain.activatedFeatures
-                .get(BlockchainFeatures.ReduceNFTFee.id)
-                .exists(_ <= height)
-
-              val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
-
-              (baseFee * multiplier).toLong
-            case _ => baseFee
-          }
-        }
-        .toRight(UnsupportedTransactionType)
+      }
+      .toRight(UnsupportedTransactionType)
   }
 
   private def feeAfterSponsorship(txAsset: Asset, height: Int, blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeInfo] = {
@@ -193,15 +172,9 @@ object FeeValidation {
   }
 
   def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, FeeDetails] = {
-    val baseFeeAmount = feeAfterSponsorship(tx.assetFee._1, height, blockchain, tx)
-
-    val feeAmount =
-      if (blockchain.isFeatureActivated(BlockchainFeatures.FlatFee, height))
-        baseFeeAmount
-      else
-        baseFeeAmount
-          .map(feeAfterSmartTokens(blockchain, tx))
-          .map(feeAfterSmartAccounts(blockchain, tx))
+    val feeAmount = feeAfterSponsorship(tx.assetFee._1, height, blockchain, tx)
+      .map(feeAfterSmartTokens(blockchain, tx))
+      .map(feeAfterSmartAccounts(blockchain, tx))
 
     feeAmount.map {
       case FeeInfo(Some((assetId, assetInfo)), reqs, amountInWaves) =>

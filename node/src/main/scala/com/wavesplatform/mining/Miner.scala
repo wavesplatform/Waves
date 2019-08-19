@@ -167,7 +167,7 @@ class MinerImpl(allChannels: ChannelGroup,
     else
       settings.featuresSettings.supported
         .filterNot(blockchainUpdater.approvedFeatures.keySet)
-        .filter(BlockchainFeatures.implemented)
+        .filter(BlockchainFeatures.Implemented)
         .toSet
   }
 
