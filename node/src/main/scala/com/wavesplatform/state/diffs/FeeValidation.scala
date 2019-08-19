@@ -172,15 +172,14 @@ object FeeValidation {
   }
 
   def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, FeeDetails] = {
-    val feeAmount = feeAfterSponsorship(tx.assetFee._1, height, blockchain, tx)
+    feeAfterSponsorship(tx.assetFee._1, height, blockchain, tx)
       .map(feeAfterSmartTokens(blockchain, tx))
       .map(feeAfterSmartAccounts(blockchain, tx))
-
-    feeAmount.map {
-      case FeeInfo(Some((assetId, assetInfo)), reqs, amountInWaves) =>
-        FeeDetails(assetId, reqs, Sponsorship.fromWaves(amountInWaves, assetInfo.sponsorship), amountInWaves)
-      case FeeInfo(None, reqs, amountInWaves) =>
-        FeeDetails(Waves, reqs, amountInWaves, amountInWaves)
-    }
+      .map {
+        case FeeInfo(Some((assetId, assetInfo)), reqs, amountInWaves) =>
+          FeeDetails(assetId, reqs, Sponsorship.fromWaves(amountInWaves, assetInfo.sponsorship), amountInWaves)
+        case FeeInfo(None, reqs, amountInWaves) =>
+          FeeDetails(Waves, reqs, amountInWaves, amountInWaves)
+      }
   }
 }
