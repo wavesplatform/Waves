@@ -35,7 +35,7 @@ object ApiExtensionsImpl {
       fromAddressTransactionsAndDistributions(AddressTransactions.empty, Distributions.empty)
   }
 
-  private[this] def fromAddressTransactionsAndDistributions(at: AddressTransactions, d: Distributions): ApiExtensions = {
+  private[extensions] def fromAddressTransactionsAndDistributions(at: AddressTransactions, d: Distributions): ApiExtensions = {
     new AddressTransactions with Distributions {
       override def portfolio(a: Address): Portfolio                               = d.portfolio(a)
       override def assetDistribution(asset: Asset.IssuedAsset): AssetDistribution = d.assetDistribution(asset)

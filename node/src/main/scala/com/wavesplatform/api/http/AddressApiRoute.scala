@@ -30,8 +30,8 @@ import scala.util.{Failure, Success, Try}
 @Api(value = "/addresses/")
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, apiExtensions: ApiExtensions, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
-    with WithSettings
-    with BroadcastRoute {
+    with BroadcastRoute
+    with AuthRoute {
 
   import AddressApiRoute._
 
@@ -49,7 +49,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def scriptInfo: Route = (path("scriptInfo" / Segment) & get) { address =>
     complete(
       Address
@@ -63,7 +64,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
       if (Address.fromString(address).isLeft) {
@@ -81,7 +83,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "string"),
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(
@@ -89,7 +92,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         message =
           "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}"
       )
-    ))
+    )
+  )
   def sign: Route = {
     path("sign" / Segment) { address =>
       signPath(address, encode = true)
@@ -102,13 +106,16 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "string"),
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(
         code = 200,
-        message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
-    ))
+        message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}"
+      )
+    )
+  )
   def signText: Route = {
     path("signText" / Segment) { address =>
       signPath(address, encode = false)
@@ -129,11 +136,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         defaultValue =
           "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
       )
-    ))
-  def verify: Route = {
-    path("verify" / Segment) { address =>
-      verifyPath(address, decode = true)
-    }
+    )
+  )
+  def verify: Route = path("verify" / Segment) { address =>
+    verifyPath(address, decode = true)
   }
 
   @Path("/verifyText/{address}")
@@ -150,7 +156,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         defaultValue =
           "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
       )
-    ))
+    )
+  )
   def verifyText: Route = path("verifyText" / Segment) { address =>
     verifyPath(address, decode = false)
   }
@@ -160,7 +167,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address))
   }
@@ -170,7 +178,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
     complete(
       Address
@@ -179,7 +188,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         .map(acc => {
           ToResponseMarshallable(balancesDetailsJson(acc))
         })
-        .getOrElse(InvalidAddress))
+        .getOrElse(InvalidAddress)
+    )
   }
 
   @Path("/balance/{address}/{confirmations}")
@@ -188,7 +198,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def balanceWithConfirmations: Route = {
     (path("balance" / Segment / IntNumber) & get) {
       case (address, confirmations) =>
@@ -201,7 +212,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def effectiveBalance: Route = {
     path("effectiveBalance" / Segment) { address =>
       complete(effectiveBalanceJson(address, 0))
@@ -214,7 +226,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / Segment / IntNumber) {
       case (address, confirmations) =>
@@ -229,7 +242,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
       complete(for {
@@ -244,7 +258,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def validate: Route = (path("validate" / Segment) & get) { address =>
     complete(Validity(address, Address.fromString(address).isRight))
   }
@@ -262,9 +277,12 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         defaultValue =
           "{\n\t\"version\": 1,\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": [{\"key\":\"intValue\", \"type\":\"integer\", \"value\":17},{\"key\":\"stringValue\", \"type\":\"string\", \"value\":\"seventeen\"},{\"key\":\"boolValue\", \"type\":\"boolean\", \"value\":false},{\"key\":\"binaryArray\", \"type\":\"binary\", \"value\":\"EQ==\"}]\n}"
       )
-    ))
+    )
+  )
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def postData: Route = processRequest("data", (req: DataRequest) => broadcastIfSuccess(TransactionFactory.data(req, wallet, time)))
+  def postData: Route = (path("data") & withAuth) {
+    broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
+  }
 
   @Path("/data/{address}")
   @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
@@ -278,23 +296,26 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         dataType = "string",
         paramType = "query"
       )
-    ))
+    )
+  )
   def getData: Route =
-    extractScheduler(implicit sc =>
-      (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
-        maybeRegex match {
-          case None => complete(accountData(address))
-          case Some(regex) =>
-            complete(
-              Try(regex.r)
-                .fold(
-                  _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
-                  r => accountData(address, r.pattern)
-                )
-            )
+    extractScheduler(
+      implicit sc =>
+        (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
+          maybeRegex match {
+            case None => complete(accountData(address))
+            case Some(regex) =>
+              complete(
+                Try(regex.r)
+                  .fold(
+                    _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+                    r => accountData(address, r.pattern)
+                  )
+              )
 
+          }
         }
-    })
+    )
 
   @Path("/data/{address}/{key}")
   @ApiOperation(value = "Data by Key", notes = "Read data associated with an account and a key", httpMethod = "GET")
@@ -302,7 +323,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def getDataItem: Route = (path("data" / Segment / Segment) & get) {
     case (address, key) =>
       complete(accountData(address, key))
@@ -322,7 +344,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "from", value = "Start address", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def seq: Route = {
     (path("seq" / IntNumber / IntNumber) & get) {
       case (start, end) =>
@@ -356,7 +379,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
               acc.address,
               confirmations,
               commonAccountApi.balance(acc, confirmations)
-            )))
+            )
+          )
+      )
       .getOrElse(InvalidAddress)
   }
 
@@ -364,14 +389,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .right
-      .map(
-        acc =>
-          ToResponseMarshallable(
-            Balance(
-              acc.address,
-              0,
-              commonAccountApi.balance(acc, 0)
-            )))
+      .map(acc => ToResponseMarshallable(Balance(acc.address, 0, commonAccountApi.balance(acc))))
       .getOrElse(InvalidAddress)
   }
 
@@ -440,8 +458,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     }
   }
 
-  private def verifyPath(address: String, decode: Boolean) = withAuth {
-    json[SignedMessage] { m =>
+  private def verifyPath(address: String, decode: Boolean): Route = withAuth {
+    jsonPost[SignedMessage] { m =>
       if (Address.fromString(address).isLeft) {
         InvalidAddress
       } else {
@@ -468,7 +486,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "publicKey", value = "Public key Base58-encoded", required = true, paramType = "path", dataType = "string")
-    ))
+    )
+  )
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.tryDecodeWithLimit(publicKey) match {

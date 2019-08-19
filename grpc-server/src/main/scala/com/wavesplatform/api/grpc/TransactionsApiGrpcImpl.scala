@@ -2,12 +2,12 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -18,15 +18,17 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(wallet: Wallet,
-                              blockchain: Blockchain,
-                              addressTransactions: AddressTransactions,
+class TransactionsApiGrpcImpl(
+    wallet: Wallet,
+    blockchain: Blockchain,
+    addressTransactions: AddressTransactions,
                               utx: UtxPool,
-                              utxPoolSynchronizer: UtxPoolSynchronizer,
-                              forceBroadcast: Boolean)(implicit sc: Scheduler)
-    extends TransactionsApiGrpc.TransactionsApi {
+                              publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
+)(
+    implicit sc: Scheduler
+) extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, addressTransactions, utx, wallet, utxPoolSynchronizer)
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, addressTransactions, utx, wallet, publishTransaction)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi
@@ -83,10 +85,12 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
     signTransactionWith(request.getTransaction, wallet, signerAddress.toString).explicitGetErr()
   }
 
-  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
+  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
     commonApi
-      .broadcastTransaction(tx.toVanilla, forceBroadcast)
-      .map(_.resultE.map(_ => tx).explicitGetErr())
+      .broadcastTransaction(tx.toVanilla)
+      .resultE
+      .map(_ => tx)
+      .explicitGetErr()
   }
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {

@@ -3,7 +3,6 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
@@ -15,9 +14,10 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 
-import scala.concurrent.Future
-
-private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTransactions: AddressTransactions, utx: UtxPool, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer) {
+private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTransactions: AddressTransactions, utx: UtxPool,
+    wallet: Wallet,
+    publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
+) {
   def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] =
     addressTransactions.addressTransactionsObservable(address, Set.empty, fromId)
 
@@ -30,7 +30,7 @@ private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTr
   def unconfirmedTransactionById(transactionId: ByteStr): Option[VanillaTransaction] =
     utx.transactionById(transactionId)
 
-  def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] =
     FeeValidation
       .getMinFee(blockchain, blockchain.height, tx)
       .map {
@@ -38,9 +38,5 @@ private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTr
           (asset, feeInAsset, feeInWaves)
       }
 
-  }
-
-  def broadcastTransaction(tx: VanillaTransaction, forceBroadcast: Boolean = false): Future[TracedResult[ValidationError, Boolean]] = {
-    utxPoolSynchronizer.publishTransaction(tx, forceBroadcast = forceBroadcast)
-  }
+  def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }

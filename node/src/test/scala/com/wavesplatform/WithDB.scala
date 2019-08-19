@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.nio.file.Files
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.database.LevelDBFactory
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject

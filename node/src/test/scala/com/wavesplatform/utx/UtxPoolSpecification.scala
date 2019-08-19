@@ -11,8 +11,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.{WithDomain, openDB}
+import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock

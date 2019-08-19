@@ -7,8 +7,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
 import com.wavesplatform.transaction.Asset
