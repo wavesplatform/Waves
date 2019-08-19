@@ -22,7 +22,7 @@ object FeeValidation {
 
   val ScriptExtraFee = 400000L
   val FeeUnit        = 100000L
-  val NFTUnits  = 1
+  val NFTUnits       = 1
 
   val OldFeeUnits: Map[Byte, Long] = Map(
     GenesisTransaction.typeId        -> 0,
@@ -45,9 +45,9 @@ object FeeValidation {
 
   val FeeUnits = {
     val patches = Map[Byte, Long](
-      CreateAliasTransaction.typeId -> 1000, // 1 Waves
-      IssueTransaction.typeId -> 10000, // 10 Waves
-      ReissueTransaction.typeId -> 1 // 0.001 Waves
+      CreateAliasTransaction.typeId -> 1000,  // 1 Waves
+      IssueTransaction.typeId       -> 10000, // 10 Waves
+      ReissueTransaction.typeId     -> 1      // 0.001 Waves
     )
     OldFeeUnits ++ patches
   }
@@ -59,7 +59,7 @@ object FeeValidation {
     if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         feeDetails <- getMinFee(blockchain, height, tx)
-        minFee     = feeDetails.minFeeInAsset
+        minFee = feeDetails.minFeeInAsset
         _ <- Either.cond(
           minFee <= tx.assetFee._2,
           (),
