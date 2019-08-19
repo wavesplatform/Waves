@@ -105,7 +105,7 @@ node('wavesnode'){
                                 prerelease: false]
                             def createReleaseBodyJson = JsonOutput.toJson(createReleaseBody)
                             def createReleaseUrl = "https://api.github.com/repos/${user}/${repo}/releases"
-                            def id = ut.shWithOutput "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: application/json' -d '${createReleaseBodyJson}' ${createReleaseUrl} | grep -m 1 'id.:'' | tr -cd '[0-9]='"
+                            def id = ut.shWithOutput "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: application/json' -d '${createReleaseBodyJson}' ${createReleaseUrl} | grep -m 1 'id.:' | tr -cd '[0-9]='"
 
                             artifacts.each{
                                 def contentType = (it.name.contains('tgz')) ? "application/gzip" : "application/octet-stream"
