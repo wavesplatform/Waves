@@ -117,10 +117,11 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
         1000,
         0,
         script = Some(scriptV2),
-        fee = issueFee,
-        waitForTx = true
+        fee = issueFee
       )
       .id
+
+    nodes.waitForTransaction(issueTxId)
 
     sender
       .setAssetScript(
@@ -157,7 +158,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 }
 
 object Ride4DAppsActivationTestSuite {
-  val activationHeight = 25
+  val activationHeight = 35
 
   private val configWithRide4DAppsFeature: Seq[Config] =
     Default.map(ConfigFactory.parseString(s"""

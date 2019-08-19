@@ -11,8 +11,9 @@ import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypeParam}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
+import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
 
 object ExpressionCompiler {
@@ -88,25 +89,57 @@ object ExpressionCompiler {
     } yield compiledIf
   }
 
-  def flat(
-            pos:           Pos,
-            typeDefs:      Map[String, FINAL],
-            definedTypes:  List[String],
-            expectedTypes: List[String] = List(),
-            varName:       Option[String] = None
-          ): Either[CompilationError, List[FINAL]] = {
-    definedTypes.flatTraverse(typeName =>
-      typeDefs.get(typeName) match {
-        case Some(UNION(unionTypes, _)) => Right(unionTypes)
-        case Some(realType)             => Right(List(realType))
-        case None                       => Left {
-          val messageTypes =
-            if (expectedTypes.nonEmpty) expectedTypes
-            else definedTypes
-          TypeNotFound(pos.start, pos.end, typeName, messageTypes, varName)
-        }
-      })
+  private def flat(
+    pos:           Pos,
+    typeDefs:      Map[String, FINAL],
+    definedTypes:  List[String],
+    expectedTypes: List[String] = List(),
+    varName:       Option[String] = None
+  ): Either[CompilationError, List[FINAL]] =
+    definedTypes.flatTraverse(flatSingle(pos, typeDefs, definedTypes, expectedTypes, varName, _))
+
+  private def flatSingle(
+    pos:             Pos,
+    typeDefs:        Map[String, FINAL],
+    definedTypesStr: List[String],
+    expectedTypes:   List[String],
+    varName:         Option[String],
+    typeName:        String
+  ): Either[CompilationError, List[FINAL]] =
+    typeDefs.get(typeName) match {
+      case Some(UNION(unionTypes, _)) => Right(unionTypes)
+      case Some(realType)             => Right(List(realType))
+      case None                       => Left {
+        val messageTypes =
+          if (expectedTypes.nonEmpty) expectedTypes
+          else definedTypesStr
+        TypeNotFound(pos.start, pos.end, typeName, messageTypes, varName)
+      }
+    }
+
+  private def genericFlat(
+    pos:           Pos,
+    typeDefs:      Map[String, FINAL],
+    definedTypes:  List[(String, Option[String])],
+    expectedTypes: List[String] = List(),
+    varName:       Option[String] = None
+  ): Either[CompilationError, List[FINAL]] = {
+    def f(t: String) = flatSingle(pos, typeDefs, definedTypes.map(_.toString), expectedTypes, varName, t)
+    definedTypes.flatTraverse { case (typeName, typeParamO) =>
+      typeParamO.fold(f(typeName))(
+        paramName => for {
+          typeConstr <- findGenericType(pos, typeName)
+          typeParam  <- f(paramName)
+        } yield List(typeConstr(UNION.reduce(UNION.create(typeParam))))
+      )
+    }
   }
+
+  private def findGenericType(p: Pos, t: String): Either[CompilationError, FINAL => FINAL] =
+    t match {
+      case "List" => Right(LIST)
+      case _      => Left(GenericTypeNotFound(p.start, p.end, t))
+    }
 
   private def compileMatch(p: Pos, expr: Expressions.EXPR, cases: List[Expressions.MATCH_CASE]): CompileM[(Terms.EXPR, FINAL)] = {
     for {
@@ -191,14 +224,16 @@ object ExpressionCompiler {
           names.toSet.size == names.size
         }
       ctx <- get[CompilerContext, CompilationError]
-      argTypes <- func.args.toList.traverse[CompileM, (String, FINAL)] {
+      argTypes <- func.args.toList.traverse {
         case (argName, argType) =>
           for {
             name      <- handlePart(argName)
             typeDecls <- argType.toList
-              .traverse[CompileM, String](handlePart)
-              .ensure(NonExistingType(p.start, p.end, funcName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
-            types     <- liftEither(flat(p, ctx.predefTypes, typeDecls))
+              .traverse(handleGenericPart)
+              .ensure(NonExistingType(p.start, p.end, funcName, ctx.predefTypes.keys.toList))(_.forall {
+                case (t, param) => param.fold(ctx.predefTypes.contains(t))(ctx.predefTypes.contains)
+              })
+            types     <- liftEither(genericFlat(p, ctx.predefTypes, typeDecls))
             union = UNION.reduce(UNION.create(types))
           } yield (name, union)
       }
@@ -379,6 +414,14 @@ object ExpressionCompiler {
         (GETTER(expr, fieldName), ct).asRight[CompilationError]
       })
   }
+
+  private def handleGenericPart(
+    decl: (PART[String], TypeParam)
+  ): TaskM[CompilerContext, CompilationError, (String, Option[String])] =
+    for {
+      t1 <- handlePart(decl._1)
+      t2 <- decl._2.traverse(handlePart)
+    } yield (t1, t2)
 
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
     case PART.VALID(_, x)         => x.pure[CompileM]

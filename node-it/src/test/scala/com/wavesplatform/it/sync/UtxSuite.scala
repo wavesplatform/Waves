@@ -47,8 +47,8 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
       .selfSigned(Waves, account, notMiner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
-    val tx1Id = miner.signedBroadcast(firstTransfer.json()).id
     val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id
+    val tx1Id = miner.signedBroadcast(firstTransfer.json()).id
 
     waitForEmptyUtx(nodes)
 

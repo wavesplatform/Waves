@@ -10,7 +10,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 trait RestAPISettingsHelper {
   private val apiKey: String = "test_api_key"
 
-  val ApiKeyHeader = api_key(apiKey)
+  val ApiKeyHeader = `X-Api-Key`(apiKey)
 
   lazy val MaxTransactionsPerRequest = 10000
   lazy val MaxAddressesPerRequest    = 10000

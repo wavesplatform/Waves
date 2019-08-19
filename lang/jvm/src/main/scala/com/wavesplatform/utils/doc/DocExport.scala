@@ -1,9 +1,10 @@
 package com.wavesplatform.utils.doc
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.github.mustachejava.DefaultMustacheFactory
 import com.wavesplatform.DocSource
-import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion}
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, UNION}
 
 import scala.collection.JavaConverters._
@@ -18,7 +19,7 @@ object DocExport {
       val outputFile  = args(3)
 
       val version = DirectiveDictionary[StdLibVersion].idMap(versionStr.toInt)
-      val fullContext = RideFullContext.build(version)
+      val fullContext = RideFullContext.build(DirectiveSet(version, Account, Expression).explicitGet())
 
       def getTypes() = fullContext.types.map(v => TypeDoc.typeRepr(v)(v.name))
 

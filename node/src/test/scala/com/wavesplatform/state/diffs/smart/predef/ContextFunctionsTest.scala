@@ -302,7 +302,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           append(Seq(transferTx, issueTx)).explicitGet()
 
-          val assetId = issueTx.assetId.value
+          val assetId = issueTx.assetId
           val script = ScriptCompiler
             .compile(
               s"""

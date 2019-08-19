@@ -10,7 +10,7 @@ import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage._
-import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
+import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
@@ -41,6 +41,7 @@ import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
 
+  //noinspection ScalaStyle
   implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with Matchers {
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
@@ -141,6 +142,8 @@ object AsyncHttpApi extends Assertions {
     def lastBlock: Future[Block] = get("/blocks/last").as[Block]
 
     def blockSeq(from: Int, to: Int): Future[Seq[Block]] = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
+
+    def blockSeqByAddress(address: String, from: Int, to: Int): Future[Seq[Block]] = get(s"/blocks/address/$address/$from/$to").as[Seq[Block]]
 
     def blockHeadersAt(height: Int): Future[BlockHeaders] = get(s"/blocks/headers/at/$height").as[BlockHeaders]
 
@@ -438,27 +441,8 @@ object AsyncHttpApi extends Assertions {
       signedBroadcast(issue.toTx.explicitGet().json())
 
     def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-      val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
-        .setHeader("Content-type", "application/json")
-        .withApiKey(n.apiKey)
-        .setReadTimeout(timeout.toMillis.toInt)
-        .setRequestTimeout(timeout.toMillis.toInt)
-        .setBody(stringify(toJson(transfers)))
-        .build()
-
-      def aux: Future[Response] =
-        once(request)
-          .flatMap { response =>
-            if (response.getStatusCode == 503) throw new IOException(s"Unexpected status code: 503")
-            else Future.successful(response)
-          }
-          .recoverWith {
-            case e @ (_: IOException | _: TimeoutException) =>
-              n.log.debug(s"Failed to send ${transfers.size} txs: ${e.getMessage}")
-              timer.schedule(aux, 20.seconds)
-          }
-
-      aux.as[Seq[Transaction]]
+      import SignedTransferV2Request.writes
+      Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 
     def createAlias(targetAddress: String, alias: String, fee: Long, version: Byte = 2): Future[Transaction] =
@@ -710,7 +694,7 @@ object AsyncHttpApi extends Assertions {
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {
-    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
+    def withApiKey(x: String): RequestBuilder = self.setHeader(`X-Api-Key`.name, x)
   }
 
 }
