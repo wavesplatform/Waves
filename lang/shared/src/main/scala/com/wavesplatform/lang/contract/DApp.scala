@@ -1,15 +1,15 @@
 package com.wavesplatform.lang.contract
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.protobuf.dapp.DAppMeta
 
 case class DApp(
-    meta: ByteStr,
+    meta: DAppMeta,
     decs: List[DECLARATION],
     callableFuncs: List[CallableFunction],
     verifierFuncOpt: Option[VerifierFunction]

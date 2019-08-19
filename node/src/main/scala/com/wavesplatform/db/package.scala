@@ -18,7 +18,7 @@ package object db extends ScorexLogging {
       LevelDBFactory.factory.destroy(file, options)
     }
 
-    file.getParentFile.mkdirs()
+    file.getAbsoluteFile.getParentFile.mkdirs()
     LevelDBFactory.factory.open(file, options)
   }
 

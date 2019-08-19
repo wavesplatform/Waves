@@ -3,7 +3,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height, ProvenBalance}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -56,7 +56,7 @@ class CommonAccountApi(blockchain: Blockchain) {
       script = script.map(_.bytes()),
       scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
-      extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
+      extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }
 

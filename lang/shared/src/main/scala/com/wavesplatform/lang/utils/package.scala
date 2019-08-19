@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
@@ -40,6 +40,7 @@ package object utils {
       override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
       override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+      override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
       override def tthis: Recipient.Address                                                                        = ???
     }
     directives
@@ -81,8 +82,10 @@ package object utils {
 
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
     val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType).explicitGet()
-    lazyContexts(ds)().compilerContext
+    compilerContext(ds)
   }
+
+  def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
 
   val defaultDecompilerContext: DecompilerContext =
     lazyContexts(DirectiveSet(V3, Account, DApp).explicitGet())().decompilerContext

@@ -7,6 +7,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountApi
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
@@ -438,7 +439,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   private def accountData(address: String, key: String): ToResponseMarshallable = {
     val result = for {
       addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
-      value <- commonAccountApi.data(addr, key).toRight(DataKeyNotExists)
+      value <- commonAccountApi.data(addr, key).toRight(DataKeyDoesNotExist)
     } yield value
     ToResponseMarshallable(result)
   }

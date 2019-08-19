@@ -6,9 +6,9 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
-import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import play.api.libs.json._
 
 import scala.util.control.Exception.nonFatalCatch
@@ -33,10 +33,12 @@ trait ApiMarshallers {
 
   implicit lazy val tracedResultMarshaller: ToResponseMarshaller[TracedResult[ApiError, Transaction]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
-      .compose(ae => (
-        ae.resultE.fold(_.code, _ => StatusCodes.OK),
-        ae.json
-      ))
+      .compose(
+        ae =>
+          (
+            ae.resultE.fold(_.code, _ => StatusCodes.OK),
+            ae.json
+        ))
 
   private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller

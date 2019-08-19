@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.ContractLimits.{MaxComplexityByVersion, MaxCont
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader, ScriptEstimator}
 import monix.eval.Coeval
+import cats.implicits._
 
 object ContractScript {
 
@@ -33,7 +34,11 @@ object ContractScript {
   case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: DApp, complexityMap: Map[String, Long]) extends Script {
     override val complexity: Long = (0L +: complexityMap.toSeq.map(_._2)).max
     override type Expr = DApp
-    override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeContract(expr, stdLibVersion)))
+    override val bytes: Coeval[ByteStr] = Coeval.fromTry(
+      Global.serializeContract(expr, stdLibVersion)
+        .bimap(new RuntimeException(_), ByteStr(_))
+        .toTry
+    )
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 

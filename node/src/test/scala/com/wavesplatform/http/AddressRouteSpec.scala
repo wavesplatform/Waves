@@ -1,13 +1,18 @@
 package com.wavesplatform.http
 
 // [WAIT] import cats.kernel.Monoid
+import com.google.protobuf.ByteString
+import java.net.{URLDecoder, URLEncoder}
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
+import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
 import monix.execution.Scheduler
 
@@ -20,7 +25,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -158,9 +163,9 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
-      (response \ "scriptText").as[String] shouldBe "TRUE" // [WAIT] "true"
+      (response \ "scriptText").as[String] shouldBe "true"
       (response \ "complexity").as[Long] shouldBe 1
-      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
     (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: AddressOrAlias) => None)
@@ -174,7 +179,12 @@ class AddressRouteSpec
     }
 
     val contractWithMeta = DApp(
-      meta = ByteStr.fromByteArray(Array(1, 2, 3, 4)),
+      meta = DAppMeta(
+        version = 1,
+        List(
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 3)))
+        )
+      ),
       decs = List(),
       callableFuncs = List(),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
@@ -186,27 +196,80 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAQBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "scriptText").as[String] shouldBe "DApp(2VfUX,List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAkIARIFCgMBAgMAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAYSVyVy"
+      (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
+      "DAppMeta\\(" +
+        "1," +
+        "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
+        "List\\(\\)," +
+        "List\\(\\)," +
+        "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
+      "\\)").r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
-      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
+      (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val testData: Map[String, String] = (
-      (1 to 10).map(i => s"SomeKey#$i") ++
-        (1 to 10).map(i => s"OtherKey#$i")
-    ).map { k =>
-      k -> Random.nextString(16)
-    }.toMap
+    val dataKeys = List(
+      "abc",
+      "aBcD",
+      "ABD",
+      "ac",
+      "ab1c",
+      "1aB1cD",
+      "A1BD0",
+      "a110b",
+      "123",
+      "reeee",
+      " ab",
+      "ab ",
+      "a b\n",
+      "ab1 \n\t",
+      "\n\raB1\t",
+      "\n  \r  \t\t",
+      "!#$%&'()*+,",
+      "!#$%&'()<*=>+,",
+      "!",
+      "<!@#qwe>",
+      "\\",
+      "\"\\",
+      "qwe!",
+      "\b",
+      "\u0000",
+      "\b\b",
+      "\bqweasd\u0000",
+      "\u0000qweqwe"
+    )
+
+    val testData: Map[String, String] =
+      dataKeys.map { k =>
+        k -> Random.nextString(16)
+      }.toMap
+
+    val regexps = List(
+      /*"abc", "bca",*/
+      "[a-zA-Z]{1,}",
+      "[a-z0-9]{0,4}",
+      "[a-zA-Z0-9]{1,4}",
+      "[a-z!-/]{2,}",
+      "[!-/:-@]{0,}",
+      "re*",
+      "re.ee",
+      "\\w{0,}",
+      "\\d{0,}",
+      "[\\w\\d]{0,}",
+      "\\s{0,}",
+      "^1aB1cD$",
+      "(a|b)c"
+    )
 
     (blockchain.accountDataKeys _)
       .when(allAccounts(1).toAddress)
-      .returning(testData.keys.toList)
+      .returning(dataKeys)
       .anyNumberOfTimes()
 
     testData.foreach {
@@ -218,24 +281,39 @@ class AddressRouteSpec
           .anyNumberOfTimes()
     }
 
-    val regex = """^Some.*$"""
+    for (regex <- regexps) {
+      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+        val kvs = responseAs[JsArray].value
+          .map { json =>
+            ((json \ "key").as[String], (json \ "value").as[String])
+          }
+          .toList
+          .sortBy(_._1)
 
-    Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-      val kvs = responseAs[JsArray].value.map { json =>
-        ((json \ "key").as[String], (json \ "value").as[String])
-      }.toList
-
-      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
+        val regexPattern = regex.r.pattern
+        kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
+      }
     }
 
-    val urlEncRegex = """%5ESome.%2A%24"""
+    for (regex <- regexps.map(rgx => URLEncoder.encode(rgx, "UTF-8"))) {
+      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+        val kvs = responseAs[JsArray].value
+          .map { json =>
+            ((json \ "key").as[String], (json \ "value").as[String])
+          }
+          .toList
+          .sortBy(_._1)
 
-    Get(routePath(s"""/data/${allAddresses(1)}?matches=$urlEncRegex""")) ~> route ~> check {
-      val kvs = responseAs[JsArray].value.map { json =>
-        ((json \ "key").as[String], (json \ "value").as[String])
-      }.toList
+        val regexPattern = URLDecoder.decode(regex, "UTF-8").r.pattern
+        kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
+      }
+    }
 
-      assert(kvs forall { case (k, v) => k.startsWith("Some") && testData(k) == v })
+    val invalidRegexps = List("[a-z", "([a-z]{0}", "[a-z]{0", "[a-z]{,5}")
+    for (regex <- invalidRegexps) {
+      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
+        responseAs[String] should include("Cannot compile regex")
+      }
     }
   }
 }

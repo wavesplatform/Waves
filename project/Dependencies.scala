@@ -23,7 +23,7 @@ object Dependencies {
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect", "1.2.0")
@@ -104,11 +104,13 @@ object Dependencies {
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
         .exclude("org.typelevel", "cats-testkit_2.12"),
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
-    ))
+    ) ++ protobuf.value
+  )
 
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)

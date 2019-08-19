@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.leasing.LeaseBroadcastApiRoute
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -48,7 +49,7 @@ class LeaseBroadcastRouteSpec
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { t: Transaction =>
-          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(CustomValidationError("foo"), t))
         }
       }
     }
