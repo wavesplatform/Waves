@@ -51,31 +51,30 @@ object CryptoContext {
   private def digestAlgValue(tpe: CASETYPEREF): LazyVal = LazyVal(EitherT(Eval.always(CaseObj(tpe, Map.empty).asRight[String])))
 
   def build(global: BaseGlobal, version: StdLibVersion): CTX = {
-    def hashFunction(name: String, internalName: Short, cost: Long, docString: String)(h: Array[Byte] => Array[Byte]): BaseFunction =
-      NativeFunction(name, cost, internalName, BYTESTR, docString, ("bytes", BYTESTR, "value")) {
+    def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction =
+      NativeFunction(name, cost, internalName, BYTESTR, ("bytes", BYTESTR)) {
         case CONST_BYTESTR(m: ByteStr) :: Nil => CONST_BYTESTR(ByteStr(h(m.arr)))
-        case _                                => ???
+        case xs                               => notImplemented(s"$name(bytes: ByteVector)", xs)
       }
 
-    val keccak256F: BaseFunction  = hashFunction("keccak256", KECCAK256, 10, "256 bit Keccak/SHA-3/TIPS-202")(global.keccak256)
-    val blake2b256F: BaseFunction = hashFunction("blake2b256", BLAKE256, 10, "256 bit BLAKE")(global.blake2b256)
-    val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10, "256 bit SHA-2")(global.sha256)
+    val keccak256F: BaseFunction  = hashFunction("keccak256", KECCAK256, 10)(global.keccak256)
+    val blake2b256F: BaseFunction = hashFunction("blake2b256", BLAKE256, 10)(global.blake2b256)
+    val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10)(global.sha256)
 
     def sigVerifyF(contextVer: StdLibVersion): BaseFunction =
       NativeFunction("sigVerify",
                      100,
                      SIGVERIFY,
                      BOOLEAN,
-                     "check signature",
-                     ("message", BYTESTR, "value"),
-                     ("sig", BYTESTR, "signature"),
-                     ("pub", BYTESTR, "public key")) {
+                     ("message", BYTESTR),
+                     ("sig", BYTESTR),
+                     ("pub", BYTESTR)) {
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (contextVer != V1 && contextVer != V2 && msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
           Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
-        case _ => ???
+        case xs => notImplemented(s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
 
     val rsaVerifyF: BaseFunction =
@@ -84,11 +83,10 @@ object CryptoContext {
         300,
         RSAVERIFY,
         BOOLEAN,
-        "check RSA signature",
-        ("digest", digestAlgorithmType, "digest algorithm"),
-        ("message", BYTESTR, "value"),
-        ("sig", BYTESTR, "signature"),
-        ("pub", BYTESTR, "public key")
+        ("digest", digestAlgorithmType),
+        ("message", BYTESTR),
+        ("sig", BYTESTR),
+        ("pub", BYTESTR)
       ) {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
@@ -97,27 +95,27 @@ object CryptoContext {
           algFromCO(digestAlg) map { alg =>
             CONST_BOOLEAN(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
           }
-        case _ => ???
+        case xs => notImplemented(s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
 
-    def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "Base58 encode", ("bytes", BYTESTR, "value")) {
+    def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented("toBase58String(bytes: ByteVector)", xs)
     }
 
     def fromBase58StringF: BaseFunction =
-      NativeFunction("fromBase58String", 10, FROMBASE58, BYTESTR, "Base58 decode", ("str", STRING, "base58 encoded string")) {
+      NativeFunction("fromBase58String", 10, FROMBASE58, BYTESTR, ("str", STRING)) {
         case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented("fromBase58String(str: String)", xs)
       }
 
-    def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "Base64 encode", ("bytes", BYTESTR, "value")) {
+    def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented("toBase64String(bytes: ByteVector)", xs)
     }
 
     def fromBase64StringF: BaseFunction =
-      NativeFunction("fromBase64String", 10, FROMBASE64, BYTESTR, "Base64 decode", ("str", STRING, "base64 encoded string")) {
+      NativeFunction("fromBase64String", 10, FROMBASE64, BYTESTR, ("str", STRING)) {
         case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented("fromBase64String(str: String)", xs)
       }
@@ -128,24 +126,23 @@ object CryptoContext {
         30,
         CHECK_MERKLE_PROOF,
         BOOLEAN,
-        "Check validity of Merkle tree proof",
-        ("merkleRoot", BYTESTR, "root hash of Merkle tree"),
-        ("merkleProof", BYTESTR, "proof bytes"),
-        ("valueBytes", BYTESTR, "bytes of value that must be proven")
+        ("merkleRoot", BYTESTR),
+        ("merkleProof", BYTESTR),
+        ("valueBytes", BYTESTR)
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
           Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
-        case _ => ???
+        case xs => notImplemented(s"checkMerkleProof(merkleRoot: ByteVector, merkleProof: ByteVector, valueBytes: ByteVector)", xs)
       }
 
-    def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, "Base16 encode", ("bytes", BYTESTR, "value")) {
+    def toBase16StringF: BaseFunction = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF: BaseFunction =
-      NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, "Base16 decode", ("str", STRING, "base16 encoded string")) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, global.MaxBase64String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+      NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented("fromBase16String(str: String)", xs)
       }
 
@@ -176,18 +173,18 @@ object CryptoContext {
       digestAlgorithmType
     )
 
-    val v3Vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-      ("NOALG", ((none, "NONE digest algorithm"), digestAlgValue(none))),
-      ("MD5", ((md5, "MD5 digest algorithm"), digestAlgValue(md5))),
-      ("SHA1", ((sha1, "SHA1 digest algorithm"), digestAlgValue(sha1))),
-      ("SHA224", ((sha224, "SHA224 digest algorithm"), digestAlgValue(sha224))),
-      ("SHA256", ((sha256, "SHA256 digest algorithm"), digestAlgValue(sha256))),
-      ("SHA384", ((sha384, "SHA384 digest algorithm"), digestAlgValue(sha384))),
-      ("SHA512", ((sha512, "SHA512 digest algorithm"), digestAlgValue(sha512))),
-      ("SHA3224", ((sha3224, "SHA3-224 digest algorithm"), digestAlgValue(sha3224))),
-      ("SHA3256", ((sha3256, "SHA3-256 digest algorithm"), digestAlgValue(sha3256))),
-      ("SHA3384", ((sha3384, "SHA3-384 digest algorithm"), digestAlgValue(sha3384))),
-      ("SHA3512", ((sha3512, "SHA3-512 digest algorithm"), digestAlgValue(sha3512)))
+    val v3Vars: Map[String, (FINAL, LazyVal)] = Map(
+      ("NOALG", (none, digestAlgValue(none))),
+      ("MD5", (md5, digestAlgValue(md5))),
+      ("SHA1", (sha1, digestAlgValue(sha1))),
+      ("SHA224", (sha224, digestAlgValue(sha224))),
+      ("SHA256", (sha256, digestAlgValue(sha256))),
+      ("SHA384", (sha384, digestAlgValue(sha384))),
+      ("SHA512", (sha512, digestAlgValue(sha512))),
+      ("SHA3224", (sha3224, digestAlgValue(sha3224))),
+      ("SHA3256", (sha3256, digestAlgValue(sha3256))),
+      ("SHA3384", (sha3384, digestAlgValue(sha3384))),
+      ("SHA3512", (sha3512, digestAlgValue(sha3512)))
     )
 
     val v3Functions =

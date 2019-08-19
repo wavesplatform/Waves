@@ -75,7 +75,7 @@ object FeeValidation {
 
     val errorMessage = s"Fee for $txName ($actualFee) does not exceed minimal value of $requiredFee."
 
-    GenericError((feeDetails.requirements mkString_ " ") ++ errorMessage)
+    GenericError((feeDetails.requirements mkString_ " ") ++ ". " ++ errorMessage)
   }
 
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)

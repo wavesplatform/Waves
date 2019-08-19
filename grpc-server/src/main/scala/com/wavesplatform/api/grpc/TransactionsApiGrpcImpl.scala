@@ -6,6 +6,7 @@ import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTrans
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -16,13 +17,16 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(wallet: Wallet,
-                              blockchain: Blockchain,
-                              utx: UtxPool,
-                              broadcast: VanillaTransaction => Unit)(implicit sc: Scheduler)
-    extends TransactionsApiGrpc.TransactionsApi {
+class TransactionsApiGrpcImpl(
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utx: UtxPool,
+    publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
+)(
+    implicit sc: Scheduler
+) extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, _) => broadcast(tx))
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, publishTransaction)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
     val stream = commonApi
@@ -67,7 +71,7 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
     responseObserver.completeWith(result)
   }
 
-  override def sign(request: SignRequest): Future[PBSignedTransaction] = {
+  override def sign(request: SignRequest): Future[PBSignedTransaction] = Future {
     def signTransactionWith(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBSignedTransaction] =
       for {
         sender <- wallet.findPrivateKey(tx.sender.toString)
@@ -75,16 +79,16 @@ class TransactionsApiGrpcImpl(wallet: Wallet,
         tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
       } yield tx
 
-    val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKeyAccount
-    signTransactionWith(request.getTransaction, wallet, signerAddress.toString).toFuture
+    val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKey
+    signTransactionWith(request.getTransaction, wallet, signerAddress.toString).explicitGetErr()
   }
 
-  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = {
+  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
     commonApi
       .broadcastTransaction(tx.toVanilla)
-      .map(_.toPB)
       .resultE
-      .toFuture
+      .map(_ => tx)
+      .explicitGetErr()
   }
 
   private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {

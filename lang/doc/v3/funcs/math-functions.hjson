@@ -1,0 +1,39 @@
+{
+  funcs: [
+    {
+      name: "pow"
+      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      doc: "Returns a number raised to a power"
+      paramsDoc: [
+        "The base."
+        "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
+        "The number of decimals of the resulting value."
+        "One of the rounding functions. The HalfUp() function may be used as the default value."
+      ]
+    }
+	 {
+      name: "log"
+      params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
+      doc: "Returns the logarithm of a number."
+      paramsDoc: [
+        "The number which logarithm should be calculated."
+        "The number of decimals of the number."
+        "The base of the logarithm."
+        "The number of decimals of the base."
+        "The number of decimals of the resulting value."
+        '''
+        The rounding function.
+        The HalfUp() function may be used as the default value.
+        '''
+      ]
+    }
+	 {
+      name: "fraction"
+      params: [ "Int", "Int", "Int" ]
+      doc: "Multiply and division with big integer intermediate representation"
+      paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
+    }
+  ]
+}

@@ -10,7 +10,9 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
+import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec}
 import play.api.libs.json._
@@ -55,6 +57,8 @@ class NFTBalanceSuite
 
   private val (simple, nft) = fillPortfolio(issuer, 100, 100)
 
+  private val randomTokenToTransfer = IssuedAsset(nft(Random.nextInt(nft.length)).assetId)
+
   protected override def beforeAll(): Unit = {
     theNodes.run()
 
@@ -78,7 +82,7 @@ class NFTBalanceSuite
 
   "after activation" - {
     "returns only non-nft portfolio on /balance/{address}" in {
-      val expectedIds = simple map (_.assetId().base58)
+      val expectedIds = simple map (_.assetId.base58)
 
       val assertion =
         getPortfolio(node, issuer.address) map { ids =>
@@ -89,7 +93,7 @@ class NFTBalanceSuite
     }
 
     "returns issue transactions on /nft/{address}/limit/{limit}" in {
-      val expectedIds = nft.map(_.assetId().base58)
+      val expectedIds = nft.map(_.assetId.base58)
 
       val assertion =
         getNFTPage(node, issuer.address, 1000, None) map { ids =>
@@ -98,11 +102,43 @@ class NFTBalanceSuite
 
       Await.result(assertion, 10.seconds)
     }
+
+    "returns only nft with balance > 0 on /nft/{address}/limit/{limit}" in {
+      val other = KeyPair("other".getBytes)
+
+      val transfer = TransferTransactionV1
+        .selfSigned(
+          randomTokenToTransfer,
+          issuer,
+          other,
+          1,
+          System.currentTimeMillis(),
+          Waves,
+          0.001.waves,
+          Array.emptyByteArray
+        )
+        .explicitGet()
+
+      val assertion = for {
+        tx         <- node.signedBroadcast(transfer.json())
+        _          <- node.waitForTransaction(tx.id)
+        issuerNFTs <- getNFTPage(node, issuer.address, 1000, None)
+        otherNFTs  <- getNFTPage(node, other.address, 1000, None)
+      } yield {
+        issuerNFTs shouldNot contain(randomTokenToTransfer.id.base58)
+        otherNFTs should contain(randomTokenToTransfer.id.base58)
+      }
+
+      Await.result(assertion, 10.seconds)
+    }
   }
 
   "pagination" - {
     "works" in {
-      val expectedIds = nft.map(_.assetId().base58).toSet
+      val expectedIds = nft
+        .filter(_.assetId != randomTokenToTransfer.id)
+        .map(_.assetId.base58)
+        .toSet
 
       val assertion = for {
         pagedIds    <- getNFTPaged(node, issuer.address, 10).map(_.toSet)

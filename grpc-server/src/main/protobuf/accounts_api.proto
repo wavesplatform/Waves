@@ -5,12 +5,14 @@ option csharp_namespace = "Waves.Grpc";
 
 import "transactions_api.proto";
 import "transaction.proto";
+import "google/protobuf/wrappers.proto";
 
 service AccountsApi {
     rpc GetBalances (BalancesRequest) returns (stream BalanceResponse);
     rpc GetScript (AccountRequest) returns (ScriptData);
     rpc GetActiveLeases (AccountRequest) returns (stream TransactionResponse);
     rpc GetDataEntries (DataRequest) returns (stream DataEntryResponse);
+    rpc ResolveAlias (google.protobuf.StringValue) returns (google.protobuf.BytesValue);
 }
 
 message AccountRequest {

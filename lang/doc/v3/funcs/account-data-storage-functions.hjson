@@ -1,0 +1,64 @@
+{
+  funcs: [
+    {
+      name: "assetBalance"
+      params: [ "Address|Alias", "ByteVector|Unit" ]
+      doc: "Gets account balance by token ID."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "Token ID." ]
+    }
+    {
+      name: "getBinary"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets an array of bytes by key."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getBinaryValue"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets an array of bytes by key. Throws an exception if there is no data."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getBoolean"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets a boolean value by key."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getBooleanValue"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets a boolean value by key. Throws an exception if there is no data."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getInteger"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets an integer by key."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getIntegerValue"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets an integer by key. Throws an exception if there is no data."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getString"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets a string by key."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "getStringValue"
+      params: [ "Address|Alias", "String" ]
+      doc: "Gets a string by key. Throws an exception if there is no data."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "The key." ]
+    }
+    {
+      name: "wavesBalance"
+      params: [ "Address|Alias" ]
+      doc: "Gets account balance in [WAVES](/blockchain/token/waves.md)."
+      paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account." ]
+    }
+  ]
+}

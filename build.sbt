@@ -22,45 +22,33 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
-lazy val versionSourceTask = (path: String) => Def.task {
-  // WARNING!!!
-  // Please, update the fallback version every major and minor releases.
-  // This version is used then building from sources without Git repository
-  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (1, 0, 1)
+lazy val langSharedSources = settingKey[File]("Shared scala sources of lang module")
+lazy val langProtoModels   = settingKey[File]("Protobuf sources of lang module")
 
-  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "Version.scala"
-  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-  val (major, minor, patch) = version.value match {
-    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case _                            => FallbackVersion
-  }
-  IO.write(
-    versionFile,
-    s"""package $path
-       |
-       |object Version {
-       |  val VersionString = "${version.value}"
-       |  val VersionTuple = ($major, $minor, $patch)
-       |}
-       |""".stripMargin
-  )
-  Seq(versionFile)
-}
-
-lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += versionSourceTask(path)))
+lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += Tasks.versionSource(path)))
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .disablePlugins(ProtocPlugin)
     .dependsOn(common % "compile;test->test")
     .settings(
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
+      resolvers += Resolver.sbtPluginRepo("releases"),
+      //Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
+      cleanFiles += langSharedSources.value / "com" / "wavesplatform" / "protobuf",
+      inConfig(Compile)(
+        Seq(
+          PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources.value,
+          PB.protoSources := Seq(langProtoModels.value),
+          PB.deleteTargetDirectory := false,
+          sourceGenerators += Tasks.docSource
+        )
+      ),
+      langSharedSources := baseDirectory.value.getParentFile / "shared" / "src" / "main" / "scala",
+      langProtoModels := baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
@@ -175,9 +163,10 @@ packageAll := Def
   .sequential(
     root / cleanAll,
     Def.task {
-      (node /  assembly).value
+      (node / assembly).value
       (node / Debian / packageBin).value
-    (`grpc-server` /Universal / packageZipTarball).value
+      (`grpc-server` / Universal / packageZipTarball).value
+      (`grpc-server` / Debian / packageBin).value
     }
   )
   .value

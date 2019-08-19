@@ -2,12 +2,12 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry}
+import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {
@@ -42,10 +42,8 @@ class CommonAccountApi(blockchain: Blockchain) {
     portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
   }
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    val iterator = blockchain.nftList(address, from)
-    Observable.fromIterator(iterator, () => iterator.close())
-  }
+  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+    blockchain.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain.accountScript(address)
@@ -54,7 +52,7 @@ class CommonAccountApi(blockchain: Blockchain) {
       script = script.map(_.bytes()),
       scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
-      extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
+      extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }
 
@@ -70,13 +68,13 @@ class CommonAccountApi(blockchain: Blockchain) {
       .flatMap(Observable.fromIterable(_))
   }
 
-  def activeLeases(address: Address): Either[String, Seq[(Int, LeaseTransaction)]] = {
+  def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
     blockchain
-      .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-      .map(_.collect {
+      .addressTransactionsObservable(address, Set(LeaseTransactionV1, LeaseTransactionV2))
+      .collect {
         case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
           (height, leaseTransaction)
-      })
+      }
   }
 }
 

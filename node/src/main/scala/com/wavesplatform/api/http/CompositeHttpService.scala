@@ -6,8 +6,8 @@ import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
+import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
-import akka.http.scaladsl.server.{Route, RouteResult}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.api.http.swagger.SwaggerDocService
 import com.wavesplatform.settings.RestAPISettings
@@ -39,7 +39,7 @@ case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], 
 
   private def corsAllowAll = if (settings.cors) respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
 
-  private def extendRoute(base: Route): Route =
+  private def extendRoute(base: Route): Route = handleAllExceptions {
     if (settings.cors) { ctx =>
       val extendedRoute = corsAllowAll(base) ~ options {
         respondWithDefaultHeaders(
@@ -51,4 +51,5 @@ case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], 
 
       extendedRoute(ctx)
     } else base
+  }
 }

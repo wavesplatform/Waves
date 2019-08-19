@@ -21,7 +21,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
   private def firstAddress = nodes(1).address
 
   private def txRequestsGen(n: Int, fee: Long): Future[Unit] = {
-    val parallelRequests = 1
+    val parallelRequests = 10
 
     def requests(n: Int): Future[Unit] =
       Future
@@ -77,7 +77,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
       }
     }
 
-    Await.result(f, 2.minute)
+    Await.result(f, 5.minute)
   }
 
   private val microblockActivationHeight = 10

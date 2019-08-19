@@ -6,7 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
 import com.wavesplatform.transaction.Asset.Waves
@@ -26,7 +26,7 @@ object BaseTargetChecker {
     val settings          = WavesSettings.fromRootConfig(sharedConfig)
     val db                = openDB("/tmp/tmp-db")
     val ntpTime           = new NTP("ntp.pool.org")
-    val portfolioChanges  = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+    val portfolioChanges  = Observer.empty(UncaughtExceptionReporter.default)
     val blockchainUpdater = StorageFactory(settings, db, ntpTime, portfolioChanges)
     val poSSelector       = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
 

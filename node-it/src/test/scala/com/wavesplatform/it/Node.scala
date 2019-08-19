@@ -7,7 +7,7 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.LoggerFacade
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
@@ -25,9 +25,9 @@ abstract class Node(val config: Config) extends AutoCloseable {
       .setKeepAlive(false)
       .setNettyTimer(GlobalTimer.instance))
 
-  val privateKey: KeyPair = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
-  val publicKey: PublicKey   = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
-  val address: String               = config.getString("address")
+  val privateKey: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
+  val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
+  val address: String      = config.getString("address")
 
   def nodeExternalPort(internalPort: Int): Int
   def nodeApiEndpoint: URL
@@ -41,9 +41,9 @@ abstract class Node(val config: Config) extends AutoCloseable {
 
 object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
-    def name: String = n.settings.networkSettings.nodeName
-    def publicKeyStr: String = Base58.encode(n.publicKey)
-    def fee(txTypeId: Byte): Long = CommonValidation.OldFeeConstants(txTypeId) * CommonValidation.FeeUnit
+    def name: String               = n.settings.networkSettings.nodeName
+    def publicKeyStr: String       = Base58.encode(n.publicKey)
+    def fee(txTypeId: Byte): Long  = FeeValidation.OldFeeConstants(txTypeId) * FeeValidation.FeeUnit
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }
 }

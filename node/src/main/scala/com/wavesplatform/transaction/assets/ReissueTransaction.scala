@@ -14,7 +14,6 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
   def quantity: Long
   def reissuable: Boolean
   def fee: Long
-  def chainByte: Option[Byte]
 
   override val assetFee: (Asset, Long) = (Waves, fee)
 

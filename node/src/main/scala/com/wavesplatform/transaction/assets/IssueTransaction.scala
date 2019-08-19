@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.serialization.Deser
@@ -22,7 +23,6 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   def fee: Long
   def script: Option[Script]
 
-  final lazy val assetId                     = id
   override final val assetFee: (Asset, Long) = (Waves, fee)
 
   val isNFT: Boolean = quantity == 1 && decimals == 0 && !reissuable
@@ -30,7 +30,7 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   val issueJson: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"     -> version,
-      "assetId"     -> assetId().base58,
+      "assetId"     -> id().base58,
       "name"        -> new String(name, StandardCharsets.UTF_8),
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,
@@ -78,5 +78,9 @@ object IssueTransaction {
     ).mapN { case _ => () }
       .leftMap(_.head)
       .toEither
+  }
+
+  implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
+    def assetId: ByteStr = tx.id()
   }
 }

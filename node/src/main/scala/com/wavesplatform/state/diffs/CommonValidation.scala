@@ -24,29 +24,6 @@ import scala.util.{Left, Right, Try}
 
 object CommonValidation {
 
-  val ScriptExtraFee = 400000L
-  val FeeUnit        = 100000
-  val NFTMultiplier  = 0.001
-
-  val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId            -> 0,
-    PaymentTransaction.typeId            -> 1,
-    IssueTransaction.typeId              -> 1000,
-    ReissueTransaction.typeId            -> 1000,
-    BurnTransaction.typeId               -> 1,
-    TransferTransaction.typeId           -> 1,
-    MassTransferTransaction.typeId       -> 1,
-    LeaseTransaction.typeId              -> 1,
-    LeaseCancelTransaction.typeId        -> 1,
-    ExchangeTransaction.typeId           -> 3,
-    CreateAliasTransaction.typeId        -> 1,
-    DataTransaction.typeId               -> 1,
-    SetScriptTransaction.typeId          -> 10,
-    SponsorFeeTransaction.typeId         -> 1000,
-    SetAssetScriptTransaction.typeId     -> (1000 - 4),
-    smart.InvokeScriptTransaction.typeId -> 5
-  )
-
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
@@ -174,11 +151,14 @@ object CommonValidation {
           case Some(sc) => scriptActivation(sc)
         }
 
-      case it: SetAssetScriptTransaction =>
-        it.script match {
-          case None     => Left(GenericError("Cannot set empty script"))
-          case Some(sc) => scriptActivation(sc)
+      case sast: SetAssetScriptTransaction =>
+        activationBarrier(BlockchainFeatures.SmartAssets).flatMap { _ =>
+          sast.script match {
+            case None     => Left(GenericError("Cannot set empty script"))
+            case Some(sc) => scriptActivation(sc)
+          }
         }
+
 
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)

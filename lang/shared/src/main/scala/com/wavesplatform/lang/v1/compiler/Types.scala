@@ -16,7 +16,7 @@ object Types {
 
   case class TYPEPARAM(char: Byte)               extends PARAMETERIZED with SINGLE { override def toString: String = char.toChar.toString }
   case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE { override def toString: String = s"List[$t]" }
-  case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED
+  case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED             { override def toString: String = l.mkString("|")}
   case object NOTHING                            extends FINAL { override val name = "Nothing"; override val typeList = List() }
   case object LONG                               extends REAL { override val name = "Int"; override val typeList = List(this) }
   case object BYTESTR                            extends REAL { override val name = "ByteVector"; override val typeList = List(this) }

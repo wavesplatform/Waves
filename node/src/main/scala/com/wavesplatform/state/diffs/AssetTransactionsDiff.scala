@@ -55,17 +55,8 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.asset).get
 
-      def wasBurnt: Boolean = {
-        val burns = blockchain
-          .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
-          .getOrElse(Nil)
-
-        val result = burns.collectFirst { case (_, btx: BurnTransaction) if btx.asset == btx.asset => btx }
-        result.isDefined
-      }
-
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, height)
-      if (oldInfo.reissuable || (blockTime <= blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
+      if (oldInfo.reissuable || (blockTime <= blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp)) {
         if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
           Left(GenericError("Asset total value overflow"))
         } else {

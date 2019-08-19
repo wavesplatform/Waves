@@ -21,24 +21,24 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.eval.Task
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{AsyncQueue, CancelableFuture}
 import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration => ScalaDuration}
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time,
-                  blockchain: Blockchain,
-                  spendableBalanceChanged: Observer[(Address, Asset)],
-                  utxSettings: UtxSettings,
-                  nanoTimeSource: () => Long = () => System.nanoTime())
-    extends ScorexLogging
+class UtxPoolImpl(
+    time: Time,
+    blockchain: Blockchain,
+    spendableBalanceChanged: Observer[(Address, Asset)],
+    utxSettings: UtxSettings,
+    nanoTimeSource: () => Long = () => System.nanoTime()
+) extends ScorexLogging
     with AutoCloseable
     with UtxPool {
 
@@ -53,7 +53,7 @@ class UtxPoolImpl(time: Time,
     else putNewTx(tx, verify)
   }
 
-  protected def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -74,14 +74,18 @@ class UtxPoolImpl(time: Time,
           PoolMetrics.checkScripted.measure(tx match {
             case scripted if TxCheck.isScripted(scripted) =>
               for {
-                _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts,
-                                 (),
-                                 GenericError("transactions from scripted accounts are denied from UTX pool"))
+                _ <- Either.cond(
+                  utxSettings.allowTransactionsFromSmartAccounts,
+                  (),
+                  GenericError("transactions from scripted accounts are denied from UTX pool")
+                )
 
                 scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
-                _ <- Either.cond(skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
-                                 (),
-                                 GenericError("Transaction pool scripted txs size limit is reached"))
+                _ <- Either.cond(
+                  skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
+                  (),
+                  GenericError("Transaction pool scripted txs size limit is reached")
+                )
               } yield tx
 
             case _ =>
@@ -128,9 +132,11 @@ class UtxPoolImpl(time: Time,
 
       for {
         _ <- Either.cond(transactions.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
-        _ <- Either.cond(skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-                         (),
-                         GenericError("Transaction pool bytes size limit is reached"))
+        _ <- Either.cond(
+          skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
+          (),
+          GenericError("Transaction pool bytes size limit is reached")
+        )
 
         _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
         _ <- LimitChecks.checkNotBlacklisted(tx)
@@ -186,8 +192,10 @@ class UtxPoolImpl(time: Time,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(initialConstraint: MultiDimensionalMiningConstraint,
-                               maxPackTime: ScalaDuration): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+  override def packUnconfirmed(
+      initialConstraint: MultiDimensionalMiningConstraint,
+      maxPackTime: ScalaDuration
+  ): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, totalIterations) = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
@@ -213,7 +221,8 @@ class UtxPoolImpl(time: Time,
                   if (updatedConstraint.isOverfilled) {
                     log.trace(
                       s"Transaction ${tx.id()} does not fit into the block: " +
-                        s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}")
+                        s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}"
+                    )
                     bumpIterations(r)
                   } else {
                     log.trace(s"Packing transaction ${tx.id()}")
@@ -255,12 +264,24 @@ class UtxPoolImpl(time: Time,
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[UtxPoolImpl] val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  private[this] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
-  val cleanupTask: Task[Unit] = Task
-    .eval[Unit](packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf))
-    .onErrorRecover { case t => log.error("Error cleaning up UTX pool", t) }
-    .executeOn(scheduler)
+  private val q = AsyncQueue.unbounded[Seq[Transaction]]()(scheduler)
+
+  /** DOES NOT verify transactions */
+  def addAndCleanup(transactions: Seq[Transaction]): Unit = q.offer(transactions)
+
+  private def consume(): CancelableFuture[Unit] =
+    q.drain(1, Int.MaxValue)
+      .flatMap { transactionSeq =>
+        for (ts <- transactionSeq; t <- ts) {
+          addTransaction(t, verify = false)
+        }
+        packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+        consume()
+      }(scheduler)
+
+  consume()
 
   override def close(): Unit = {
     scheduler.shutdown()

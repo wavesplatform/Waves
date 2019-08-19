@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
@@ -112,13 +112,13 @@ object Sponsorship {
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {
     if (sponsorship == 0) return Long.MaxValue
-    val waves = BigInt(assetFee) * CommonValidation.FeeUnit / sponsorship
+    val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
     waves.bigInteger.longValueExact()
   }
 
   def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
     if (wavesFee == 0 || sponsorship == 0) return 0
-    val assetFee = BigInt(wavesFee) * sponsorship / CommonValidation.FeeUnit
+    val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
     assetFee.bigInteger.longValueExact()
   }
 }

@@ -22,16 +22,19 @@ import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Proofs, Transaction}
+import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import monix.eval.Coeval
@@ -45,8 +48,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   def ciFee(sc: Int = 0): Gen[Long] =
     Gen.choose(
-      CommonValidation.FeeUnit * CommonValidation.OldFeeConstants(InvokeScriptTransaction.typeId) + sc * CommonValidation.ScriptExtraFee,
-      CommonValidation.FeeUnit * CommonValidation.OldFeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * CommonValidation.ScriptExtraFee - 1
+      FeeValidation.FeeUnit * FeeValidation.OldFeeConstants(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
+      FeeValidation.FeeUnit * FeeValidation.OldFeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
     )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -67,23 +70,26 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   def dataContract(senderBinding: String, argName: String, funcName: String, bigData: Boolean) = {
     val datas =
-      if (bigData) List(
-        FUNCTION_CALL(
-          User("DataEntry"),
-          List(CONST_STRING("argument").explicitGet(), CONST_STRING("abcde" * 1024).explicitGet())
-        ),
-        REF("nil")
-      )
+      if (bigData)
+        List(
+          FUNCTION_CALL(
+            User("DataEntry"),
+            List(CONST_STRING("argument").explicitGet(), CONST_STRING("abcde" * 1024).explicitGet())
+          ),
+          REF("nil")
+        )
       else
         List(
           FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument").explicitGet(), REF(argName))),
           FUNCTION_CALL(
             Native(1100),
-            List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))), REF("nil")))
+            List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))),
+                 REF("nil"))
+          )
         )
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -128,7 +134,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -168,7 +174,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     DApp(
-      ByteStr.empty,
+      DAppMeta(),
       List.empty,
       List(
         CallableFunction(
@@ -195,8 +201,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           |{-# CONTENT_TYPE DAPP #-}
           |
           |@Callable(xx)
-          |func $funcName(amount: Int) = {
-          |    if (amount + 1 != 0) then throw() else throw()
+          |func $funcName(str: String, num: Int) = {
+          |    if (parseInt(str) == num) then throw() else throw()
           |}
           |
           |@Verifier(txx)
@@ -315,7 +321,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(
         FunctionHeader.User(funcBinding),
-        List.fill(invocationParamsCount)(CONST_STRING("Not-a-Number").explicitGet())
+        List.fill(invocationParamsCount)(FALSE)
       )
       ci = InvokeScriptTransaction
         .selfSigned(
@@ -392,16 +398,21 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
-                                               verifier: DApp,
-                                               senderBindingToContract: String => Gen[DApp],
-                                               invokerGen: Gen[KeyPair] = accountGen,
-                                               masterGen: Gen[KeyPair] = accountGen,
-                                               payment: Option[Payment] = None,
-                                               feeGen: Gen[Long] = ciFee(1),
-                                               sponsored: Boolean = false,
-                                               isCIDefaultFunc: Boolean = false
-                                             )
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
+      verifier: DApp,
+      senderBindingToContract: String => Gen[DApp],
+      invokerGen: Gen[KeyPair] = accountGen,
+      masterGen: Gen[KeyPair] = accountGen,
+      payment: Option[Payment] = None,
+      feeGen: Gen[Long] = ciFee(1),
+      sponsored: Boolean = false,
+      isCIDefaultFunc: Boolean = false
+  ): Gen[(List[GenesisTransaction],
+          SetScriptTransaction,
+          SetScriptTransaction,
+          InvokeScriptTransaction,
+          KeyPair,
+          IssueTransaction,
+          SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -548,7 +559,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
-            newState.addressTransactions(acc.toAddress, Set.empty, None).toList.head._2 shouldBe ci
+            newState.addressTransactions(acc.toAddress, Set.empty, Int.MaxValue, None).right.get.head._2 shouldBe ci
         }
     }
   }
@@ -656,7 +667,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   }
 
   val chainId   = AddressScheme.current.chainId
-  val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.OldFeeConstants(IssueTransactionV2.typeId) * CommonValidation.FeeUnit
+  val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.OldFeeConstants(IssueTransactionV2.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {
     forAll(for {
@@ -1021,11 +1032,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   property("argument passed to callable function has wrong type") {
     forAll(for {
-      r <- simplePreconditionsAndSetContract()
+      r <- simplePreconditionsAndSetContract(invocationParamsCount = 2)
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("Passed argument with wrong type")
+          _ should produce("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
         }
     }
   }
@@ -1076,12 +1087,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   property("Function call args count should be equal @Callable func one") {
     forAll(for {
-      invocationArgsCount <- Gen.oneOf(0, 2)
+      invocationArgsCount <- Gen.oneOf(0, 3)
       r                   <- simplePreconditionsAndSetContract(invocationParamsCount = invocationArgsCount)
     } yield (r._1, r._2, r._3, invocationArgsCount)) {
       case (genesis, setScript, ci, count) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce(s"takes 1 args but $count were(was) given")
+          _ should produce(s"takes 2 args but $count were(was) given")
         }
     }
   }
@@ -1110,7 +1121,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
     forAll(for {
       proofsCount <- Gen.choose(2, 9)
-      r <- preconditionsAndSetContractWithVerifier(multiSigCheckDApp(proofsCount), writeSetWithKeyLength(_))
+      r           <- preconditionsAndSetContractWithVerifier(multiSigCheckDApp(proofsCount), writeSetWithKeyLength(_))
     } yield (r._1, r._2, r._3, r._4, proofsCount)) {
       case (genesis, setVerifier, setContract, ci, proofsCount) =>
         val proof         = ci.proofs

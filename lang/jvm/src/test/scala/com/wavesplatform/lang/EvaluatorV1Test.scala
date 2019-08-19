@@ -29,8 +29,6 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
-import scala.util.Try
-
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   val version = V3
@@ -39,7 +37,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   private val defaultCryptoContext = CryptoContext.build(Global, version)
 
-  val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) (BLOCK.apply _) else (LET_BLOCK.apply _))
+  val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 
   private def defaultFullContext(environment: Environment): CTX = Monoid.combineAll(
     Seq(
@@ -214,7 +212,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, "test function", Seq(("_", LONG, "")): _*) {
+      val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
         case _ =>
           functionEvaluated = functionEvaluated + 1
           evaluated(1L)
@@ -254,7 +252,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, "test function", List.empty: _*) {
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
       case _ =>
         evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
     }
@@ -272,7 +270,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, "test function", List.empty: _*) {
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
       case _ =>
         evaluated(
           CaseObj(
@@ -284,7 +282,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           ))
     }
     val fooTransform =
-      NativeFunction("transformFoo", 1: Long, 260: Short, fooType, "test function", ("foo", fooType, "foo")) {
+      NativeFunction("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
         case (fooObj: CaseObj) :: Nil => evaluated(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
@@ -730,10 +728,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-      ("tx", ((txType, "Test transaction"), LazyVal(EitherT.pure(txObj)))),
-      ("alicePubKey", ((BYTESTR, "Alices test publik key"), LazyVal(EitherT.pure(ByteStr(alicePK))))),
-      ("bobPubKey", ((BYTESTR, "Bob test public key"), LazyVal(EitherT.pure(ByteStr(bobPK)))))
+    val vars: Map[String, (FINAL, LazyVal)] = Map(
+      ("tx", (txType, LazyVal(EitherT.pure(txObj)))),
+      ("alicePubKey", (BYTESTR, LazyVal(EitherT.pure(ByteStr(alicePK))))),
+      ("bobPubKey", (BYTESTR, LazyVal(EitherT.pure(ByteStr(bobPK)))))
     )
 
     val context = Monoid.combineAll(
@@ -820,8 +818,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToString(toStringLong, CONST_LONG(n)) shouldBe evaluated(n.toString)
-      Try(evalToString(toStringLong, CONST_STRING("").explicitGet())).isFailure shouldBe true
-      Try(evalToString(toStringBoolean, CONST_STRING("").explicitGet())).isFailure shouldBe true
+      evalToString(toStringLong, CONST_STRING("").explicitGet()) should produce("Can't apply (CONST_STRING) to 'toString(u: Int)'")
+      evalToString(toStringBoolean, CONST_STRING("").explicitGet()) should produce("Can't apply (CONST_STRING) to 'toString(b: Boolean)'")
     }
   }
 
@@ -831,7 +829,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteStr.fromBytes(1))
     evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteStr.fromBytes(0))
-    Try(evalToBytes(toStringBoolean, REF("unit"))).isFailure shouldBe true
+    evalToBytes(toStringBoolean, REF("unit")) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe evaluated(ByteStr(ByteBuffer.allocate(8).putLong(n).array))
@@ -842,13 +840,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction("F", 1, 258: Short, LONG, "", ("_", LONG, "")) {
+    val f = NativeFunction("F", 1, 258: Short, LONG, ("_", LONG)) {
       case _ =>
         functionEvaluated = functionEvaluated + 1
         evaluated(1L)
     }
 
-    val doubleFst = UserFunction("ID", 0, LONG, "", ("x", LONG, "")) {
+    val doubleFst = UserFunction("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
@@ -870,11 +868,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
-    val doubleFn = UserFunction("doubleFn", 0, LONG, "", ("x", LONG, "")) {
+    val doubleFn = UserFunction("doubleFn", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val subFn = UserFunction("mulFn", 0, LONG, "", ("y", LONG, ""), ("x", LONG, "")) {
+    val subFn = UserFunction("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
       FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
 
