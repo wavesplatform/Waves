@@ -43,7 +43,7 @@ object FeeValidation {
     InvokeScriptTransaction.typeId   -> 5
   )
 
-  val FeeUnits = {
+  val FeeUnits: Map[Byte, Long] = {
     val patches = Map[Byte, Long](
       CreateAliasTransaction.typeId -> 1000,  // 1 Waves
       IssueTransaction.typeId       -> 10000, // 10 Waves
@@ -162,13 +162,13 @@ object FeeValidation {
     }
 
     val extraFee = smartAccountScriptsCount * ScriptExtraFee
-    val extraRequeirements =
+    val extraRequirements =
       if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee.")
       else Chain.empty
 
     val FeeInfo(feeAssetInfo, reqs, feeAmount) = inputFee
 
-    FeeInfo(feeAssetInfo, extraRequeirements ++ reqs, feeAmount + extraFee)
+    FeeInfo(feeAssetInfo, extraRequirements ++ reqs, feeAmount + extraFee)
   }
 
   def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, FeeDetails] = {

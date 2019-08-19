@@ -161,7 +161,7 @@ class TransactionsRouteSpec
           preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 0)
         )
         val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
+        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).once()
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
@@ -205,7 +205,7 @@ class TransactionsRouteSpec
         )
 
         val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
+        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(true).once()
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
