@@ -53,7 +53,7 @@ object FeeValidation {
   }
 
   def feeUnits(blockchain: Blockchain): Map[Byte, Long] =
-    if (blockchain.isFeatureActivated(BlockchainFeatures.IncreaseIssueFee)) OldFeeUnits else FeeUnits
+    if (blockchain.isFeatureActivated(BlockchainFeatures.IncreaseIssueFee)) FeeUnits else OldFeeUnits
 
   def apply(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
     if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
