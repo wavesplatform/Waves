@@ -275,7 +275,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               ))
 
           case SetScriptTransaction =>
-            val script = Gen.script()
+            val script = Gen.script(complexity = false)
             val sender = randomFrom(accounts).get
 
             logOption(
@@ -289,9 +289,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 
           case SetAssetScriptTransaction =>
             for {
-              assetTx <- randomFrom(validIssueTxs)
-              sender  <- accounts.find(_.address == assetTx.sender.address && assetTx.script.isDefined)
-              script = Gen.script()
+              assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
+              sender <- (accounts ++ Universe.Accounts.map(_.keyPair)).find(a => a.address == assetTx.sender.address && assetTx.script.isDefined)
+              script = Gen.script(complexity = false)
               tx <- logOption(
                 SetAssetScriptTransaction.selfSigned(
                   AddressScheme.current.chainId,
