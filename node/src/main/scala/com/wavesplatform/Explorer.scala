@@ -5,13 +5,11 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.google.common.primitives.Shorts
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -19,6 +17,7 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -88,21 +87,28 @@ object Explorer extends ScorexLogging {
     "invoke-script-result"
   )
 
-  def main(args: Array[String]): Unit = {
-    if (args.isEmpty) {
+  def main(args1: Array[String]): Unit = {
+    if (args1.isEmpty) {
       System.err.println("Usage: waves explore <command> [args] [--config|-c <cfg file>]")
       return
     }
 
-    val configFileOption = args.sliding(2).collectFirst {
-      case Array("-c" | "--config", config) if config.nonEmpty =>
-        new File(config)
+    @tailrec
+    def parseArgs(buffer: Seq[String], args: Seq[String] = Nil, flags: Map[String, String] = Map.empty): (Seq[String], Map[String, String]) = buffer match {
+      case flag +: value +: rest if flag.startsWith("-") =>
+        parseArgs(rest, args, flags + (flag -> value))
+
+      case arg +: rest =>
+        parseArgs(rest, args :+ arg, flags)
+
+      case Nil =>
+        (args, flags)
     }
 
-    val settings = WavesSettings.fromRootConfig(loadConfig(configFileOption.map(ConfigFactory.parseFile)))
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
+    val (args, flags) = parseArgs(args)
+    val configFileOption = flags.collectFirst { case ("-c" | "--config", config) if config.nonEmpty => new File(config) }
+
+    val settings =  Application.loadApplicationConfig(configFileOption)
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
@@ -115,7 +121,7 @@ object Explorer extends ScorexLogging {
     try {
       @inline
       def argument(i: Int, msg: => String) = args.applyOrElse(i, throw new IllegalArgumentException(s"Argument #${i + 1} missing: $msg"))
-      val flag = argument(0, "command").toUpperCase
+      val flag                             = argument(0, "command").toUpperCase
 
       flag match {
         case "B" =>
