@@ -58,7 +58,7 @@ object FunctionalitySettings {
     minimalGeneratingBalanceAfter = 1479168000000L,
     allowTransactionsFromFutureUntil = 1479168000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
+    allowInvalidReissueInSameBlockUntilTimestamp = 1530161445559L, // 1492768800000L
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,

@@ -13,32 +13,37 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val contract = pkByAddress(firstAddress)
-  private val caller = pkByAddress(secondAddress)
+  private val contract  = pkByAddress(firstAddress)
+  private val caller    = pkByAddress(secondAddress)
   private val recipient = pkByAddress(thirdAddress)
 
-  var simpleAsset: String = ""
-  var assetSponsoredByDApp: String = ""
+  var simpleAsset: String               = ""
+  var assetSponsoredByDApp: String      = ""
   var assetSponsoredByRecipient: String = ""
-  var initCallerTxs: Long = 0
-  var initDAppTxs: Long = 0
-  var initRecipientTxs: Long = 0
-  var initCallerStateChanges: Long = 0
-  var initDAppStateChanges: Long = 0
-  var initRecipientStateChanges: Long = 0
+  var initCallerTxs: Long               = 0
+  var initDAppTxs: Long                 = 0
+  var initRecipientTxs: Long            = 0
+  var initCallerStateChanges: Long      = 0
+  var initDAppStateChanges: Long        = 0
+  var initRecipientStateChanges: Long   = 0
 
   test("prepare") {
     simpleAsset = sender.issue(contract.address, "simple", "", 9000, 0).id
     assetSponsoredByDApp = sender.issue(contract.address, "DApp asset", "", 9000, 0).id
     assetSponsoredByRecipient = sender.issue(recipient.address, "Recipient asset", "", 9000, 0, waitForTx = true).id
     sender.massTransfer(contract.address, List(Transfer(caller.address, 3000), Transfer(recipient.address, 3000)), 0.01.waves, Some(simpleAsset))
-    sender.massTransfer(contract.address, List(Transfer(caller.address, 3000), Transfer(recipient.address, 3000)), 0.01.waves, Some(assetSponsoredByDApp))
-    sender.massTransfer(recipient.address, List(Transfer(caller.address, 3000), Transfer(contract.address, 3000)), 0.01.waves, Some(assetSponsoredByRecipient))
+    sender.massTransfer(contract.address,
+                        List(Transfer(caller.address, 3000), Transfer(recipient.address, 3000)),
+                        0.01.waves,
+                        Some(assetSponsoredByDApp))
+    sender.massTransfer(recipient.address,
+                        List(Transfer(caller.address, 3000), Transfer(contract.address, 3000)),
+                        0.01.waves,
+                        Some(assetSponsoredByRecipient))
     sender.sponsorAsset(contract.address, assetSponsoredByDApp, 1)
     sender.sponsorAsset(recipient.address, assetSponsoredByRecipient, 5)
 
-    val script = ScriptCompiler.compile(
-      """
+    val script = ScriptCompiler.compile("""
         |{-# STDLIB_VERSION 3 #-}
         |{-# CONTENT_TYPE DAPP #-}
         |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -84,12 +89,12 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo = sender.transactionInfo(invokeTx.id)
-    val callerTxs = sender.transactionsByAddress(caller.address, 100)
-    val dAppTxs = sender.transactionsByAddress(contract.address, 100)
-    val txStateChanges = sender.debugStateChanges(invokeTx.id)
+    val txInfo             = sender.transactionInfo(invokeTx.id)
+    val callerTxs          = sender.transactionsByAddress(caller.address, 100)
+    val dAppTxs            = sender.transactionsByAddress(contract.address, 100)
+    val txStateChanges     = sender.debugStateChanges(invokeTx.id)
     val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
-    val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
+    val dAppStateChanges   = sender.debugStateChangesByAddress(contract.address, 100)
 
     callerTxs.length shouldBe initCallerTxs + 1
     callerTxs.length shouldBe callerStateChanges.length
@@ -119,13 +124,13 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo = sender.transactionInfo(invokeTx.id)
-    val callerTxs = sender.transactionsByAddress(caller.address, 100)
-    val dAppTxs = sender.transactionsByAddress(contract.address, 100)
-    val recipientTxs = sender.transactionsByAddress(recipient.address, 100)
-    val txStateChanges = sender.debugStateChanges(invokeTx.id)
-    val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
-    val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
+    val txInfo                = sender.transactionInfo(invokeTx.id)
+    val callerTxs             = sender.transactionsByAddress(caller.address, 100)
+    val dAppTxs               = sender.transactionsByAddress(contract.address, 100)
+    val recipientTxs          = sender.transactionsByAddress(recipient.address, 100)
+    val txStateChanges        = sender.debugStateChanges(invokeTx.id)
+    val callerStateChanges    = sender.debugStateChangesByAddress(caller.address, 100)
+    val dAppStateChanges      = sender.debugStateChangesByAddress(contract.address, 100)
     val recipientStateChanges = sender.debugStateChangesByAddress(recipient.address, 100)
 
     callerTxs.length shouldBe initCallerTxs + 2
@@ -161,13 +166,13 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo = sender.transactionInfo(invokeTx.id)
-    val callerTxs = sender.transactionsByAddress(caller.address, 100)
-    val dAppTxs = sender.transactionsByAddress(contract.address, 100)
-    val recipientTxs = sender.transactionsByAddress(recipient.address, 100)
-    val txStateChanges = sender.debugStateChanges(invokeTx.id)
-    val callerStateChanges = sender.debugStateChangesByAddress(caller.address, 100)
-    val dAppStateChanges = sender.debugStateChangesByAddress(contract.address, 100)
+    val txInfo                = sender.transactionInfo(invokeTx.id)
+    val callerTxs             = sender.transactionsByAddress(caller.address, 100)
+    val dAppTxs               = sender.transactionsByAddress(contract.address, 100)
+    val recipientTxs          = sender.transactionsByAddress(recipient.address, 100)
+    val txStateChanges        = sender.debugStateChanges(invokeTx.id)
+    val callerStateChanges    = sender.debugStateChangesByAddress(caller.address, 100)
+    val dAppStateChanges      = sender.debugStateChangesByAddress(contract.address, 100)
     val recipientStateChanges = sender.debugStateChangesByAddress(recipient.address, 100)
 
     callerTxs.length shouldBe initCallerTxs + 3
@@ -192,6 +197,25 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
+  }
+
+  test("Error on wrong tx type") {
+    val tx = nodes.head.transfer(
+      caller.address,
+      recipient.address,
+      100000000,
+      1000000,
+      None,
+      None,
+      1,
+      waitForTx = true
+    )
+
+    assertBadRequestAndMessage(
+      nodes.head.debugStateChanges(tx.id),
+      "transaction type not supported",
+      expectedStatusCode = 501
+    )
   }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges) {

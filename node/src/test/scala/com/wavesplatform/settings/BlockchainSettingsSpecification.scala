@@ -132,7 +132,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.minimalGeneratingBalanceAfter should be(1479168000000L)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1479168000000L)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
-    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(1492768800000L)
+    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(1530161445559L)
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492768800000L)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)

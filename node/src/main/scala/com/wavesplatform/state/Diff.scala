@@ -10,7 +10,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.utils.CloseableIterator
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -50,14 +49,16 @@ object AssetInfo {
   }
 }
 
-case class AssetDescription(issuer: PublicKey,
-                            name: Array[Byte],
-                            description: Array[Byte],
-                            decimals: Int,
-                            reissuable: Boolean,
-                            totalVolume: BigInt,
-                            script: Option[Script],
-                            sponsorship: Long) {
+case class AssetDescription(
+    issuer: PublicKey,
+    name: Array[Byte],
+    description: Array[Byte],
+    decimals: Int,
+    reissuable: Boolean,
+    totalVolume: BigInt,
+    script: Option[Script],
+    sponsorship: Long
+) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
@@ -124,31 +125,35 @@ object Sponsorship {
   }
 }
 
-case class Diff(transactions: Map[ByteStr, (Transaction, Set[Address])],
-                portfolios: Map[Address, Portfolio],
-                issuedAssets: Map[IssuedAsset, AssetInfo],
-                aliases: Map[Alias, Address],
-                orderFills: Map[ByteStr, VolumeAndFee],
-                leaseState: Map[ByteStr, Boolean],
-                scripts: Map[Address, Option[Script]],
-                assetScripts: Map[IssuedAsset, Option[Script]],
-                accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[IssuedAsset, Sponsorship],
-                scriptsRun: Int,
-                scriptsComplexity: Long,
-                scriptResults: Map[ByteStr, InvokeScriptResult])
+case class Diff(
+    transactions: Map[ByteStr, (Transaction, Set[Address])],
+    portfolios: Map[Address, Portfolio],
+    issuedAssets: Map[IssuedAsset, AssetInfo],
+    aliases: Map[Alias, Address],
+    orderFills: Map[ByteStr, VolumeAndFee],
+    leaseState: Map[ByteStr, Boolean],
+    scripts: Map[Address, Option[Script]],
+    assetScripts: Map[IssuedAsset, Option[Script]],
+    accountData: Map[Address, AccountDataInfo],
+    sponsorship: Map[IssuedAsset, Sponsorship],
+    scriptsRun: Int,
+    scriptsComplexity: Long,
+    scriptResults: Map[ByteStr, InvokeScriptResult]
+)
 
 object Diff {
-  def stateOps(portfolios: Map[Address, Portfolio] = Map.empty,
-               assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
-               aliases: Map[Alias, Address] = Map.empty,
-               orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-               leaseState: Map[ByteStr, Boolean] = Map.empty,
-               scripts: Map[Address, Option[Script]] = Map.empty,
-               assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
-               accountData: Map[Address, AccountDataInfo] = Map.empty,
-               sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-               scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
+  def stateOps(
+      portfolios: Map[Address, Portfolio] = Map.empty,
+      assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
+      aliases: Map[Alias, Address] = Map.empty,
+      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+      leaseState: Map[ByteStr, Boolean] = Map.empty,
+      scripts: Map[Address, Option[Script]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
+      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+  ): Diff =
     Diff(
       transactions = Map(),
       portfolios = portfolios,
@@ -165,19 +170,21 @@ object Diff {
       scriptsComplexity = 0
     )
 
-  def apply(tx: Transaction,
-            portfolios: Map[Address, Portfolio] = Map.empty,
-            assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
-            aliases: Map[Alias, Address] = Map.empty,
-            orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-            leaseState: Map[ByteStr, Boolean] = Map.empty,
-            scripts: Map[Address, Option[Script]] = Map.empty,
-            assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
-            accountData: Map[Address, AccountDataInfo] = Map.empty,
-            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-            scriptsRun: Int = 0,
-            scriptsComplexity: Long = 0,
-            scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
+  def apply(
+      tx: Transaction,
+      portfolios: Map[Address, Portfolio] = Map.empty,
+      assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
+      aliases: Map[Alias, Address] = Map.empty,
+      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+      leaseState: Map[ByteStr, Boolean] = Map.empty,
+      scripts: Map[Address, Option[Script]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
+      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+      scriptsRun: Int = 0,
+      scriptsComplexity: Long = 0,
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+  ): Diff =
     Diff(
       transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
@@ -215,15 +222,5 @@ object Diff {
         scriptResults = older.scriptResults.combine(newer.scriptResults),
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
       )
-  }
-
-  implicit class DiffOps(val diff: Diff) {
-    def iterator[A](f: Diff => Iterable[A]): CloseableIterator[A] = {
-      CloseableIterator.fromIterator(f(diff).iterator)
-    }
-
-    def reverseIterator[A](f: Diff => Iterable[A]): CloseableIterator[A] = {
-      CloseableIterator.fromIterator(f(diff).toSeq.reverseIterator)
-    }
   }
 }

@@ -57,7 +57,7 @@ class NFTBalanceSuite
 
   private val (simple, nft) = fillPortfolio(issuer, 100, 100)
 
-  private val randomTokenToTransfer = IssuedAsset(nft(Random.nextInt(nft.length)).assetId())
+  private val randomTokenToTransfer = IssuedAsset(nft(Random.nextInt(nft.length)).assetId)
 
   protected override def beforeAll(): Unit = {
     theNodes.run()
@@ -82,7 +82,7 @@ class NFTBalanceSuite
 
   "after activation" - {
     "returns only non-nft portfolio on /balance/{address}" in {
-      val expectedIds = simple map (_.assetId().toString)
+      val expectedIds = simple map (_.assetId.toString)
 
       val assertion =
         getPortfolio(node, issuer.address) map { ids =>
@@ -93,7 +93,7 @@ class NFTBalanceSuite
     }
 
     "returns issue transactions on /nft/{address}/limit/{limit}" in {
-      val expectedIds = nft.map(_.assetId().toString)
+      val expectedIds = nft.map(_.assetId.toString)
 
       val assertion =
         getNFTPage(node, issuer.address, 1000, None) map { ids =>
@@ -136,8 +136,8 @@ class NFTBalanceSuite
   "pagination" - {
     "works" in {
       val expectedIds = nft
-        .filter(_.assetId() != randomTokenToTransfer.id)
-        .map(_.assetId().toString)
+        .filter(_.assetId != randomTokenToTransfer.id)
+        .map(_.assetId.toString)
         .toSet
 
       val assertion = for {

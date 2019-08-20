@@ -135,8 +135,8 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
             )
 
           val expectedError =
-            s"Fee for TransferTransaction (${insufficientFee.fee} in ${issue.assetId().toString})" ++
-              s" does not exceed minimal value of 100000 WAVES or $minFee ${issue.assetId().toString}"
+            s"Fee for TransferTransaction (${insufficientFee.fee} in ${issue.assetId.toString})" ++
+              s" does not exceed minimal value of 100000 WAVES or $minFee ${issue.assetId.toString}"
 
           blockDiffEi should produce(expectedError)
         }

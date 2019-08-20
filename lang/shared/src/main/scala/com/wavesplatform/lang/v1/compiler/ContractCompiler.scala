@@ -166,7 +166,9 @@ object ContractCompiler {
         .traverse[CompileM, (Pos, String, List[String])] {
           case (pos, funcNamePart, argTypesPart) =>
             for {
-              argTypes <- argTypesPart.toList.traverse[CompileM, PART.VALID[String]](handleValid)
+              argTypes <- argTypesPart.toList.pure[CompileM]
+                .ensure(Generic(contract.position.start, contract.position.start, "Annotated function should not have generic parameter types"))(_.forall(_._2.isEmpty))
+                .flatMap(_.traverse(t => handleValid(t._1)))
               funcName <- handleValid(funcNamePart)
             } yield (pos, funcName.v, argTypes.map(_.v))
         }

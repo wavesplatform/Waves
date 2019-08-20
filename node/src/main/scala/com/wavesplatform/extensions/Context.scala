@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
@@ -20,7 +21,8 @@ trait Context {
   def time: Time
   def wallet: Wallet
   def utx: UtxPool
-  def broadcastTx(tx: Transaction): Unit
+
+  def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def spendableBalanceChanged: Observable[(Address, Asset)]
   def blockchainUpdated: Observable[BlockchainUpdated]
   def actorSystem: ActorSystem

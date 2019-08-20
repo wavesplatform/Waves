@@ -6,8 +6,6 @@
    2. You've checked "Make project before run"
  */
 
-import java.nio.file.Paths
-
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -24,8 +22,8 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
-lazy val langSharedSources = Paths.get("lang/shared/src/main/scala").toAbsolutePath.toFile
-lazy val langProtoModels   = Paths.get("lang/shared/src/main/protobuf").toAbsolutePath.toFile
+lazy val langSharedSources = settingKey[File]("Shared scala sources of lang module")
+lazy val langProtoModels   = settingKey[File]("Protobuf sources of lang module")
 
 lazy val versionSourceSetting = (path: String) => inConfig(Compile)(Seq(sourceGenerators += Tasks.versionSource(path)))
 
@@ -40,13 +38,17 @@ lazy val lang =
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
       resolvers += Resolver.sbtPluginRepo("releases"),
       //Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
-      cleanFiles += langSharedSources / "com" / "wavesplatform" / "protobuf",
-      inConfig(Compile)(Seq(
-        PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources,
-        PB.protoSources := Seq(langProtoModels),
-        PB.deleteTargetDirectory := false,
-        sourceGenerators += Tasks.docSource
-      ))
+      cleanFiles += langSharedSources.value / "com" / "wavesplatform" / "protobuf",
+      inConfig(Compile)(
+        Seq(
+          PB.targets += scalapb.gen(flatPackage = true) -> langSharedSources.value,
+          PB.protoSources := Seq(langProtoModels.value),
+          PB.deleteTargetDirectory := false,
+          sourceGenerators += Tasks.docSource
+        )
+      ),
+      langSharedSources := baseDirectory.value.getParentFile / "shared" / "src" / "main" / "scala",
+      langProtoModels := baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
