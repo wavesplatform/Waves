@@ -52,9 +52,9 @@ object Serialize {
       case FunctionHeader.Native(id) =>
         self.write(FH_NATIVE)
         self.writeShort(id)
-      case FunctionHeader.User(name) =>
+      case FunctionHeader.User(internalName, _) =>
         self.write(FH_USER)
-        self.writeString(name)
+        self.writeString(internalName)
     }
   }
 }

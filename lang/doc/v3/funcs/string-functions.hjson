@@ -1,0 +1,64 @@
+{
+  funcs: [
+    {
+      name: "drop"
+      params: [ "String", "Int" ]
+      doc: "Drops the first n characters of a string"
+      paramsDoc: [ "The string.", "The number n." ]
+    }
+    {
+      name: "dropRight"
+      params: [ "String", "Int" ]
+      doc: "Drops the last n characters of a string"
+      paramsDoc: [ "The string.", "The number n." ]
+    }
+    {
+      name: "indexOf"
+      params: [ "String", "String" ]
+      doc: "Returns the index of the first occurrence of a substring"
+      paramsDoc: [ "The string.", "The substring." ]
+    }
+    {
+      name: "indexOf"
+      params: [ "String", "String", "Int" ]
+      doc: "Returns the index of the first occurrence of a substring after a certain index"
+      paramsDoc: [ "The string.", "The substring.", "The index." ]
+    }
+    {
+      name: "lastIndexOf"
+      params: [ "String", "String" ]
+      doc: "Returns the index of the last occurrence of a substring"
+      paramsDoc: [ "The string.", "The substring." ]
+    }
+	 {
+      name: "lastIndexOf"
+      params: [ "String", "String", "Int" ]
+      doc: "Returns the index of the last occurrence of a substring after a certain index"
+      paramsDoc: [ "The string.", "The substring.", "The index." ]
+    }
+    {
+      name: "split"
+      params: [ "String", "String" ]
+      doc: "Splits a string delimited by a separator into a list of substrings"
+      paramsDoc: [ "The string.", "The separator." ]
+    }
+    {
+      name: "size"
+      params: [ "String" ]
+      doc: "Returns the size of a string"
+      paramsDoc: [ "The string." ]
+    }
+    {
+      name: "take"
+      params: [ "String", "Int" ]
+      doc: "Takes the first n characters from a string"
+      paramsDoc: [ "The string.", "The number n." ]
+    }
+    {
+      name: "takeRight"
+      params: [ "String", "Int" ]
+      doc: "Takes the last n characters from a string"
+      paramsDoc: [ "The string.", "The number n." ]
+    }
+  ]
+}

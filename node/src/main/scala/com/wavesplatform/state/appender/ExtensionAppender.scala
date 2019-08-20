@@ -7,14 +7,12 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
-import io.netty.channel.group.ChannelGroup
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import org.influxdb.dto.Point
@@ -24,14 +22,12 @@ import scala.util.{Left, Right}
 object ExtensionAppender extends ScorexLogging {
 
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
-            utxStorage: UtxPool,
+            utxStorage: UtxPoolImpl,
             pos: PoSSelector,
             time: Time,
-            settings: WavesSettings,
             invalidBlocks: InvalidBlockStorage,
             peerDatabase: PeerDatabase,
             miner: Miner,
-            allChannels: ChannelGroup,
             scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
       Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
@@ -43,7 +39,7 @@ object ExtensionAppender extends ScorexLogging {
               val forkApplicationResultEi = Coeval {
                 extension.view
                   .map { b =>
-                    b -> appendBlock(blockchainUpdater, utxStorage, pos, time, settings)(b).right
+                    b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b).right
                       .map {
                         _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                       }
@@ -54,7 +50,7 @@ object ExtensionAppender extends ScorexLogging {
                     case (i, declinedBlock, e) =>
                       e match {
                         case _: TxValidationError.BlockFromFuture =>
-                        case _                                  => invalidBlocks.add(declinedBlock.uniqueId, e)
+                        case _                                    => invalidBlocks.add(declinedBlock.uniqueId, e)
                       }
 
                       extension.view
@@ -115,7 +111,6 @@ object ExtensionAppender extends ScorexLogging {
       ch,
       peerDatabase,
       miner,
-      allChannels,
       s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks)}",
       s"${id(ch)} Successfully appended extension ${formatBlocks(extensionBlocks)}",
       s"${id(ch)} Error appending extension ${formatBlocks(extensionBlocks)}"

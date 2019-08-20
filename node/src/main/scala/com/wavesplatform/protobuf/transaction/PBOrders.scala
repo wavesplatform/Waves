@@ -26,7 +26,7 @@ object PBOrders {
       order.getMatcherFee.longAmount,
       order.proofs.map(_.toByteArray: ByteStr),
       if (version == 0) order.version.toByte else version.toByte,
-      Asset.fromProtoId(order.getMatcherFee.getAssetId)
+      PBAmounts.toVanillaAssetId(order.getMatcherFee.getAssetId)
     )
   }
 

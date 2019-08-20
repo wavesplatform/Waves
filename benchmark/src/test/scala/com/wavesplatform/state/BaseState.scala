@@ -6,8 +6,7 @@ import java.nio.file.Files
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
@@ -32,7 +31,7 @@ trait BaseState {
     LevelDBFactory.factory.open(new File(dir), options)
   }
 
-  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
   val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
 
   private var _richAccount: KeyPair = _

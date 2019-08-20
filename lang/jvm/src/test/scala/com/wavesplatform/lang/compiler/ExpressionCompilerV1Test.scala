@@ -52,7 +52,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("GETTER")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> (pointType -> "Test variable")), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
     expr = Expressions.GETTER(
       AnyPos,
       ref = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
@@ -65,7 +65,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("REF(OBJECT)")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> (pointType -> "Test variable")), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right((REF("p"), pointType))
@@ -74,7 +74,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("REF x = y")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> (pointType -> "Test variable")), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right((REF("p"), pointType))
@@ -450,7 +450,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.FUNC(
         AnyPos,
         Expressions.PART.VALID(AnyPos, "id"),
-        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
         Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
       ),
       Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))

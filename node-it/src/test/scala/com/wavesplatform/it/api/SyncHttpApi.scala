@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
+import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
@@ -38,12 +38,6 @@ object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-  case class NotFoundErrorMessage(status: String, details: String)
-
-  object NotFoundErrorMessage {
-    implicit val format: Format[NotFoundErrorMessage] = Json.format
-  }
-
   def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
     case Failure(e)                                                  => Assertions.fail(e)
@@ -59,17 +53,10 @@ object SyncHttpApi extends Assertions {
   }
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
-    case Failure(e @ UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
-  }
-
-  def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
-    case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting not found error")
   }
 
   val RequestAwaitTime: FiniteDuration = 50.seconds
@@ -204,11 +191,11 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
 
-    def debugStateChanges(transactionId:String): DebugStateChanges ={
+    def debugStateChanges(transactionId: String): DebugStateChanges = {
       sync(async(n).debugStateChanges(transactionId))
     }
 
-    def debugStateChangesByAddress(address:String, limit: Int): Seq[DebugStateChanges] ={
+    def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
       sync(async(n).debugStateChangesByAddress(address, limit))
     }
 
@@ -321,8 +308,11 @@ object SyncHttpApi extends Assertions {
     def getData(sourceAddress: String): List[DataEntry[_]] =
       sync(async(n).getData(sourceAddress))
 
-    def getData(sourceAddress: String, key: String): DataEntry[_] =
-      sync(async(n).getData(sourceAddress, key))
+    def getData(sourceAddress: String, regexp: String): List[DataEntry[_]] =
+      sync(async(n).getData(sourceAddress, regexp))
+
+    def getDataByKey(sourceAddress: String, key: String): DataEntry[_] =
+      sync(async(n).getDataByKey(sourceAddress, key))
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
@@ -395,6 +385,8 @@ object SyncHttpApi extends Assertions {
 
     def blockSeq(fromHeight: Int, toHeight: Int): Seq[Block] = sync(async(n).blockSeq(fromHeight, toHeight))
 
+    def blockSeqByAddress(address: String, from: Int, to: Int): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to))
+
     def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
@@ -458,14 +450,18 @@ object SyncHttpApi extends Assertions {
     private val TxInBlockchainAwaitTime = 80 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
+    private[this] def withTxIdMessage[T](transactionId: String)(f: => T): T =
+      try f
+      catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
+
     def height(implicit pos: Position): Seq[Int] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
-      sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+      withTxIdMessage(transactionId)(sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime))
 
     def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
-      sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime)
+      withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)

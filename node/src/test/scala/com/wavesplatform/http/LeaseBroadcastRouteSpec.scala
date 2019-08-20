@@ -1,15 +1,16 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.leasing.LeaseBroadcastApiRoute
+import com.wavesplatform.api.http.leasing.LeaseApiRoute
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
+import com.wavesplatform.utils.Time
+import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -23,16 +24,9 @@ class LeaseBroadcastRouteSpec
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper {
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
-
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
-
+  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(t => TransactionValidationError(GenericError("foo"), t))
+  private[this] val route               = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], utxPoolSynchronizer, stub[Time]).route
   "returns StateCheckFailed" - {
-    val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
@@ -55,7 +49,6 @@ class LeaseBroadcastRouteSpec
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("lease"), v) ~> route

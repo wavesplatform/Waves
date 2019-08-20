@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import java.io.IOException
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
@@ -15,16 +15,29 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
-import com.wavesplatform.utils.CloseableIterator
-import org.iq80.leveldb.DB
+import com.wavesplatform.utils.ScorexLogging
+import org.iq80.leveldb.{DB, Options, ReadOptions}
 
-import scala.util.control.NonFatal
+package object database extends ScorexLogging {
+  def openDB(path: String, recreate: Boolean = false): DB = {
+    log.debug(s"Open DB at $path")
+    val file = new File(path)
+    val options = new Options()
+      .createIfMissing(true)
+      .paranoidChecks(true)
 
-package object database {
+    if (recreate) {
+      LevelDBFactory.factory.destroy(file, options)
+    }
+
+    file.getAbsoluteFile.getParentFile.mkdirs()
+    LevelDBFactory.factory.open(file, options)
+  }
+
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
 
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
-    def writeByteStr(s: ByteStr) = {
+    def writeByteStr(s: ByteStr): Unit = {
       output.write(s.arr)
     }
 
@@ -164,7 +177,7 @@ package object database {
 
   def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
 
-  def writeTransactionInfo(txInfo: (Int, Transaction)) = {
+  def writeTransactionInfo(txInfo: (Int, Transaction)): Array[Byte] = {
     val (h, tx) = txInfo
     val txBytes = tx.bytes()
     ByteBuffer.allocate(4 + txBytes.length).putInt(h).put(txBytes).array()
@@ -324,6 +337,20 @@ package object database {
       ch.withContext(ctx => f(ctx.readWriteDB()))
   }
 
+  implicit class DBExt(val db: DB) extends AnyVal {
+    def readOnly[A](f: ReadOnlyDB => A): A = {
+      val snapshot = db.getSnapshot
+      try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
+      finally snapshot.close()
+    }
+
+    /**
+      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+      */
+    def readWrite[A](f: RW => A): A =
+      ch.withContext(ctx => f(ctx.readWriteDB()))
+  }
+
   implicit class DBExt(private val db: DB) extends AnyVal {
     def createContext(): DBContextHolder = new DBContextHolder(db)
 
@@ -346,56 +373,6 @@ package object database {
         iterator.seek(prefix)
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
       } finally iterator.close()
-    }
-
-    def iterateOverStream(): CloseableIterator[DBEntry] = CloseableIterator.defer {
-      import scala.collection.JavaConverters._
-      val dbIter = db.iterator()
-      CloseableIterator(
-        dbIter.asScala,
-        () => dbIter.close()
-      )
-    }
-
-    def iterateOverStream(prefix: Array[Byte], suffix: Array[Byte] = Array.emptyByteArray): CloseableIterator[DBEntry] = CloseableIterator.defer {
-      import scala.collection.JavaConverters._
-      val dbIter = db.iterator()
-      try {
-        dbIter.seek(Bytes.concat(prefix, suffix))
-        CloseableIterator(
-          dbIter.asScala.takeWhile(_.getKey.startsWith(prefix)),
-          () => dbIter.close()
-        )
-      } catch {
-        case NonFatal(err) =>
-          dbIter.close()
-          throw new IOException("Couldn't create DB iterator", err)
-      }
-    }
-
-    def iterateOverStream(prefixes: Iterable[Array[Byte]]): CloseableIterator[DBEntry] = CloseableIterator.defer {
-      import scala.collection.JavaConverters._
-      val dbIter = db.iterator()
-
-      def createIter(prefix: ByteStr, next: Seq[ByteStr]): Iterator[DBEntry] = {
-        dbIter.seek(prefix)
-        dbIter.asScala.takeWhile(_.getKey.startsWith(prefix.arr)) ++ (next match {
-          case x +: xs => createIter(x, xs)
-          case Nil => Iterator.empty
-        })
-      }
-
-      try {
-        val sortedPrefixes = prefixes.toList.map(ByteStr(_)).sorted
-        CloseableIterator(
-          if (prefixes.isEmpty) Iterator.empty else createIter(sortedPrefixes.head, sortedPrefixes.tail),
-          () => dbIter.close()
-        )
-      } catch {
-        case NonFatal(err) =>
-          dbIter.close()
-          throw new IOException("Couldn't create DB iterator", err)
-      }
     }
   }
 

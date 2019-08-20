@@ -126,7 +126,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
                                    ctxt: CTX = CTX.empty): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
-    val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
+    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =
       Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
@@ -323,7 +323,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction("ID", 0, LONG, "D", ("x", LONG, "X")) {
+    val doubleFst = UserFunction("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
@@ -515,7 +515,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       s""" arr.toInt(65528) """
     eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("arr" -> ((BYTESTR -> "max sized ByteVector") -> LazyVal(EitherT.fromEither(CONST_BYTESTR(array))))), Array())
+      Map("arr" -> (BYTESTR -> LazyVal(EitherT.fromEither(CONST_BYTESTR(array))))), Array())
     ) shouldBe Right(CONST_LONG(0x0101010101010101L))
   }
 
@@ -602,7 +602,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ str.indexOf("z", 32766) """
     eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.pure(CONST_STRING(str).explicitGet())))), Array())
+      Map("str" -> (STRING -> LazyVal(EitherT.pure(CONST_STRING(str).explicitGet())))), Array())
     ) shouldBe Right(CONST_LONG(32766L))
   }
 
@@ -677,7 +677,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ str.lastIndexOf("z", 32766) """
     eval(src, ctxt = CTX(Seq(),
-      Map("str" -> ((STRING -> "max sized String") -> LazyVal(EitherT.fromEither(CONST_STRING(str))))), Array())
+      Map("str" -> (STRING -> LazyVal(EitherT.fromEither(CONST_STRING(str))))), Array())
     ) shouldBe Right(CONST_LONG(32766L))
   }
 
@@ -992,5 +992,23 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(script(error = false)) shouldBe Right(CONST_LONG(1))
     eval(script(error = true))  shouldBe Left(message)
+  }
+
+  property("list as argument") {
+    val script =
+      """
+        | func head(a: List[Int]) = [a[2], a[0]]
+        | head([1, 2, 3]) == [3, 1]
+      """.stripMargin
+    eval(script) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("illegal generic") {
+    val script =
+      """
+        | func head(a: Generic[Int]) = a
+        | true
+      """.stripMargin
+    eval(script) should produce("Undefined generic type")
   }
 }

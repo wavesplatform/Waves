@@ -1,20 +1,20 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -26,7 +26,6 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0))
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
-    version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     master  <- accountGen
     ts      <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
@@ -53,7 +52,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     script = ContractScript(
       V3,
       DApp(
-        ByteStr.empty,
+        DAppMeta(),
         List.empty,
         List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None

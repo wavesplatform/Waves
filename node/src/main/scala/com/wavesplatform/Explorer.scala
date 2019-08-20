@@ -10,8 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{AddressId, Height, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -78,7 +77,7 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
-    val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+    val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
     val db               = openDB(settings.dbSettings.directory)
     val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
 

@@ -1,21 +1,19 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.protobuf.transaction.VanillaTransaction
+import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.execution.Scheduler
@@ -26,38 +24,46 @@ import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)(implicit sc: Scheduler)
-    extends ApiRoute
+case class TransactionsApiRoute(
+    settings: RestAPISettings,
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utx: UtxPool,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    time: Time
+) extends ApiRoute
     with BroadcastRoute
-    with CommonApiFunctions
-    with WithSettings {
+    with AuthRoute {
 
-  import com.wavesplatform.network._
-
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, (tx, isNew) => if (isNew || settings.allowTxRebroadcasting) allChannels.broadcastTx(tx, None))
+  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
+      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast
     }
 
   @Path("/address/{address}/limit/{limit}")
-  @ApiOperation(value = "List of transactions by address",
-                notes = "Get list of transactions where specified address has been involved",
-                httpMethod = "GET")
+  @ApiOperation(
+    value = "List of transactions by address",
+    notes = "Get list of transactions where specified address has been involved",
+    httpMethod = "GET"
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit",
-                           value = "Number of transactions to be returned",
-                           required = true,
-                           dataType = "integer",
-                           paramType = "path"),
+      new ApiImplicitParam(
+        name = "limit",
+        value = "Number of transactions to be returned",
+        required = true,
+        dataType = "integer",
+        paramType = "path"
+      ),
       new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
-    ))
+    )
+  )
   def addressLimit: Route = {
     (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
-      complete(transactionsByAddress(address, limit, maybeAfter))
+      extractScheduler(implicit sc => complete(transactionsByAddress(address, limit, maybeAfter)))
     }
   }
 
@@ -66,7 +72,8 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidSignature)
@@ -76,7 +83,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
           case Success(id) =>
             commonApi.transactionById(id) match {
               case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None          => complete(StatusCodes.NotFound             -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+              case None          => complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }
@@ -92,9 +99,11 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
   }
 
   @Path("/unconfirmed/size")
-  @ApiOperation(value = "Number of unconfirmed transactions",
-                notes = "Get the number of unconfirmed transactions in the UTX pool",
-                httpMethod = "GET")
+  @ApiOperation(
+    value = "Number of unconfirmed transactions",
+    notes = "Get the number of unconfirmed transactions in the UTX pool",
+    httpMethod = "GET"
+  )
   def utxSize: Route = (pathPrefix("size") & get) {
     complete(Json.obj("size" -> JsNumber(utx.size)))
   }
@@ -104,7 +113,8 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def utxTransactionInfo: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidSignature)
@@ -116,7 +126,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>
-                complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in UTX"))
+                complete(ApiError.TransactionDoesNotExist)
             }
           case _ => complete(InvalidSignature)
         }
@@ -128,46 +138,41 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "json", required = true, dataType = "string", paramType = "body", value = "Transaction data including type")
-    ))
-  def calculateFee: Route = (pathPrefix("calculateFee") & post) {
-    pathEndOrSingleSlash {
-      handleExceptions(jsonExceptionHandler) {
-        json[JsObject] { jsv =>
-          val senderPk = (jsv \ "senderPublicKey").as[String]
-          // Just for converting the request to the transaction
-          val enrichedJsv = jsv ++ Json.obj(
-            "fee"    -> 1234567,
-            "sender" -> senderPk
-          )
+    )
+  )
+  def calculateFee: Route =
+    path("calculateFee")(jsonPost[JsObject] { jsv =>
+      val senderPk = (jsv \ "senderPublicKey").as[String]
+      // Just for converting the request to the transaction
+      val enrichedJsv = jsv ++ Json.obj(
+        "fee"    -> 1234567,
+        "sender" -> senderPk
+      )
 
-          createTransaction(senderPk, enrichedJsv) { tx =>
-            commonApi
-              .calculateFee(tx)
-              .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount" -> assetAmount) }
-          }
-        }
+      createTransaction(senderPk, enrichedJsv) { tx =>
+        commonApi
+          .calculateFee(tx)
+          .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount" -> assetAmount) }
       }
-    }
-  }
+    })
 
   @Path("/sign")
   @ApiOperation(value = "Sign a transaction", notes = "Sign a transaction with the sender's private key", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "json",
-                           required = true,
-                           dataType = "string",
-                           paramType = "body",
-                           value = "Transaction data including <a href='transaction-types.html'>type</a>")
-    ))
-  def sign: Route = (pathPrefix("sign") & post & withAuth) {
-    pathEndOrSingleSlash {
-      handleExceptions(jsonExceptionHandler) {
-        json[JsObject] { jsv =>
-          TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
-        }
-      }
-    } ~ signWithSigner
+      new ApiImplicitParam(
+        name = "json",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Transaction data including <a href='transaction-types.html'>type</a>"
+      )
+    )
+  )
+  def sign: Route = (pathPrefix("sign") & withAuth) {
+    pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
+      TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
+    }) ~ signWithSigner
   }
 
   @Path("/sign/{signerAddress}")
@@ -179,15 +184,17 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "signerAddress", value = "Wallet address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "json",
-                           required = true,
-                           dataType = "string",
-                           paramType = "body",
-                           value = "Transaction data including <a href='transaction-types.html'>type</a>")
-    ))
-  def signWithSigner: Route = (pathPrefix(Segment) & handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { (signerAddress, jsv) =>
-    val result = TransactionFactory.parseRequestAndSign(wallet, signerAddress, time, jsv)
-    complete(result)
+      new ApiImplicitParam(
+        name = "json",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Transaction data including <a href='transaction-types.html'>type</a>"
+      )
+    )
+  )
+  def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
+    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, signerAddress, time, _))
   }
 
   @Path("/broadcast")
@@ -201,18 +208,9 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
         dataType = "string",
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
-    ))
-  def broadcast: Route =
-    (pathPrefix("broadcast") & post) {
-      (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { transactionJson =>
-        val result: TracedResult[ApiError, VanillaTransaction] =
-          TracedResult(TransactionFactory.fromSignedRequest(transactionJson))
-            .flatMap(commonApi.broadcastTransaction)
-            .leftMap(ApiError.fromValidationError)
-
-        complete(result)
-      }
-    }
+    )
+  )
+  def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -228,7 +226,9 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
+      implicit sc: Scheduler
+  ): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
       lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
 
@@ -249,7 +249,7 @@ case class TransactionsApiRoute(settings: RestAPISettings, wallet: Wallet, block
         .take(limit)
         .toListL
         .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
-        .runAsync
+        .runToFuture
     }
 
     for {

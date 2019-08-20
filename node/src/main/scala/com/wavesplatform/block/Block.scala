@@ -38,6 +38,8 @@ class BlockHeader(val timestamp: Long,
   protected val consensusField                    = NxtConsensusBlockField(consensusData)
   protected val supportedFeaturesField            = FeaturesBlockField(version, featureVotes)
 
+  val uniqueId: ByteStr = signerData.signature
+
   val headerJson: Coeval[JsObject] = Coeval.evalOnce(
     versionField.json() ++
       timestampField.json() ++
@@ -191,8 +193,6 @@ case class Block private[block] (override val timestamp: Long,
   val sender = signerData.generator
 
   private val transactionField = TransactionsBlockField(version.toInt, transactionData)
-
-  val uniqueId: ByteStr = signerData.signature
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val txBytesSize = transactionField.bytes().length

@@ -18,18 +18,20 @@ import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.utils.{CloseableIterator, Schedulers, ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: LevelDBWriter,
+class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
                             spendableBalanceChanged: Observer[(Address, Asset)],
                             wavesSettings: WavesSettings,
                             time: Time,
@@ -60,8 +62,18 @@ with Closeable {
   private var ngState: Option[NgState]              = Option.empty
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
 
-  private val service               = Schedulers.singleThread("last-block-info-publisher")
-  private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
+  private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
+
+  private def publishLastBlockInfo(): Unit =
+    for (id <- lastBlockId; ts <- ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)) {
+      val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
+      internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
+    }
+
+  publishLastBlockInfo()
+
+  @noinline
+  def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
@@ -69,18 +81,7 @@ with Closeable {
     ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
   }
 
-  override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
-  lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
-
-  private def blockchainReady: Boolean = {
-    val lastBlock = ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp).get
-    lastBlock + maxBlockReadinessAge > time.correctedTime()
-  }
-
-  // Store last block information in a cache
-  lastBlockId.foreach { id =>
-    internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
-  }
+  override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
@@ -233,7 +234,7 @@ with Closeable {
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
               notifyChangedSpendable(prevNgState, ngState)
-              lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
+              publishLastBlockInfo()
 
               if ((block.timestamp > time
                     .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
@@ -268,7 +269,7 @@ with Closeable {
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, blockchainReady))
+    publishLastBlockInfo()
     result
   }
 
@@ -325,6 +326,10 @@ with Closeable {
             }
         }
     }
+  }
+
+  def shutdown(): Unit = {
+    internalLastBlockInfo.onComplete()
   }
 
   private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
@@ -466,16 +471,22 @@ with Closeable {
       blockchain.blockHeaderAndSize(height)
   }
 
-  override def portfolio(a: Address): Portfolio = readLock {
-    val p = ngState.fold(Portfolio.empty)(_.bestLiquidDiff.portfolios.getOrElse(a, Portfolio.empty))
-    blockchain.portfolio(a).combine(p)
-  }
-
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
     val diffPf  = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
     val lease   = blockchain.leaseBalance(a)
     val balance = blockchain.balance(a)
     Portfolio(balance, lease, Map.empty).combine(diffPf)
+  }
+
+  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
+    ngState
+      .fold(Diff.empty)(_.bestLiquidDiff)
+      .transactions
+      .get(id)
+      .collect {
+        case (tx: TransferTransaction, _) => (height, tx)
+      }
+      .orElse(blockchain.transferById(id))
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
@@ -486,27 +497,6 @@ with Closeable {
       .map(t => (this.height, t._1))
       .orElse(blockchain.transactionInfo(id))
   }
-
-  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] =
-    readLock {
-      nftListFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, from)
-    }
-
-  override def addressTransactions(address: Address,
-                                   types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] =
-    readLock {
-      val fromNg = ngState
-        .fold(CloseableIterator.empty[(Height, Transaction, Set[Address])]) { ng =>
-          ng.bestLiquidDiff
-            .iterator(_.transactions)
-            .map {
-              case (_, (tx, addrs)) => (Height @@ this.height, tx, addrs)
-            }
-        }
-
-      addressTransactionsCompose(blockchain, fromNg)(address, types, fromId)
-    }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {
     ngState.fold(blockchain.containsTransaction(tx)) { ng =>
@@ -615,49 +605,15 @@ with Closeable {
     }
   }
 
-  private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] = readLock {
-    ngState
-      .fold(Map.empty[Address, Long]) { ng =>
-        for {
-          (address, p) <- ng.bestLiquidDiff.portfolios
-          if pred(p)
-        } yield address -> f(address)
-      }
-  }
-
-  override def assetDistribution(assetId: IssuedAsset): AssetDistribution = readLock {
-    val fromInner = blockchain.assetDistribution(assetId)
-    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, assetId)))
-
-    fromInner |+| fromNg
-  }
-
-  override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readLock {
-    blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
-  }
-
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readLock {
-    ngState.fold(blockchain.wavesDistribution(height)) { _ =>
-      val innerDistribution = blockchain.wavesDistribution(height)
-      if (height < this.height) innerDistribution
-      else {
-        innerDistribution.map(_ ++ changedBalances(_.balance != 0, balance(_)))
-      }
-    }
-  }
-
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = readLock {
-    ngState.fold(blockchain.allActiveLeases) { ng =>
+  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
+    ngState.fold(blockchain.collectActiveLeases(pf)) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
-      val fromDiff = active.keysIterator
+      val fromDiff = active.keys
         .map(id => ng.bestLiquidDiff.transactions(id)._1)
-        .collect { case lt: LeaseTransaction => lt }
+        .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
 
-      val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
-      CloseableIterator.seq(fromDiff, fromInner)
+      val fromInner = blockchain.collectActiveLeases { case lt if !canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt) }
+      fromDiff.toVector ++ fromInner
     }
   }
 
@@ -683,16 +639,6 @@ with Closeable {
         .orElse(blockchain.invokeScriptResult(txId))
     }
   }
-
-  /* override def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): CloseableIterator[(Height, Transaction)] = {
-    ngState.fold(blockchain.transactionsIterator(ofTypes, reverse)) { ng =>
-      val typeSet = ofTypes.toSet
-      val ngTransactions = ng.bestLiquidDiff.transactions.valuesIterator
-        .collect { case (_, tx, _) if typeSet.isEmpty || typeSet.contains(tx.builder) => (Height(this.height), tx) }
-
-      CloseableIterator.seq(ngTransactions, blockchain.transactionsIterator(ofTypes, reverse))
-    }
-  } */
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
     ngState flatMap { ng =>
@@ -723,6 +669,7 @@ with Closeable {
     service.shutdown()
   }
 
+  //noinspection ScalaStyle
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
@@ -732,10 +679,16 @@ with Closeable {
   }
 }
 
-object BlockchainUpdaterImpl extends ScorexLogging {
+object BlockchainUpdaterImpl extends ScorexLogging with AddressTransactions.Prov[BlockchainUpdaterImpl] with Distributions.Prov[BlockchainUpdaterImpl] {
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
       b1.reference == b2.reference &&
       b1.timestamp == b2.timestamp
+
+  def addressTransactions(bu: BlockchainUpdaterImpl): AddressTransactions =
+    new CompositeAddressTransactions(bu.blockchain, Height @@ bu.height, () => bu.bestLiquidDiff)
+
+  def distributions(bu: BlockchainUpdaterImpl): Distributions =
+    new CompositeDistributions(bu, bu.blockchain, () => bu.bestLiquidDiff)
 }

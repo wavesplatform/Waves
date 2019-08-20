@@ -1,0 +1,355 @@
+{
+  "vars" : [ {
+    "name" : "CEILING",
+    "doc" : "'CEILING' rounding mode"
+  }, {
+    "name" : "HALFUP",
+    "doc" : "'HALF_UP' rounding mode"
+  }, {
+    "name" : "HALFDOWN",
+    "doc" : "'HALF_DOWN' rounding mode"
+  }, {
+    "name" : "height",
+    "doc" : "Current blockchain height"
+  }, {
+    "name" : "Buy",
+    "doc" : "Buy OrderType"
+  }, {
+    "name" : "UP",
+    "doc" : "'UP' rounding mode"
+  }, {
+    "name" : "HALFEVEN",
+    "doc" : "'HALF_EVEN' rounding mode"
+  }, {
+    "name" : "unit",
+    "doc" : "Single instance value"
+  }, {
+    "name" : "FLOOR",
+    "doc" : "'FLOOR' rounding mode"
+  }, {
+    "name" : "DOWN",
+    "doc" : "'DOWN' rounding mode"
+  }, {
+    "name" : "tx",
+    "doc" : "Processing transaction"
+  }, {
+    "name" : "Sell",
+    "doc" : "Sell OrderType"
+  } ],
+  "funcs" : [ {
+    "name" : "keccak256",
+    "params" : [ "ByteVector" ],
+    "doc" : "256 bit Keccak/SHA-3/TIPS-202",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "blake2b256",
+    "params" : [ "ByteVector" ],
+    "doc" : "256 bit BLAKE",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "sha256",
+    "params" : [ "ByteVector" ],
+    "doc" : "256 bit SHA-2",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "sigVerify",
+    "params" : [ "ByteVector", "ByteVector", "ByteVector" ],
+    "doc" : "check signature",
+    "paramsDoc" : [ "value", "signature", "public key" ]
+  }, {
+    "name" : "toBase58String",
+    "params" : [ "ByteVector" ],
+    "doc" : "Base58 encode",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "fromBase58String",
+    "params" : [ "String" ],
+    "doc" : "Base58 decode",
+    "paramsDoc" : [ "base58 encoded string" ]
+  }, {
+    "name" : "toBase64String",
+    "params" : [ "ByteVector" ],
+    "doc" : "Base64 encode",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "fromBase64String",
+    "params" : [ "String" ],
+    "doc" : "Base64 decode",
+    "paramsDoc" : [ "base64 encoded string" ]
+  }, {
+    "name" : "transactionHeightById",
+    "params" : [ "ByteVector" ],
+    "doc" : "get height when transaction was stored to blockchain",
+    "paramsDoc" : [ "transaction Id" ]
+  }, {
+    "name" : "getInteger",
+    "params" : [ "Address|Alias", "String" ],
+    "doc" : "get data from the account state",
+    "paramsDoc" : [ "account", "key" ]
+  }, {
+    "name" : "getBoolean",
+    "params" : [ "Address|Alias", "String" ],
+    "doc" : "get data from the account state",
+    "paramsDoc" : [ "account", "key" ]
+  }, {
+    "name" : "getBinary",
+    "params" : [ "Address|Alias", "String" ],
+    "doc" : "get data from the account state",
+    "paramsDoc" : [ "account", "key" ]
+  }, {
+    "name" : "getString",
+    "params" : [ "Address|Alias", "String" ],
+    "doc" : "get data from the account state",
+    "paramsDoc" : [ "account", "key" ]
+  }, {
+    "name" : "getInteger",
+    "params" : [ "List[DataEntry]", "String" ],
+    "doc" : "Find and extract data by key",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "key" ]
+  }, {
+    "name" : "getBoolean",
+    "params" : [ "List[DataEntry]", "String" ],
+    "doc" : "Find and extract data by key",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "key" ]
+  }, {
+    "name" : "getBinary",
+    "params" : [ "List[DataEntry]", "String" ],
+    "doc" : "Find and extract data by key",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "key" ]
+  }, {
+    "name" : "getString",
+    "params" : [ "List[DataEntry]", "String" ],
+    "doc" : "Find and extract data by key",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "key" ]
+  }, {
+    "name" : "getInteger",
+    "params" : [ "List[DataEntry]", "Int" ],
+    "doc" : "Extract data by index",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "index" ]
+  }, {
+    "name" : "getBoolean",
+    "params" : [ "List[DataEntry]", "Int" ],
+    "doc" : "Extract data by index",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "index" ]
+  }, {
+    "name" : "getBinary",
+    "params" : [ "List[DataEntry]", "Int" ],
+    "doc" : "Extract data by index",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "index" ]
+  }, {
+    "name" : "getString",
+    "params" : [ "List[DataEntry]", "Int" ],
+    "doc" : "Extract data by index",
+    "paramsDoc" : [ "DataEntry list, usually tx.data", "index" ]
+  }, {
+    "name" : "addressFromPublicKey",
+    "params" : [ "ByteVector" ],
+    "doc" : "Convert public key to account address",
+    "paramsDoc" : [ "public key" ]
+  }, {
+    "name" : "addressFromString",
+    "params" : [ "String" ],
+    "doc" : "Decode account address",
+    "paramsDoc" : [ "string address representation" ]
+  }, {
+    "name" : "addressFromRecipient",
+    "params" : [ "Address|Alias" ],
+    "doc" : "Extract address or lookup alias",
+    "paramsDoc" : [ "address or alias, usually tx.recipient" ]
+  }, {
+    "name" : "assetBalance",
+    "params" : [ "Address|Alias", "ByteVector|Unit" ],
+    "doc" : "get asset balance for account",
+    "paramsDoc" : [ "account", "assetId (WAVES if none)" ]
+  }, {
+    "name" : "wavesBalance",
+    "params" : [ "Address|Alias" ],
+    "doc" : "get WAVES balance for account",
+    "paramsDoc" : [ "account" ]
+  }, {
+    "name" : "transactionById",
+    "params" : [ "ByteVector" ],
+    "doc" : "Lookup transaction",
+    "paramsDoc" : [ "transaction Id" ]
+  }, {
+    "name" : "fraction",
+    "params" : [ "Int", "Int", "Int" ],
+    "doc" : "Multiply and division with big integer intermediate representation",
+    "paramsDoc" : [ "multiplier", "multiplier", "divisor" ]
+  }, {
+    "name" : "size",
+    "params" : [ "ByteVector" ],
+    "doc" : "Size of bytes str",
+    "paramsDoc" : [ "vector" ]
+  }, {
+    "name" : "toBytes",
+    "params" : [ "Boolean" ],
+    "doc" : "Bytes array representation",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "toBytes",
+    "params" : [ "Int" ],
+    "doc" : "Bytes array representation",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "toBytes",
+    "params" : [ "String" ],
+    "doc" : "Bytes array representation",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "take",
+    "params" : [ "ByteVector", "Int" ],
+    "doc" : "Take first bytes subvector",
+    "paramsDoc" : [ "vector", "Bytes number" ]
+  }, {
+    "name" : "drop",
+    "params" : [ "ByteVector", "Int" ],
+    "doc" : "Skip first bytes",
+    "paramsDoc" : [ "vector", "Bytes number" ]
+  }, {
+    "name" : "takeRight",
+    "params" : [ "ByteVector", "Int" ],
+    "doc" : "Take vector tail",
+    "paramsDoc" : [ "vector", "taking size" ]
+  }, {
+    "name" : "dropRight",
+    "params" : [ "ByteVector", "Int" ],
+    "doc" : "Cut vectors tail",
+    "paramsDoc" : [ "vector", "cutting size" ]
+  }, {
+    "name" : "size",
+    "params" : [ "String" ],
+    "doc" : "String size in characters",
+    "paramsDoc" : [ "string" ]
+  }, {
+    "name" : "toString",
+    "params" : [ "Boolean" ],
+    "doc" : "String representation",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "toString",
+    "params" : [ "Int" ],
+    "doc" : "String representation",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "take",
+    "params" : [ "String", "Int" ],
+    "doc" : "Take string prefix",
+    "paramsDoc" : [ "string", "prefix size in characters" ]
+  }, {
+    "name" : "drop",
+    "params" : [ "String", "Int" ],
+    "doc" : "Remove string prefix",
+    "paramsDoc" : [ "string", "prefix size" ]
+  }, {
+    "name" : "takeRight",
+    "params" : [ "String", "Int" ],
+    "doc" : "Take string suffix",
+    "paramsDoc" : [ "String", "suffix size in characters" ]
+  }, {
+    "name" : "dropRight",
+    "params" : [ "String", "Int" ],
+    "doc" : "Remove string suffix",
+    "paramsDoc" : [ "string", "suffix size in characters" ]
+  }, {
+    "name" : "_isInstanceOf",
+    "params" : [ "T", "String" ],
+    "doc" : "Internal function to check value type",
+    "paramsDoc" : [ "value", "type name" ]
+  }, {
+    "name" : "isDefined",
+    "params" : [ "T|Unit" ],
+    "doc" : "Check the value is defined",
+    "paramsDoc" : [ "Option value" ]
+  }, {
+    "name" : "extract",
+    "params" : [ "T|Unit" ],
+    "doc" : "Extract value from option or fail",
+    "paramsDoc" : [ "Optional value" ]
+  }, {
+    "name" : "throw",
+    "params" : [ "String" ],
+    "doc" : "Fail script",
+    "paramsDoc" : [ "Error message" ]
+  }, {
+    "name" : "throw",
+    "params" : [ ],
+    "doc" : "Fail script",
+    "paramsDoc" : [ ]
+  }, {
+    "name" : "*",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Integer multiplication",
+    "paramsDoc" : [ "multiplier", "multiplier" ]
+  }, {
+    "name" : "/",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Integer division",
+    "paramsDoc" : [ "divisible", "divisor" ]
+  }, {
+    "name" : "%",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Modulo",
+    "paramsDoc" : [ "divisible", "divisor" ]
+  }, {
+    "name" : "+",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Integer sum",
+    "paramsDoc" : [ "term", "term" ]
+  }, {
+    "name" : "-",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Integer substitution",
+    "paramsDoc" : [ "term", "term" ]
+  }, {
+    "name" : "+",
+    "params" : [ "String", "String" ],
+    "doc" : "Limited strings concatenation",
+    "paramsDoc" : [ "prefix", "suffix" ]
+  }, {
+    "name" : "+",
+    "params" : [ "ByteVector", "ByteVector" ],
+    "doc" : "Limited byte vectors concatenation",
+    "paramsDoc" : [ "prefix", "suffix" ]
+  }, {
+    "name" : "==",
+    "params" : [ "T", "T" ],
+    "doc" : "Equality",
+    "paramsDoc" : [ "value", "value" ]
+  }, {
+    "name" : "!=",
+    "params" : [ "T", "T" ],
+    "doc" : "Inequality",
+    "paramsDoc" : [ "value", "value" ]
+  }, {
+    "name" : ">=",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Integer greater or equal comparison",
+    "paramsDoc" : [ "term", "term" ]
+  }, {
+    "name" : ">",
+    "params" : [ "Int", "Int" ],
+    "doc" : "Integer greater comparison",
+    "paramsDoc" : [ "term", "term" ]
+  }, {
+    "name" : "getElement",
+    "params" : [ "List[T]", "Int" ],
+    "doc" : "Get list element by position",
+    "paramsDoc" : [ "list", "element position" ]
+  }, {
+    "name" : "size",
+    "params" : [ "List[T]" ],
+    "doc" : "Size of list",
+    "paramsDoc" : [ "list" ]
+  }, {
+    "name" : "-",
+    "params" : [ "Int" ],
+    "doc" : "Change integer sign",
+    "paramsDoc" : [ "value" ]
+  }, {
+    "name" : "!",
+    "params" : [ "Boolean" ],
+    "doc" : "unary negation",
+    "paramsDoc" : [ "boolean" ]
+  } ]
+}

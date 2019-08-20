@@ -16,9 +16,12 @@ object Deser {
   }
 
   def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
-    val length = Shorts.fromByteArray(bytes.slice(position, position + 2))
-    require(0 <= length && length <= bytes.length, s"Invalid array size $length")
-    (bytes.slice(position + 2, position + 2 + length), position + 2 + length)
+    val from   = position + 2
+    val length = Shorts.fromByteArray(bytes.slice(position, from))
+    val to     = from + length
+    require(length >= 0, s"Array length should be non-negative, but $length found")
+    require(bytes.length >= to, s"Array length = ${bytes.length} less than slice end point index = $to")
+    (bytes.slice(from, to), to)
   }
 
   def parseArrayByLength(bytes: Array[Byte], position: Int, length: Int): (Array[Byte], Int) = {
@@ -45,9 +48,13 @@ object Deser {
   }
 
   def parseArrays(bytes: Array[Byte]): Seq[Array[Byte]] = {
-    val length = Shorts.fromByteArray(bytes.slice(0, 2))
-    require(0 <= length && length <= bytes.size, s"Invalid array size $length")
-    val r = (0 until length).foldLeft((Seq.empty[Array[Byte]], 2)) {
+    val arraysCount = Shorts.fromByteArray(bytes.slice(0, 2))
+    require(arraysCount >= 0, s"Arrays count should be non-negative, but $arraysCount found")
+    require(
+      arraysCount <= (bytes.length - 2) / 2,
+      s"Bytes with length = ${bytes.length - 2} can't contain $arraysCount array(s)"
+    )
+    val r = (0 until arraysCount).foldLeft((Seq.empty[Array[Byte]], 2)) {
       case ((acc, pos), _) =>
         val (arr, nextPos) = parseArrayWithLength(bytes, pos)
         (acc :+ arr, nextPos)

@@ -1,8 +1,14 @@
 package com.wavesplatform.api
 
+import java.util.NoSuchElementException
+import java.util.concurrent.ExecutionException
+
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.{PathMatcher, PathMatcher1}
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
@@ -10,7 +16,7 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.http.ApiMarshallers
+import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -18,11 +24,15 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, Exc
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.ScorexLogging
+import monix.execution.Scheduler
 import play.api.libs.json._
 
+import scala.concurrent.Future
+import scala.util.control.NonFatal
 import scala.util.{Success, Try}
 
-package object http extends ApiMarshallers {
+package object http extends ApiMarshallers with ScorexLogging {
   val versionReads: Reads[Byte] = {
     val defaultByteReads = implicitly[Reads[Byte]]
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)
@@ -95,4 +105,56 @@ package object http extends ApiMarshallers {
     .flatMap(str => Base58.tryDecodeWithLimit(str).toOption.map(ByteStr(_)))
 
   val AddrSegment: PathMatcher1[Address] = B58Segment.flatMap(Address.fromBytes(_).toOption)
+
+  private val jsonRejectionHandler = RejectionHandler
+    .newBuilder()
+    .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
+    .result()
+
+  private val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
+    case JsResultException(err)                                         => complete(WrongJson(errors = err))
+    case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
+    case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
+    case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
+    case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
+    case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
+  }
+
+  def jsonPost[A: Reads](f: A => ToResponseMarshallable): Route =
+    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
+      entity(as[A]) { a =>
+        complete(f(a))
+      }
+    }) ~ get(complete(StatusCodes.MethodNotAllowed))
+
+  def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
+
+  private val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
+    case e: StackOverflowError => log.error("Stack overflow error", e); complete(ApiError.Unknown)
+    case NonFatal(e)           => log.error("Uncaught error", e); complete(ApiError.Unknown)
+  }
+
+  /** Handles all [[scala.util.control.NonFatal non-fatal]] exceptions and tries to handle fatal errors.
+    *
+    * This directive can't handle __fatal__ errors from:
+    *
+    *   - Monix [[monix.eval.Task tasks]] with async boundaries:
+    *     {{{
+    *       get(complete(Task(throw new StackOverflowError()).executeAsync.runToFuture))
+    *       get(complete(Task.evalAsync(throw new StackOverflowError()).runToFuture))
+    *       get(complete(Task.deferFuture(Future(throw new StackOverflowError())).runToFuture))
+    *     }}}
+    *   - Async futures (i.e. which are not available at the time of handling):
+    *     {{{
+    *       get(complete(Future(throw new StackOverflowException())))
+    *     }}}
+    */
+  def handleAllExceptions: Directive0 =
+    Directive { inner => ctx =>
+      val handleExceptions = uncaughtExceptionHandler.andThen(_(ctx))
+      try inner(())(ctx).recoverWith(handleExceptions)(ctx.executionContext)
+      catch {
+        case thr: Throwable => uncaughtExceptionHandler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
+      }
+    }
 }
