@@ -69,7 +69,7 @@ object Explorer extends ScorexLogging {
     "addresses-for-asset-seq-nr",
     "addresses-for-asset",
     "address-transaction-ids-seq-nr", // not used now
-    "address-transaction-ids", // not used now
+    "address-transaction-ids",        // not used now
     "alias-is-disabled",
     "carry-fee-history",
     "carry-fee",
@@ -93,21 +93,22 @@ object Explorer extends ScorexLogging {
     }
 
     @tailrec
-    def parseArgs(buffer: Seq[String], args: Seq[String] = Nil, flags: Map[String, String] = Map.empty): (Seq[String], Map[String, String]) = buffer match {
-      case flag +: value +: rest if flag.startsWith("-") =>
-        parseArgs(rest, args, flags + (flag -> value))
+    def parseArgs(buffer: Seq[String], args: Seq[String] = Nil, flags: Map[String, String] = Map.empty): (Seq[String], Map[String, String]) =
+      buffer match {
+        case flag +: value +: rest if flag.startsWith("-") =>
+          parseArgs(rest, args, flags + (flag -> value))
 
-      case arg +: rest =>
-        parseArgs(rest, args :+ arg, flags)
+        case arg +: rest =>
+          parseArgs(rest, args :+ arg, flags)
 
-      case Nil =>
-        (args, flags)
-    }
+        case Nil =>
+          (args, flags)
+      }
 
-    val (args, flags) = parseArgs(argsRaw)
+    val (args, flags)    = parseArgs(argsRaw)
     val configFileOption = flags.collectFirst { case ("-c" | "--config", config) if config.nonEmpty => new File(config) }
 
-    val settings =  Application.loadApplicationConfig(configFileOption)
+    val settings = Application.loadApplicationConfig(configFileOption)
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
@@ -119,7 +120,7 @@ object Explorer extends ScorexLogging {
     log.info(s"Blockchain height is $blockchainHeight")
     try {
       @inline
-      def argument(i: Int, msg: => String) = args.applyOrElse(i, throw new IllegalArgumentException(s"Argument #${i + 1} missing: $msg"))
+      def argument(i: Int, msg: => String) = args.applyOrElse(i, (_: Int) => throw new IllegalArgumentException(s"Argument #${i + 1} missing: $msg"))
       val flag                             = argument(0, "command").toUpperCase
 
       flag match {
@@ -181,12 +182,14 @@ object Explorer extends ScorexLogging {
           for (id <- BigInt(1) to lastAddressId.getOrElse(BigInt(0))) {
             val k       = Keys.idToAddress(id)
             val address = k.parse(db.get(k.keyBytes))
-            result.compute(address,
-                           (_, prev) =>
-                             prev match {
-                               case null    => 1
-                               case notNull => 1 + notNull
-                           })
+            result.compute(
+              address,
+              (_, prev) =>
+                prev match {
+                  case null    => 1
+                  case notNull => 1 + notNull
+                }
+            )
           }
 
           for ((k, v) <- result.asScala if v > 1) {
@@ -223,7 +226,7 @@ object Explorer extends ScorexLogging {
                 maybePrev match {
                   case null => Stats(1, entry.getKey.length, entry.getValue.length)
                   case prev => Stats(prev.entryCount + 1, prev.totalKeySize + entry.getKey.length, prev.totalValueSize + entry.getValue.length)
-              }
+                }
             )
           }
           iterator.close()
