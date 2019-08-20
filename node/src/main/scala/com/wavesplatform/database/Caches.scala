@@ -136,7 +136,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long
 
-  protected val assetHNCache: LoadingCache[IssuedAsset, Option[(Height, TxNum)]] = cache(dbSettings.maxCacheSize, loadAssetHN)
+  private[database] val assetHNCache: LoadingCache[IssuedAsset, Option[(Height, TxNum)]] = cache(dbSettings.maxCacheSize, loadAssetHN)
   protected def loadAssetHN(asset: IssuedAsset): Option[(Height, TxNum)]
   protected val assetDescriptionCache: LoadingCache[IssuedAsset, Option[(AssetDescription, (Height, TxNum))]] =
     cache(dbSettings.maxCacheSize, loadAssetDescription)

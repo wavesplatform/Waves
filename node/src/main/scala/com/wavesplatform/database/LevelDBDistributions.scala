@@ -1,72 +1,57 @@
 package com.wavesplatform.database
 
-import cats.effect.Resource
+import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionPage, Portfolio}
+import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionPage, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.Paged
-import monix.eval.Task
 import monix.reactive.Observable
 
 private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends Distributions {
-  import LevelDBWriter._
-  import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
   import ldb._
 
   def portfolio(a: Address): Portfolio =
     portfolioCache.get(a, () => loadPortfolio(a))
 
-  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    def openIterator() = readOnlyNoClose { (snapshot, db) =>
-      def issueTxIterator = {
-        val assetIds = db
-          .get(Keys.addressId(address))
-          .fold(Seq.empty[IssuedAsset]) { id =>
-            val addressId = AddressId @@ id
-            db.get(Keys.assetList(addressId))
-          }
+  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = readOnly { case db =>
+    val assetIdStream = db
+      .get(Keys.addressId(address))
+      .map(assetBalanceIterator(db, _))
+      .getOrElse(Nil)
+      .map { case ((asset, _), _) => asset }
+      .distinct
+      .reverse
 
-        assetIds.iterator
-          .flatMap(ia => transactionInfo(ia.id).map(_._2))
-          .collect {
-            case itx: IssueTransaction if itx.isNFT => itx
-          }
+    val issueTxStream = assetIdStream
+      .flatMap(ia => transactionInfo(ia.id).map(_._2))
+      .collect {
+        case itx: IssueTransaction if itx.isNFT => itx
       }
 
-      val result = from
-        .flatMap(ia => transactionInfo(ia.id))
-        .fold(issueTxIterator) {
-          case (_, afterTx) =>
-            issueTxIterator
-              .dropWhile(_.id() != afterTx.id())
-              .drop(1)
-        }
+   val result = from
+      .flatMap(ia => transactionInfo(ia.id))
+      .fold(issueTxStream) {
+        case (_, afterTx) =>
+          issueTxStream
+            .dropWhile(_.id() != afterTx.id())
+            .drop(1)
+      }
 
-      (result, snapshot)
-    }
-
-    val resource = Resource(Task {
-      val (iter, snapshot) = openIterator()
-      (iter, Task(snapshot.close()))
-    })
-    Observable.fromIterator(resource)
+    Observable.fromIterable(result)
   }
 
   override def assetDistribution(asset: IssuedAsset): AssetDistribution = readOnly { db =>
+    val (issueH, issueN) = getAssetHN(asset)
+
     val dst = (for {
-      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(asset))).par
-      addressId <- db.get(Keys.addressesForAsset(asset, seqNr)).par
-      actualHeight <- db
-        .get(Keys.assetBalanceHistory(addressId, asset))
-        .filterNot(_ > height)
-        .headOption
-      balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-      if balance > 0
+      addressId <- db
+        .iterateToSeq(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))(e => AddressId.fromBytes(e.getKey.takeRight(4)))
+      balance <- loadBalanceForAssetHN(db)(addressId, issueH, issueN) if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
     AssetDistribution(dst)
@@ -76,38 +61,34 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
-    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
-
-    lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
-
-    def takeAfter(s: Seq[BigInt], a: Option[BigInt]): Seq[BigInt] = {
-      a match {
-        case None    => s
-        case Some(v) => s.dropWhile(_ != v).drop(1)
-      }
-    }
-
-    lazy val addressIds: Seq[BigInt] = {
-      val all = for {
-        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(asset))
-        addressId <- db
-          .get(Keys.addressesForAsset(asset, seqNr))
-      } yield addressId
-
-      takeAfter(all, maybeAddressId)
-    }
-
-    lazy val distribution: Stream[(Address, Long)] =
-      for {
-        addressId <- addressIds.toStream
-        history = db.get(Keys.assetBalanceHistory(addressId, asset))
-        actualHeight <- history.filterNot(_ > height).headOption
-        balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-        if balance > 0
-      } yield db.get(Keys.idToAddress(addressId)) -> balance
+    lazy val (issueH, issueN) = getAssetHN(asset)
 
     lazy val page: AssetDistributionPage = {
-      val dst = distribution.take(count + 1)
+      val addressIds: Seq[AddressId] = {
+        def takeAfter(s: Seq[AddressId], a: Option[AddressId]): Seq[AddressId] = {
+          a match {
+            case None    => s
+            case Some(v) => s.dropWhile(_ != v).drop(1)
+          }
+        }
+
+        val all = db
+          .iterateToSeq(Bytes.concat(Shorts.toByteArray(Keys.AddressesForAssetPrefix), Keys.heightWithNum(issueH, issueN)))(e => AddressId.fromBytes(e.getKey.takeRight(AddressId.Bytes)))
+
+        val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
+        takeAfter(all, maybeAddressId)
+      }
+
+      val distribution: Seq[(Address, Long)] =
+        for {
+          addressId <- addressIds.toStream
+          balance <- db
+            .lastValue(Keys.AssetBalancePrefix, Bytes.concat(AddressId.toBytes(addressId), Keys.heightWithNum(issueH, issueN)), height)
+            .map(e => Longs.fromByteArray(e.getValue))
+            .filter(_ > 0)
+        } yield db.get(Keys.idToAddress(addressId)) -> balance
+
+      val dst = distribution.take(count + 1).toStream
 
       val hasNext = dst.length > count
       val items   = if (hasNext) dst.init else dst
@@ -115,10 +96,10 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
 
       val result: Paged[Address, AssetDistribution] =
         Paged(hasNext, lastKey, AssetDistribution(items.toMap))
-
       AssetDistributionPage(result)
     }
 
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
     Either
       .cond(
         height > canGetAfterHeight,
@@ -127,18 +108,31 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
       )
   }
 
+  private[this] def getAssetHNOption(asset: IssuedAsset): Option[(Height, TxNum)] = {
+    assetHNCache.get(asset)
+  }
+
+  private[this] def getAssetHN(asset: IssuedAsset): (Height, TxNum) = {
+    getAssetHNOption(asset).getOrElse((Height @@ 0, TxNum @@ 0.toShort))
+  }
+
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
-    def createMap() =
-      (for {
-        seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-        addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-        history = db.get(Keys.wavesBalanceHistory(addressId))
-        actualHeight <- history.partition(_ > height)._2.headOption
-        balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
-        if balance > 0
-      } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+    def createMap() = {
+      val balances = db.iterateToSeq(Shorts.toByteArray(Keys.WavesBalancePrefix)) { e =>
+        val (_, addressId, _, height) = Keys.parseAddressBytesHeight(e.getKey)
+        (addressId, height) -> Longs.fromByteArray(e.getValue)
+      }
+
+      val byAddressId = balances.foldLeft(Map.empty[AddressId, Long]) {
+        case (map, ((addressId, h), balance)) =>
+          if (h <= height) map + (addressId -> balance)
+          else map
+      }
+
+      byAddressId.map(kv => db.get(Keys.idToAddress(kv._1)) -> kv._2)
+    }
 
     Either.cond(
       height > canGetAfterHeight,
@@ -147,23 +141,30 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
     )
   }
 
-  private[this] def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      asset <- db.get(Keys.assetList(addressId))
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+  private def loadFullPortfolio(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
+    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+      val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
+      val (txH, txN)    = Keys.parseHeightNum(bs)
+      val tx            = getTransactionByHN(txH, txN)
+      map + (IssuedAsset(tx.id()) -> Longs.fromByteArray(e.getValue))
+    }
   )
 
   private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      issuedAsset <- db.get(Keys.assetList(addressId))
-      asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
+    assets = readFromStartForAddress(db)(Keys.AssetBalancePrefix, addressId).foldLeft(Map.empty[IssuedAsset, Long]) { (map, e) =>
+      val (_, _, bs, _) = Keys.parseAddressBytesHeight(e.getKey)
+      val (txH, txN)    = Keys.parseHeightNum(bs)
+      val tx            = getTransactionByHN(txH, txN)
+      val isNFT = tx match {
+        case it: IssueTransaction => it.isNFT
+        case _                    => false
       }
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+      if (isNFT) map else map + (IssuedAsset(tx.id()) -> Longs.fromByteArray(e.getValue))
+    }
   )
 
-  private[this] def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    val excludeNFT = ldb.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
+  override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
+    val excludeNFT = this.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
 
     addressId(address).fold(Portfolio.empty) { addressId =>
       if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)

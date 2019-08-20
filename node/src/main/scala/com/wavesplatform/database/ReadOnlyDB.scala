@@ -1,10 +1,12 @@
 package com.wavesplatform.database
 
+import com.google.common.primitives.Shorts
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
 import org.iq80.leveldb.{DB, DBIterator, ReadOptions}
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 
 class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
   def get[V](key: Key[V]): V = {
@@ -30,7 +32,11 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
 
-  def iterateOverStream(prefixes: Iterable[Array[Byte]]): CloseableIterator[DBEntry] = db.iterateOverStream(prefixes)
+  def iterateToSeq[T](prefix: Array[Byte])(f: DBEntry => T): Seq[T] = {
+    val buffer = new ArrayBuffer[T]()
+    iterateOver(prefix)(e => buffer += f(e))
+    buffer
+  }
 
   def lastValue(prefix: Short, bytes: Array[Byte], height: Int): Option[DBEntry] = {
     val stableBytes = Bytes.concat(

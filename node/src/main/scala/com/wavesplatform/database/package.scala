@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Bytes, Ints, Shorts}
+import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,7 +16,7 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.{DB, Options, ReadOptions}
+import org.iq80.leveldb.{DB, Options, ReadOptions, Snapshot}
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -309,21 +309,6 @@ package object database extends ScorexLogging {
   }
 
   implicit class DBContextHolderExt(private val ch: DBContextHolder) extends AnyVal {
-    def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = {
-      val ctx = new SynchronizedDBContext(ch.db)
-      ctx.incCounter()
-      try {
-        val iterator = f(ctx.readOnlyDB())
-        CloseableIterator(iterator, { () =>
-          iterator.close()
-          ctx.close()
-        })
-      } catch { case NonFatal(exc) =>
-        ctx.close(successful = false)
-        throw exc
-      }
-    }
-
     def readOnly[A](f: ReadOnlyDB => A): A =
       ch.withContext { ctx =>
         val db = ctx.readOnlyDB()
@@ -337,29 +322,20 @@ package object database extends ScorexLogging {
       ch.withContext(ctx => f(ctx.readWriteDB()))
   }
 
-  implicit class DBExt(val db: DB) extends AnyVal {
-    def readOnly[A](f: ReadOnlyDB => A): A = {
-      val snapshot = db.getSnapshot
-      try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
-      finally snapshot.close()
-    }
-
-    /**
-      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
-      */
-    def readWrite[A](f: RW => A): A =
-      ch.withContext(ctx => f(ctx.readWriteDB()))
-  }
 
   implicit class DBExt(private val db: DB) extends AnyVal {
     def createContext(): DBContextHolder = new DBContextHolder(db)
 
     // Compatibility
-    def readOnlyStream[A](f: ReadOnlyDB => CloseableIterator[A]): CloseableIterator[A] = createContext().readOnlyStream(f)
-
     def readOnly[A](f: ReadOnlyDB => A): A = createContext().readOnly(f)
 
     def readWrite[A](f: RW => A): A = createContext().readWrite(f)
+
+    def readOnlyNoClose[A](f: (ReadOnlyDB, Snapshot) => A): A = {
+      val snapshot = db.getSnapshot
+      val ro = new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot))
+      f(ro, snapshot)
+    }
 
     def get[A](key: Key[A]): A    = key.parse(db.get(key.keyBytes))
     def has(key: Key[_]): Boolean = db.get(key.keyBytes) != null

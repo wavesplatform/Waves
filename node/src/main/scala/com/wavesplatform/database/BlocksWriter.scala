@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import java.io._
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
+import cats.effect.Resource
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
@@ -14,7 +15,8 @@ import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.{Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.{CloseableIterator, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Coeval
 import monix.execution.Scheduler
 
 import scala.collection.concurrent.TrieMap
@@ -97,12 +99,12 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
   }
 
   // Not really safe
-  def blocksIterator(): CloseableIterator[Block] = {
-    val (inMemBlocks, endOffset) = locked(_.readLock()) {
+  def blocksIterator(): Resource[Coeval, Iterator[Block]] = {
+    lazy val (inMemBlocks, endOffset) = locked(_.readLock()) {
       (this.blocks.toVector.sortBy(_._1).map(_._2._1), this.lastOffset)
     }
 
-    val protoBlocks = Try(dbContext.db.get(Keys.blockOffset(1))) match {
+    lazy val (protoBlocks, closeF) = Try(dbContext.db.get(Keys.blockOffset(1))) match {
       case Success(startOffset) =>
         unlockedRead(startOffset, close = false) { input =>
           def createIter(offset: Long): Iterator[PBBlock] = {
@@ -112,17 +114,17 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
             } else Iterator.empty
           }
 
-          CloseableIterator(
-            createIter(startOffset) ++ inMemBlocks,
-            () => input.close()
-          )
+          (createIter(startOffset) ++ inMemBlocks, Coeval.evalOnce(input.close()))
         }
 
       case Failure(_) =>
-        CloseableIterator.fromIterator(inMemBlocks.iterator)
+        (inMemBlocks.iterator, Coeval())
     }
 
-    protoBlocks.map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
+    Resource(Coeval {
+      val iter = protoBlocks.map(PBBlocks.vanilla(_, unsafe = true).explicitGet())
+      (iter, closeF)
+    })
   }
 
   def deleteBlock(h: Height, transactions: Seq[TransactionId]): Unit =
@@ -154,8 +156,8 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
         (height, num)
       }(v => (v._1, v._2))
 
-  def getTransactionsByHN(hn: (Height, TxNum)*): CloseableIterator[(Height, TxNum, Transaction)] = {
-    val (inMemTxs, endOffset) = locked(_.readLock()) {
+  def getTransactionsByHN(hn: (Height, TxNum)*): Resource[Coeval, Iterator[(Height, TxNum, Transaction)]] = {
+    lazy val (inMemTxs, endOffset) = locked(_.readLock()) {
       val heightNumSet = hn.toSet
       (this.transactions.values
          .collect { case (h, n, tx) if heightNumSet.contains(h -> n) => (h, n, toTransaction(tx)) }
@@ -164,7 +166,7 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
        this.lastOffset)
     }
 
-    val fileTxs = dbContext.readOnlyStream(db =>
+    lazy val (fileTxs, closeF) = dbContext.readOnlyNoClose(db =>
       unlockedRead(0L, close = false) { input =>
         var currentOffset = 0L
 
@@ -208,10 +210,13 @@ private[database] final class BlocksWriter(dbContext: DBContextHolder, dbSetting
             }
         }
 
-        CloseableIterator(iterator, () => input.close())
+        (iterator, () => input.close())
     })
 
-    fileTxs ++ inMemTxs
+    Resource(Coeval {
+      val iter = fileTxs ++ inMemTxs
+      (iter, Coeval.evalOnce(closeF()))
+    })
   }
 
   def getTransaction(id: TransactionId): (Height, TxNum, Transaction) =
