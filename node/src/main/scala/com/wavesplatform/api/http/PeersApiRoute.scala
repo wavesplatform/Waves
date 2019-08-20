@@ -15,13 +15,13 @@ import play.api.libs.json._
 import scala.collection.JavaConverters._
 
 @Path("/peers")
-@Api(value = "/peers", description = "Get info about peers", position = 2)
+@Api(value = "/peers")
 case class PeersApiRoute(settings: RestAPISettings,
                          connectToPeer: InetSocketAddress => Unit,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo])
     extends ApiRoute
-    with WithSettings {
+    with AuthRoute {
 
   import PeersApiRoute._
 
@@ -89,8 +89,8 @@ case class PeersApiRoute(settings: RestAPISettings,
         dataType = "com.wavesplatform.api.http.ConnectReq"
       )
     ))
-  def connect: Route = (path("connect") & post & withAuth) {
-    json[ConnectReq] { req =>
+  def connect: Route = (path("connect") & withAuth) {
+    jsonPost[ConnectReq] { req =>
       val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
       connectToPeer(add)
 

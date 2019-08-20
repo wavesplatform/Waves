@@ -192,6 +192,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
     val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, version = 2, waitForTx = true).id
+    nodes.waitForHeightAriseAndTxPresent(tx)
 
     nodes.rollback(height)
     nodes.waitForSameBlockHeadesAt(height)
