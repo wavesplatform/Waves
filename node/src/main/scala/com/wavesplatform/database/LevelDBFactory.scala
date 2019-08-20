@@ -1,4 +1,4 @@
-package com.wavesplatform.db
+package com.wavesplatform.database
 
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DBFactory

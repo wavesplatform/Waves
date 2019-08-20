@@ -16,8 +16,7 @@ import play.api.libs.json._
 @Path("/blocks")
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
-    extends ApiRoute
-    with WithSettings {
+    extends ApiRoute with CommonApiFunctions {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
   private[this] val commonApi           = new CommonBlocksApi(blockchain)
 
@@ -55,12 +54,6 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
           }
     })
 
-  @Path("/child/{signature}")
-  @ApiOperation(value = "Child block", notes = "Get successor of specified block", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
-    ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
       val childJson = for ((child, height) <- commonApi.childBlock(block.uniqueId))
@@ -233,7 +226,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
           .toOption
           .toRight(InvalidSignature)
 
-        block <- commonApi.blockBySignature(blockId)
+        block <- commonApi.blockBySignature(blockId).toRight(BlockDoesNotExist)
       } yield block.json().addBlockFields(block.uniqueId)
 
       complete(result)

@@ -7,47 +7,49 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.utils.{CloseableIterator, Paged}
+import com.wavesplatform.utils.Paged
+import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
 
+import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
-  def nftListFromDiff(b: Blockchain, d: Option[Diff])(address: Address, after: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = {
+  private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
+      address: Address,
+      maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = {
 
     def nonZeroBalance(asset: IssuedAsset): Boolean = {
       val balanceFromDiff = for {
-        diff      <- d
+        diff      <- maybeDiff
         portfolio <- diff.portfolios.get(address)
         balance   <- portfolio.assets.get(asset)
       } yield balance
 
       !balanceFromDiff.exists(_ < 0)
     }
-
-    def transactionFromDiff(d: Diff, id: ByteStr): Option[Transaction] = {
-      d.transactions.get(id).map(_._2)
+    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
+      diff.transactions.get(id).map(_._2)
     }
 
-    def assetStreamFromDiff(d: Diff): Iterator[IssuedAsset] = {
-      d.portfolios
+    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
+      diff.portfolios
         .get(address)
-        .toIterator
-        .flatMap(_.assets.keysIterator)
-
+        .toIterable
+        .flatMap(_.assets.keys)
     }
 
-    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Iterator[IssueTransaction] = {
-      after
+    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
+      maybeAfter
         .fold(assetStreamFromDiff(diff)) { after =>
           assetStreamFromDiff(diff)
             .dropWhile(_ != after)
@@ -56,59 +58,50 @@ package object state {
         .filter(nonZeroBalance)
         .map { asset =>
           transactionFromDiff(diff, asset.id)
-            .orElse(b.transactionInfo(asset.id).map(_._2))
+            .orElse(blockchain.transactionInfo(asset.id).map(_._2))
         }
         .collect {
           case Some(itx: IssueTransaction) if itx.isNFT => itx
         }
     }
 
-    def nftFromBlockchain: CloseableIterator[IssueTransaction] =
-      b.nftList(address, after)
+    def nftFromBlockchain: Observable[IssueTransaction] =
+      distr
+        .nftObservable(address, maybeAfter)
         .filter { itx =>
-          val asset = IssuedAsset(itx.assetId())
-
+          val asset = IssuedAsset(itx.assetId)
           nonZeroBalance(asset)
         }
 
-    d.fold(b.nftList(address, after)) { d =>
-      after match {
-        case None                                         => nftFromDiff(d, after) ++ nftFromBlockchain
-        case Some(asset) if d.issuedAssets contains asset => nftFromDiff(d, after) ++ nftFromBlockchain
+    maybeDiff.fold(nftFromBlockchain) { diff =>
+      maybeAfter match {
+        case None                                         => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
+        case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
         case _                                            => nftFromBlockchain
       }
     }
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsFromDiff(b: Blockchain, d: Option[Diff])(address: Address,
-                                                                  types: Set[TransactionParser],
-                                                                  fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = {
+  def addressTransactionsCompose(at: AddressTransactions, fromDiffIter: Observable[(Height, Transaction, Set[Address])])(
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
-    def transactionsFromDiff(d: Diff): Iterator[(Int, Transaction, Set[Address])] =
-      d.transactions.values.toSeq.reverseIterator
-
-    def withPagination(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction, Set[Address])] =
+    def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {
         case None     => txs
         case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: Iterator[(Int, Transaction, Set[Address])]): Iterator[(Int, Transaction)] =
+    def withFilterAndLimit(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] =
       txs
         .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
 
-    def transactions: Diff => Iterator[(Int, Transaction)] =
-      withFilterAndLimit _ compose withPagination compose transactionsFromDiff
-
-    d.fold(b.addressTransactions(address, types, fromId)) { diff =>
-      fromId match {
-        case Some(id) if !diff.transactions.contains(id) => b.addressTransactions(address, types, fromId)
-        case _ =>
-          val diffTxs = transactions(diff).map(kv => (Height(kv._1), kv._2))
-          CloseableIterator.seq(diffTxs, b.addressTransactions(address, types, None))
-      }
-    }
+    Observable(
+      withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
+      at.addressTransactionsObservable(address, types, fromId)
+    ).concat
   }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
@@ -163,20 +156,22 @@ package object state {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val block       = blockchain.blockAt(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
+      val (block, _)  = blockchain.blockHeaderAndSize(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, block.uniqueId)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
-    def aliasesOfAddress(address: Address): CloseableIterator[Alias] =
-      blockchain
-        .addressTransactions(address, TransactionParsers.forTypes(CreateAliasTransaction.typeId), None)
-        .collect { case (_, a: CreateAliasTransaction) => a.alias }
+    def aliasesOfAddress(address: Address): Seq[Alias] = {
+      import monix.execution.Scheduler.Implicits.global
 
-    def activeLeases(address: Address): CloseableIterator[(Int, LeaseTransaction)] =
       blockchain
-        .addressTransactions(address, TransactionParsers.forTypes(LeaseTransaction.typeId), None)
-        .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
+        .addressTransactionsObservable(address, Set(CreateAliasTransactionV1, CreateAliasTransactionV2), None)
+        .collect {
+          case (_, a: CreateAliasTransaction) => a.alias
+        }
+        .toListL
+        .runSyncUnsafe(Duration.Inf)
+    }
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain

@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
+import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory, TxValidationError}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -44,10 +44,10 @@ import scala.util.Success
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with WithSettings {
+    with AuthRoute {
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
-  private[this] val commonAssetsApi = new CommonAssetsApi(blockchain)
+  private[this] val commonAssetsApi  = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {
     val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
@@ -56,7 +56,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ nft ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
+      balance ~ balances ~ nft ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ deprecatedRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -65,7 +65,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def balance: Route =
     (get & path("balance" / Segment / Segment)) { (address, assetId) =>
       complete(balanceJson(address, assetId))
@@ -75,8 +76,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     val (asset, height, limit, maybeAfter) = params
 
     val distributionTask = Task.eval(
-      blockchain
-        .assetDistributionAtHeight(asset, height, limit, maybeAfter)
+      blockchain.assetDistributionAtHeight(asset, height, limit, maybeAfter)
     )
 
     distributionTask.map {
@@ -91,7 +91,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def balanceDistribution: Route =
     (get & path(Segment / "distribution")) { (assetParam) =>
       val assetEi = AssetsApiRoute
@@ -128,7 +129,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "limit", value = "Number of addresses to be returned", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "after", value = "address to paginate after", required = false, dataType = "string", paramType = "query")
-    ))
+    )
+  )
   def balanceDistributionAtHeight: Route =
     (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
       (assetParam, heightParam, limitParam, afterParam) =>
@@ -157,7 +159,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def balances: Route =
     (get & path("balance" / Segment)) { address =>
       complete(fullAccountAssetsInfo(address))
@@ -169,7 +172,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     Array(
       new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    ))
+    )
+  )
   def details: Route =
     (get & path("details" / Segment)) { id =>
       parameters('full.as[Boolean].?) { full =>
@@ -184,73 +188,87 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
-    ))
-  def nft: Route = extractScheduler(implicit sc => (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
-    val response: Either[ApiError, Future[JsArray]] = for {
-      addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-      limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
-      maybeAfter <- maybeAfterParam match {
-        case Some(v) =>
-          ByteStr
-            .decodeBase58(v)
-            .fold(
-              _ => Left(CustomValidationError(s"Unable to decode asset id $v")),
-              id => Right(Some(IssuedAsset(id)))
-            )
-        case None => Right(None)
-      }
-    } yield {
-      commonAccountApi
-        .portfolioNFT(addr, maybeAfter)
-        .take(limit)
-        .map(_.json())
-        .toListL
-        .map(lst => JsArray(lst))
-        .runAsyncLogErr
-    }
+    )
+  )
+  def nft: Route =
+    extractScheduler(
+      implicit sc =>
+        (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
+          val response: Either[ApiError, Future[JsArray]] = for {
+            addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
+            limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
+            maybeAfter <- maybeAfterParam match {
+              case Some(v) =>
+                ByteStr
+                  .decodeBase58(v)
+                  .fold(
+                    _ => Left(CustomValidationError(s"Unable to decode asset id $v")),
+                    id => Right(Some(IssuedAsset(id)))
+                  )
+              case None => Right(None)
+            }
+          } yield {
+            commonAccountApi
+              .portfolioNFT(addr, maybeAfter)
+              .take(limit)
+              .map(_.json())
+              .toListL
+              .map(lst => JsArray(lst))
+              .runAsyncLogErr
+          }
 
-    complete(response)
-  })
-
-  def transfer: Route =
-    processRequest[TransferRequests](
-      "transfer", { req =>
-        req.eliminate(
-          x => broadcastIfSuccess(TransactionFactory.transferAssetV1(x, wallet, time)),
-          _.eliminate(
-            x => broadcastIfSuccess(TransactionFactory.transferAssetV2(x, wallet, time)),
-            _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
-          )
-        )
-      }
+          complete(response)
+        }
     )
 
-  def massTransfer: Route =
-    processRequest("masstransfer", (t: MassTransferRequest) => broadcastIfSuccess(TransactionFactory.massTransferAsset(t, wallet, time)))
-
-  def issue: Route =
-    processRequest("issue", (r: IssueV1Request) => broadcastIfSuccess(TransactionFactory.issueAssetV1(r, wallet, time)))
-
-  def reissue: Route =
-    processRequest("reissue", (r: ReissueV1Request) => broadcastIfSuccess(TransactionFactory.reissueAssetV1(r, wallet, time)))
-
-  def burnRoute: Route =
-    processRequest("burn", (b: BurnV1Request) => broadcastIfSuccess(TransactionFactory.burnAssetV1(b, wallet, time)))
-
-  def signOrder: Route =
-    processRequest("order", (order: Order) => {
+  private def deprecatedRoute: Route =
+    (path("transfer") & withAuth) {
+      broadcast[TransferRequests](
+        _.eliminate(
+          v1 => TransactionFactory.transferAssetV1(v1, wallet, time),
+          _.eliminate(v2 => TransactionFactory.transferAssetV2(v2, wallet, time), _ => Left(TxValidationError.UnsupportedTransactionType))
+        )
+      )
+    } ~ (path("masstransfer") & withAuth) {
+      broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
+    } ~ (path("issue") & withAuth) {
+      broadcast[IssueV1Request](TransactionFactory.issueAssetV1(_, wallet, time))
+    } ~ (path("reissue") & withAuth) {
+      broadcast[ReissueV1Request](TransactionFactory.reissueAssetV1(_, wallet, time))
+    } ~ (path("burn") & withAuth) {
+      broadcast[BurnV1Request](TransactionFactory.burnAssetV1(_, wallet, time))
+    } ~ (path("sponsor") & withAuth) {
+      broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
+    } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
       wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
-    })
+    }) ~ pathPrefix("broadcast")(
+      path("issue")(broadcast[SignedIssueV1Request](_.toTx)) ~
+        path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
+        path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
+        path("exchange")(broadcast[SignedExchangeRequest](_.toTx)) ~
+        path("transfer")(
+          broadcast[SignedTransferRequests](
+            _.eliminate(
+              _.toTx,
+              _.eliminate(
+                _.toTx,
+                _ => Left(TxValidationError.UnsupportedTransactionType)
+              )
+            )
+          )
+        )
+    )
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     ByteStr.decodeBase58(assetIdStr) match {
       case Success(assetId) =>
         (for {
           acc <- Address.fromString(address)
-        } yield
-          Json.obj("address" -> acc.address,
-                   "assetId" -> assetIdStr,
-                   "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, IssuedAsset(assetId)))))).left
+        } yield Json.obj(
+          "address" -> acc.address,
+          "assetId" -> assetIdStr,
+          "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, IssuedAsset(assetId))))
+        )).left
           .map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }
@@ -264,21 +282,21 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         "address" -> acc.address,
         "balances" -> JsArray(
           (for {
-            (asset @ IssuedAsset(assetId), balance) <- commonAccountApi.portfolio(acc) if balance > 0
+            (asset @ IssuedAsset(assetId), balance)                                <- commonAccountApi.portfolio(acc) if balance > 0
             CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) <- commonAssetsApi.fullInfo(asset)
-          } yield
-            Json.obj(
-              "assetId"    -> assetId,
-              "balance"    -> balance,
-              "reissuable" -> assetInfo.reissuable,
-              "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-                case 0           => JsNull
-                case sponsorship => JsNumber(sponsorship)
-              }),
-              "sponsorBalance"   -> sponsorBalance,
-              "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-              "issueTransaction" -> issueTransaction.json()
-            )).toSeq)
+          } yield Json.obj(
+            "assetId"    -> assetId,
+            "balance"    -> balance,
+            "reissuable" -> assetInfo.reissuable,
+            "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+              case 0           => JsNull
+              case sponsorship => JsNumber(sponsorship)
+            }),
+            "sponsorBalance"   -> sponsorBalance,
+            "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
+            "issueTransaction" -> issueTransaction.json()
+          )).toSeq
+        )
       )
     }).left.map(ApiError.fromValidationError)
 
@@ -320,9 +338,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         }
       )
     }).left.map(m => CustomValidationError(m))
-
-  def sponsorRoute: Route =
-    processRequest("sponsor", (req: SponsorFeeRequest) => broadcastIfSuccess(TransactionFactory.sponsor(req, wallet, time)))
 }
 
 object AssetsApiRoute {
@@ -330,12 +345,14 @@ object AssetsApiRoute {
 
   type DistributionParams = (IssuedAsset, Int, Int, Option[Address])
 
-  def validateDistributionParams(blockchain: Blockchain,
-                                 assetParam: String,
-                                 heightParam: Int,
-                                 limitParam: Int,
-                                 maxLimit: Int,
-                                 afterParam: Option[String]): Either[ValidationError, DistributionParams] = {
+  def validateDistributionParams(
+      blockchain: Blockchain,
+      assetParam: String,
+      heightParam: Int,
+      limitParam: Int,
+      maxLimit: Int,
+      afterParam: Option[String]
+  ): Either[ValidationError, DistributionParams] = {
     for {
       limit   <- validateLimit(limitParam, maxLimit)
       height  <- validateHeight(blockchain, heightParam)

@@ -6,8 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.bench.DataTestData
@@ -51,7 +50,10 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   try {
-    val state = new LevelDBWriter(db, Observer.empty(UncaughtExceptionReporter.default), wavesSettings.blockchainSettings.functionalitySettings, wavesSettings.dbSettings)
+    val state = new LevelDBWriter(db,
+                                  Observer.empty(UncaughtExceptionReporter.default),
+                                  wavesSettings.blockchainSettings.functionalitySettings,
+                                  wavesSettings.dbSettings)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {
@@ -92,7 +94,7 @@ object ExtractInfo extends App with ScorexLogging {
     val assets = nonEmptyBlocks(benchSettings.assetsFromHeight)
       .flatMap { b =>
         b.transactionData.collect {
-          case tx: IssueTransaction => tx.assetId()
+          case tx: IssueTransaction => tx.assetId
         }
       }
       .map(_.base58)

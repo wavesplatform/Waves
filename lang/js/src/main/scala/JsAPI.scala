@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
 
 import scala.scalajs.js
-import scala.scalajs.js.Any
+import scala.scalajs.js.{Any, Dictionary}
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
@@ -118,7 +118,7 @@ object JsAPI {
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
       .map(f => {
-        val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.args.toList, ver))
+        val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList, ver))
         js.Dynamic.literal(
           "name" -> f.name,
           "doc" -> funcDoc,
@@ -154,7 +154,7 @@ object JsAPI {
             "stdLibVersion" -> ver.id,
             "contentType"   -> contentType.id,
             "scriptType"    -> scriptType.id,
-            "imports"       -> imports.fileNames
+            "imports"       -> imports.fileNames.toJSArray
           )
       }
     info.fold(
@@ -166,12 +166,12 @@ object JsAPI {
   @JSExportTopLevel("compile")
   def compile(
     input:     String,
-    libraries: Map[String, String] = Map()
+    libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries, ds)
+      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds)
       compiled    <- compileScript(ds, linkedInput)
     } yield compiled
     r.fold(
@@ -243,14 +243,18 @@ object JsAPI {
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
-  val repl = Repl()
-
   @JSExportTopLevel("repl")
-  def repl(expr: String): js.Dynamic = {
-    repl.execute(expr)
-      .fold(
-        e => js.Dynamic.literal("error" -> e),
-        r => js.Dynamic.literal("result" -> r)
-      )
-  }
+  def repl(): js.Dynamic = asJs(Repl())
+
+  private def asJs(repl: Repl): js.Dynamic =
+    jObj(
+      "evaluate" -> (repl.execute _ andThen mapResult),
+      "clear"    -> repl.clear _
+    )
+
+  private def mapResult(eval: Either[String, String]): js.Dynamic =
+    eval.fold(
+      e => jObj("error" -> e),
+      r => jObj("result" -> r)
+    )
 }

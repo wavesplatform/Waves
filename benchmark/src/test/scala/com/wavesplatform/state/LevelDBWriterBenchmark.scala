@@ -7,8 +7,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
 import com.wavesplatform.transaction.Asset
@@ -18,6 +17,7 @@ import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
+import scala.concurrent.duration.Duration
 import scala.io.Codec
 
 /**
@@ -52,7 +52,8 @@ class LevelDBWriterBenchmark {
 
   @Benchmark
   def transactionByAddress_test(st: TransactionByAddressSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.addressTransactions(st.txsAddresses.random, Set.empty, 1, None).right.get)
+    import monix.execution.Scheduler.Implicits.global
+    bh.consume(st.db.addressTransactionsObservable(st.txsAddresses.random, Set.empty, None).firstL.runSyncUnsafe(Duration.Inf))
   }
 
 }

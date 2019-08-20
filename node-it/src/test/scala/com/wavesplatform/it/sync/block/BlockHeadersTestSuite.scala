@@ -65,4 +65,15 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
         header.transactionCount shouldBe block.transactions.size
     }
   }
+
+  test("blocks/address produces correct result") {
+    val miner  = nodes.head
+    val height = miner.height
+
+    val minerBlocks    = miner.blockSeqByAddress(miner.address, 1, height)
+    val nonMinerBlocks = notMiner.blockSeqByAddress(notMiner.address, 1, height)
+
+    minerBlocks.size shouldEqual (height - 1)
+    nonMinerBlocks shouldBe empty
+  }
 }

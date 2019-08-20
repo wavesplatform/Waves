@@ -10,7 +10,7 @@ import play.api.libs.json.JsObject
 class WalletRouteSpec extends RouteSpec("/wallet") with RestAPISettingsHelper with TestWallet {
   private val route = WalletApiRoute(restAPISettings, testWallet).route
 
-  private val brokenRestApiSettings = restAPISettings.copy(apiKeyHash = "InvalidAPIKeyHash", allowTxRebroadcasting = true)
+  private val brokenRestApiSettings = restAPISettings.copy(apiKeyHash = "InvalidAPIKeyHash")
   private val routeWithIncorrectKeyHash = WalletApiRoute(brokenRestApiSettings, testWallet).route
 
   routePath("/seed") - {

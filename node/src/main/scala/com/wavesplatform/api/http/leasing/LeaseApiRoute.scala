@@ -21,33 +21,44 @@ import play.api.libs.json.JsNumber
 case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with WithSettings {
+    with AuthRoute {
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
 
   override val route = pathPrefix("leasing") {
-    lease ~ cancel ~ active
+    active ~ deprecatedRoute
   }
 
-  def lease: Route = processRequest("lease", (t: LeaseV1Request) => broadcastIfSuccess(TransactionFactory.leaseV1(t, wallet, time)))
-
-  def cancel: Route = processRequest("cancel", (t: LeaseCancelV1Request) => broadcastIfSuccess(TransactionFactory.leaseCancelV1(t, wallet, time)))
+  private def deprecatedRoute: Route =
+    (path("lease") & withAuth) {
+      broadcast[LeaseV1Request](TransactionFactory.leaseV1(_, wallet, time))
+    } ~ (path("cancel") & withAuth) {
+      broadcast[LeaseCancelV1Request](TransactionFactory.leaseCancelV1(_, wallet, time))
+    } ~ pathPrefix("broadcast") {
+      path("lease")(broadcast[SignedLeaseV1Request](_.toTx)) ~
+        path("cancel")(broadcast[SignedLeaseCancelV1Request](_.toTx))
+    }
 
   @Path("/active/{address}")
   @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
-    ))
-  def active: Route = (pathPrefix("active") & get) {
+    )
+  )
+  def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
     pathPrefix(Segment) { address =>
       complete(Address.fromString(address) match {
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
-          commonAccountApi.activeLeases(a).map(_.collect {
-            case (height, leaseTransaction: LeaseTransaction) =>
-              leaseTransaction.json() + ("height" -> JsNumber(height))
-          })
+          commonAccountApi
+            .activeLeases(a)
+            .collect {
+              case (height, leaseTransaction: LeaseTransaction) =>
+                leaseTransaction.json() + ("height" -> JsNumber(height))
+            }
+            .toListL
+            .runToFuture
       })
     }
   }

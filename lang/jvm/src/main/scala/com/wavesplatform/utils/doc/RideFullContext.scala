@@ -30,18 +30,13 @@ object RideFullContext {
     override def tthis: Recipient.Address = ???
   }
 
-  def build(ver: StdLibVersion, wavesEnv: Environment = dummyEnv): CTX = {
-    val wavesCtx = WavesContext.build(directives(ver), wavesEnv)
-    val cryptoCtx = CryptoContext.build(Global, ver)
-    val pureCtx = PureContext.build(Global, ver)
+  def build(
+    ds:       DirectiveSet,
+    wavesEnv: Environment = dummyEnv
+  ): CTX = {
+    val wavesCtx = WavesContext.build(ds, wavesEnv)
+    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion)
+    val pureCtx = PureContext.build(Global, ds.stdLibVersion)
     pureCtx |+| cryptoCtx |+| wavesCtx
-  }
-
-  private def directives(v: StdLibVersion): DirectiveSet = {
-    val contentType = v match {
-      case V1 | V2 => Expression
-      case V3      => DApp
-    }
-    DirectiveSet(v, Account, contentType).explicitGet()
   }
 }

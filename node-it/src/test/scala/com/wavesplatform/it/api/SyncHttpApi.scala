@@ -191,11 +191,11 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
 
-    def debugStateChanges(transactionId:String): DebugStateChanges ={
+    def debugStateChanges(transactionId: String): DebugStateChanges = {
       sync(async(n).debugStateChanges(transactionId))
     }
 
-    def debugStateChangesByAddress(address:String, limit: Int): Seq[DebugStateChanges] ={
+    def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
       sync(async(n).debugStateChangesByAddress(address, limit))
     }
 
@@ -385,6 +385,8 @@ object SyncHttpApi extends Assertions {
 
     def blockSeq(fromHeight: Int, toHeight: Int): Seq[Block] = sync(async(n).blockSeq(fromHeight, toHeight))
 
+    def blockSeqByAddress(address: String, from: Int, to: Int): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to))
+
     def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
@@ -449,7 +451,8 @@ object SyncHttpApi extends Assertions {
     private val ConditionAwaitTime      = 5.minutes
 
     private[this] def withTxIdMessage[T](transactionId: String)(f: => T): T =
-      try f catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
+      try f
+      catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
 
     def height(implicit pos: Position): Seq[Int] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)

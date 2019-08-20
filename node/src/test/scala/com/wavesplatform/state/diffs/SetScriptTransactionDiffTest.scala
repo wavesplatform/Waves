@@ -26,7 +26,6 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0))
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
-    version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     master  <- accountGen
     ts      <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()

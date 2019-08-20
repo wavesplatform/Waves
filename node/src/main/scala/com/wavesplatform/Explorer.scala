@@ -8,7 +8,7 @@ import com.google.common.primitives.Shorts
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
+import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
