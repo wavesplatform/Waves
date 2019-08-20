@@ -92,11 +92,6 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 
         val ts = now + i
 
-        def anyAccountByAddress(address: String): Option[KeyPair] =
-          accounts
-            .find(_.address == address)
-            .orElse(Universe.Accounts.map(_.keyPair).find(_.address == address))
-
         val tx = typeGen.getRandom match {
           case IssueTransactionV2 =>
             val sender      = randomFrom(accounts).get
@@ -123,19 +118,12 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             )
 
           case TransferTransactionV2 =>
-            val useAlias  = random.nextBoolean()
-            val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
-            val sendAsset = random.nextBoolean()
-            val senderAndAssetOpt = if (sendAsset) {
-              val asset = randomFrom(validIssueTxs) orElse randomFrom(Universe.IssuedAssets)
-              asset.map(issue => {
-                val pk = accounts.find(_.publicKey == issue.sender).get
-                (pk, Some(issue.id()))
-              })
-            } else Some((randomFrom(accounts).get, None))
-            senderAndAssetOpt.flatMap {
-              case (sender, asset) =>
-                logOption(
+            (
+              for {
+                (sender, asset) <- randomSenderAndAsset(validIssueTxs)
+                useAlias = random.nextBoolean()
+                recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
+                tx <- logOption(
                   TransferTransactionV2
                     .selfSigned(
                       Asset.fromCompatId(asset),
@@ -148,47 +136,48 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                       Array.fill(random.nextInt(100))(random.nextInt().toByte)
                     )
                 )
-            }
+              } yield tx
+            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
           case ReissueTransactionV2 =>
-            val assetAndReissuableOpt =
-              randomFrom(reissuableIssueTxs).map((_, random.nextBoolean())) orElse
-                randomFrom(Universe.IssuedAssets.filter(_.reissuable)).map(asset => (asset, asset.reissuable))
-            assetAndReissuableOpt.flatMap {
-              case (assetTx, reissuable) =>
-                for {
-                  sender <- anyAccountByAddress(assetTx.sender.address)
-                  fee = assetTx.script.fold(100040000L)(_ => 100840000L)
-                  tx <- logOption(
-                    ReissueTransactionV2
-                      .selfSigned(
-                        AddressScheme.current.chainId,
-                        sender,
-                        IssuedAsset(assetTx.id()),
-                        Random.nextInt(Int.MaxValue),
-                        reissuable,
-                        fee,
-                        ts
-                      )
-                  )
-                } yield tx
-            }
+            (
+              for {
+                (assetTx, reissuable) <- randomFrom(reissuableIssueTxs).map((_, random.nextBoolean())) orElse
+                  randomFrom(Universe.IssuedAssets.filter(_.reissuable)).map(asset => (asset, asset.reissuable))
+                sender <- accountByAddress(assetTx.sender.address)
+                fee = assetTx.script.fold(100040000L)(_ => 100840000L)
+                tx <- logOption(
+                  ReissueTransactionV2
+                    .selfSigned(
+                      AddressScheme.current.chainId,
+                      sender,
+                      IssuedAsset(assetTx.id()),
+                      Random.nextInt(Int.MaxValue),
+                      reissuable,
+                      fee,
+                      ts
+                    )
+                )
+              } yield tx
+            ).logNone("There is no reissuable assets, may be you need to increase issue transaction's probability or pre-configure them")
 
           case BurnTransactionV2 =>
-            for {
-              assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
-              sender  <- anyAccountByAddress(assetTx.sender.address)
-              tx <- logOption(
-                BurnTransactionV2.selfSigned(
-                  AddressScheme.current.chainId,
-                  sender,
-                  IssuedAsset(assetTx.id()),
-                  Random.nextInt(1000),
-                  900000L,
-                  ts
+            (
+              for {
+                assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
+                sender  <- accountByAddress(assetTx.sender.address)
+                tx <- logOption(
+                  BurnTransactionV2.selfSigned(
+                    AddressScheme.current.chainId,
+                    sender,
+                    IssuedAsset(assetTx.id()),
+                    Random.nextInt(1000),
+                    900000L,
+                    ts
+                  )
                 )
-              )
-            } yield tx
+              } yield tx
+            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
           case ExchangeTransactionV1 =>
             for {
@@ -217,18 +206,24 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             } yield tx
 
           case LeaseTransactionV2 =>
-            val sender   = randomFrom(accounts).get
-            val useAlias = random.nextBoolean()
-            val recipientOpt =
-              if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
-              else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
-            recipientOpt.flatMap(recipient => logOption(LeaseTransactionV2.selfSigned(sender, 1, moreThanStandardFee * 3, ts, recipient)))
+            (
+              for {
+                sender <- randomFrom(accounts)
+                useAlias = random.nextBoolean()
+                recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
+                else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
+                tx <- logOption(LeaseTransactionV2.selfSigned(sender, 1, moreThanStandardFee * 3, ts, recipient))
+              } yield tx
+            ).logNone("Can't define recipient of transaction, check your configuration")
 
           case LeaseCancelTransactionV2 =>
-            randomFrom(activeLeaseTransactions).flatMap(lease => {
-              val sender = accounts.find(_.address == lease.sender.address).get
-              logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThanStandardFee * 3, ts))
-            })
+            (
+              for {
+                lease  <- randomFrom(activeLeaseTransactions)
+                sender <- accountByAddress(lease.sender.address)
+                tx     <- logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThanStandardFee * 3, ts))
+              } yield tx
+            ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
           case CreateAliasTransactionV2 =>
             val sender      = randomFrom(accounts).get
@@ -236,24 +231,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 500000, ts))
 
           case MassTransferTransaction =>
-            val transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
-            val transfers = for (i <- 0 to transferCount) yield {
-              val useAlias  = random.nextBoolean()
-              val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
-              val amount    = random.nextLong(500000)
-              ParsedTransfer(recipient, amount)
-            }
-            val sendAsset = random.nextBoolean()
-            val senderAndAssetOpt = if (sendAsset) {
-              val asset = randomFrom(validIssueTxs)
-              asset.map(issue => {
-                val pk = accounts.find(_.publicKey == issue.sender).get
-                (pk, Some(issue.id()))
-              })
-            } else Some((randomFrom(accounts).get, None))
-            senderAndAssetOpt.flatMap {
-              case (sender, asset) =>
-                logOption(
+            (
+              for {
+                (sender, asset) <- randomSenderAndAsset(validIssueTxs)
+                transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
+                transfers = for (_ <- 0 to transferCount) yield {
+                  val useAlias  = random.nextBoolean()
+                  val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
+                  val amount    = random.nextLong(500000)
+                  ParsedTransfer(recipient, amount)
+                }
+                tx <- logOption(
                   MassTransferTransaction
                     .selfSigned(
                       Asset.fromCompatId(asset),
@@ -264,7 +252,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                       Array.fill(random.nextInt(100))(random.nextInt().toByte)
                     )
                 )
-            }
+              } yield tx
+            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
           case DataTransaction =>
             val sender = randomFrom(accounts).get
@@ -284,14 +273,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
                 BinaryDataEntry(Random.nextString(10), ByteStr(b))
             }
             val size = 128 + data.map(_.toBytes.length).sum
-            val fee  = 100000 * (size / 1024 + 1)
+            val fee  = 500000 * (size / 1024 + 1)
             logOption(DataTransaction.selfSigned(sender, data.toList, fee, ts))
 
           case SponsorFeeTransaction =>
-            randomFrom(validIssueTxs).flatMap(assetTx => {
-              val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, ts))
-            })
+            (
+              for {
+                assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
+                sender  <- accountByAddress(assetTx.sender.address)
+                tx      <- logOption(SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, ts))
+              } yield tx
+            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
           case InvokeScriptTransaction =>
             val script   = randomFrom(settings.scripts).get
@@ -326,34 +318,37 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             )
 
           case SetScriptTransaction =>
-            val script = Gen.script(complexity = false)
-            val sender = randomFrom(accounts).get
-
-            logOption(
-              SetScriptTransaction.selfSigned(
-                sender,
-                Some(script),
-                1800000L,
-                ts
-              )
-            )
-
-          case SetAssetScriptTransaction =>
             for {
-              assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
-              sender  <- (accounts ++ Universe.Accounts.map(_.keyPair)).find(a => a.address == assetTx.sender.address && assetTx.script.isDefined)
+              sender <- randomFrom(accounts)
               script = Gen.script(complexity = false)
               tx <- logOption(
-                SetAssetScriptTransaction.selfSigned(
-                  AddressScheme.current.chainId,
+                SetScriptTransaction.selfSigned(
                   sender,
-                  IssuedAsset(assetTx.id()),
                   Some(script),
-                  100400000L,
+                  1800000L,
                   ts
                 )
               )
             } yield tx
+
+          case SetAssetScriptTransaction =>
+            (
+              for {
+                assetTx <- randomFrom(validIssueTxs ++ Universe.IssuedAssets).filter(_.script.isDefined)
+                sender  <- accountByAddress(assetTx.sender.address)
+                script = Gen.script(complexity = false)
+                tx <- logOption(
+                  SetAssetScriptTransaction.selfSigned(
+                    AddressScheme.current.chainId,
+                    sender,
+                    IssuedAsset(assetTx.id()),
+                    Some(script),
+                    100400000L,
+                    ts
+                  )
+                )
+              } yield tx
+            ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
@@ -373,6 +368,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         })
     }
 
+    log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).mapValues(_.size).mkString("\t", "\n\t", "")}")
+
     generated._1
   }
 
@@ -387,6 +384,29 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
         None
       case Right(tx) => Some(tx)
     }
+  }
+
+  private[this] def accountByAddress(address: String): Option[KeyPair] =
+    accounts
+      .find(_.address == address)
+      .orElse(Universe.Accounts.map(_.keyPair).find(_.address == address))
+
+  private[this] def randomSenderAndAsset(issueTxs: Seq[IssueTransactionV2]): Option[(KeyPair, Option[ByteStr])] =
+    if (random.nextBoolean()) {
+      (randomFrom(issueTxs) orElse randomFrom(Universe.IssuedAssets)).map { issue =>
+        val pk = (accounts ++ Universe.Accounts.map(_.keyPair)).find(_.publicKey == issue.sender).get
+        (pk, Some(issue.id()))
+      }
+    } else randomFrom(accounts).map((_, None))
+
+  private implicit class OptionExt[A](opt: Option[A]) {
+    def logNone(msg: => String): Option[A] =
+      opt match {
+        case None =>
+          log.trace(msg)
+          None
+        case Some(_) => opt
+      }
   }
 }
 
