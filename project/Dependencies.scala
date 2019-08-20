@@ -100,7 +100,8 @@ object Dependencies {
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
-      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
+      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
+      "org.http4s" % "blaze-http_2.12" % "0.14.8"
     ) ++ protobuf.value
   )
 

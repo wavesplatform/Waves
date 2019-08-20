@@ -28,8 +28,11 @@ package object repl {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
   }
 
-  def buildInitialCtx(version: StdLibVersion) =
+  def buildInitialCtx(
+    version:     StdLibVersion,
+    environment: Environment
+  ): CTX =
     CryptoContext.build(Global, version) |+|
     PureContext.build(Global, version)   |+|
-    WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
+    WavesContext.build(contractDirectiveSet, environment)
 }
