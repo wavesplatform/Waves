@@ -86,8 +86,8 @@ object Explorer extends ScorexLogging {
     "invoke-script-result"
   )
 
-  def main(args1: Array[String]): Unit = {
-    if (args1.isEmpty) {
+  def main(argsRaw: Array[String]): Unit = {
+    if (argsRaw.isEmpty) {
       System.err.println("Usage: waves explore <command> [args] [--config|-c <cfg file>]")
       return
     }
@@ -104,7 +104,7 @@ object Explorer extends ScorexLogging {
         (args, flags)
     }
 
-    val (args, flags) = parseArgs(args)
+    val (args, flags) = parseArgs(argsRaw)
     val configFileOption = flags.collectFirst { case ("-c" | "--config", config) if config.nonEmpty => new File(config) }
 
     val settings =  Application.loadApplicationConfig(configFileOption)
