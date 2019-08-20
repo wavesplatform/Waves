@@ -149,7 +149,7 @@ class NFTBalanceSuite
         nonPagedIds shouldBe expectedIds
       }
 
-      Await.result(node.waitFor("nft sync")(a => assertion(a.n).map(_ => true).recover { case _ => false }, identity, 30 seconds), 10.minutes)
+      Await.result(node.waitFor("nft sync")(a => assertion(a.n).map(_ => true).recover { case _ => false }, _ == true, 30 seconds), 10.minutes)
     }
 
     "returns error on wrong limit" in {
