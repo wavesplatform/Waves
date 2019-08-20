@@ -24,6 +24,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
+//noinspection ScalaStyle
 class NFTBalanceSuite
     extends FreeSpec
     with WaitForHeight2
@@ -140,7 +141,7 @@ class NFTBalanceSuite
         .map(_.assetId.base58)
         .toSet
 
-      val assertion = for {
+      def assertion(node: Node) = for {
         pagedIds    <- getNFTPaged(node, issuer.address, 10).map(_.toSet)
         nonPagedIds <- getNFTPage(node, issuer.address, 1000, None).map(_.toSet)
       } yield {
@@ -148,7 +149,7 @@ class NFTBalanceSuite
         nonPagedIds shouldBe expectedIds
       }
 
-      Await.result(assertion, 1.minute)
+      Await.result(node.waitFor("nft sync")(a => assertion(a.n).map(_ => true).recover { case _ => false }, identity, 30 seconds), 10.minutes)
     }
 
     "returns error on wrong limit" in {
