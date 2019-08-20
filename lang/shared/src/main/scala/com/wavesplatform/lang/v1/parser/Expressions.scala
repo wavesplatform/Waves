@@ -67,7 +67,12 @@ object Expressions {
   }
 
   case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
-  case class FUNC(position: Pos, name: PART[String], args: Seq[(PART[String], Seq[PART[String]])], expr: EXPR) extends Declaration {
+
+  type TypeParam = Option[PART[String]]
+  type Type      = (PART[String], TypeParam)
+  type FuncArgs  = Seq[(PART[String], Seq[Type])]
+
+  case class FUNC(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR) extends Declaration {
     val allowShadowing = false
   }
 

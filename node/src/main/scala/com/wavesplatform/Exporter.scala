@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Blockchain
@@ -38,7 +38,7 @@ object Exporter extends ScorexLogging {
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
+        val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.default))
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")

@@ -539,7 +539,7 @@ object PBTransactions {
           chainId,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
-          Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
+          Deser.parseOption(functionCall.toByteArray, 0, functionCall.size() - 1)(Serde.deserialize(_, all = false))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
           feeAmount,
           feeAssetId,

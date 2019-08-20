@@ -2,11 +2,11 @@ import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt.Keys._
 import sbt._
 
+//noinspection TypeAnnotation
 object Dependencies {
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.5.20"
 
-  private def swaggerModule(module: String)                = "io.swagger.core.v3"            % s"swagger-$module" % "2.0.5"
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.8"
   private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
   private def kamonModule(module: String, v: String)       = "io.kamon"                      %% s"kamon-$module"  % v
@@ -14,7 +14,7 @@ object Dependencies {
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0-RC1")
+  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0-RC3")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
@@ -24,16 +24,11 @@ object Dependencies {
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
+  val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect", "1.2.0")
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
-
-  private val quill = Seq(
-    "org.postgresql" % "postgresql"  % "9.4.1208",
-    "io.getquill"    %% "quill-jdbc" % "3.1.0"
-  )
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
@@ -95,7 +90,7 @@ object Dependencies {
       machinist.exclude("org.scala-js", "scalajs-library_2.12"),
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
-      "ch.obermuhlner" % "big-math" % "2.1.0",
+      "ch.obermuhlner"       % "big-math" % "2.1.0",
       "org.scorexfoundation" %% "scrypto" % "2.0.4",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
@@ -142,7 +137,8 @@ object Dependencies {
       "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
       // "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
-      "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0",
+      "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
+      "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger
       jacksonModule("core", "databind"),
       jacksonModuleScala,
       akkaHttp,
@@ -154,20 +150,9 @@ object Dependencies {
       nettyModule("handler"),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
-      ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava") % Test
+      ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
     ) ++ protobuf.value ++ test ++ console
   )
-
-  lazy val matcher = Seq(
-    akkaModule("actor"),
-    akkaModule("persistence-query"),
-    akkaHttp,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0"
-  ) ++ Seq(
-    akkaModule("testkit"),
-    akkaModule("persistence-tck"),
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
-  ).map(_ % Test) ++ test ++ quill
 
   lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion

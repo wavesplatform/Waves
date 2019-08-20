@@ -11,8 +11,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.{WithDomain, openDB}
+import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -24,6 +24,7 @@ import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -502,7 +503,7 @@ class UtxPoolSpecification
 
       "takes into account unconfirmed transactions" in forAll(withValidPayments) {
         case (sender, state, utxPool, _, _) =>
-          val basePortfolio = state.portfolio(sender)
+          val basePortfolio = Distributions(state).portfolio(sender)
           val baseAssetIds  = basePortfolio.assetIds
 
           val pessimisticAssetIds = {

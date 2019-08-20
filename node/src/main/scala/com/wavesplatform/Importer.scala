@@ -6,7 +6,7 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.appender.BlockAppender
@@ -36,7 +36,7 @@ object Importer extends ScorexLogging {
         Try(new FileInputStream(blockchainFile)) match {
           case Success(inputStream) =>
             val db                = openDB(settings.dbSettings.directory)
-            val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
+            val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.default))
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
             val ups               = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
             val extAppender       = BlockAppender(blockchainUpdater, time, ups, pos, scheduler, verifyTransactions) _
@@ -73,7 +73,7 @@ object Importer extends ScorexLogging {
                       else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
-                      Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
+                      Await.result(extAppender.apply(block).runAsyncLogErr, Duration.Inf) match {
                         case Left(ve) =>
                           log.error(s"Error appending block: $ve")
                           quit = true

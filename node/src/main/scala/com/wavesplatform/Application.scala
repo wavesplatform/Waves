@@ -15,16 +15,17 @@ import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
-import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
-import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
+import com.wavesplatform.api.http.alias.AliasApiRoute
+import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
+import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
@@ -32,9 +33,10 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Schedulers._
-import com.wavesplatform.utils.{LoggerFacade, NTP, ScorexLogging, SystemInformationReporter, Time, UtilApp}
+import com.wavesplatform.utils.{LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -44,7 +46,6 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
-import monix.execution.Scheduler
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -61,7 +62,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   app =>
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
-  private[this] val apiScheduler = Scheduler(actorSystem.dispatcher)
 
   private val db = openDB(settings.dbSettings.directory)
 
@@ -184,19 +184,22 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    UtxPoolSynchronizer.start(utxStorage,
-                              settings.synchronizationSettings.utxSynchronizer,
-                              allChannels,
-                              transactions,
-                              blockchainUpdater.lastBlockInfo)
+    val utxSynchronizerScheduler = Schedulers.fixedPool(settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val utxSynchronizer =
+      UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
+        utxSynchronizerScheduler)
+
+    transactions.foreach {
+      case (channel, transaction) => utxSynchronizer.tryPublish(transaction, channel)
+    }
 
     val microBlockSink = microblockData
-      .mapTask(scala.Function.tupled(processMicroBlock))
+      .mapEval(scala.Function.tupled(processMicroBlock))
 
     val blockSink = newBlocks
-      .mapTask(scala.Function.tupled(processBlock))
+      .mapEval(scala.Function.tupled(processBlock))
 
-    Observable.merge(microBlockSink, blockSink).subscribe()
+    Observable(microBlockSink, blockSink).merge.subscribe()
 
     miner.scheduleMining()
 
@@ -208,12 +211,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     val extensionContext = new Context {
-      override def settings: WavesSettings                               = app.settings
-      override def blockchain: Blockchain                                = app.blockchainUpdater
-      override def time: Time                                            = app.time
-      override def wallet: Wallet                                        = app.wallet
-      override def utx: UtxPool                                          = utxStorage
-      override def broadcastTx(tx: Transaction): Unit                    = allChannels.broadcastTx(tx, None)
+      override def settings: WavesSettings = app.settings
+      override def blockchain: Blockchain  = app.blockchainUpdater
+      override def time: Time              = app.time
+      override def wallet: Wallet          = app.wallet
+      override def utx: UtxPool            = utxStorage
+
+      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
     }
@@ -228,14 +232,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels)(apiScheduler),
-        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time)(apiScheduler),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
+        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
-        PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         UtilsApiRoute(time, settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time)(apiScheduler),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         DebugApiRoute(
           settings,
           time,
@@ -254,14 +257,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           scoreStatsReporter,
           configRoot
         ),
-        WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, blockchainUpdater, time)(apiScheduler),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
-        LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, blockchainUpdater),
-        AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
+        AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
       )
 
       val apiTypes: Set[Class[_]] = Set(
@@ -342,10 +341,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Shutdown complete")
     }
 
-  private def shutdownAndWait(scheduler: SchedulerService,
-                              name: String,
-                              timeout: Option[FiniteDuration] = none,
-                              tryForce: Boolean = true): Unit = {
+  private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: Option[FiniteDuration] = none, tryForce: Boolean = true): Unit = {
     log.debug(s"Shutting down $name")
     scheduler match {
       case es: ExecutorScheduler if tryForce => es.executor.shutdownNow()
@@ -369,6 +365,7 @@ object Application {
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
+    if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
     val settings = WavesSettings.fromRootConfig(config)
 
@@ -426,7 +423,6 @@ object Application {
     val isMetricsStarted = Metrics.start(settings.metrics, time)
 
     RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
-      import actorSystem.dispatcher
       isMetricsStarted.foreach { started =>
         if (started) {
           import settings.synchronizationSettings.microBlockSynchronizer
