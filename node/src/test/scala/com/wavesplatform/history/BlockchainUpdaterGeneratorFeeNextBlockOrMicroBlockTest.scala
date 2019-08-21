@@ -33,7 +33,7 @@ class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest
 
   property("generator should get fees before applying block before applyMinerFeeWithTransactionAfter in two blocks") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.Inflation.id))
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.BlockReward.id))
     scenario(preconditionsAndPayments, DefaultWavesSettings) {
       case (domain: Domain, (genesis, somePayment, generatorPaymentOnFee, someOtherPayment, oneWavesPayment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis, somePayment), Seq(generatorPaymentOnFee, someOtherPayment, oneWavesPayment)))

@@ -63,7 +63,8 @@ package object history {
         consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
         transactionData = txs,
         signer = signer,
-        Set.empty
+        Set.empty,
+        0.toByte
       )
       .explicitGet()
 

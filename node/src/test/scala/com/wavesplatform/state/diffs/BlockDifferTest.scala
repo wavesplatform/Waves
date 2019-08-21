@@ -139,11 +139,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
       resetEffectiveBalancesAtHeight = 0,
       blockVersion3AfterHeight = 0,
-      preActivatedFeatures = Map[Short, Int](BlockchainFeatures.NG at ngAtHeight, BlockchainFeatures.Inflation at ngAtHeight),
+      preActivatedFeatures = Map[Short, Int](BlockchainFeatures.NG at ngAtHeight, BlockchainFeatures.BlockReward at ngAtHeight),
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
       maxTransactionTimeBackOffset = 120.minutes,
       maxTransactionTimeForwardOffset = 90.minutes,
-      inflationAmount = inflationAmount
+      inflationAmount = inflationAmount,
+      blockVersion4AfterHeight = Int.MaxValue,
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

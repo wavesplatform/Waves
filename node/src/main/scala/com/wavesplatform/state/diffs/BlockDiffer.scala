@@ -122,7 +122,7 @@ object BlockDiffer extends ScorexLogging {
     val initDiff = {
       val generatorFeePf = currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty
       val generatorPf =
-        if (fullBlock && blockchain.isFeatureActivated(BlockchainFeatures.Inflation))
+        if (fullBlock && blockchain.isFeatureActivated(BlockchainFeatures.BlockReward))
           generatorFeePf |+| Portfolio.build(Asset.Waves, blockchain.settings.functionalitySettings.inflationAmount)
         else
           generatorFeePf

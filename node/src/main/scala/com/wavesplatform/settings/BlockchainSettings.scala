@@ -24,6 +24,7 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  doubleFeaturesPeriodsAfterHeight: Int,
                                  maxTransactionTimeBackOffset: FiniteDuration,
                                  maxTransactionTimeForwardOffset: FiniteDuration,
+                                 blockVersion4AfterHeight: Int,
                                  inflationAmount: Long) {
   val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
@@ -67,7 +68,8 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = 810000,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    inflationAmount = 1L * Constants.UnitsInWave
+    inflationAmount = 1L * Constants.UnitsInWave,
+    blockVersion4AfterHeight = Int.MaxValue
   )
 
   val TESTNET = apply(
@@ -86,7 +88,8 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    inflationAmount = 1L * Constants.UnitsInWave
+    inflationAmount = 1L * Constants.UnitsInWave,
+    blockVersion4AfterHeight = Int.MaxValue
   )
 
   val configPath = "waves.blockchain.custom.functionality"

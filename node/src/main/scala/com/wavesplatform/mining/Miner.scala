@@ -124,10 +124,15 @@ class MinerImpl(allChannels: ChannelGroup,
       .leftMap(_.toString)
   }
 
+  private def getVersion(height: Int): Byte =
+    if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion
+    else if (height <= blockchainSettings.functionalitySettings.blockVersion4AfterHeight) NgBlockVersion
+    else RewardBlockVersion
+
   private def forgeBlock(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height              = blockchainUpdater.height
-    val version             = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
+    val version             = getVersion(height)
     val lastBlock           = blockchainUpdater.lastBlock.get
     val referencedBlockInfo = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
     val refBlockBT          = referencedBlockInfo.consensus.baseTarget
@@ -152,7 +157,7 @@ class MinerImpl(allChannels: ChannelGroup,
         utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime))
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
-        .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
+        .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version), blockRewardVote(version))
         .leftMap(_.err)
     } yield (estimators, block, updatedMdConstraint.constraints.head))
   }
@@ -170,6 +175,10 @@ class MinerImpl(allChannels: ChannelGroup,
         .filter(BlockchainFeatures.implemented)
         .toSet
   }
+
+  private def blockRewardVote(version: Byte): Byte =
+    if (version < RewardBlockVersion) 0.toByte
+    else settings.featuresSettings.reward
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)

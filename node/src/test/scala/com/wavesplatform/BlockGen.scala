@@ -36,7 +36,8 @@ trait BlockGen extends TransactionGen { _: Suite =>
           NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
           txs,
           signer,
-          Set.empty
+          Set.empty,
+          0.toByte
         )
         .explicitGet()
 

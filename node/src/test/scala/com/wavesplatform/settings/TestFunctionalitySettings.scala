@@ -28,11 +28,12 @@ object TestFunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    inflationAmount = 100000000L
+    inflationAmount = 100000000L,
+    blockVersion4AfterHeight = Int.MaxValue,
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
 
   val EmptyFeaturesSettings: FeaturesSettings =
-    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
+    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty, 0.toByte)
 }

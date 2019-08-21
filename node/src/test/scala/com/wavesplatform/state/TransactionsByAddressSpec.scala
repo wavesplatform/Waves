@@ -32,7 +32,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
 
   def mkBlock(sender: KeyPair, reference: ByteStr, transactions: Seq[Transaction]): Block =
     Block
-      .buildAndSign(3.toByte, ntpNow, reference, NxtLikeConsensusBlockData(1000, ByteStr(new Array[Byte](32))), transactions, sender, Set.empty)
+      .buildAndSign(3.toByte, ntpNow, reference, NxtLikeConsensusBlockData(1000, ByteStr(new Array[Byte](32))), transactions, sender, Set.empty, 0.toByte)
       .explicitGet()
 
   val gen = for {

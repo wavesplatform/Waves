@@ -35,6 +35,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
                                                           |        max-transaction-time-back-offset = 55s
                                                           |        max-transaction-time-forward-offset = 12d
                                                           |        inflation-amount = 100000000
+                                                          |        block-version-4-after-height = 22
                                                           |      }
                                                           |      genesis {
                                                           |        timestamp = 1460678400000

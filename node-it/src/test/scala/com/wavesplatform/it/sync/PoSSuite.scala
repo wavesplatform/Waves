@@ -255,7 +255,8 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         consensusData = cData,
         transactionData = Nil,
         signer = signerPK,
-        featureVotes = Set.empty
+        featureVotes = Set.empty,
+        rewardVote = 0.toByte
       )
       .explicitGet()
   }

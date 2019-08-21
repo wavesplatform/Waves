@@ -134,7 +134,8 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
             consensusData = accumulatedBlock.consensusData,
             transactionData = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account,
-            featureVotes = accumulatedBlock.featureVotes
+            featureVotes = accumulatedBlock.featureVotes,
+            rewardVote = accumulatedBlock.rewardVote
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock

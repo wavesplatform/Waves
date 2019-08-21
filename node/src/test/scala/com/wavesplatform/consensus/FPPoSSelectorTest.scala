@@ -275,7 +275,8 @@ object FPPoSSelectorTest {
           NxtLikeConsensusBlockData(bt, ByteStr(gs)),
           Seq.empty,
           miner,
-          Set.empty
+          Set.empty,
+          0.toByte
         )
         .explicitGet()
 
@@ -316,7 +317,7 @@ object FPPoSSelectorTest {
     val updatedCData = cData.copy(updateBT(cData.baseTarget), updateGS(cData.generationSignature))
 
     Block
-      .buildAndSign(3: Byte, lastBlock.timestamp + delay, lastBlock.uniqueId, updatedCData, Seq.empty, miner, Set.empty)
+      .buildAndSign(3: Byte, lastBlock.timestamp + delay, lastBlock.uniqueId, updatedCData, Seq.empty, miner, Set.empty, 0.toByte)
       .explicitGet()
   }
 

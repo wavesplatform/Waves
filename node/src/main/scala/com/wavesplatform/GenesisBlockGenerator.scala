@@ -107,7 +107,8 @@ object GenesisBlockGenerator extends App {
         consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
         transactionData = genesisTxs,
         signer = genesisSigner,
-        featureVotes = Set.empty
+        featureVotes = Set.empty,
+        rewardVote = 0
       )
       .explicitGet()
   }

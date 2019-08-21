@@ -52,7 +52,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
                       NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
                       Seq.fill(amt)(paymentTransaction),
                       recipient,
-                      Set.empty)
+                      Set.empty,
+                      0.toByte)
         .explicitGet()
 
   property(" block with txs bytes/parse roundtrip version 1,2") {
@@ -60,7 +61,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
           val block = Block
-            .buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty)
+            .buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty, 0.toByte)
             .explicitGet()
           val parsedBlock = Block.parseBytes(block.bytes()).get
           assert(block.signaturesValid().isRight)
@@ -76,7 +77,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     Seq[Byte](1, 2).foreach { version =>
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
-          Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set(1)) should produce(
+          Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set(1), 0.toByte) should produce(
             "could not contain feature votes")
       }
     }
@@ -94,7 +95,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
                            NxtLikeConsensusBlockData(baseTarget, generationSignature),
                            transactionData,
                            recipient,
-                           supportedFeatures) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
+                           supportedFeatures, 0.toByte) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
     }
   }
   property(" block with txs bytes/parse roundtrip version 3") {
@@ -111,7 +112,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
                         NxtLikeConsensusBlockData(baseTarget, generationSignature),
                         transactionData,
                         recipient,
-                        featureVotes)
+                        featureVotes,
+                        0.toByte)
           .explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes()).get
         assert(block.signaturesValid().isRight)
@@ -135,7 +137,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             NxtLikeConsensusBlockData(baseTarget, generationSignature),
             transactionData,
             SignerData(weakAccount, ByteStr(Array.fill(64)(0: Byte))),
-            Set.empty
+            Set.empty,
+            0.toByte
           )
           .explicitGet()
         block.signaturesValid() shouldBe 'left
@@ -147,7 +150,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
+            Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty, 0.toByte).explicitGet())
         val (bytes, t1) = Instrumented.withTimeMillis(block.bytesWithoutSignature())
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
         val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))
