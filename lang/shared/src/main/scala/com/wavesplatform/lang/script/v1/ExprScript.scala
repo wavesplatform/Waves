@@ -8,6 +8,8 @@ import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{BaseGlobal, ScriptEstimator}
 import monix.eval.Coeval
+import cats.implicits._
+import com.google.common.annotations.VisibleForTesting
 
 object ExprScript {
 
@@ -16,22 +18,35 @@ object ExprScript {
   val checksumLength = 4
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
-    Either.cond(bs.length <= MaxExprSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $MaxExprSizeInBytes bytes")
+    Either.cond(
+      bs.length <= MaxExprSizeInBytes,
+      (),
+      s"Script is too large: ${bs.length} bytes > $MaxExprSizeInBytes bytes"
+    )
 
+  @VisibleForTesting
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
-  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true, checkComplexity: Boolean = true): Either[String, Script] =
-    for {
-      scriptComplexity <- ScriptEstimator(varNames(version, Expression), functionCosts(version), x)
-      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxComplexityByVersion(version),
-                       (),
-                       s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}")
-      s = new ExprScriptImpl(version, x, scriptComplexity)
-      _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
-    } yield s
+  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
+    ExprScriptImpl(version, x)
+      .asRight[String]
+      .flatTap(s => validateBytes(s.bytes().arr))
 
-  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends ExprScript {
-    override val complexityMap: Map[String, Long] = Map.empty
+  def estimate(
+    expr:      EXPR,
+    version:   StdLibVersion,
+    estimator: ScriptEstimator
+  ): Either[String, Long] =
+    for {
+      scriptComplexity <- ScriptEstimator(varNames(version, Expression), functionCosts(version), expr)
+      _ <- Either.cond(
+        scriptComplexity <= MaxComplexityByVersion(version),
+        (),
+        s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}"
+      )
+    } yield scriptComplexity
+
+  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr))
@@ -43,5 +58,4 @@ trait ExprScript extends Script {
   override type Expr = EXPR
   val stdLibVersion: StdLibVersion
   val expr: EXPR
-  val complexity: Long
 }

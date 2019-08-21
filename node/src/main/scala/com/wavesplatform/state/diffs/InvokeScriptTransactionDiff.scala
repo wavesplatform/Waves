@@ -49,7 +49,7 @@ object InvokeScriptTransactionDiff {
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(_, contract, _))) =>
+      case Right(Some(sc @ ContractScriptImpl(_, contract))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val environment = new WavesEnvironment(

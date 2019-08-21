@@ -94,54 +94,60 @@ trait BaseGlobal {
       .map(r => r ++ checksum(r))
 
   val compileExpression =
-    compile(_, _, _, _, ExpressionCompiler.compile)
+    compile(_, _, _, _, _, ExpressionCompiler.compile)
 
   val compileDecls =
-    compile(_, _, _, _, ExpressionCompiler.compileDecls)
+    compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
-    input: String,
-    context: CompilerContext,
-    restrictToLetBlockOnly: Boolean,
+    input:         String,
+    context:       CompilerContext,
+    letBlockOnly:  Boolean,
     stdLibVersion: StdLibVersion,
-    compiler: (String, CompilerContext) => Either[String, EXPR]
+    estimator:     ScriptEstimator,
+    compiler:      (String, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
     for {
       ex <- compiler(input, context)
-      illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
+      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion)
-      complexity <- ScriptEstimator(vars, costs, ex)
+      complexity <- estimator(vars, costs, ex)
     } yield (x, ex, complexity)
 
   type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])
 
-  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, ContractInfo] =
+  def compileContract(
+    input:         String,
+    ctx:           CompilerContext,
+    stdLibVersion: StdLibVersion,
+    estimator:     ScriptEstimator
+  ): Either[String, ContractInfo] =
     for {
       dapp       <- ContractCompiler.compile(input, ctx)
-      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp)
+      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, estimator)
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {
-      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      script <- Script.fromBase64String(compiledCode.trim)
       meta   <- scriptMeta(script)
     } yield (Script.decompile(script)._1, meta)
 
   def scriptMeta(compiledCode: String): Either[ScriptParseError, Dic] =
     for {
-      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      script <- Script.fromBase64String(compiledCode.trim)
       meta   <- scriptMeta(script)
     } yield meta
 
   def scriptMeta(script: Script): Either[ScriptParseError, Dic] =
     script match {
-      case ContractScriptImpl(_, dApp, _) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
-      case _                              => Right(Dic(Map()))
+      case ContractScriptImpl(_, dApp) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
+      case _                           => Right(Dic(Map()))
     }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean

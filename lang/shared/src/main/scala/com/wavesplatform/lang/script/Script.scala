@@ -7,6 +7,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import monix.eval.Coeval
 
@@ -18,9 +19,6 @@ trait Script {
   val expr: Expr
 
   val bytes: Coeval[ByteStr]
-
-  val complexityMap: Map[String, Long]
-  val complexity: Long
 
   val containsBlockV2: Coeval[Boolean]
 
@@ -36,10 +34,10 @@ object Script {
 
   val checksumLength = 4
 
-  def fromBase64String(str: String, checkComplexity: Boolean = true): Either[ScriptParseError, Script] =
+  def fromBase64String(str: String): Either[ScriptParseError, Script] =
     for {
       bytes  <- Base64.tryDecode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
-      script <- ScriptReader.fromBytes(bytes, checkComplexity)
+      script <- ScriptReader.fromBytes(bytes)
     } yield script
 
   type DirectiveMeta = List[(String, Any)]
@@ -47,8 +45,8 @@ object Script {
   def decompile(s: Script): (String, DirectiveMeta) = {
     val ctx = defaultDecompilerContext
     val (scriptText, directives) = s match {
-      case e: ExprScript                      => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
-      case ContractScriptImpl(_, contract, _) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DApp))
+      case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
+      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DApp))
     }
     val directivesText = directives
       .map(_.unparsed)
@@ -57,4 +55,10 @@ object Script {
     val meta = directives.map(d => (d.key.text, d.value))
     (directivesText + scriptText, meta)
   }
+
+  def estimate(s: Script, estimator: ScriptEstimator): Either[String, Long] =
+    s match {
+      case script: ExprScript                    => ExprScript.estimate(script.expr, script.stdLibVersion, estimator)
+      case ContractScriptImpl(version, contract) => ContractScript.estimateComplexity(version, contract, estimator).map(_._1)
+    }
 }

@@ -23,7 +23,8 @@ object ScriptCompiler extends ScorexLogging {
       scriptType  = if (isAssetScript) Asset else Account
       _      <- DirectiveSet(version, scriptType, contentType)
       script <- tryCompile(scriptText, contentType, version, isAssetScript)
-    } yield (script, script.complexity)
+      complexity <- Script.estimate(script, ScriptEstimator)
+    } yield (script, complexity)
   }
 
   def compile(
@@ -55,10 +56,6 @@ object ScriptCompiler extends ScorexLogging {
     }
   }
 
-  def estimate(script: Script, version: StdLibVersion): Either[String, Long] = script match {
-    case s: ExprScript         => ScriptEstimator(varNames(version, Expression), functionCosts(version), s.expr)
-    case s: ContractScriptImpl => ContractScript.estimateComplexity(version, s.expr).map(_._1)
-    case _                     => ???
-  }
-
+  def estimate(script: Script, version: StdLibVersion): Either[String, Long] =
+    Script.estimate(script, ScriptEstimator)
 }

@@ -12,7 +12,7 @@ object ScriptReader {
 
   val checksumLength = 4
 
-  def fromBytes(bytes: Array[Byte], checkComplexity: Boolean = true): Either[ScriptParseError, Script] = {
+  def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
     val checkSum          = bytes.takeRight(checksumLength)
     val computedCheckSum  = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
 
@@ -42,13 +42,8 @@ object ScriptReader {
       s <- scriptType match {
         case Expression | Library =>
           for {
-            _ <- if (checkComplexity) {
-              ExprScript.validateBytes(scriptBytes)
-            } else {
-              Right(())
-            }
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
-            s     <- ExprScript(stdLibVersion, bytes, checkSize = false, checkComplexity = checkComplexity)
+            s     <- ExprScript(stdLibVersion, bytes, checkSize = false)
           } yield s
         case DApp =>
           for {

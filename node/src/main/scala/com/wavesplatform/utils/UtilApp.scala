@@ -207,7 +207,7 @@ object UtilApp {
         .map(_._1.bytes())
 
     def doDecompile(c: Command, data: Array[Byte]): ActionResult = {
-      ScriptReader.fromBytes(data, checkComplexity = false) match {
+      ScriptReader.fromBytes(data) match {
         case Left(value) =>
           Left(value.m)
         case Right(value) =>

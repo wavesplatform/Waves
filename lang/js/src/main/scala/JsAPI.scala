@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl, ScriptEstimator}
 
 import scala.scalajs.js
 import scala.scalajs.js.{Any, Dictionary}
@@ -180,12 +180,14 @@ object JsAPI {
     )
   }
 
+  val estimator = ScriptEstimator
+
   private def compileScript(ds: DirectiveSet, input: String) = {
     val ver = ds.stdLibVersion
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -196,7 +198,7 @@ object JsAPI {
           }
       case Library =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver)
+        Global.compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -207,7 +209,7 @@ object JsAPI {
           }
       case DAppType =>
         // Just ignore stdlib version here
-        Global.compileContract(input, fullContractContext.compilerContext, ver)
+        Global.compileContract(input, fullContractContext.compilerContext, ver, estimator)
           .map {
             case (bytes, ast, complexity, complexityByFunc) =>
               js.Dynamic.literal(
