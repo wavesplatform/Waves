@@ -18,6 +18,12 @@ Please follow the SBT installation instructions depending on your operating syst
 
 ## 2. Obtaining Source Codes
 
+Cloning with HTTPS URLs (recommended)
+```
+git clone https://github.com/wavesplatform/Waves.git
+cd Waves
+```
+or cloning with SSH URLs
 ```
 git clone git@github.com:wavesplatform/Waves.git
 cd Waves
