@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import java.io.{FileOutputStream, PrintWriter}
+
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
@@ -11,8 +13,9 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 
+//noinspection ScalaStyle
 object TransactionDiffer extends ScorexLogging {
 
   private val stats = TxProcessingStats
@@ -60,31 +63,45 @@ object TransactionDiffer extends ScorexLogging {
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
+  lazy val scheduler = Schedulers.singleThread("tx-measure")
+
   def unverified(
       currentBlockTimestamp: Long,
       currentBlockHeight: Int
   )(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
-    stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
-      tx match {
-        case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
-        case ptx: PaymentTransaction =>
-          PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
-        case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain, currentBlockHeight)(itx)
-        case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockHeight, currentBlockTimestamp)(rtx)
-        case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)
-        case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockHeight, currentBlockTimestamp)(ttx)
-        case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp, currentBlockHeight)(mtx)
-        case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain, currentBlockHeight)(ltx)
-        case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp, currentBlockHeight)(ltx)
-        case etx: ExchangeTransaction        => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
-        case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain, currentBlockHeight)(atx)
-        case dtx: DataTransaction            => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
-        case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain, currentBlockHeight)(sstx)
-        case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockHeight, currentBlockTimestamp)(sstx)
-        case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockHeight, currentBlockTimestamp)(stx)
-        case ci: InvokeScriptTransaction     => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
-        case _                               => Left(UnsupportedTransactionType)
-      }
+
+    val start = System.nanoTime()
+    val result: TracedResult[ValidationError, Diff] = tx match {
+      case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
+      case ptx: PaymentTransaction =>
+        PaymentTransactionDiff(blockchain.settings.functionalitySettings, currentBlockHeight, currentBlockTimestamp)(ptx)
+      case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain, currentBlockHeight)(itx)
+      case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockHeight, currentBlockTimestamp)(rtx)
+      case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)
+      case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockHeight, currentBlockTimestamp)(ttx)
+      case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp, currentBlockHeight)(mtx)
+      case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain, currentBlockHeight)(ltx)
+      case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp, currentBlockHeight)(ltx)
+      case etx: ExchangeTransaction        => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
+      case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain, currentBlockHeight)(atx)
+      case dtx: DataTransaction            => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
+      case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain, currentBlockHeight)(sstx)
+      case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockHeight, currentBlockTimestamp)(sstx)
+      case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockHeight, currentBlockTimestamp)(stx)
+      case ci: InvokeScriptTransaction     => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
+      case _                               => Left(UnsupportedTransactionType)
     }
+
+    val time = System.nanoTime() - start
+    scheduler.execute { () =>
+      val fs = new FileOutputStream("/var/lib/waves/tx-measure.csv", true)
+      val pw = new PrintWriter(fs)
+      if (fs.getChannel.size() == 0) pw.println("Height,Type,Time,Scripts,Complexity,TxId")
+      val scripts = result.resultE.fold(_ => -1, _.scriptsRun)
+      val complexity = result.resultE.fold(_ => -1, _.scriptsComplexity)
+      pw.println(s"$currentBlockHeight,${tx.builder.typeId},$time,$scripts,$complexity,${tx.id()}")
+      pw.close()
+    }
+    result
   }
 }
