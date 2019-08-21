@@ -58,7 +58,7 @@ class NewWorker(settings: Settings,
           channel.foreach(_.close())
 
           if (settings.autoReconnect) {
-            log.error(s"[$node] An error during sending transations, reconnect", error)
+            log.error(s"[$node] An error during sending transactions, reconnect", error)
             for {
               _       <- Task.sleep(settings.reconnectDelay)
               channel <- pullAndWriteTask()

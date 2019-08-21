@@ -62,7 +62,7 @@ object ItTestPlugin extends AutoPlugin {
                   runJVMOptions = Vector(
                     "-Dwaves.it.logging.appender=FILE",
                     s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
-                  ) ++ javaOptionsValue ++ ModernJavaSettings.options,
+                  ) ++ javaOptionsValue,
                   connectInput = false,
                   envVars = envVarsValue
                 ))

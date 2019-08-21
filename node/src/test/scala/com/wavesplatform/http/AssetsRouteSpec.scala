@@ -5,7 +5,6 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.wallet.Wallet
@@ -14,12 +13,9 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Writes
 
-import scala.concurrent.Future
-
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually with RestAPISettingsHelper {
 
   private val wallet = stub[Wallet]
-  private val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
   private val state = stub[Blockchain]
 
   private val seed               = "seed".getBytes("UTF-8")
@@ -27,10 +23,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
 
   "/transfer" - {
-    val route: Route = AssetsApiRoute(restAPISettings, wallet, utxPoolSynchronizer, state, new TestTime()).route
+    val route: Route = AssetsApiRoute(restAPISettings, wallet, DummyUtxPoolSynchronizer.accepting, state, new TestTime()).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 
