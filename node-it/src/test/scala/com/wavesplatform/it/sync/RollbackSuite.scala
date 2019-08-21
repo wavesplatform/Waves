@@ -57,6 +57,8 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val startHeight      = sender.height
     val stateBeforeApply = sender.debugStateAt(startHeight)
 
+    nodes.waitForHeightArise()
+
     val requests = generateTransfersToRandomAddresses(190, nodeAddresses)
     Await.result(processRequests(requests), 2.minutes)
 
@@ -191,6 +193,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
     val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, waitForTx = true).id
+    nodes.waitForHeightAriseAndTxPresent(tx)
 
     //as rollback is too fast, we should blacklist nodes from each other before rollback
     sender.blacklist(miner.networkAddress)

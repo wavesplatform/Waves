@@ -13,14 +13,15 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalacheck.Gen
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyChecks with BlockGen with WithState {
 
   private def assertDetailedDiff(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: (Diff, DetailedDiff) => Unit): Unit =
-    withStateAndHistory(fs) { state =>
+      assertion: (Diff, DetailedDiff) => Unit
+  ): Unit =
+    withLevelDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block) =
         BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited)
 
@@ -70,12 +71,14 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
         transfer1 = createWavesTransfer(a1, a2, amount1, transactionFee, ts + 10).explicitGet()
         transfer2 = createWavesTransfer(a2, a1, amount2, transactionFee, ts + 20).explicitGet()
         block = TestBlock
-          .create(a1,
-                  Seq(
-                    genesis,
-                    transfer1,
-                    transfer2
-                  ))
+          .create(
+            a1,
+            Seq(
+              genesis,
+              transfer1,
+              transfer2
+            )
+          )
       } yield (KeyPair.toAddress(a1), KeyPair.toAddress(a2), amount1, amount2, block)
 
       "transaction diffs are correct" in

@@ -123,12 +123,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
-  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, loadPortfolio)
-  protected def loadPortfolio(address: Address): Portfolio
-  protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
-  override def portfolio(a: Address): Portfolio = {
-    portfolioCache.get(a)
-  }
+  private[database] val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, _ => ???)
+  protected def discardPortfolio(address: Address): Unit                 = portfolioCache.invalidate(address)
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
@@ -172,7 +168,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
-  protected def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
+
+  private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -185,22 +182,24 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   //noinspection ScalaStyle
-  protected def doAppend(block: Block,
-                         carry: Long,
-                         newAddresses: Map[Address, BigInt],
-                         balances: Map[BigInt, Map[Asset, Long]],
-                         leaseBalances: Map[BigInt, LeaseBalance],
-                         addressTransactions: Map[AddressId, List[TransactionId]],
-                         leaseStates: Map[ByteStr, Boolean],
-                         reissuedAssets: Map[IssuedAsset, AssetInfo],
-                         filledQuantity: Map[ByteStr, VolumeAndFee],
-                         scripts: Map[BigInt, Option[Script]],
-                         assetScripts: Map[IssuedAsset, Option[Script]],
-                         data: Map[BigInt, AccountDataInfo],
-                         aliases: Map[Alias, BigInt],
-                         sponsorship: Map[IssuedAsset, Sponsorship],
-                         totalFee: Long,
-                         scriptResults: Map[ByteStr, InvokeScriptResult]): Unit
+  protected def doAppend(
+      block: Block,
+      carry: Long,
+      newAddresses: Map[Address, BigInt],
+      balances: Map[BigInt, Map[Asset, Long]],
+      leaseBalances: Map[BigInt, LeaseBalance],
+      addressTransactions: Map[AddressId, List[TransactionId]],
+      leaseStates: Map[ByteStr, Boolean],
+      reissuedAssets: Map[IssuedAsset, AssetInfo],
+      filledQuantity: Map[ByteStr, VolumeAndFee],
+      scripts: Map[BigInt, Option[Script]],
+      assetScripts: Map[IssuedAsset, Option[Script]],
+      data: Map[BigInt, AccountDataInfo],
+      aliases: Map[Alias, BigInt],
+      sponsorship: Map[IssuedAsset, Sponsorship],
+      totalFee: Long,
+      scriptResults: Map[ByteStr, InvokeScriptResult]
+  ): Unit
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
@@ -279,7 +278,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
-    for (address                 <- newPortfolios) portfolioCache.invalidate(address)
+    for (address                 <- newPortfolios) discardPortfolio(address)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)

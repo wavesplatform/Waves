@@ -3,7 +3,6 @@ package com.wavesplatform.utils
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.{RejectedExecutionHandler, ScheduledThreadPoolExecutor, ThreadFactory}
 
-import monix.execution.UncaughtExceptionReporter.LogExceptionsToStandardErr
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.execution.{ExecutionModel, UncaughtExceptionReporter}
 
@@ -25,7 +24,7 @@ object Schedulers {
   }
 
   def singleThread(name: String,
-                   reporter: UncaughtExceptionReporter = LogExceptionsToStandardErr,
+                   reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
                    executionModel: ExecutionModel = ExecutionModel.Default,
                    rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy): SchedulerService = {
     val factory  = threadFactory(name, daemonic = true, reporter)
@@ -36,7 +35,7 @@ object Schedulers {
 
   def fixedPool(poolSize: Int,
                 name: String,
-                reporter: UncaughtExceptionReporter = LogExceptionsToStandardErr,
+                reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
                 executionModel: ExecutionModel = ExecutionModel.Default,
                 rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy): SchedulerService = {
     val factory  = threadFactory(name, daemonic = true, reporter)

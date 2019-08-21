@@ -1,5 +1,6 @@
 package com.wavesplatform.metrics
 
+import com.wavesplatform.utils.LoggerFacade
 import kamon.metric.{Histogram, MeasurementUnit}
 
 object Instrumented {
@@ -15,6 +16,12 @@ object Instrumented {
   def withTimeMillis[R](f: => R): (R, Long) = {
     val (result, nanos) = withTimeNanos(f)
     (result, nanos / NanosInMS)
+  }
+
+  def logMeasure[R](log: LoggerFacade, action: String)(f: => R): R = {
+    val (result, time) = Instrumented.withTimeMillis(f)
+    log.trace(s"$action took ${time}ms")
+    result
   }
 
   def withTime[R](h: Histogram, f: => R): (R, Long) = {

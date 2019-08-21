@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Blockchain
@@ -38,7 +38,7 @@ object Exporter extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
       case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
-        implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.LogExceptionsToStandardErr
+        implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
 
         val settings = Application.loadApplicationConfig(Some(configFile))
 

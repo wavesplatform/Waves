@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {
@@ -44,10 +44,8 @@ class CommonAccountApi(blockchain: Blockchain) {
     portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
   }
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    val iterator = blockchain.nftList(address, from)
-    Observable.fromIterator(iterator, () => iterator.close())
-  }
+  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+    blockchain.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain.accountScript(address)
@@ -72,13 +70,13 @@ class CommonAccountApi(blockchain: Blockchain) {
       .flatMap(Observable.fromIterable(_))
   }
 
-  def activeLeases(address: Address): Either[String, Seq[(Int, LeaseTransaction)]] = {
+  def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
     blockchain
-      .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-      .map(_.collect {
+      .addressTransactionsObservable(address, Set(LeaseTransactionV1, LeaseTransactionV2))
+      .collect {
         case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
           (height, leaseTransaction)
-      })
+      }
   }
 
   def balanceProof(address: Address, height: Int): Either[ValidationError, ProvenBalance] = {
