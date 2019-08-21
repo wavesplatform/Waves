@@ -70,6 +70,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
         waitForTx = true)
       .id
 
+    nodes.waitForHeightArise()
+
     secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 1L)
   }
 
