@@ -80,9 +80,11 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         secondAccount <- accountGen
 
         tsAmount = FeeAmount * 10
-        transfer1 <- transfer(richAccount, secondAccount, tsAmount)
-        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount)
-        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount)
+
+        blockTime = ntpNow
+        transfer1 <- transfer(richAccount, secondAccount, tsAmount, validTimestampGen(blockTime))
+        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
+        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
@@ -98,7 +100,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           micros = Seq(Seq(transfer2)),
           signer = richAccount,
           version = 3,
-          timestamp = System.currentTimeMillis()
+          timestamp = blockTime
         )
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
@@ -107,7 +109,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           micros = Nil,
           signer = secondAccount,
           version = 3,
-          timestamp = System.currentTimeMillis()
+          timestamp = blockTime
         )
 
         (genesisBlock, keyBlock, microBlocks, keyBlock1)
@@ -120,9 +122,11 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         secondAccount <- accountGen
 
         tsAmount = FeeAmount * 10
-        transfer1 <- transfer(richAccount, secondAccount, tsAmount)
-        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount)
-        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount)
+
+        blockTime = ntpNow
+        transfer1 <- transfer(richAccount, secondAccount, tsAmount, validTimestampGen(blockTime))
+        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
+        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
@@ -138,7 +142,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           micros = Seq(Seq(), Seq(transfer2)),
           signer = richAccount,
           version = 3,
-          timestamp = System.currentTimeMillis()
+          timestamp = blockTime
         )
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
@@ -147,7 +151,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           micros = Nil,
           signer = secondAccount,
           version = 3,
-          timestamp = System.currentTimeMillis()
+          timestamp = blockTime
         )
 
         (genesisBlock, keyBlock, microBlocks, keyBlock1)
@@ -161,9 +165,10 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         randomAccount <- accountGen
 
         tsAmount = FeeAmount * 10
-        lease       <- lease(richAccount, secondAccount, tsAmount)
-        leaseCancel <- leaseCancel(richAccount, lease.id())
-        transfer    <- transfer(richAccount, randomAccount, tsAmount)
+        blockTime = ntpNow
+        lease       <- lease(richAccount, secondAccount, tsAmount, validTimestampGen(blockTime))
+        leaseCancel <- leaseCancel(richAccount, lease.id(), validTimestampGen(blockTime))
+        transfer    <- transfer(richAccount, randomAccount, tsAmount, validTimestampGen(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
@@ -178,7 +183,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           Seq(lease),
           richAccount,
           3,
-          System.currentTimeMillis()
+          blockTime
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
@@ -187,7 +192,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           micros = Seq(Seq(leaseCancel)),
           signer = richAccount,
           version = 3,
-          timestamp = System.currentTimeMillis()
+          timestamp = blockTime
         )
 
         val transferBlock = unsafeBlock(
@@ -195,7 +200,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           Seq(transfer),
           secondAccount,
           3,
-          System.currentTimeMillis()
+          blockTime
         )
 
         (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount)
@@ -206,8 +211,9 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
       for {
         richAccount   <- accountGen
         tsAmount = FeeAmount * 10
-        data1 <- QuickTX.data(richAccount, "test")
-        data2 <- QuickTX.data(richAccount, "test")
+        blockTime = ntpNow
+        data1 <- QuickTX.data(richAccount, "test", Gen.const(ntpNow))
+        data2 <- QuickTX.data(richAccount, "test", Gen.const(ntpNow))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
@@ -222,7 +228,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           Seq(data1),
           richAccount,
           3,
-          System.currentTimeMillis()
+          blockTime
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
@@ -231,7 +237,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           micros = Seq(Seq(data2)),
           signer = richAccount,
           version = 3,
-          timestamp = System.currentTimeMillis()
+          blockTime
         )
         (genesisBlock, Seq(preBlock, keyBlock), microBlocks, richAccount.toAddress)
       }
