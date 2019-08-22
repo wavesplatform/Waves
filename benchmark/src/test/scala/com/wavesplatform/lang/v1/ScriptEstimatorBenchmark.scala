@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.ScriptEstimatorBenchmark.St
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import monix.eval.Coeval
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -17,7 +18,7 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10)
 class ScriptEstimatorBenchmark {
   @Benchmark
-  def apply_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptEstimator(Set.empty, st.functionCosts, st.expr))
+  def apply_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptEstimatorV2(Set.empty, st.functionCosts, st.expr))
 }
 
 object ScriptEstimatorBenchmark {
