@@ -42,8 +42,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val assetDescription = "my asset description"
 
     firstNode.transfer(
-      firstNode.privateKey.address,
-      firstNodeIssuer.address,
+      firstNode.privateKey.stringRepr,
+      firstNodeIssuer.stringRepr,
       10.waves,
       0.001.waves,
       waitForTx = true
@@ -69,6 +69,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
         script = None,
         waitForTx = true)
       .id
+
+    nodes.waitForHeightArise()
 
     secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 1L)
   }

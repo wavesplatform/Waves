@@ -97,7 +97,7 @@ class UtxPoolImpl(
             Right(())
           } else {
             val sender: Option[String] = tx match {
-              case x: Authorized => Some(x.sender.address)
+              case x: Authorized => Some(x.sender.stringRepr)
               case _             => None
             }
 

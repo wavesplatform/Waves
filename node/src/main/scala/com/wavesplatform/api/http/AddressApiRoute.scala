@@ -334,7 +334,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = (path("addresses") & get) {
     val accounts = wallet.privateKeyAccounts
-    val json     = JsArray(accounts.map(a => JsString(a.address)))
+    val json     = JsArray(accounts.map(a => JsString(a.stringRepr)))
     complete(json)
   }
 
@@ -351,7 +351,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       case (start, end) =>
         if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
           val json = JsArray(
-            wallet.privateKeyAccounts.map(a => JsString(a.address)).slice(start, end)
+            wallet.privateKeyAccounts.map(a => JsString(a.stringRepr)).slice(start, end)
           )
 
           complete(json)
@@ -363,7 +363,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
   def create: Route = (path("addresses") & post & withAuth) {
     wallet.generateNewAccount() match {
-      case Some(pka) => complete(Json.obj("address" -> pka.address))
+      case Some(pka) => complete(Json.obj("address" -> pka.stringRepr))
       case None      => complete(Unknown)
     }
   }
@@ -376,7 +376,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         acc =>
           ToResponseMarshallable(
             Balance(
-              acc.address,
+              acc.stringRepr,
               confirmations,
               commonAccountApi.balance(acc, confirmations)
             )
@@ -389,26 +389,26 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.address, 0, commonAccountApi.balance(acc))))
+      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, 0, commonAccountApi.balance(acc))))
       .getOrElse(InvalidAddress)
   }
 
   private def balancesDetailsJson(account: Address): BalanceDetails = {
     val details = commonAccountApi.balanceDetails(account)
     import details._
-    BalanceDetails(account.address, regular, generating, available, effective)
+    BalanceDetails(account.stringRepr, regular, generating, available, effective)
   }
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
     val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountApi.script(account)
-    AddressScriptInfo(account.address, script.map(_.base64), scriptText, complexity, extraFee)
+    AddressScriptInfo(account.stringRepr, script.map(_.base64), scriptText, complexity, extraFee)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, commonAccountApi.effectiveBalance(acc, confirmations))))
+      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, confirmations, commonAccountApi.effectiveBalance(acc, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
@@ -476,7 +476,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
-        val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
+        val isValid = account.stringRepr == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }
@@ -493,7 +493,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Base58.tryDecodeWithLimit(publicKey) match {
       case Success(pubKeyBytes) =>
         val account = Address.fromPublicKey(PublicKey(pubKeyBytes))
-        complete(Json.obj("address" -> account.address))
+        complete(Json.obj("address" -> account.stringRepr))
       case Failure(_) => complete(InvalidPublicKey)
     }
   }

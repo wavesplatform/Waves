@@ -36,9 +36,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         feeAssetId = None,
         amount = 1 * Waves,
         fee = Waves / 3,
-        sender = senderPrivateKey.address,
+        sender = senderPrivateKey.stringRepr,
         attachment = Some("attachment"),
-        recipient = receiverPrivateKey.address,
+        recipient = receiverPrivateKey.stringRepr,
         timestamp = Some(System.currentTimeMillis())
       )
 
@@ -54,9 +54,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         amount = 1 * Waves,
         feeAssetId = None,
         fee = Waves / 3,
-        sender = senderPrivateKey.address,
+        sender = senderPrivateKey.stringRepr,
         attachment = None,
-        recipient = receiverPrivateKey.address,
+        recipient = receiverPrivateKey.stringRepr,
         timestamp = Some(System.currentTimeMillis())
       )
 

@@ -144,4 +144,5 @@ package object appender extends ScorexLogging {
     val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all")
     val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put")
   }
+
 }
