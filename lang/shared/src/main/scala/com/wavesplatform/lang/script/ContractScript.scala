@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.script
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits.{MaxComplexityByVersion, MaxContractSizeInBytes}
+import com.wavesplatform.lang.v1.ContractLimits.MaxContractSizeInBytes
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader, ScriptEstimator}
 import monix.eval.Coeval
-import cats.implicits._
 
 object ContractScript {
 
@@ -35,31 +35,27 @@ object ContractScript {
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 
-  private def estimateComplexityByFunction(
+  def estimateComplexityByFunction(
     version:   StdLibVersion,
     contract:  DApp,
     estimator: ScriptEstimator
-  ): Either[String, Vector[(String, Long)]] = {
-    import cats.implicits._
-    val funcsWithComplexity: Seq[Either[String, (String, Long)]] =
-      (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
-        contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
-        .map {
-          case (annotationArgName, funcExpr) =>
-            estimator(
-              varNames(version, DAppType),
-              functionCosts(version),
-              constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr)
-            ).map((funcExpr.name, _))
-        }
-    funcsWithComplexity.toVector.sequence
-  }
+  ): Either[String, List[(String, Long)]] =
+    (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
+      contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
+      .traverse {
+        case (annotationArgName, funcExpr) =>
+          estimator(
+            varNames(version, DAppType),
+            functionCosts(version),
+            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr)
+          ).map((funcExpr.name, _))
+      }
 
   def estimateComplexity(
     version:   StdLibVersion,
     contract:  DApp,
     estimator: ScriptEstimator
-  ): Either[String, (Long, Vector[(String, Long)])] =
+  ): Either[String, (Long, List[(String, Long)])] =
     estimateComplexityByFunction(version, contract, estimator)
       .map(namesAndComp => ((("", 0L) +: namesAndComp).map(_._2).max, namesAndComp))
 

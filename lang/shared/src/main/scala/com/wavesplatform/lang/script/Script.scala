@@ -61,4 +61,10 @@ object Script {
       case script: ExprScript                    => ExprScript.estimate(script.expr, script.stdLibVersion, estimator)
       case ContractScriptImpl(version, contract) => ContractScript.estimateComplexity(version, contract, estimator).map(_._1)
     }
+
+  def complexityMap(s: Script, estimator: ScriptEstimator): Either[String, Map[String, Long]] =
+    s match {
+      case script: ExprScript                    => Right(Map())
+      case ContractScriptImpl(version, contract) => ContractScript.estimateComplexityByFunction(version, contract, estimator).map(_._1)
+    }
 }
