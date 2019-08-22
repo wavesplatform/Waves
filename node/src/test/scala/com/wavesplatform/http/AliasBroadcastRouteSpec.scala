@@ -1,33 +1,32 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.api.http.alias.AliasApiRoute
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils.Time
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
-
-import scala.concurrent.Future
 
 class AliasBroadcastRouteSpec
     extends RouteSpec("/alias/broadcast/")
     with RequestGen
     with PathMockFactory
     with PropertyChecks
-    with RestAPISettingsHelper {
-  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _)
-    .when(*, *, *)
-    .onCall((t, _, _) => Future.successful(Left(TransactionValidationError(GenericError("foo"), t))))
+    with RestAPISettingsHelper
+    with NoShrink {
+  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
+
+  val route = AliasApiRoute(restAPISettings, stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
 
   "returns StateCheckFiled" - {
-    val route = AliasBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
@@ -39,7 +38,6 @@ class AliasBroadcastRouteSpec
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(restAPISettings, utxPoolSynchronizer).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat

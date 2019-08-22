@@ -11,12 +11,10 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
 
-import scala.concurrent.Future
 import scala.util.Random
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
@@ -41,11 +39,10 @@ class AddressRouteSpec
     with TestWallet
     with NoShrink {
 
-  private val allAccounts               = testWallet.privateKeyAccounts
-  private val allAddresses              = allAccounts.map(_.address)
-  private val blockchain                = stub[Blockchain]
-  private[this] val utxPoolSynchronizer = stub[UtxPoolSynchronizer]
-  (utxPoolSynchronizer.publishTransaction _).when(*, *, *).returns(Future.successful(Right(true)))
+  private val allAccounts  = testWallet.privateKeyAccounts
+  private val allAddresses = allAccounts.map(_.stringRepr)
+  private val blockchain   = stub[Blockchain]
+  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
 
   private val route =
     AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime).route
@@ -88,11 +85,11 @@ class AddressRouteSpec
 
   routePath("/seed/{address}") in {
     val account = allAccounts.head
-    val path    = routePath(s"/seed/${account.address}")
+    val path    = routePath(s"/seed/${account.stringRepr}")
     Get(path) ~> route should produce(ApiKeyNotValid)
     Get(path) ~> ApiKeyHeader ~> route ~> check {
       val json = responseAs[JsObject]
-      (json \ "address").as[String] shouldEqual account.address
+      (json \ "address").as[String] shouldEqual account.stringRepr
       (json \ "seed").as[String] shouldEqual Base58.encode(account.seed)
     }
   }
@@ -100,7 +97,7 @@ class AddressRouteSpec
   private def testSign(path: String, encode: Boolean): Unit =
     forAll(generatedMessages) {
       case (account, message) =>
-        val uri = routePath(s"/$path/${account.address}")
+        val uri = routePath(s"/$path/${account.stringRepr}")
         Post(uri, message) ~> route should produce(ApiKeyNotValid)
         Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
           val resp      = responseAs[JsObject]
@@ -120,7 +117,7 @@ class AddressRouteSpec
 
     forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) {
       case ((account, message), b58) =>
-        val uri          = routePath(s"/$path/${account.address}")
+        val uri          = routePath(s"/$path/${account.stringRepr}")
         val messageBytes = message.getBytes("UTF-8")
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(

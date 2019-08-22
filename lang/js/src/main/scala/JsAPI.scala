@@ -172,7 +172,7 @@ object JsAPI {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds)
+      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
       compiled    <- compileScript(ds, linkedInput)
     } yield compiled
     r.fold(
@@ -186,7 +186,7 @@ object JsAPI {
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = false)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -197,7 +197,7 @@ object JsAPI {
           }
       case Library =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = true)
+        Global.compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
