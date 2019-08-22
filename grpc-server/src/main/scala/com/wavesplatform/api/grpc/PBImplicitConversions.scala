@@ -50,7 +50,7 @@ trait PBImplicitConversions {
         NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
         0,
         header.featureVotes.map(intToShort).toSet,
-        0.toByte
+        intToByte(header.rewardVote)
       )
     }
   }
@@ -95,5 +95,10 @@ trait PBImplicitConversions {
   private[this] def intToShort(int: Int): Short = {
     require(int >= 0 && int <= 65535, s"Short overflow: $int")
     int.toShort
+  }
+
+  private[this] def intToByte(int: Int): Byte = {
+    require(int >= Byte.MinValue && int <= Byte.MaxValue, s"Byte overflow: $int")
+    int.toByte
   }
 }
