@@ -10,7 +10,6 @@ import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -400,8 +399,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   }
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) =
-      commonAccountApi.script(account, blockchain.estimator())
+    val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountApi.script(account)
     AddressScriptInfo(account.address, script.map(_.base64), scriptText, complexity, extraFee)
   }
 

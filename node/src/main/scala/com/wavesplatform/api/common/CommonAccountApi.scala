@@ -2,8 +2,8 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
@@ -47,13 +47,13 @@ class CommonAccountApi(blockchain: Blockchain) {
   def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
     blockchain.nftObservable(address, from)
 
-  def script(address: Address, estimator: ScriptEstimator): AddressScriptInfo = {
+  def script(address: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain.accountScript(address)
 
     AddressScriptInfo(
       script = script.map(_.bytes()),
       scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
-      complexity = script.map(Script.estimate(_, estimator).explicitGet()).getOrElse(0),
+      complexity = script.map(Script.estimate(_, blockchain.estimator()).explicitGet()).getOrElse(0L),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }
