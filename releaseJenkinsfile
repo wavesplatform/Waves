@@ -71,7 +71,7 @@ node('wavesnode'){
                     sh 'env'
                     step([$class: 'WsCleanup'])
                     ut.checkout(branch, repo_url)
-                    sh "mkdir ${artifactsDir}"
+                    sh "mkdir -p ${artifactsDir}/all"
                 }
 
                 stage ('Build artifacts'){
@@ -81,6 +81,7 @@ node('wavesnode'){
                         ut.sbt 'clean packageAll'
                     }
                     sh """
+                        mkdir -p ${artifactsDir}/${it}
                         cp node/target/waves-all-*.jar ${artifactsDir}/all/
                         cp grpc-server/target/universal/*.tgz ${artifactsDir}/all/
                         cp node/target/waves*all.deb ${artifactsDir}/${it}/
