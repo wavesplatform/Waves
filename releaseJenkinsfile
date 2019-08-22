@@ -5,11 +5,11 @@ import devops.waves.*
 
 ut = new utils()
 
-def networkParam = ut.checkBox("network", // name
+def networkParam = ut.checkBox("network",   // name
                 "mainnet,testnet,stagenet", // values
-                "mainnet", //default value
-                0, //visible item cnt
-                "", // description
+                "mainnet",                  //default value
+                0,                          //visible item cnt
+                "",                         // description
                 )
 def artifactsDir="out"
 def networks
@@ -85,11 +85,20 @@ node('wavesnode'){
 
                     sh """
                         mkdir -p ${artifactsDir}/${it}
+
                         cp node/target/waves-all-*.jar ${artifactsDir}/all/
-                        cp grpc-server/target/universal/*${filter}*.tgz ${artifactsDir}/all/ || true
-                        cp node/target/waves*${filter}*all.deb ${artifactsDir}/${it}/ || true
-                        cp grpc-server/target/*${filter}*.deb ${artifactsDir}/${it}/ || true
-                        cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/
+                        
+                        find grpc-server/target/universal/ -name *${filter}*.tgz | grep -q . && \
+                            cp grpc-server/target/universal/*${filter}*.tgz ${artifactsDir}/all/ || true
+
+                        find node/target/ -name waves*${filter}*all.deb | grep -q . && \
+                            cp node/target/waves*${filter}*all.deb ${artifactsDir}/${it}/ || true
+
+                        find grpc-server/target/ -name *${filter}*.deb | grep -q . && \
+                            cp grpc-server/target/*${filter}*.deb ${artifactsDir}/${it}/ || true
+
+                        find ${artifactsDir}/${it}/ -name *.deb | grep -q . && \
+                            cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/ || true
                         """
                     }
                     dir (artifactsDir + '/all'){
