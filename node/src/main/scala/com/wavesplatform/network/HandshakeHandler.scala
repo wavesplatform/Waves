@@ -12,8 +12,10 @@ import io.netty.channel.group.ChannelGroup
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.AttributeKey
 import io.netty.util.concurrent.ScheduledFuture
+import monix.execution.Scheduler
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Random
 
 class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void] with ScorexLogging {
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
@@ -96,28 +98,28 @@ abstract class HandshakeHandler(localHandshake: Handshake,
 
           case Some(key) =>
             val previousPeer = peerConnections.putIfAbsent(key, ctx.channel())
-            if (previousPeer == null) {
-              log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
-              removeHandshakeHandlers(ctx, this)
-              establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
-
-              ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
-              Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
-                log.trace(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
-              }
-              ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-                peerConnections.remove(key, f.channel())
-                establishedConnections.remove(f.channel())
-                log.trace(s"${id(f.channel())} was closed")
-              }
-
-              connectionNegotiated(ctx)
-              ctx.fireChannelRead(msg)
-            } else {
+            if (previousPeer != null) {
               val peerAddress = ctx.remoteAddress.getOrElse("unknown")
               log.debug(s"${id(ctx)} Already connected to peer $peerAddress with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
-              ctx.close()
+              HandshakeHandler.closeEventually(peerConnections.containsKey(key), ctx)
             }
+
+            log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
+            removeHandshakeHandlers(ctx, this)
+            establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
+
+            ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
+            Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
+              log.trace(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
+            }
+            ctx.channel().closeFuture().addListener { f: ChannelFuture =>
+              peerConnections.remove(key, f.channel())
+              establishedConnections.remove(f.channel())
+              log.trace(s"${id(f.channel())} was closed")
+            }
+
+            connectionNegotiated(ctx)
+            ctx.fireChannelRead(msg)
         }
       }
     case _ => super.channelRead(ctx, msg)
@@ -183,4 +185,8 @@ object HandshakeHandler extends ScorexLogging {
     }
   }
 
+  private def closeEventually(cond: => Boolean, ctx: ChannelHandlerContext): Unit = {
+    val time = Random.nextInt(30000)
+    Scheduler.global.scheduleOnce(time, TimeUnit.MILLISECONDS, () => if (cond) ctx.close())
+  }
 }
