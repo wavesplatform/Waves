@@ -6,12 +6,11 @@ import com.wavesplatform.transaction.TxValidationError._
 
 trait AddressOrAlias {
   def stringRepr: String
-
   def bytes: ByteStr
 
   override def toString: String = stringRepr
 
-  override def equals(obj: scala.Any): Boolean = obj match {
+  override def equals(obj: Any): Boolean = obj match {
     case a: AddressOrAlias => bytes == a.bytes
     case _                 => false
   }

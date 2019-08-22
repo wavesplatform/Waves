@@ -273,7 +273,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
     for ((address, id) <- newAddresses) {
       rw.put(Keys.addressId(address), Some(id))
-      log.trace(s"WRITE ${address.address} -> $id")
+      log.trace(s"WRITE ${address.stringRepr} -> $id")
       rw.put(Keys.idToAddress(id), address)
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")

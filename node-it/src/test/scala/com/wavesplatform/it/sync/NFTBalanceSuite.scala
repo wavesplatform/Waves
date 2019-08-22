@@ -65,7 +65,7 @@ class NFTBalanceSuite
     val fundAndIssue =
       for {
         _      <- traverse(nodes)(_.waitForHeight(2))
-        fundTx <- node.transfer(node.address, issuer.address, 1000.waves, 0.001.waves)
+        fundTx <- node.transfer(node.address, issuer.stringRepr, 1000.waves, 0.001.waves)
         _      <- node.waitForTransaction(fundTx.id)
         _ <- Future.sequence((simple ++ nft) map { tx =>
           for {
@@ -85,7 +85,7 @@ class NFTBalanceSuite
       val expectedIds = simple map (_.assetId.base58)
 
       val assertion =
-        getPortfolio(node, issuer.address) map { ids =>
+        getPortfolio(node, issuer.stringRepr) map { ids =>
           ids.toSet shouldBe expectedIds.toSet
         }
 
@@ -96,7 +96,7 @@ class NFTBalanceSuite
       val expectedIds = nft.map(_.assetId.base58)
 
       val assertion =
-        getNFTPage(node, issuer.address, 1000, None) map { ids =>
+        getNFTPage(node, issuer.stringRepr, 1000, None) map { ids =>
           ids.toSet shouldBe expectedIds.toSet
         }
 
@@ -122,8 +122,8 @@ class NFTBalanceSuite
       val assertion = for {
         tx         <- node.signedBroadcast(transfer.json())
         _          <- node.waitForTransaction(tx.id)
-        issuerNFTs <- getNFTPage(node, issuer.address, 1000, None)
-        otherNFTs  <- getNFTPage(node, other.address, 1000, None)
+        issuerNFTs <- getNFTPage(node, issuer.stringRepr, 1000, None)
+        otherNFTs  <- getNFTPage(node, other.stringRepr, 1000, None)
       } yield {
         issuerNFTs shouldNot contain(randomTokenToTransfer.id.base58)
         otherNFTs should contain(randomTokenToTransfer.id.base58)
@@ -141,8 +141,8 @@ class NFTBalanceSuite
         .toSet
 
       val assertion = for {
-        pagedIds    <- getNFTPaged(node, issuer.address, 10).map(_.toSet)
-        nonPagedIds <- getNFTPage(node, issuer.address, 1000, None).map(_.toSet)
+        pagedIds    <- getNFTPaged(node, issuer.stringRepr, 10).map(_.toSet)
+        nonPagedIds <- getNFTPage(node, issuer.stringRepr, 1000, None).map(_.toSet)
       } yield {
         pagedIds shouldBe expectedIds
         nonPagedIds shouldBe expectedIds
@@ -152,7 +152,7 @@ class NFTBalanceSuite
     }
 
     "returns error on wrong limit" in {
-      val assertion = getNFTPage(node, issuer.address, 10000000, None)
+      val assertion = getNFTPage(node, issuer.stringRepr, 10000000, None)
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith {
           case ex: Throwable =>
@@ -165,7 +165,7 @@ class NFTBalanceSuite
     }
 
     "returns error on wrong base58 in after" in {
-      val assertion = getNFTPage(node, issuer.address, 100, Some("wr0ngbase58str1ng"))
+      val assertion = getNFTPage(node, issuer.stringRepr, 100, Some("wr0ngbase58str1ng"))
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith {
           case ex: Throwable =>
