@@ -1,17 +1,24 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.CancelAfterFailure
 
 class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -174,8 +181,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("lastBlock and blockInfoByHeight(last) must return liquid block") {
-    val script = ScriptCompiler.compile(
-      s"""
+    val script = ScriptCompiler.compile(s"""
          |  {-# STDLIB_VERSION 3       #-}
          |  {-# CONTENT_TYPE   DAPP    #-}
          |  {-# SCRIPT_TYPE    ACCOUNT #-}
@@ -199,5 +205,89 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val transfer = sender.transfer(newAddress, newAddress, 1.waves, minFee + (2 * smartFee))
     nodes.waitForHeightAriseAndTxPresent(transfer.id)
+  }
+
+  test("parseBlockHeader() must work!") {
+    val blockheaderGen: Gen[BlockHeader] = {
+      for {
+        timestamp        <- Gen.posNum[Long]
+        version          <- Gen.posNum[Byte]
+        reference        <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
+        generator        <- Gen.containerOfN[Array, Byte](KeyLength, Arbitrary.arbByte.arbitrary)
+        signature        <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
+        baseTarget       <- Gen.posNum[Long]
+        genSignature     <- Gen.containerOfN[Array, Byte](Block.GeneratorSignatureLength, Arbitrary.arbByte.arbitrary)
+        transactionCount <- Gen.posNum[Int]
+        featureVotes     <- Gen.listOf(Gen.posNum[Short])
+      } yield {
+        new BlockHeader(
+          timestamp,
+          version,
+          reference,
+          SignerData(PublicKey(generator), signature),
+          NxtLikeConsensusBlockData(baseTarget, genSignature),
+          transactionCount,
+          featureVotes.toSet
+        )
+      }
+    }
+
+    def script(header: BlockHeader): Script = {
+      val expectedReference    = Base64.encode(header.reference)
+      val expectedGenerator    = Base64.encode(header.signerData.generator.bytes)
+      val expectedGeneratorPK  = Base64.encode(header.signerData.generator.toAddress.bytes)
+      val expectedSignature    = Base64.encode(header.signerData.signature)
+      val expectedGenSignature = Base64.encode(header.consensusData.generationSignature)
+
+      ScriptCompiler.compile(
+        s"""
+           |  {-# STDLIB_VERSION 4       #-}
+           |  {-# CONTENT_TYPE   DAPP    #-}
+           |  {-# SCRIPT_TYPE    ACCOUNT #-}
+           |
+           |  @Callable(i)
+           |  func test(headerBytes: ByteVector)  = {
+           |    match headerBytes.parseBlockHeader() {
+           |      case header: BlockHeader =>
+           |        let headerValid =
+           |          header.timestamp == ${header.timestamp} &&
+           |            header.version == ${header.version} &&
+           |            header.reference == base64'$expectedReference' &&
+           |            header.generator == base64'$expectedGenerator' &&
+           |            header.generatorPublicKey == base64'$expectedGeneratorPK' &&
+           |            header.signature == base64'$expectedSignature' &&
+           |            header.baseTarget == ${header.consensusData.baseTarget} &&
+           |            header.generationSignature == base64'$expectedGenSignature' &&
+           |            header.transactionCount == ${header.transactionCount}
+           |        if headerValid
+           |        then WriteSet([
+           |          DataEntry("k", "v")
+           |        ])
+           |        else throw("Parsed invalid header!")
+           |      case _ => throw("Can't parse header!")
+           |    }
+           |  }
+           |""".stripMargin
+      )
+    }.explicitGet()._1
+
+    val newAddress = sender.createAddress()
+    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+
+    val header: BlockHeader = blockheaderGen.sample.get
+
+    val setScript = sender.setScript(newAddress, Some(script(header).bytes().base64), setScriptFee)
+    nodes.waitForHeightAriseAndTxPresent(setScript.id)
+
+    val invokeTx = sender.invokeScript(
+      sender.address,
+      newAddress,
+      Some("test"),
+      List(
+        CONST_BYTESTR(BlockHeader.writeHeaderOnly(header)).explicitGet()
+      )
+    )
+
+    nodes.waitForHeightAriseAndTxPresent(invokeTx.id)
   }
 }

@@ -49,7 +49,7 @@ object InvokeScriptTransactionDiff {
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(_, contract, _))) =>
+      case Right(Some(sc @ ContractScriptImpl(v, contract, _))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val environment = new WavesEnvironment(
@@ -72,13 +72,13 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
-              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              directives <- DirectiveSet(v, Account, DAppType).leftMap((_, List.empty[LogItem]))
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(
                     Seq(
-                      PureContext.build(Global, V3),
-                      CryptoContext.build(Global, V3),
+                      PureContext.build(Global, v),
+                      CryptoContext.build(Global, v),
                       WavesContext.build(directives, environment)
                     )
                   )
