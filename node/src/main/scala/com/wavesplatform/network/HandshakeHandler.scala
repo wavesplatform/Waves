@@ -101,7 +101,7 @@ abstract class HandshakeHandler(localHandshake: Handshake,
             if (previousPeer != null) {
               val peerAddress = ctx.remoteAddress.getOrElse("unknown")
               log.debug(s"${id(ctx)} Already connected to peer $peerAddress with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
-              HandshakeHandler.closeEventually(peerConnections.containsKey(key), ctx)
+              HandshakeHandler.closeEventually(peerConnections.putIfAbsent(key, ctx.channel()) != null, ctx)
             }
 
             log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
@@ -186,7 +186,7 @@ object HandshakeHandler extends ScorexLogging {
   }
 
   private def closeEventually(cond: => Boolean, ctx: ChannelHandlerContext): Unit = {
-    val time = Random.nextInt(30000)
+    val time = Random.nextInt(5000)
     Scheduler.global.scheduleOnce(time, TimeUnit.MILLISECONDS, () => if (cond) ctx.close())
   }
 }
