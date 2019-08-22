@@ -97,6 +97,16 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
+
+  def selfSigned(chainId: Byte,
+                 sender: KeyPair,
+                 asset: IssuedAsset,
+                 script: Option[Script],
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, SetAssetScriptTransaction] = {
+    signed(chainId, sender, asset, script, fee, timestamp, sender)
+  }
+
   override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either

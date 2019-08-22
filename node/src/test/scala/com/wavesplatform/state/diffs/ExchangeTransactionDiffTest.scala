@@ -144,7 +144,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-            val matcherPortfolio = Monoid.combineAll(blockDiff.portfolios.filterKeys(_.address == exchange.sender.address).values)
+            val matcherPortfolio = Monoid.combineAll(blockDiff.portfolios.filterKeys(_.stringRepr == exchange.sender.stringRepr).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -243,7 +243,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-            val matcherPortfolio = Monoid.combineAll(blockDiff.portfolios.filterKeys(_.address == exchange.sender.address).values)
+            val matcherPortfolio = Monoid.combineAll(blockDiff.portfolios.filterKeys(_.stringRepr == exchange.sender.stringRepr).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(

@@ -236,7 +236,7 @@ class TransactionsRouteSpec
 
   routePath("/address/{address}/limit/{limit}") - {
     val bytes32StrGen = bytes32gen.map(Base58.encode)
-    val addressGen    = accountGen.map(_.address)
+    val addressGen    = accountGen.map(_.stringRepr)
 
     "handles parameter errors with corresponding responses" - {
       "invalid address" in {

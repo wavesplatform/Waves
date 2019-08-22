@@ -93,15 +93,19 @@ trait BaseGlobal {
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
 
-  def compileExpression(input: String,
-                        context: CompilerContext,
-                        restrictToLetBlockOnly: Boolean,
-                        stdLibVersion: StdLibVersion,
-                        isDecl: Boolean
-                       ): Either[String, (Array[Byte], Terms.EXPR, Long)] = {
-    val compiler =
-      if (isDecl) ExpressionCompiler.compileDecls _
-      else ExpressionCompiler.compile _
+  val compileExpression =
+    compile(_, _, _, _, ExpressionCompiler.compile)
+
+  val compileDecls =
+    compile(_, _, _, _, ExpressionCompiler.compileDecls)
+
+  private def compile(
+    input: String,
+    context: CompilerContext,
+    restrictToLetBlockOnly: Boolean,
+    stdLibVersion: StdLibVersion,
+    compiler: (String, CompilerContext) => Either[String, EXPR]
+  ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
     for {
       ex <- compiler(input, context)
       illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
@@ -112,7 +116,6 @@ trait BaseGlobal {
       costs = utils.functionCosts(stdLibVersion)
       complexity <- ScriptEstimator(vars, costs, ex)
     } yield (x, ex, complexity)
-  }
 
   type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])
 

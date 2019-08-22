@@ -202,7 +202,7 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set(sender.address), Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set(sender.stringRepr), Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
@@ -217,8 +217,8 @@ class UtxPoolSpecification
       UtxSettings(txs.length,
                   PoolDefaultMaxBytes,
                   1000,
-                  Set(sender.address),
-                  Set(recipient.address),
+                  Set(sender.stringRepr),
+                  Set(recipient.stringRepr),
                   allowTransactionsFromSmartAccounts = true,
                   allowSkipChecks = false)
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
@@ -233,12 +233,12 @@ class UtxPoolSpecification
       time = new TestTime()
       txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
     } yield {
-      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
+      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.stringRepr).toSet else Set.empty
       val settings =
         UtxSettings(txs.length,
                     PoolDefaultMaxBytes,
                     1000,
-                    Set(sender.address),
+                    Set(sender.stringRepr),
                     whitelist,
                     allowTransactionsFromSmartAccounts = true,
                     allowSkipChecks = false)
