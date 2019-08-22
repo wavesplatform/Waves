@@ -89,36 +89,36 @@ node('wavesnode'){
                         cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/
                         """
                     }
-                    dir (artifactsDir + '/all'){
-                        artifacts = findFiles(glob: '**/*')
-                        artifacts.each{
-                            shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
-                        }
-                    }
+                    // dir (artifactsDir + '/all'){
+                    //     artifacts = findFiles(glob: '**/*')
+                    //     artifacts.each{
+                    //         shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
+                    //     }
+                    // }
                 }
 
-                stage ('Create a release'){
-                    withCredentials([string(credentialsId: 'waves-release-github-token', variable: 'token')]) {
-                        dir (artifactsDir){
-                            def createReleaseBody = [
-                                tag_name: "${tag}",
-                                target_commitish: "${branch}",
-                                name: "Version ${tag.replace('v','')} (${networks.collect{ it.capitalize() }.join(" + ")})",
-                                body: "# In this release\n${shaSumField}```",
-                                draft: true,
-                                prerelease: false]
-                            def createReleaseBodyJson = JsonOutput.toJson(createReleaseBody)
-                            def createReleaseUrl = "https://api.github.com/repos/${user}/${repo}/releases"
-                            def id = ut.shWithOutput "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: application/json' -d '${createReleaseBodyJson}' ${createReleaseUrl} | grep -m 1 'id.:' | tr -cd '[0-9]='"
+                // stage ('Create a release'){
+                //     withCredentials([string(credentialsId: 'waves-release-github-token', variable: 'token')]) {
+                //         dir (artifactsDir){
+                //             def createReleaseBody = [
+                //                 tag_name: "${tag}",
+                //                 target_commitish: "${branch}",
+                //                 name: "Version ${tag.replace('v','')} (${networks.collect{ it.capitalize() }.join(" + ")})",
+                //                 body: "# In this release\n${shaSumField}```",
+                //                 draft: true,
+                //                 prerelease: false]
+                //             def createReleaseBodyJson = JsonOutput.toJson(createReleaseBody)
+                //             def createReleaseUrl = "https://api.github.com/repos/${user}/${repo}/releases"
+                //             def id = ut.shWithOutput "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: application/json' -d '${createReleaseBodyJson}' ${createReleaseUrl} | grep -m 1 'id.:' | tr -cd '[0-9]='"
 
-                            artifacts.each{
-                                def contentType = (it.name.contains('tgz')) ? "application/gzip" : "application/octet-stream"
-                                def uploadAssetsUrl = "https://uploads.github.com/repos/${user}/${repo}/releases/${id}/assets?name=${it.name}"
-                                sh "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: ${contentType}' --data-binary @${it.name} ${uploadAssetsUrl}"
-                            }
-                        }
-                    }
-                }
+                //             artifacts.each{
+                //                 def contentType = (it.name.contains('tgz')) ? "application/gzip" : "application/octet-stream"
+                //                 def uploadAssetsUrl = "https://uploads.github.com/repos/${user}/${repo}/releases/${id}/assets?name=${it.name}"
+                //                 sh "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: ${contentType}' --data-binary @${it.name} ${uploadAssetsUrl}"
+                //             }
+                //         }
+                //     }
+                // }
 
                 withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
                     Constants.REMOTE.host = Constants.APT_REPO_CONTROLLER_SERVER
@@ -127,9 +127,9 @@ node('wavesnode'){
                     Constants.REMOTE.identityFile = identity
                     stage ('Updating APT repo'){
                         networks.each {
-                            ut.remotePut("${artifactsDir}/${it}/*.deb", "/opt/aptly/waves-${it}/")
+                            ut.remotePut("${artifactsDir}/${it}", "/opt/aptly/${it}")
                         }
-                        remoteExec "/opt/aptly/aptly.sh"
+                        // remoteExec "/opt/aptly/aptly.sh"
                     }                    
                 }
             }
