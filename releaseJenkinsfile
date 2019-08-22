@@ -127,7 +127,7 @@ node('wavesnode'){
                     Constants.REMOTE.identityFile = identity
                     stage ('Updating APT repo'){
                         networks.each {
-                            ut.remotePut("${artifactsDir}/${it}", "/opt/aptly/${it}")
+                            ut.remotePut("${artifactsDir}/${it}", "/opt/aptly")
                         }
                         remoteExec "/opt/aptly/aptly.sh"
                     }                    
