@@ -20,10 +20,10 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
   private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.address)
+    val (balance1, eff1) = miner.accountBalances(acc0.stringRepr)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee).id
+    val txId = sender.transfer(sender.address, acc0.stringRepr, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)

@@ -585,7 +585,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | this.bytes == base58'${masterAcc.address}'
+                 | this.bytes == base58'${masterAcc.stringRepr}'
                  |
               """.stripMargin,
               estimator
@@ -616,7 +616,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let checkAddressToStrRight = this.toString() == "${masterAcc.address}"
+                 | let checkAddressToStrRight = this.toString() == "${masterAcc.stringRepr}"
                  | let checkAddressToStr = this.bytes.toBase58String() == this.toString()
                  |
                  | checkAddressToStrRight && checkAddressToStr

@@ -50,6 +50,7 @@ import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import org.bouncycastle.util.encoders.Hex
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
 
