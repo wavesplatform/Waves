@@ -13,6 +13,9 @@ import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.features.BlockchainFeatures.ReduceNFTFee
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
@@ -165,20 +168,26 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           .load("preconditions.conf")
           .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
 
+      val estimator =
+        if (wavesSettings.featuresSettings.supported.contains(ReduceNFTFee.id))
+          ScriptEstimatorV2
+        else
+          ScriptEstimatorV1
+
       val (universe, initialTransactions) = preconditions
-        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
+        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
 
       Universe.Accounts = universe.accounts
       Universe.IssuedAssets = universe.issuedAssets
       Universe.Leases = universe.leases
 
       val generator: TransactionGenerator = finalConfig.mode match {
-        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
+        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts, estimator)
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
-        case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
-        case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts)
-        case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts)
+        case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts, estimator)
+        case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts, estimator)
+        case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts, estimator)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
