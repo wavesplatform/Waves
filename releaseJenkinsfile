@@ -111,7 +111,7 @@ node('wavesnode'){
 
                 stage ('Create a release'){
                     withCredentials([string(credentialsId: 'waves-release-github-token', variable: 'token')]) {
-                        dir (artifactsDir){
+                        dir (artifactsDir + '/all'){
                             def createReleaseBody = [
                                 tag_name: "${tag}",
                                 target_commitish: "${branch}",
