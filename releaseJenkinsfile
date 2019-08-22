@@ -6,7 +6,7 @@ import devops.waves.*
 ut = new utils()
 
 def networkParam = ut.checkBox("network", // name
-                "mainnet,testnet,devnet", // values
+                "mainnet,testnet,stagenet", // values
                 "mainnet", //default value
                 0, //visible item cnt
                 "", // description
@@ -18,6 +18,7 @@ def shaSumField = "## SHA256 Checksums\n```\n"
 def user = "wavesplatform"
 def repo = "Waves"
 def repo_url = "https://github.com/${user}/${repo}"
+
 properties([
     parameters([
         string(defaultValue: 'v0.0.0', description: '', name: 'tag', trim: true),
@@ -46,7 +47,7 @@ stage('Build information'){
     }
     else
     {
-        networks = network.split(',').collect{it.toLowerCase().capitalize()}
+        networks = network.split(',').collect{it.toLowerCase()}
          echo "Parameters are specified:\n" +
         "network: ${networks}\n" +
         "branch: ${branch}\n" +
@@ -79,14 +80,15 @@ node('wavesnode'){
                     withEnv(["SBT_OPTS=-Xmx2g -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=128m -Dnetwork=${it.toLowerCase()}"]) {
                         ut.sbt 'clean packageAll'
                     }
-                      sh """
-                        cp node/target/waves-all-*.jar ${artifactsDir}/
-                        cp node/target/waves*all.deb ${artifactsDir}/
-                        cp grpc-server/target/universal/*.tgz ${artifactsDir}/
-                        cp grpc-server/target/*.deb ${artifactsDir}/
+                    sh """
+                        cp node/target/waves-all-*.jar ${artifactsDir}/all/
+                        cp grpc-server/target/universal/*.tgz ${artifactsDir}/all/
+                        cp node/target/waves*all.deb ${artifactsDir}/${it}/
+                        cp grpc-server/target/*.deb ${artifactsDir}/${it}/
+                        cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/
                         """
                     }
-                    dir (artifactsDir){
+                    dir (artifactsDir + '/all'){
                         artifacts = findFiles(glob: '**/*')
                         artifacts.each{
                             shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
@@ -100,7 +102,7 @@ node('wavesnode'){
                             def createReleaseBody = [
                                 tag_name: "${tag}",
                                 target_commitish: "${branch}",
-                                name: "Version ${tag.replace('v','')} (${networks.join(" + ")})",
+                                name: "Version ${tag.replace('v','')} (${networks.collect{ it.capitalize() }.join(" + ")})",
                                 body: "# In this release\n${shaSumField}```",
                                 draft: true,
                                 prerelease: false]
@@ -115,9 +117,20 @@ node('wavesnode'){
                             }
                         }
                     }
-
                 }
 
+                withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
+                    Constants.REMOTE.host = Constants.APT_REPO_CONTROLLER_SERVER
+                    Constants.REMOTE.name = Constants.APT_REPO_CONTROLLER_SERVER
+                    Constants.REMOTE.user = userName
+                    Constants.REMOTE.identityFile = identity
+                    stage ('Updating APT repo'){
+                        networks.each {
+                            ut.remotePut("${artifactsDir}/${it}/*.deb", "/opt/aptly/waves-${it}/")
+                        }
+                        remoteExec "/opt/aptly/aptly.sh"
+                    }                    
+                }
             }
             catch (err) {
                 currentBuild.result = Constants.PIPELINE_FAILURE
