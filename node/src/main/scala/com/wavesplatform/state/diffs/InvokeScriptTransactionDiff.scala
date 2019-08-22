@@ -6,6 +6,7 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -72,7 +73,7 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
-              invocationComplexity <- DiffsCommon.functionComplexity(sc, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator(), tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
               directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
               evaluator <- ContractEvaluator(
                 Monoid
@@ -101,14 +102,14 @@ object InvokeScriptTransactionDiff {
           verifierComplexity <- TracedResult {
             blockchain
               .accountScript(tx.sender)
-              .traverse(DiffsCommon.verifierComplexity)
+              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator()))
               .leftMap(GenericError(_))
           }
           assetsComplexity <- TracedResult {
             (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
               .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
               .toList
-              .traverse(DiffsCommon.verifierComplexity)
+              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator()))
               .leftMap(GenericError(_))
           }
 

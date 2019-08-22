@@ -7,14 +7,18 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {
 
   @Deprecated
-  def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
+  def apply(
+    scriptText:    String,
+    isAssetScript: Boolean,
+    estimator:     ScriptEstimator
+  ): Either[String, (Script, Long)] =
     for {
       directives <- DirectiveParser(scriptText)
       contentType = extractValue(directives, CONTENT_TYPE)
@@ -22,19 +26,19 @@ object ScriptCompiler extends ScorexLogging {
       scriptType  = if (isAssetScript) Asset else Account
       _      <- DirectiveSet(version, scriptType, contentType)
       script <- tryCompile(scriptText, contentType, version, isAssetScript)
-      complexity <- Script.estimate(script, ScriptEstimator)
+      complexity <- Script.estimate(script, estimator)
     } yield (script, complexity)
-  }
 
   def compile(
     scriptText: String,
+    estimator:  ScriptEstimator,
     libraries:  Map[String, String] = Map()
   ): Either[String, (Script, Long)] = {
     for {
       directives  <- DirectiveParser(scriptText)
       ds          <- Directive.extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
-      result      <- apply(linkedInput, ds.scriptType == Asset)
+      result      <- apply(linkedInput, ds.scriptType == Asset, estimator)
     } yield result
   }
 
@@ -56,5 +60,5 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script, version: StdLibVersion): Either[String, Long] =
-    Script.estimate(script, ScriptEstimator)
+    Script.estimate(script, ScriptEstimatorV1)
 }

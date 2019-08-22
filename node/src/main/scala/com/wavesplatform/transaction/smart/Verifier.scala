@@ -4,9 +4,9 @@ import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
@@ -88,7 +88,7 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = for {
-      _      <- Script.estimate(script, ScriptEstimator).leftMap(GenericError(_))
+      _      <- Script.estimate(script, blockchain.estimator()).leftMap(GenericError(_))
       result <- Try {
         val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
         val eval = ScriptRunner(height, Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
@@ -126,7 +126,7 @@ object Verifier extends ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     for {
-      _      <- Script.estimate(script, ScriptEstimator).leftMap(GenericError(_))
+      _      <- Script.estimate(script, blockchain.estimator()).leftMap(GenericError(_))
       result <- Try {
         val eval = ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
         val scriptResult = eval match {
@@ -204,7 +204,7 @@ object Verifier extends ScorexLogging {
     }
 
     val estimate: TracedResult[GenericError, Option[Long]] =
-      matcherScriptOpt.traverse(Script.estimate(_, ScriptEstimator).leftMap(GenericError(_)))
+      matcherScriptOpt.traverse(Script.estimate(_, blockchain.estimator()).leftMap(GenericError(_)))
 
     for {
       _ <- estimate

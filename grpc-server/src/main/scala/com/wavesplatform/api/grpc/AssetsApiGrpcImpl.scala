@@ -4,8 +4,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.api.common.CommonAssetsApi
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.execution.Scheduler
@@ -30,7 +30,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
               ScriptData(
                 script.bytes().toPBByteString,
                 script.expr.toString,
-                Script.estimate(script, ScriptEstimator).explicitGet()
+                Script.estimate(script, blockchain.estimator()).explicitGet()
               )
           ),
           info.description.sponsorship,

@@ -7,8 +7,8 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Decompiler
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import monix.eval.Coeval
 
 trait Script {

@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -9,6 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -20,7 +22,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     }
   }
 
-  property("ScriptV1.apply should deny too complex scripts") {
+  property("Script.estimate should deny too complex scripts") {
     val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet()
     val expr = (1 to 21)
       .map { _ =>
@@ -31,7 +33,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    ExprScript(expr) should produce("Script is too complex")
+    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2) should produce("Script is too complex")
   }
 
   property("ScriptV1.apply should deny too big scripts") {

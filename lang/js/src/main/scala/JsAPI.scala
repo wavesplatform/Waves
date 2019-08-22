@@ -12,11 +12,13 @@ import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl, ScriptEstimator}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
 import scala.scalajs.js
 import scala.scalajs.js.{Any, Dictionary}
@@ -180,7 +182,7 @@ object JsAPI {
     )
   }
 
-  val estimator = ScriptEstimator
+  val estimator = ScriptEstimatorV2
 
   private def compileScript(ds: DirectiveSet, input: String) = {
     val ver = ds.stdLibVersion

@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 import cats.implicits._
 import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.

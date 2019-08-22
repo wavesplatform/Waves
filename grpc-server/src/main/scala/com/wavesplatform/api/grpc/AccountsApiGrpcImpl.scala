@@ -4,6 +4,7 @@ import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.protobuf.transaction.{AssetAmount, AssetId, PBTransactions}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -46,7 +47,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
   }
 
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
-    val desc = commonApi.script(request.address.toAddress)
+    val desc = commonApi.script(request.address.toAddress, blockchain.estimator())
     ScriptData(desc.script.getOrElse(ByteStr.empty).toPBByteString, desc.scriptText.getOrElse(""), desc.complexity)
   }
 

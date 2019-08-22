@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -71,6 +72,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(recipient, Some(typedScript), 100000000L, ts).explicitGet()
 
   } yield (master, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
+
+  private val estimator = ScriptEstimatorV2
 
   property("validation of all functions from contexts") {
     forAll(preconditionsAndPayments) {
@@ -331,7 +334,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | reissuable      &&
               | sponsored
               |
-            """.stripMargin
+            """.stripMargin,
+              estimator
             )
             .explicitGet()
             ._1
@@ -368,7 +372,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
                  |
                  |
-              """.stripMargin
+              """.stripMargin,
+              estimator
             )
             .explicitGet()
             ._1
@@ -411,7 +416,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |
                  | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
                  |
-              """.stripMargin
+              """.stripMargin,
+              estimator
             )
             .explicitGet()
             ._1
@@ -543,7 +549,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | checkFeeAssetId     &&
                  | checkAnotherTxType
                  |
-              """.stripMargin
+              """.stripMargin,
+              estimator
             )
             .explicitGet()
             ._1
@@ -580,7 +587,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |
                  | this.bytes == base58'${masterAcc.address}'
                  |
-              """.stripMargin
+              """.stripMargin,
+              estimator
             )
             .explicitGet()
             ._1
@@ -613,7 +621,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |
                  | checkAddressToStrRight && checkAddressToStr
                  |
-              """.stripMargin
+              """.stripMargin,
+              estimator
             )
             .explicitGet()
             ._1

@@ -12,6 +12,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -25,7 +26,11 @@ import scala.concurrent.ExecutionContext
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with AuthRoute {
+case class UtilsApiRoute(
+  timeService: Time,
+  settings:    RestAPISettings,
+  estimator:   ScriptEstimator
+) extends ApiRoute with AuthRoute {
 
   import UtilsApiRoute._
 
@@ -108,7 +113,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
         complete(
-          ScriptCompiler(code, isAssetScript).fold(
+          ScriptCompiler(code, isAssetScript, estimator).fold(
             e => ScriptCompilerError(e), {
               case (script, complexity) =>
                 Json.obj(
@@ -146,7 +151,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       complete(
         ScriptCompiler
-          .compile(code)
+          .compile(code, estimator)
           .fold(
             e => ScriptCompilerError(e), {
               case (script, complexity) =>
@@ -184,7 +189,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[ScriptWithImportsRequest])) { req =>
       complete(
         ScriptCompiler
-          .compile(req.script, req.imports)
+          .compile(req.script, estimator, req.imports)
           .fold(
             e => ScriptCompilerError(e), {
               case (script, complexity) =>
@@ -226,7 +231,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
           .left
           .map(_.m)
           .flatMap { script =>
-            ScriptCompiler.estimate(script, script.stdLibVersion).map((script, _))
+            Script.estimate(script, estimator).map((script, _))
           }
           .fold(
             e => ScriptCompilerError(e), {

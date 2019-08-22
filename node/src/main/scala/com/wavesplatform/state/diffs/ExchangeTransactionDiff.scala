@@ -4,6 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset
@@ -69,12 +70,12 @@ object ExchangeTransactionDiff {
       assetsComplexity <- assets.toList
         .flatten
         .flatMap(_.script)
-        .traverse(DiffsCommon.verifierComplexity)
+        .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator()))
         .leftMap(GenericError(_))
 
       accountsComplexity <- List(tx.sender.toAddress, buyer, seller)
         .flatMap(blockchain.accountScript)
-        .traverse(DiffsCommon.verifierComplexity)
+        .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator()))
         .leftMap(GenericError(_))
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum

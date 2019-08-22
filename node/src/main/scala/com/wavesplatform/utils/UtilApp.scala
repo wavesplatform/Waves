@@ -7,7 +7,11 @@ import java.nio.file.{Files, Paths}
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
+import com.wavesplatform.features.BlockchainFeatures.ReduceNFTFee
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.wallet.Wallet
@@ -62,7 +66,7 @@ object UtilApp {
         val inBytes        = IO.readInput(cmd)
         val result = {
           val doAction = cmd.mode match {
-            case Command.CompileScript   => Actions.doCompile _
+            case Command.CompileScript   => Actions.doCompile(nodeState.settings) _
             case Command.DecompileScript => Actions.doDecompile _
             case Command.SignBytes       => Actions.doSign _
             case Command.VerifySignature => Actions.doVerify _
@@ -202,9 +206,16 @@ object UtilApp {
     type ActionResult = Either[String, Array[Byte]]
 
     //noinspection ScalaDeprecation
-    def doCompile(c: Command, str: Array[Byte]): ActionResult =
-      ScriptCompiler(new String(str), c.compileOptions.assetScript)
+    def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
+      val estimator =
+        if (settings.featuresSettings.supported.contains(ReduceNFTFee.id))
+          ScriptEstimatorV2
+        else
+          ScriptEstimatorV1
+
+      ScriptCompiler(new String(str), c.compileOptions.assetScript, estimator)
         .map(_._1.bytes())
+    }
 
     def doDecompile(c: Command, data: Array[Byte]): ActionResult = {
       ScriptReader.fromBytes(data) match {

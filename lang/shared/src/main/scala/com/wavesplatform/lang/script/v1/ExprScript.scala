@@ -6,10 +6,11 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{BaseGlobal, ScriptEstimator}
+import com.wavesplatform.lang.v1.BaseGlobal
 import monix.eval.Coeval
 import cats.implicits._
 import com.google.common.annotations.VisibleForTesting
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 
 object ExprScript {
 
@@ -38,7 +39,7 @@ object ExprScript {
     estimator: ScriptEstimator
   ): Either[String, Long] =
     for {
-      scriptComplexity <- ScriptEstimator(varNames(version, Expression), functionCosts(version), expr)
+      scriptComplexity <- estimator(varNames(version, Expression), functionCosts(version), expr)
       _ <- Either.cond(
         scriptComplexity <= MaxComplexityByVersion(version),
         (),

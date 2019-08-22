@@ -2,53 +2,64 @@ package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
 import cats.kernel.Monoid
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.sumLong
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ScriptEstimatorTest(estimator: ScriptEstimator)
+  extends PropSpec
+     with PropertyChecks
+     with Matchers
+     with ScriptGen
+     with NoShrink {
+
   val Plus  = FunctionHeader.Native(SUM_LONG)
   val Minus = FunctionHeader.Native(SUB_LONG)
   val Gt    = FunctionHeader.Native(GT_LONG)
 
   val FunctionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
 
-  private val ctx = {
+  protected val ctx = {
     val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
-      .combine(
-        PureContext.build(Global, V1),
+      .combineAll(Seq(
+        PureContext.build(Global, V3),
+        CryptoContext.build(Global, V3),
+        WavesContext.build(DirectiveSet.contractDirectiveSet, Common.emptyBlockchainEnvironment()),
         CTX(
           Seq(transactionType),
           Map(("tx", (transactionType, LazyVal(EitherT.pure(tx))))),
           Array.empty
         )
-      )
+      ))
   }
 
-  private def compile(code: String): EXPR = {
+  protected def compile(code: String): EXPR = {
     val untyped = Parser.parseExpr(code).get.value
     ExpressionCompiler(ctx.compilerContext, untyped).map(_._1).explicitGet()
   }
 
-  private def estimate(functionCosts: collection.Map[FunctionHeader, Coeval[Long]], script: EXPR) =
-    ScriptEstimator(ctx.evaluationContext.letDefs.keySet, functionCosts, script)
+  protected def estimate(functionCosts: Map[FunctionHeader, Coeval[Long]], script: EXPR) =
+    estimator(ctx.evaluationContext.letDefs.keySet, functionCosts, script)
 
   property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -166,5 +177,20 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     Script.fromBase64String(script)
       .flatMap { case s: ExprScript => estimate(costs, s.expr) }
       .explicitGet() shouldBe 1970
+  }
+
+  property("context leak") {
+    def script(ref: String) = {
+      val script =
+        s"""
+           |  func inc($ref: Int) = $ref + 1
+           |  let xxx = 5
+           |  inc(xxx)
+         """.stripMargin
+      compile(script)
+    }
+    val costs = functionCosts(V3)
+
+    estimate(costs, script("xxx")) shouldBe estimate(costs, script("y"))
   }
 }

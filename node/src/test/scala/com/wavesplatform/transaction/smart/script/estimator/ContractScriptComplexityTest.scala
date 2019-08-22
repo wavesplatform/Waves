@@ -1,20 +1,20 @@
-package com.wavesplatform.transaction.smart.script
+package com.wavesplatform.transaction.smart.script.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
   property("estimate contract script correctly") {
     val contract = DApp(
@@ -62,7 +62,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract, ScriptEstimator) shouldBe Right((41, Vector(("first", 32), ("default", 20), ("third", 41))))
+    ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((41, Map("first" -> 32, "default" -> 20, "third" -> 41)))
   }
 
   property("estimate contract script with context correctly") {
@@ -114,7 +114,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract, ScriptEstimator) shouldBe Right((68, Vector(("first", 68), ("default", 30), ("third", 51))))
+    ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "third" -> 51)))
   }
 
   property("estimate contract script with context correctly 2") {
@@ -166,6 +166,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(V3, contract, ScriptEstimator) shouldBe Right((68, Vector(("first", 68), ("default", 30), ("second", 51))))
+    ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "second" -> 51)))
   }
 }

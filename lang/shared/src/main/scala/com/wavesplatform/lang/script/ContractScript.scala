@@ -1,12 +1,16 @@
 package com.wavesplatform.lang.script
+
 import cats.implicits._
+import cats.instances.map
+import cats.kernel.Order
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits.MaxContractSizeInBytes
+import com.wavesplatform.lang.v1.ContractLimits.{MaxComplexityByVersion, MaxContractSizeInBytes}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
 
 object ContractScript {
@@ -56,8 +60,17 @@ object ContractScript {
     contract:  DApp,
     estimator: ScriptEstimator
   ): Either[String, (Long, Map[String, Long])] =
-    estimateComplexityByFunction(version, contract, estimator)
-      .map(namesAndComp => ((("", 0L) +: namesAndComp).map(_._2).max, namesAndComp.toMap))
+    for {
+      cbf <- estimateComplexityByFunction(version, contract, estimator)
+      max = cbf.maximumOption(_._2 compareTo _._2)
+      _   <- max.fold(().asRight[String])(m =>
+        Either.cond(
+          m._2 <= MaxComplexityByVersion(version),
+          (),
+          s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
+        )
+      )
+    } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =
