@@ -93,11 +93,12 @@ class LevelDBWriter(private[database] val writableDB: DB,
   @inline
   private[this] def withNodeStopOnError[A](f: => A): A = {
     try f
-    catch { case e: DBException =>
-      val message = "Fatal DB error, force stopping node"
-      log.error(message, e)
-      com.wavesplatform.utils.forceStopApplication(FatalDBError)
-      throw new RuntimeException(message, e)
+    catch {
+      case e: DBException =>
+        val message = "Fatal DB error, force stopping node"
+        log.error(message, e)
+        com.wavesplatform.utils.forceStopApplication(FatalDBError)
+        throw new RuntimeException(message, e)
     }
   }
 
@@ -164,9 +165,13 @@ class LevelDBWriter(private[database] val writableDB: DB,
     } yield key
   }
 
-  override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
-    addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
-      db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+  override protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]] = {
+    val (address, key) = addressWithKey
+
+    readOnly { db =>
+      addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
+        db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+      }
     }
   }
 
@@ -453,12 +458,13 @@ class LevelDBWriter(private[database] val writableDB: DB,
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
-        val balancesToInvalidate   = Seq.newBuilder[(Address, Asset)]
-        val portfoliosToInvalidate = Seq.newBuilder[Address]
-        val assetInfoToInvalidate  = Seq.newBuilder[IssuedAsset]
-        val ordersToInvalidate     = Seq.newBuilder[ByteStr]
-        val scriptsToDiscard       = Seq.newBuilder[Address]
-        val assetScriptsToDiscard  = Seq.newBuilder[IssuedAsset]
+        val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
+        val portfoliosToInvalidate  = Seq.newBuilder[Address]
+        val assetInfoToInvalidate   = Seq.newBuilder[IssuedAsset]
+        val ordersToInvalidate      = Seq.newBuilder[ByteStr]
+        val scriptsToDiscard        = Seq.newBuilder[Address]
+        val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
+        val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
 
         val h = Height(currentHeight)
 
@@ -483,6 +489,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
+              accountDataToInvalidate += (address -> k)
               rw.delete(Keys.data(addressId, k)(currentHeight))
               rw.filterHistory(Keys.dataHistory(addressId, k), currentHeight)
             }
@@ -592,6 +599,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
+        accountDataToInvalidate.result().foreach(discardAccountData)
         discardedBlock
       }
 
@@ -630,7 +638,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
       txBytes       <- db.get(Keys.transactionBytesAt(height, num))
-      isTransfer <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
+      isTransfer    <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
     } yield height -> TransactionParsers.parseBytes(txBytes).get.asInstanceOf[TransferTransaction]
   }
 
@@ -734,14 +742,14 @@ class LevelDBWriter(private[database] val writableDB: DB,
         val heightNumBytes = kv.getValue
 
         val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-        val txNum = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
         db.get(Keys.transactionAt(height, txNum))
       } else None
 
       txOption match {
         case Some(tx: LeaseTransaction) if pf.isDefinedAt(tx) => results += pf(tx)
-        case _ => // Skip
+        case _                                                => // Skip
       }
     }
     results.result()
