@@ -49,7 +49,8 @@ trait PBImplicitConversions {
         vb.SignerData(header.generator.toPublicKey, signature),
         NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
         0,
-        header.featureVotes.map(intToShort).toSet
+        header.featureVotes.map(intToShort).toSet,
+        0.toByte
       )
     }
   }

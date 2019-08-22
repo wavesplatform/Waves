@@ -16,6 +16,7 @@ message Block {
         int64 timestamp = 6;
         int32 version = 7;
         bytes generator = 8;
+        int32 reward_vote = 9;
     }
 
     Header header = 1;

@@ -23,13 +23,13 @@ object TestFunctionalitySettings {
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.FairPoS,
       BlockchainFeatures.Ride4DApps,
-      // BlockchainFeatures.Inflation
+      // BlockchainFeatures.BlockReward
     ).map(_ at 0).toMap,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    inflationAmount = 100000000L,
     blockVersion4AfterHeight = Int.MaxValue,
+    blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1)
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

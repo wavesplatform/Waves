@@ -54,6 +54,11 @@ case object EmptyBlockchain extends Blockchain {
 
   override def featureVotes(height: Int): Map[Short, Int] = Map.empty
 
+  /** Block reward related */
+  override def blockReward: Long = 0L
+
+  override def blockRewardVotes(height: Int): Map[Byte, Int] = Map.empty
+
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = None
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = None

@@ -230,6 +230,11 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
+
+  /** Block reward related */
+  override def blockReward: Long = inner.blockReward
+
+  override def blockRewardVotes(height: Int): Map[Byte, Int] = inner.blockRewardVotes(height)
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {

@@ -10,7 +10,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{BlockRewardSettings, FunctionalitySettings}
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.utils.Implicits._
@@ -111,22 +111,10 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
             s.balance(signerB) shouldBe 50
         }
       }
-
-      "height > enableMicroblocksAfterHeight + inflation - a miner should receive 60% of previous block's fee and 40% of the current one + 1 waves" in {
-        assertDiff(testChain.init, 4, 100000000L) {
-          case (_, s) =>
-            s.balance(signerA) shouldBe 300000000L + 34
-        }
-
-        assertDiff(testChain, 4, 100000000L) {
-          case (_, s) =>
-            s.balance(signerB) shouldBe 400000000L + 50
-        }
-      }
     }
   }
 
-  private[this] def assertDiff(blocks: Seq[Block], ngAtHeight: Int, inflationAmount: Long = 0)(assertion: (Diff, Blockchain) => Unit): Unit = {
+  private[this] def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
@@ -143,8 +131,8 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
       maxTransactionTimeBackOffset = 120.minutes,
       maxTransactionTimeForwardOffset = 90.minutes,
-      inflationAmount = inflationAmount,
       blockVersion4AfterHeight = Int.MaxValue,
+      blockRewardSettings = BlockRewardSettings.TESTNET
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

@@ -180,6 +180,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
+  @volatile
+  protected var blockRewardCache: Option[Long] = loadBlockReward()
+  protected def loadBlockReward(): Option[Long]
+  override def blockReward: Long = blockRewardCache.getOrElse(0L)
+
   //noinspection ScalaStyle
   protected def doAppend(block: Block,
                          carry: Long,

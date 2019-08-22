@@ -118,12 +118,13 @@ object BlockDiffer extends ScorexLogging {
     val timestamp          = blockchain.lastBlockTimestamp.get
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress
+    val reward             = blockchain.blockReward
 
     val initDiff = {
       val generatorFeePf = currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty
       val generatorPf =
         if (fullBlock && blockchain.isFeatureActivated(BlockchainFeatures.BlockReward))
-          generatorFeePf |+| Portfolio.build(Asset.Waves, blockchain.settings.functionalitySettings.inflationAmount)
+          generatorFeePf |+| Portfolio.build(Asset.Waves, reward)
         else
           generatorFeePf
 

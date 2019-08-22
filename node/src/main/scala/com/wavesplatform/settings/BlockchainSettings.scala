@@ -9,6 +9,56 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration._
 
+case class BlockRewardSettings(
+    minReward: Long,
+    maxReward: Long,
+    firstReward: Long,
+    rewardStep: Long,
+    firstRewardPeriod: Int,
+    rewardPeriod: Int,
+    rewardVotingPeriod: Int
+) {
+  require(minReward >= 0, "minReward must be greater than or equal to 0")
+  require(maxReward >= minReward, s"maxReward must be greater than or equal to minReward($minReward)")
+  require(firstReward >= minReward && firstReward <= maxReward, s"firstReward must be between minReward($minReward) and maxReward($maxReward)")
+  require(rewardStep > 0, "rewardStep must be greater than 0")
+  require(firstRewardPeriod > 0, "firstRewardPeriod must be greater than 0")
+  require(rewardPeriod > 0, "rewardPeriod must be greater than 0")
+  require(rewardVotingPeriod > 0, "rewardVotingPeriod must be greater than 0")
+  require(rewardVotingPeriod <= firstRewardPeriod, s"rewardVotingPeriod must be less than or equal to firstRewardPeriod($firstRewardPeriod)")
+  require(rewardVotingPeriod <= rewardPeriod, s"rewardVotingPeriod must be less than or equal to rewardPeriod($rewardPeriod)")
+
+  def votingWindow(height: Int): Range =
+    if (height < 1) Range(0, 0)
+    else
+      Range.inclusive(
+        (height - 1) / rewardVotingPeriod * rewardVotingPeriod + 1,
+        ((height - 1) / rewardVotingPeriod + 1) * rewardVotingPeriod
+      )
+}
+
+object BlockRewardSettings {
+  val MAINNET = apply(
+    0,
+    8 * Constants.UnitsInWave,
+    6 * Constants.UnitsInWave,
+    25000000,
+    250000,
+    150000,
+    10000
+  )
+
+  val TESTNET = apply(
+    0,
+    8 * Constants.UnitsInWave,
+    6 * Constants.UnitsInWave,
+    25000000,
+    250000,
+    150000,
+    10000
+  )
+}
+
 case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  blocksForFeatureActivation: Int,
                                  allowTemporaryNegativeUntil: Long,
@@ -25,7 +75,7 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  maxTransactionTimeBackOffset: FiniteDuration,
                                  maxTransactionTimeForwardOffset: FiniteDuration,
                                  blockVersion4AfterHeight: Int,
-                                 inflationAmount: Long) {
+                                 blockRewardSettings: BlockRewardSettings) {
   val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
@@ -68,8 +118,8 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = 810000,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    inflationAmount = 1L * Constants.UnitsInWave,
-    blockVersion4AfterHeight = Int.MaxValue
+    blockVersion4AfterHeight = Int.MaxValue,
+    blockRewardSettings = BlockRewardSettings.MAINNET
   )
 
   val TESTNET = apply(
@@ -88,8 +138,8 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    inflationAmount = 1L * Constants.UnitsInWave,
-    blockVersion4AfterHeight = Int.MaxValue
+    blockVersion4AfterHeight = Int.MaxValue,
+    blockRewardSettings = BlockRewardSettings.MAINNET
   )
 
   val configPath = "waves.blockchain.custom.functionality"
