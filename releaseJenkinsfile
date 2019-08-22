@@ -89,12 +89,12 @@ node('wavesnode'){
                         cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/
                         """
                     }
-                    // dir (artifactsDir + '/all'){
-                    //     artifacts = findFiles(glob: '**/*')
-                    //     artifacts.each{
-                    //         shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
-                    //     }
-                    // }
+                    dir (artifactsDir + '/all'){
+                        artifacts = findFiles(glob: '**/*')
+                        artifacts.each{
+                            shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
+                        }
+                    }
                 }
 
                 // stage ('Create a release'){
@@ -129,7 +129,7 @@ node('wavesnode'){
                         networks.each {
                             ut.remotePut("${artifactsDir}/${it}", "/opt/aptly/${it}")
                         }
-                        // remoteExec "/opt/aptly/aptly.sh"
+                        remoteExec "/opt/aptly/aptly.sh"
                     }                    
                 }
             }
