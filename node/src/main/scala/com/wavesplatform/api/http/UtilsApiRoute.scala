@@ -222,7 +222,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       complete(
         Script
-          .fromBase64String(code, checkComplexity = false)
+          .fromBase64String(code)
           .left
           .map(_.m)
           .flatMap { script =>

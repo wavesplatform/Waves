@@ -216,7 +216,7 @@ object JsAPI {
                 "result" -> Global.toBuffer(bytes),
                 "ast" -> toJs(ast),
                 "complexity" -> complexity,
-                "complexityByFunc" -> complexityByFunc
+                "complexityByFunc" -> complexityByFunc.toJSDictionary
               )
           }
     }

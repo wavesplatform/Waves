@@ -27,9 +27,9 @@ object TransferTransactionDiff {
     }
 
     for {
-      recipient <- blockchain.resolveAlias(tx.recipient)
-      _         <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
-
+      recipient  <- blockchain.resolveAlias(tx.recipient)
+      _          <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
+      complexity <- DiffsCommon.countScriptsComplexity(blockchain, tx).leftMap(GenericError(_))
       _ <- validateOverflow(blockchain, tx)
       portfolios = (tx.assetId match {
         case Waves =>
@@ -66,11 +66,13 @@ object TransferTransactionDiff {
         GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil}")
       )
     } yield
-      Diff(height,
+      Diff(
+        height,
         tx,
         portfolios,
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx))
+        scriptsComplexity = complexity
+      )
   }
 
   private def validateOverflow(blockchain: Blockchain, tx: TransferTransaction) = {

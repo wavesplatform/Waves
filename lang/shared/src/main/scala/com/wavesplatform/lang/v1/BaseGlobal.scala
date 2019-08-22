@@ -118,7 +118,7 @@ trait BaseGlobal {
       complexity <- estimator(vars, costs, ex)
     } yield (x, ex, complexity)
 
-  type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])
+  type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
 
   def compileContract(
     input:         String,

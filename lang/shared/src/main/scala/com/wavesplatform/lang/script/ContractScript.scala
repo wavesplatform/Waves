@@ -55,9 +55,9 @@ object ContractScript {
     version:   StdLibVersion,
     contract:  DApp,
     estimator: ScriptEstimator
-  ): Either[String, (Long, List[(String, Long)])] =
+  ): Either[String, (Long, Map[String, Long])] =
     estimateComplexityByFunction(version, contract, estimator)
-      .map(namesAndComp => ((("", 0L) +: namesAndComp).map(_._2).max, namesAndComp))
+      .map(namesAndComp => ((("", 0L) +: namesAndComp).map(_._2).max, namesAndComp.toMap))
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =

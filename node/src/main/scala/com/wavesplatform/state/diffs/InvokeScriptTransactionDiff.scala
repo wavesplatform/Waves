@@ -72,6 +72,7 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
               directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
               evaluator <- ContractEvaluator(
                 Monoid
@@ -86,13 +87,30 @@ object InvokeScriptTransactionDiff {
                 contract,
                 invocation
               )
-            } yield evaluator
+            } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
           })
         for {
-          scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE)))
-          ScriptResult(ds, ps) = scriptResult
+          scriptResult <- TracedResult(
+            scriptResultE,
+            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1)))
+          )
+          (ScriptResult(ds, ps), invocationComplexity) = scriptResult
+
+          verifierComplexity <- TracedResult {
+            blockchain
+              .accountScript(tx.sender)
+              .traverse(DiffsCommon.verifierComplexity)
+              .leftMap(GenericError(_))
+          }
+          assetsComplexity <- TracedResult {
+            (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
+              .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
+              .toList
+              .traverse(DiffsCommon.verifierComplexity)
+              .leftMap(GenericError(_))
+          }
 
           dataEntries = ds.map {
             case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
@@ -173,21 +191,6 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          scriptsComplexity = {
-            val assetsComplexity = (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
-              .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
-              .map(DiffsCommon.verifierComplexity)
-              .sum
-
-            val accountComplexity = blockchain
-              .accountScript(tx.sender)
-              .fold(0L)(DiffsCommon.verifierComplexity)
-
-            val funcComplexity = DiffsCommon.functionComplexity(sc, tx.funcCallOpt)
-
-            assetsComplexity + accountComplexity + funcComplexity
-          }
-
           _ <- foldScriptTransfers(blockchain, tx, dAppAddress)(ps, dataAndPaymentDiff)
         } yield {
           val paymentReceiversMap: Map[Address, Portfolio] = Monoid
@@ -205,7 +208,7 @@ object InvokeScriptTransactionDiff {
           dataAndPaymentDiff.copy(
             transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
             scriptsRun = scriptsInvoked + 1,
-            scriptsComplexity = scriptsComplexity
+            scriptsComplexity = invocationComplexity + verifierComplexity.getOrElse(0L) + assetsComplexity.sum
           ) |+| transferSetDiff
         }
       case Left(l) => TracedResult(Left(l))

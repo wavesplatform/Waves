@@ -15,31 +15,35 @@ object LeaseTransactionsDiff {
 
   def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender)
-    blockchain.resolveAlias(tx.recipient).flatMap { recipient =>
-      if (recipient == sender)
-        Left(GenericError("Cannot lease to self"))
-      else {
-        val lease   = blockchain.leaseBalance(tx.sender)
-        val balance = blockchain.balance(tx.sender, Waves)
-        if (balance - lease.out < tx.amount) {
-          Left(GenericError(s"Cannot lease more than own: Balance:${balance}, already leased: ${lease.out}"))
-        } else {
-          val portfolioDiff: Map[Address, Portfolio] = Map(
-            sender    -> Portfolio(-tx.fee, LeaseBalance(0, tx.amount), Map.empty),
-            recipient -> Portfolio(0, LeaseBalance(tx.amount, 0), Map.empty)
-          )
-          Right(
-            Diff(
-              height = height,
-              tx = tx,
-              portfolios = portfolioDiff,
-              leaseState = Map(tx.id() -> true),
-              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-              scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
-            ))
+    for {
+      recipient  <- blockchain.resolveAlias(tx.recipient)
+      complexity <- DiffsCommon.countScriptsComplexity(blockchain, tx).leftMap(GenericError(_))
+      diff       <- {
+        if (recipient == sender)
+          Left(GenericError("Cannot lease to self"))
+        else {
+          val lease   = blockchain.leaseBalance(tx.sender)
+          val balance = blockchain.balance(tx.sender, Waves)
+          if (balance - lease.out < tx.amount) {
+            Left(GenericError(s"Cannot lease more than own: Balance:${balance}, already leased: ${lease.out}"))
+          } else {
+            val portfolioDiff: Map[Address, Portfolio] = Map(
+              sender    -> Portfolio(-tx.fee, LeaseBalance(0, tx.amount), Map.empty),
+              recipient -> Portfolio(0, LeaseBalance(tx.amount, 0), Map.empty)
+            )
+            Right(
+              Diff(
+                height = height,
+                tx = tx,
+                portfolios = portfolioDiff,
+                leaseState = Map(tx.id() -> true),
+                scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+                scriptsComplexity = complexity
+              ))
+          }
         }
       }
-    }
+    } yield diff
   }
 
   def leaseCancel(blockchain: Blockchain, time: Long, height: Int)(tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
@@ -52,6 +56,7 @@ object LeaseTransactionsDiff {
     for {
       lease     <- leaseEi
       recipient <- blockchain.resolveAlias(lease.recipient)
+      complexity <- DiffsCommon.countScriptsComplexity(blockchain, tx).leftMap(GenericError(_))
       isLeaseActive = lease.isActive
       _ <- if (!isLeaseActive && time > fs.allowMultipleLeaseCancelTransactionUntilTimestamp)
         Left(GenericError(s"Cannot cancel already cancelled lease"))
@@ -77,7 +82,7 @@ object LeaseTransactionsDiff {
         portfolios = portfolioDiff,
         leaseState = Map(tx.leaseId -> false),
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
+        scriptsComplexity = complexity
       )
   }
 }

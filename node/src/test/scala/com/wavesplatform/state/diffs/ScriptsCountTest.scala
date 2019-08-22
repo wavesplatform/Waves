@@ -6,7 +6,9 @@ import com.wavesplatform.common.state._
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
@@ -333,7 +335,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       ) {
         case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
-          blockDiff.scriptsComplexity shouldBe (allAllowed.complexity * 31)
+          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimator).explicitGet() * 31)
       }
     }) { x =>
       x

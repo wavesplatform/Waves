@@ -21,37 +21,42 @@ object MassTransferTransactionDiff {
           }
       } yield (portfolio, xfer.amount)
     }
-    val portfoliosEi = tx.transfers.traverse(parseTransfer)
 
-    portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
-      val sender   = Address.fromPublicKey(tx.sender)
-      val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
-      val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) =>
-        (u._1 combine v._1, u._2 + v._2)
+    for {
+      portfolios <- tx.transfers.traverse(parseTransfer)
+      complexity <- DiffsCommon.countScriptsComplexity(blockchain, tx).leftMap(GenericError(_))
+      diff <- {
+        val sender   = Address.fromPublicKey(tx.sender)
+        val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
+        val (recipientPortfolios, totalAmount) = portfolios.fold(foldInit) { (u, v) =>
+          (u._1 combine v._1, u._2 + v._2)
+        }
+        val completePortfolio =
+          recipientPortfolios
+            .combine(
+              tx.assetId
+                .fold(Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
+                  Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
+                }
+            )
+
+        val assetIssued = tx.assetId match {
+          case Waves                  => true
+          case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
+        }
+
+        Either.cond(
+          assetIssued,
+          Diff(
+            height,
+            tx,
+            completePortfolio,
+            scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+            scriptsComplexity = complexity
+          ),
+          GenericError(s"Attempt to transfer a nonexistent asset")
+        )
       }
-      val completePortfolio =
-        recipientPortfolios
-          .combine(
-            tx.assetId
-              .fold(Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
-                Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
-              }
-          )
-
-      val assetIssued = tx.assetId match {
-        case Waves                  => true
-        case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
-      }
-
-      Either.cond(
-        assetIssued,
-        Diff(height,
-          tx,
-          completePortfolio,
-          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-          scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)),
-        GenericError(s"Attempt to transfer a nonexistent asset")
-      )
-    }
+    } yield diff
   }
 }

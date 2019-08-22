@@ -4,7 +4,6 @@ import com.wavesplatform.lang.directives.Directive.extractValue
 import com.wavesplatform.lang.directives.DirectiveKey._
 import com.wavesplatform.lang.directives._
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.script.ContractScript._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor}
 import com.wavesplatform.lang.utils._
