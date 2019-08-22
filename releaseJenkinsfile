@@ -80,12 +80,15 @@ node('wavesnode'){
                     withEnv(["SBT_OPTS=-Xmx2g -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=128m -Dnetwork=${it.toLowerCase()}"]) {
                         ut.sbt 'clean packageAll'
                     }
+
+                    def filter = (it == 'mainnet') ? '' : it
+
                     sh """
                         mkdir -p ${artifactsDir}/${it}
                         cp node/target/waves-all-*.jar ${artifactsDir}/all/
-                        cp grpc-server/target/universal/*.tgz ${artifactsDir}/all/
-                        cp node/target/waves*all.deb ${artifactsDir}/${it}/
-                        cp grpc-server/target/*.deb ${artifactsDir}/${it}/
+                        cp grpc-server/target/universal/*${filter}*.tgz ${artifactsDir}/all/ || true
+                        cp node/target/waves*${filter}*all.deb ${artifactsDir}/${it}/ || true
+                        cp grpc-server/target/*${filter}*.deb ${artifactsDir}/${it}/ || true
                         cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/
                         """
                     }
@@ -146,7 +149,7 @@ node('wavesnode'){
             finally{
                 sh "tar -czvf artifacts.tar.gz -C ${artifactsDir} ."
                 // archiveArtifacts artifacts: 'artifacts.tar.gz'
-                ut.notifySlack("mtuktarov-test", currentBuild.result)
+                ut.notifySlack("jenkins-notifications", currentBuild.result)
             }
         }
     }
