@@ -25,6 +25,7 @@ import org.influxdb.dto.Point
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.Random
 
 trait NS {
   def connect(remoteAddress: InetSocketAddress): Unit
@@ -37,6 +38,9 @@ trait NS {
 }
 
 object NetworkServer extends ScorexLogging {
+  private[this] val AverageHandshakePeriod = 1.second
+  private[this] val MaxFrameLength = 100 * 1024 * 1024
+  private[this] val LengthFieldSize = 4
 
   def apply(settings: WavesSettings,
             lastBlockInfos: Observable[LastBlockInfo],
@@ -111,7 +115,7 @@ object NetworkServer extends ScorexLogging {
           new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
           serverHandshakeHandler,
           lengthFieldPrepender,
-          new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
+          new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
           new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
           channelClosedHandler,
           trafficWatcher,
@@ -132,10 +136,6 @@ object NetworkServer extends ScorexLogging {
 
     val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
-    val averageHandshakePeriod = 1.second
-    val defaultHandshakeDelay  = 5.seconds
-    val greedyHandshakeDelay   = averageHandshakePeriod + 20.millis
-
     val bootstrap = new Bootstrap()
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
       .group(workerGroup)
@@ -143,10 +143,10 @@ object NetworkServer extends ScorexLogging {
       .handler(new PipelineInitializer[SocketChannel](Seq(
         new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
-        new HandshakeTimeoutHandler(if (peerConnections.isEmpty) averageHandshakePeriod else settings.networkSettings.handshakeTimeout),
+        new HandshakeTimeoutHandler(() => if (peerConnections.isEmpty) AverageHandshakePeriod else settings.networkSettings.handshakeTimeout),
         clientHandshakeHandler,
         lengthFieldPrepender,
-        new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
+        new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
         new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
         channelClosedHandler,
         trafficWatcher,
@@ -207,10 +207,14 @@ object NetworkServer extends ScorexLogging {
       )
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
-      val delay = if (peerConnections.isEmpty) greedyHandshakeDelay else defaultHandshakeDelay
-      log.trace(s"Scheduling handshake, delay = $delay")
+      val connectDelay = {
+        val random = Random.nextInt(5000).millis
+        if (peerConnections.isEmpty) random / 5 else random
+      }
 
-      workerGroup.schedule(delay) {
+      log.trace(s"Scheduling handshake, delay = $connectDelay")
+
+      workerGroup.schedule(connectDelay) {
         import scala.collection.JavaConverters._
         val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
