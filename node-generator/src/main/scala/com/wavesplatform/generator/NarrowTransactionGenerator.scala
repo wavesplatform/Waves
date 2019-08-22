@@ -144,7 +144,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               for {
                 (assetTx, reissuable) <- randomFrom(reissuableIssueTxs).map((_, random.nextBoolean())) orElse
                   randomFrom(Universe.IssuedAssets.filter(_.reissuable)).map(asset => (asset, asset.reissuable))
-                sender <- accountByAddress(assetTx.sender.address)
+                sender <- accountByAddress(assetTx.sender.stringRepr)
                 fee = assetTx.script.fold(100040000L)(_ => 100840000L)
                 tx <- logOption(
                   ReissueTransactionV2
@@ -165,7 +165,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             (
               for {
                 assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
-                sender  <- accountByAddress(assetTx.sender.address)
+                sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx <- logOption(
                   BurnTransactionV2.selfSigned(
                     AddressScheme.current.chainId,
@@ -220,7 +220,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             (
               for {
                 lease  <- randomFrom(activeLeaseTransactions)
-                sender <- accountByAddress(lease.sender.address)
+                sender <- accountByAddress(lease.sender.stringRepr)
                 tx     <- logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThanStandardFee * 3, ts))
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
@@ -280,7 +280,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             (
               for {
                 assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
-                sender  <- accountByAddress(assetTx.sender.address)
+                sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx      <- logOption(SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, ts))
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
@@ -335,7 +335,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
             (
               for {
                 assetTx <- randomFrom(validIssueTxs ++ Universe.IssuedAssets).filter(_.script.isDefined)
-                sender  <- accountByAddress(assetTx.sender.address)
+                sender  <- accountByAddress(assetTx.sender.stringRepr)
                 script = Gen.script(complexity = false)
                 tx <- logOption(
                   SetAssetScriptTransaction.selfSigned(
@@ -388,8 +388,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
 
   private[this] def accountByAddress(address: String): Option[KeyPair] =
     accounts
-      .find(_.address == address)
-      .orElse(Universe.Accounts.map(_.keyPair).find(_.address == address))
+      .find(_.stringRepr == address)
+      .orElse(Universe.Accounts.map(_.keyPair).find(_.stringRepr == address))
 
   private[this] def randomSenderAndAsset(issueTxs: Seq[IssueTransactionV2]): Option[(KeyPair, Option[ByteStr])] =
     if (random.nextBoolean()) {

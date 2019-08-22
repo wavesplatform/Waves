@@ -148,7 +148,7 @@ class MinerImpl(allChannels: ChannelGroup,
         .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
         .leftMap(_.toString)
         .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
-      _ = log.debug(s"Forging with ${account.address}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
+      _ = log.debug(s"Forging with ${account.stringRepr}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
       _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
@@ -195,7 +195,7 @@ class MinerImpl(allChannels: ChannelGroup,
           s"Invalid next block generation time: $expectedTS"
         )
       } yield result
-    } else Left(s"Balance $balance of ${account.address} is lower than required for generation")
+    } else Left(s"Balance $balance of ${account.stringRepr} is lower than required for generation")
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
@@ -230,7 +230,7 @@ class MinerImpl(allChannels: ChannelGroup,
               .map {
                 case Left(err) => log.warn("Error mining Block: " + err.toString)
                 case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
+                  log.debug(s"Forged and applied $block by ${account.stringRepr} with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()

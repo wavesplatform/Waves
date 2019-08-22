@@ -577,4 +577,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val Right((expr, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
+
+  property("list element access") {
+    val script =
+      """let arr = [1, 2, 3]
+        |arr[1]""".stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
 }

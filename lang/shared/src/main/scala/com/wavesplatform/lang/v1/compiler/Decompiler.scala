@@ -162,6 +162,8 @@ object Decompiler {
           case (List(elem), Some(listVar)) => argStr(elem).map(v => s"$v :: $listVar")
           case (elems, Some(listVar))      => listStr(elems).map(v => s"$v :: $listVar")
         }
+      case FUNCTION_CALL(`listElem`, List(list, index)) =>
+        for (l <- argStr(list); i <- argStr(index)) yield s"$l[$i]"
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = argsStr(args)
         func match {
@@ -185,6 +187,7 @@ object Decompiler {
 
   private val nil  = REF("nil")
   private val cons = Native(FunctionIds.CREATE_LIST)
+  private val listElem = Native(FunctionIds.GET_LIST)
 
   private def collectListArgs(args: List[EXPR]): (List[EXPR], Option[String]) = {
     def flattenRec(args: List[EXPR]): List[EXPR] = args match {
