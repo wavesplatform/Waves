@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -48,7 +49,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         }
       """.stripMargin
 
-    val script      = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
+    val script      = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val setScriptId = sender.setScript(acc0.address, Some(script), setScriptFee, waitForTx = true).id
 
     val acc0ScriptInfo = sender.addressScriptInfo(acc0.address)

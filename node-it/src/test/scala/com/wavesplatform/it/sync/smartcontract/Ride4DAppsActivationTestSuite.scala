@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
@@ -14,6 +15,8 @@ import org.scalatest.CancelAfterFailure
 import scala.concurrent.duration._
 
 class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+  private val estimator = ScriptEstimatorV2
+
   import Ride4DAppsActivationTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = configWithRide4DAppsFeature
@@ -30,11 +33,11 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
                                             |
                                             |@Verifier(i)
                                             |func verify() = { true }
-                                          """.stripMargin).explicitGet()._1.bytes().base64
+                                          """.stripMargin, estimator).explicitGet()._1.bytes().base64
   private val scriptV2 = ScriptCompiler.compile("""
                                           |func isTrue() = true
                                           |isTrue()
-                                        """.stripMargin).explicitGet()._1.bytes().base64
+                                        """.stripMargin, estimator).explicitGet()._1.bytes().base64
 
   test("send waves to accounts") {
     sender

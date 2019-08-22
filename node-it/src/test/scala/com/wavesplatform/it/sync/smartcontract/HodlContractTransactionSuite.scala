@@ -6,6 +6,7 @@ import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -84,7 +85,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |	}
         """.stripMargin
 
-    val script      = ScriptCompiler.compile(scriptText).explicitGet()._1.bytes().base64
+    val script      = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val setScriptId = sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true).id
 
     val acc0ScriptInfo = sender.addressScriptInfo(contract.address)

@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -14,6 +15,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import scala.concurrent.duration._
 
 class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
+  private val estimator = ScriptEstimatorV2
   var asset = ""
 
   protected override def beforeAll(): Unit = {
@@ -55,7 +57,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                     |  case _ => false
                                     |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -79,7 +82,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  case _ => false
                                         |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -99,7 +103,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                 |  case _ => false
                                 |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
 
@@ -125,7 +130,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                 |  case _ => false
                                 |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -165,7 +171,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  case _ => false
                                         |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -220,7 +227,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                 |  case _ => false
                                 |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -237,7 +245,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  case _ => false
                                         |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
 
@@ -257,7 +266,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  case _ => false
                                         |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -291,7 +301,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                |  case _ => true
                                |}
          """.stripMargin,
-            isAssetScript = true
+            isAssetScript = true,
+            estimator
           ).explicitGet()._1.bytes.value.base64),
         waitForTx = true
       )
@@ -313,7 +324,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  case _ => false
                                         |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -335,7 +347,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  case _ => false
                                         |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -358,7 +371,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                              |  case _ => false
                              |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -389,7 +403,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
         |  case _ => false
         |}""".stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(assetNonReissue, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
@@ -411,7 +426,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         reissuable = false,
         issueFee,
         2,
-        script = Some(ScriptCompiler(s"false".stripMargin, isAssetScript = true).explicitGet()._1.bytes.value.base64),
+        script = Some(ScriptCompiler(s"false".stripMargin, isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64),
         waitForTx = true
       )
       .id

@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransactionV2
@@ -15,6 +16,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import scala.concurrent.duration._
 
 class NoOrderProofsSuite extends BaseTransactionSuite {
+  val estimator = ScriptEstimatorV2
   test("try to use Order in asset scripts") {
     try {
       sender.issue(
@@ -33,7 +35,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
               |  case o: Order => true
               |  case _ => false
               |}""".stripMargin,
-            isAssetScript = true
+            isAssetScript = true,
+            estimator
           ).explicitGet()._1.bytes.value.base64)
       )
 
@@ -64,7 +67,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
                   case tx: SetAssetScriptTransaction | TransferTransaction | ReissueTransaction | BurnTransaction => tx.proofs[0] == proof
                   case _ => false
                 }""".stripMargin,
-            false
+            false,
+            estimator
           ).explicitGet()._1.bytes.value.base64),
         waitForTx = true
       )

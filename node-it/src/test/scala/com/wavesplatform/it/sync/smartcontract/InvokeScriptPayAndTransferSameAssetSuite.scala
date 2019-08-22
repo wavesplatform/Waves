@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{setScriptFee, smartFee, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -12,6 +13,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
+  private val estimator = ScriptEstimatorV2
 
   private val dApp     = pkByAddress(firstAddress).address
   private val caller   = pkByAddress(secondAddress).address
@@ -28,11 +30,11 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
   test("_issue and transfer asset") {
     assetId = sender.issue(caller, "Asset", "a", assetQuantity, 0).id
 
-    val script = Some(ScriptCompiler.compile("true").explicitGet()._1.bytes.value.base64)
+    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value.base64)
     smartAssetId = sender.issue(caller, "Smart", "s", assetQuantity, 0, script = script).id
 
     val scriptText  = "match tx {case t:TransferTransaction => false case _ => true}"
-    val smartScript = Some(ScriptCompiler.compile(scriptText).explicitGet()._1.bytes.value.base64)
+    val smartScript = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes.value.base64)
     rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript, waitForTx = true).id
   }
 
@@ -53,7 +55,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
           |    TransferSet([ScriptTransfer(receiver, 1, pay.assetId)])
           |  else throw("need payment in WAVES or any Asset")
           |}
-        """.stripMargin).explicitGet()._1
+        """.stripMargin, estimator).explicitGet()._1
     sender.setScript(dApp, Some(dAppScript.bytes().base64), waitForTx = true).id
 
   }

@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.CreateAliasTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.CancelAfterFailure
 
@@ -33,7 +34,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         |}
       """.stripMargin
 
-    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false).explicitGet()._1
+    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
 
     val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)

@@ -6,12 +6,14 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelAfterFailure {
+  val estimator = ScriptEstimatorV2
 
   private val dApp   = pkByAddress(firstAddress)
   private val caller = pkByAddress(secondAddress)
@@ -35,7 +37,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
   test("_issue and transfer assets") {
     dAppAsset = sender.issue(dApp.address, "dApp", "d", quantity, 0).id
     callerAsset = sender.issue(caller.address, "caller", "c", quantity, 0).id
-    val script = Some(ScriptCompiler.compile("true").explicitGet()._1.bytes.value.base64)
+    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value.base64)
     smartAsset = sender.issue(dApp.address, "Smart", "s", quantity, 0, script = script).id
 
     nodes.waitForHeightAriseAndTxPresent(callerAsset)
@@ -102,7 +104,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
           |    ])
           |  else throw("need payment in smartAsset " + toBase58String(smartAsset))
           |}
-        """.stripMargin).explicitGet()._1
+        """.stripMargin, estimator).explicitGet()._1
     val dAppSetScriptTxId = sender.setScript(dApp.address, Some(dAppScript.bytes().base64)).id
 
     val callerScript        = ScriptCompiler.compile(s"""
@@ -120,7 +122,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
           |    case _ => false
           |  }
           |}
-        """.stripMargin).explicitGet()._1
+        """.stripMargin, estimator).explicitGet()._1
     val callerSetScriptTxId = sender.setScript(caller.address, Some(callerScript.bytes().base64)).id
 
     nodes.waitForHeightAriseAndTxPresent(callerSetScriptTxId)

@@ -9,6 +9,7 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -73,7 +74,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     }""".stripMargin
 
     val pkSwapBC1 = pkByAddress(swapBC1)
-    val script    = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+    val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
       .explicitGet()
