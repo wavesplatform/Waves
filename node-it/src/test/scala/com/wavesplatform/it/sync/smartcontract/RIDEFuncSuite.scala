@@ -25,6 +25,22 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
+      .overrideBase(_.raw(s"""
+                           |waves.blockchain.custom.functionality.pre-activated-features = {
+                           |          2 = 0
+                           |          3 = 0
+                           |          4 = 0
+                           |          5 = 0
+                           |          6 = 0
+                           |          7 = 0
+                           |          9 = 0
+                           |          10 = 0
+                           |          11 = 0
+                           |          12 = 0
+                           |          13 = 0
+                           |          14 = 0
+                           |}
+         """.stripMargin))
       .withDefault(entitiesNumber = 1)
       .buildNonConflicting()
 

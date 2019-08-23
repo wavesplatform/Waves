@@ -60,14 +60,14 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
     val nftIssueTxId = secondNode
       .issue(secondNode.address,
-        assetName,
-        assetDescription,
-        quantity = 1,
-        decimals = 0,
-        reissuable = false,
-        fee = 0.001.waves,
-        script = None,
-        waitForTx = true)
+             assetName,
+             assetDescription,
+             quantity = 1,
+             decimals = 0,
+             reissuable = false,
+             fee = 0.001.waves,
+             script = None,
+             waitForTx = true)
       .id
 
     secondNode.assertAssetBalance(secondNode.address, nftIssueTxId, 1L)
@@ -79,14 +79,14 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
     assertBadRequestAndResponse(
       secondNode.issue(secondNode.address,
-        assetName,
-        assetDescription,
-        quantity = 1,
-        decimals = 0,
-        reissuable = true,
-        fee = 0.001.waves,
-        script = None,
-        waitForTx = true),
+                       assetName,
+                       assetDescription,
+                       quantity = 1,
+                       decimals = 0,
+                       reissuable = true,
+                       fee = 0.001.waves,
+                       script = None,
+                       waitForTx = true),
       "does not exceed minimal value"
     )
   }
@@ -97,14 +97,14 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
     assertBadRequestAndResponse(
       secondNode.issue(secondNode.address,
-        assetName,
-        assetDescription,
-        quantity = 2,
-        decimals = 0,
-        reissuable = false,
-        fee = 0.001.waves,
-        script = None,
-        waitForTx = true),
+                       assetName,
+                       assetDescription,
+                       quantity = 2,
+                       decimals = 0,
+                       reissuable = false,
+                       fee = 0.001.waves,
+                       script = None,
+                       waitForTx = true),
       "does not exceed minimal value"
     )
   }
@@ -115,14 +115,14 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
     assertBadRequestAndResponse(
       secondNode.issue(secondNode.address,
-        assetName,
-        assetDescription,
-        quantity = 1,
-        decimals = 1,
-        reissuable = false,
-        fee = 0.001.waves,
-        script = None,
-        waitForTx = true),
+                       assetName,
+                       assetDescription,
+                       quantity = 1,
+                       decimals = 1,
+                       reissuable = false,
+                       fee = 0.001.waves,
+                       script = None,
+                       waitForTx = true),
       "does not exceed minimal value"
     )
   }
@@ -133,7 +133,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val issetsId = issueManyAssets(20)
     secondNode.waitForTransaction(issetsId.last)
     nodes.waitForHeightArise()
-    val assetsBalance    = secondNode.assetsBalance(secondNode.address).balances.map(a => a.assetId)
+    val assetsBalance = secondNode.assetsBalance(secondNode.address).balances.map(a => a.assetId)
 
     val nftAssetsBalance = secondNode.nftAssetsBalance(secondNode.address, 10).map(id => id.assetId)
 
@@ -159,13 +159,13 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
       i =>
         secondNode
           .issue(secondNode.address,
-            assetName + i,
-            assetDescription + i,
-            quantity = 1,
-            decimals = 0,
-            reissuable = false,
-            fee = 0.001.waves,
-            script = None)
+                 assetName + i,
+                 assetDescription + i,
+                 quantity = 1,
+                 decimals = 0,
+                 reissuable = false,
+                 fee = 0.001.waves,
+                 script = None)
           .id)
   }
 }
