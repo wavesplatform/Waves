@@ -1,8 +1,8 @@
 package com.wavesplatform.protobuf
 
 package object transaction {
-  type PBOrder = com.wavesplatform.protobuf.transaction.ExchangeTransactionData.Order
-  val PBOrder = com.wavesplatform.protobuf.transaction.ExchangeTransactionData.Order
+  type PBOrder = com.wavesplatform.protobuf.order.Order
+  val PBOrder = com.wavesplatform.protobuf.order.Order
 
   type VanillaOrder = com.wavesplatform.transaction.assets.exchange.Order
   val VanillaOrder = com.wavesplatform.transaction.assets.exchange.Order

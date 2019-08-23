@@ -4,7 +4,8 @@ import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.{AssetAmount, AssetId, PBTransactions}
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import io.grpc.stub.StreamObserver
@@ -17,7 +18,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
   private[this] val commonApi = new CommonAccountApi(blockchain)
 
   override def getBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = {
-    val wavesOption = if (request.assets.exists(_.asset.isWaves)) {
+    val wavesOption = if (request.assets.exists(_.isEmpty)) {
       val details = commonApi.balanceDetails(request.address.toAddress)
       Some(
         BalanceResponse.WavesBalances(details.regular, details.generating, details.available, details.effective, details.leaseIn, details.leaseOut))
@@ -25,7 +26,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
       None
     }
 
-    val assetIdSet = request.assets.collect { case AssetId(AssetId.Asset.IssuedAsset(assetId)) => assetId }
+    val assetIdSet = request.assets.toSet
     val assets =
       if (assetIdSet.isEmpty)
         Observable.empty
@@ -34,13 +35,13 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
           .defer(Observable.fromIterable(commonApi.portfolio(request.address.toAddress)))
           .collect {
             case (IssuedAsset(assetId), balance) if request.assets.isEmpty || assetIdSet.contains(assetId.toPBByteString) =>
-              AssetAmount(assetId, balance)
+              Amount(assetId, balance)
           }
 
     val resultStream = Observable
       .fromIterable(wavesOption)
-      .map(wb => BalanceResponse(request.address, BalanceResponse.Balance.Waves(wb)))
-      .++(assets.map(am => BalanceResponse(request.address, BalanceResponse.Balance.Asset(am))))
+      .map(wb => BalanceResponse().withWaves(wb))
+      .++(assets.map(am => BalanceResponse().withAsset(am)))
 
     responseObserver.completeWith(resultStream)
   }

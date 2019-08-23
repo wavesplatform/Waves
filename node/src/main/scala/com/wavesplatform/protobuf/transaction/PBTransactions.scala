@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
 import com.wavesplatform.serialization.Deser
@@ -176,7 +177,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Reissue(ReissueTransactionData(Some(AssetAmount(assetId, amount)), reissuable)) =>
+      case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
         version match {
           case 1 =>
             vt.assets.ReissueTransactionV1.create(sender, IssuedAsset(assetId.toByteArray), amount, reissuable, feeAmount, timestamp, signature)
@@ -185,7 +186,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Burn(BurnTransactionData(Some(AssetAmount(assetId, amount)))) =>
+      case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
         version match {
           case 1 => vt.assets.BurnTransactionV1.create(sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
           case 2 => vt.assets.BurnTransactionV2.create(chainId, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
@@ -275,7 +276,7 @@ object PBTransactions {
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
-          PBAmounts.toVanillaAssetId(mt.getAssetId),
+          PBAmounts.toVanillaAssetId(mt.assetId),
           sender,
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
@@ -284,7 +285,7 @@ object PBTransactions {
           proofs
         )
 
-      case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
+      case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction.create(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
@@ -309,7 +310,7 @@ object PBTransactions {
             sender,
             dApp,
             fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
-            payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
+            payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
             timestamp,
@@ -425,7 +426,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Reissue(ReissueTransactionData(Some(AssetAmount(assetId, amount)), reissuable)) =>
+      case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
         version match {
           case 1 =>
             vt.assets.ReissueTransactionV1(sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, signature)
@@ -434,7 +435,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Burn(BurnTransactionData(Some(AssetAmount(assetId, amount)))) =>
+      case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
         version match {
           case 1 => vt.assets.BurnTransactionV1(sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
           case 2 => vt.assets.BurnTransactionV2(chainId, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
@@ -519,7 +520,7 @@ object PBTransactions {
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
-          PBAmounts.toVanillaAssetId(mt.getAssetId),
+          PBAmounts.toVanillaAssetId(mt.assetId),
           sender,
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
@@ -528,7 +529,7 @@ object PBTransactions {
           proofs
         )
 
-      case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
+      case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
@@ -540,7 +541,7 @@ object PBTransactions {
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser.parseOption(functionCall.toByteArray, 0, functionCall.size() - 1)(Serde.deserialize(_, all = false))._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
-          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.getAssetId))),
+          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
           timestamp,
@@ -597,12 +598,12 @@ object PBTransactions {
 
       case tx: vt.assets.ReissueTransaction =>
         import tx._
-        val data = ReissueTransactionData(Some(AssetAmount(asset.id, quantity)), reissuable)
+        val data = ReissueTransactionData(Some(Amount(asset.id, quantity)), reissuable)
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Reissue(data))
 
       case tx: vt.assets.BurnTransaction =>
         import tx._
-        val data = BurnTransactionData(Some(AssetAmount(asset.id, quantity)))
+        val data = BurnTransactionData(Some(Amount(asset.id, quantity)))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Burn(data))
 
       case tx @ vt.assets.SetAssetScriptTransaction(_, sender, assetId, script, fee, timestamp, proofs) =>
@@ -625,7 +626,7 @@ object PBTransactions {
 
       case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
         val data = MassTransferTransactionData(
-          Some(PBAmounts.toPBAssetId(assetId)),
+          PBAmounts.toPBAssetId(assetId),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
           attachment: ByteStr
         )
@@ -636,7 +637,7 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.DataTransaction(txData))
 
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
-        val data = SponsorFeeTransactionData(Some(AssetAmount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
+        val data = SponsorFeeTransactionData(Some(Amount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SponsorFee(data))
 
       case vt.smart.InvokeScriptTransaction(_, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
