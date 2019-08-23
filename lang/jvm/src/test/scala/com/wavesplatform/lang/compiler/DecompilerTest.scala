@@ -583,6 +583,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       """let arr = [1, 2, 3]
         |arr[1]""".stripMargin
     val Right((expr, _)) = compile(script)
+    val Right((expr2, _)) = compile(
+      """let arr = [1, 2, 3]
+        |arr.getElement(1)""".stripMargin
+    )
     Decompiler(expr, decompilerContext) shouldEq script
+    Decompiler(expr2, decompilerContext) shouldEq script
   }
 }
