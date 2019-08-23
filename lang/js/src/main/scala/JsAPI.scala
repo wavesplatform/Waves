@@ -14,9 +14,10 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
 import scala.scalajs.js
@@ -251,8 +252,10 @@ object JsAPI {
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
-      "evaluate" -> (repl.execute _ andThen mapResult),
-      "clear"    -> repl.clear _
+      "evaluate"  -> (repl.execute _ andThen mapResult),
+      "info"      -> repl.info _,
+      "totalInfo" -> repl.totalInfo _,
+      "clear"     -> repl.clear _
     )
 
   private def mapResult(eval: Either[String, String]): js.Dynamic =

@@ -14,55 +14,53 @@ import scala.collection.mutable.ListBuffer
 
 object EvaluatorV1 {
 
-  private def evalLetBlock(let: LET, inner: EXPR): EvalM[EVALUATED] =
+  private def evalLetBlock(let: LET, inner: EXPR): EvalM[(EvaluationContext, EVALUATED)] =
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       blockEvaluation = evalExpr(let.value)
       lazyBlock       = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
       result <- local {
         modify[LoggedEvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
-          .flatMap(_ => evalExpr(inner))
+          .flatMap(_ => evalExprWithCtx(inner))
       }
     } yield result
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[EVALUATED] = {
+  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[(EvaluationContext, EVALUATED)] = {
     val funcHeader = FunctionHeader.User(func.name)
     val function   = UserFunction(func.name, 0, null, func.args.map(n => (n, null)): _*)(func.body)
-    for {
-      ctx <- get[LoggedEvaluationContext, ExecutionError]
-      result <- local {
-        modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
-          .flatMap(_ => evalExpr(inner))
-      }
-    } yield result
+    local {
+      modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
+        .flatMap(_ => evalExprWithCtx(inner))
+    }
   }
 
-  private def evalRef(key: String): EvalM[EVALUATED] =
-    get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
-      lets.get(ctx).get(key) match {
+  private def evalRef(key: String): EvalM[(EvaluationContext, EVALUATED)] =
+    for {
+      ctx <- get
+      r   <- lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[EVALUATED](lzy.value)
-        case None      => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
+        case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
       }
-    }
+    } yield (ctx.ec, r)
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[EVALUATED] =
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[(EvaluationContext, EVALUATED)] =
     evalExpr(cond) flatMap {
-      case TRUE  => evalExpr(ifTrue)
-      case FALSE => evalExpr(ifFalse)
+      case TRUE  => evalExprWithCtx(ifTrue)
+      case FALSE => evalExprWithCtx(ifFalse)
       case _     => ???
     }
 
-  private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] = {
-    evalExpr(expr).flatMap { exprResult =>
+  private def evalGetter(expr: EXPR, field: String): EvalM[(EvaluationContext, EVALUATED)] = {
+    evalExprWithCtx(expr).flatMap { case (ctx, exprResult) =>
       val fields = exprResult.asInstanceOf[CaseObj].fields
-fields.get(field) match {
-        case Some(f) => f.pure[EvalM]
-        case None    => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$field' not found amongst ${fields.keys}")
+      fields.get(field) match {
+        case Some(f) => (ctx, f).pure[EvalM]
+        case None    => raiseError(s"A definition of '$field' not found amongst ${fields.keys}")
       }
     }
   }
 
-  private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[EVALUATED] =
+  private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[(EvaluationContext, EVALUATED)] =
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       result <- funcs
@@ -102,21 +100,24 @@ fields.get(field) match {
           }
         )
         .getOrElse(raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"function '$header' not found"))
-    } yield result
+    } yield (ctx.ec, result)
 
-  def evalExpr(t: EXPR): EvalM[EVALUATED] = t match {
-    case LET_BLOCK(let, inner) => evalLetBlock(let, inner)
-    case BLOCK(dec, inner) =>
-      dec match {
-        case l: LET  => evalLetBlock(l, inner)
-        case f: FUNC => evalFuncBlock(f, inner)
-      }
-    case REF(str)                    => evalRef(str)
-    case c: EVALUATED                => implicitly[Monad[EvalM]].pure(c)
-    case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
-    case GETTER(expr, field)         => evalGetter(expr, field)
-    case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
-  }
+  private def evalExprWithCtx(t: EXPR): EvalM[(EvaluationContext, EVALUATED)] =
+    t match {
+      case LET_BLOCK(let, inner) => evalLetBlock(let, inner)
+      case BLOCK(dec, inner) =>
+        dec match {
+          case l: LET  => evalLetBlock(l, inner)
+          case f: FUNC => evalFuncBlock(f, inner)
+        }
+      case REF(str)                    => evalRef(str)
+      case c: EVALUATED                => get.map(ctx => (ctx.ec, c))
+      case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
+      case GETTER(expr, field)         => evalGetter(expr, field)
+      case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
+    }
+
+  def evalExpr(t: EXPR): EvalM[EVALUATED] = evalExprWithCtx(t).map(_._2)
 
   def applyWithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
     val log = ListBuffer[LogItem]()
@@ -163,4 +164,9 @@ fields.get(field) match {
       ._2
   }
 
+  def applyWithCtx(c: EvaluationContext, expr: EXPR): Either[ExecutionError, (EvaluationContext, EVALUATED)] =
+    evalExprWithCtx(expr)
+      .run(LoggedEvaluationContext(_ => _ => (), c))
+      .value
+      ._2
 }

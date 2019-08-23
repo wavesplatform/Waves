@@ -160,35 +160,23 @@ object InvokeScriptTransactionDiff {
               (),
               GenericError(s"Unissued assets are not allowed")
             ))
+          scriptsInvoked = {
+            tx.checkedAssets()
+              .collect { case asset@IssuedAsset(_) => asset }
+              .count(blockchain.hasAssetScript) +
+              ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+              (if (blockchain.hasScript(tx.sender)) 1 else 0)
+          }
           _ <- TracedResult {
-            val totalScriptsInvoked =
-              tx.checkedAssets()
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) 1 else 0)
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val minWaves = scriptsInvoked * ScriptExtraFee + FeeValidation.feeUnits(blockchain)(InvokeScriptTransaction.typeId) * FeeUnit
             val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             Either.cond(
               minWaves <= wavesFee,
               (),
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for $txName with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
-            )
-          }
-          scriptsInvoked <- TracedResult {
-            val totalScriptsInvoked =
-              tx.checkedAssets()
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            Either.cond(
-              minWaves <= wavesFee,
-              totalScriptsInvoked,
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in ${
+                tx.assetFee._1
+                  .fold("WAVES")(_.toString)
+              } for $txName with $scriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
             )
           }
 

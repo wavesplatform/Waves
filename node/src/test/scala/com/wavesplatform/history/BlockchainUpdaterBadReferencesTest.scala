@@ -119,7 +119,7 @@ class BlockchainUpdaterBadReferencesTest
   }
 
   property("block: incorrect or non-existing block when liquid exists") {
-    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
+    assume(BlockchainFeatures.Implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, payment, payment2, payment3)) =>
         val blocks   = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
