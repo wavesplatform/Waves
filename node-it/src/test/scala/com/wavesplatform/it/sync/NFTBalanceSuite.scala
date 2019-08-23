@@ -1,24 +1,19 @@
 package com.wavesplatform.it.sync
 
-import java.io.File
-
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import monix.eval.Coeval
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec}
+import org.scalatest.FreeSpec
 import play.api.libs.json._
 
-import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -26,29 +21,17 @@ import scala.util.Random
 
 //noinspection ScalaStyle
 class NFTBalanceSuite
-    extends FreeSpec
-    with WaitForHeight2
-    with IntegrationSuiteWithThreeAddresses
-    with BeforeAndAfterAll
-    with NodesFromDocker
-    with CancelAfterFailure {
+    extends FreeSpec with BaseTransactionSuiteLike {
 
   import NFTBalanceSuite._
 
-  override protected def nodeConfigs: Seq[Config] = configs
 
-  protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
-    Option(System.getProperty("waves.it.config.file")) match {
-      case None => dockerNodes()
-      case Some(filePath) =>
-        val defaultConfig = ConfigFactory.load()
-        ConfigFactory
-          .parseFile(new File(filePath))
-          .getConfigList("nodes")
-          .asScala
-          .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
-    }
-  }
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 
   override protected def nodes: Seq[Node] = theNodes()
 
@@ -61,7 +44,7 @@ class NFTBalanceSuite
   private val randomTokenToTransfer = IssuedAsset(nft(Random.nextInt(nft.length)).assetId)
 
   protected override def beforeAll(): Unit = {
-    theNodes.run()
+    super.beforeAll()
 
     val fundAndIssue =
       for {
@@ -77,8 +60,6 @@ class NFTBalanceSuite
       } yield ()
 
     Await.ready(fundAndIssue, 2.minutes)
-
-    super.beforeAll()
   }
 
   "after activation" - {
@@ -149,7 +130,10 @@ class NFTBalanceSuite
         nonPagedIds shouldBe expectedIds
       }
 
-      Await.result(node.waitFor("nft sync")(a => assertion(a.n).map(_ => true).recover { case _ => false }, (b: Boolean) => b, 30 seconds), 10.minutes)
+      Await.result(
+        node.waitFor("nft sync")(a => assertion(a.n).map(_ => true).recover { case _ => false }, (b: Boolean) => b, 30 seconds),
+        10.minutes
+      )
     }
 
     "returns error on wrong limit" in {
@@ -182,26 +166,7 @@ class NFTBalanceSuite
 }
 
 object NFTBalanceSuite {
-  val configs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .overrideBase(_.raw(s"""
-                          |waves.blockchain.custom.functionality.pre-activated-features = {
-                          |          2 = 0
-                          |          3 = 0
-                          |          4 = 0
-                          |          5 = 0
-                          |          6 = 0
-                          |          7 = 0
-                          |          9 = 0
-                          |          10 = 0
-                          |          11 = 0
-                          |          12 = 0
-                          |          13 = 0
-                          |}
-         """.stripMargin))
-      .buildNonConflicting()
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
@@ -272,18 +237,14 @@ object NFTBalanceSuite {
   // returns issue transactions ids from addresses portfolio
   // obtained via paged api
   def getNFTPaged(node: Node, address: String, limit: Int): Future[List[String]] = {
-    def loop(lastId: String, acc: List[String]): Future[List[String]] = {
-      getNFTPage(node, address, limit, Some(lastId)) flatMap { ids =>
-        if (ids.nonEmpty) loop(ids.last, ids ++ acc)
+    def loop(lastId: Option[String], acc: List[String]): Future[List[String]] = {
+      getNFTPage(node, address, limit, lastId) flatMap { ids =>
+        if (ids.nonEmpty) loop(ids.lastOption, ids ++ acc)
         else Future.successful(acc)
       }
     }
 
-    getNFTPage(node, address, limit, None) flatMap { ids =>
-      if (ids.nonEmpty) loop(ids.last, ids)
-      else Future.successful(ids)
-    }
-
+    loop(None, Nil)
   }
 
   //returns asset ids from addresses portfolio

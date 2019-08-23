@@ -18,23 +18,13 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
+      .overrideBase(_.raw(
+        """waves {
+          |  miner.quorum = 0
+          |  blockchain.custom.functionality.pre-activated-features.13 = 10
+          |}""".stripMargin))
       .withDefault(1)
-      .withSpecial(_.raw(s"""
-                            |waves.blockchain.custom.functionality.pre-activated-features = {
-                            |          2 = 0
-                            |          3 = 0
-                            |          4 = 0
-                            |          5 = 0
-                            |          6 = 0
-                            |          7 = 0
-                            |          9 = 0
-                            |          10 = 0
-                            |          11 = 0
-                            |          12 = 0
-                            |          13 = 0
-                            |}
-         """.stripMargin))
+      .withSpecial(_.nonMiner)
       .buildNonConflicting()
 
   test("Can't issue NFT before activation") {
@@ -57,6 +47,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
   test("Able to issue NFT token with reduced fee") {
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
+
+    nodes.waitForHeight(10)
 
     val nftIssueTxId = secondNode
       .issue(secondNode.address,
