@@ -9,13 +9,13 @@ import com.wavesplatform.settings.WavesSettings
 
 object EstimatorProvider {
   implicit class EstimatorBlockchainExt(b: Blockchain) {
-    def estimator(): ScriptEstimator =
+    val estimator: ScriptEstimator =
       if (b.isFeatureActivated(ChangeMinimalFees)) ScriptEstimatorV2
       else ScriptEstimatorV1
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {
-    def estimator(): ScriptEstimator =
+    val estimator: ScriptEstimator =
       if (ws.featuresSettings.supported.contains(ChangeMinimalFees.id)) ScriptEstimatorV2
       else ScriptEstimatorV1
   }

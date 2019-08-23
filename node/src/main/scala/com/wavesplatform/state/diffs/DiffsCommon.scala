@@ -68,11 +68,11 @@ private[diffs] object DiffsCommon {
         .toList
         .flatMap(blockchain.assetDescription)
         .flatMap(_.script)
-        .traverse(verifierComplexity(_, blockchain.estimator()))
+        .traverse(verifierComplexity(_, blockchain.estimator))
 
       accountComplexity <- blockchain
         .accountScript(tx.sender.toAddress)
-        .traverse(verifierComplexity(_, blockchain.estimator()))
+        .traverse(verifierComplexity(_, blockchain.estimator))
 
     } yield assetsComplexity.sum + accountComplexity.getOrElse(0L)
 }

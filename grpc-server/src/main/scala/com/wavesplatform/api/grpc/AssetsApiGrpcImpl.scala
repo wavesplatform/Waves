@@ -30,7 +30,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
               ScriptData(
                 script.bytes().toPBByteString,
                 script.expr.toString,
-                Script.estimate(script, blockchain.estimator()).explicitGet()
+                Script.estimate(script, blockchain.estimator).explicitGet()
               )
           ),
           info.description.sponsorship,

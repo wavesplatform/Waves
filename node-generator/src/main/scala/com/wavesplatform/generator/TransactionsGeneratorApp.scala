@@ -166,7 +166,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           .load("preconditions.conf")
           .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
 
-      val estimator = wavesSettings.estimator()
+      val estimator = wavesSettings.estimator
 
       val (universe, initialTransactions) = preconditions
         .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time, estimator))

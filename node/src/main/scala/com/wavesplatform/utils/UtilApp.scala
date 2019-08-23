@@ -205,7 +205,7 @@ object UtilApp {
 
     //noinspection ScalaDeprecation
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
-      ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator())
+      ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator)
         .map(_._1.bytes())
     }
 

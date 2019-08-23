@@ -73,7 +73,7 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
-              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator(), tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
               directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
               evaluator <- ContractEvaluator(
                 Monoid
@@ -102,14 +102,14 @@ object InvokeScriptTransactionDiff {
           verifierComplexity <- TracedResult {
             blockchain
               .accountScript(tx.sender)
-              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator()))
+              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
               .leftMap(GenericError(_))
           }
           assetsComplexity <- TracedResult {
             (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
               .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
               .toList
-              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator()))
+              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
               .leftMap(GenericError(_))
           }
 

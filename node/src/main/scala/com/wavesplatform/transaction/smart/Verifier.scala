@@ -88,7 +88,7 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = for {
-      _      <- Script.estimate(script, blockchain.estimator()).leftMap(GenericError(_))
+      _      <- Script.estimate(script, blockchain.estimator).leftMap(GenericError(_))
       result <- Try {
         val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
         val eval = ScriptRunner(height, Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
@@ -126,7 +126,7 @@ object Verifier extends ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     for {
-      _      <- Script.estimate(script, blockchain.estimator()).leftMap(GenericError(_))
+      _      <- Script.estimate(script, blockchain.estimator).leftMap(GenericError(_))
       result <- Try {
         val eval = ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
         val scriptResult = eval match {
@@ -204,7 +204,7 @@ object Verifier extends ScorexLogging {
     }
 
     val estimate: TracedResult[GenericError, Option[Long]] =
-      matcherScriptOpt.traverse(Script.estimate(_, blockchain.estimator()).leftMap(GenericError(_)))
+      matcherScriptOpt.traverse(Script.estimate(_, blockchain.estimator).leftMap(GenericError(_)))
 
     for {
       _ <- estimate
