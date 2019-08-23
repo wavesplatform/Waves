@@ -16,7 +16,6 @@ import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
-import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -39,17 +38,19 @@ trait NS {
 
 object NetworkServer extends ScorexLogging {
   private[this] val AverageHandshakePeriod = 1.second
-  private[this] val MaxFrameLength = 100 * 1024 * 1024
-  private[this] val LengthFieldSize = 4
+  private[this] val MaxFrameLength         = 100 * 1024 * 1024
+  private[this] val LengthFieldSize        = 4
 
-  def apply(settings: WavesSettings,
-            lastBlockInfos: Observable[LastBlockInfo],
-            ng: NG,
-            historyReplier: HistoryReplier,
-            utxPool: UtxPool,
-            peerDatabase: PeerDatabase,
-            allChannels: ChannelGroup,
-            peerInfo: ConcurrentHashMap[Channel, PeerInfo]): NS = {
+  def apply(
+      settings: WavesSettings,
+      lastBlockInfos: Observable[LastBlockInfo],
+      ng: NG,
+      historyReplier: HistoryReplier,
+      utxPool: UtxPool,
+      peerDatabase: PeerDatabase,
+      allChannels: ChannelGroup,
+      peerInfo: ConcurrentHashMap[Channel, PeerInfo]
+  ): NS = {
     @volatile var shutdownInitiated = false
 
     val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
@@ -89,7 +90,7 @@ object NetworkServer extends ScorexLogging {
     val writeErrorHandler = new WriteErrorHandler
     val fatalErrorHandler = new FatalErrorHandler
 
-    val inboundConnectionFilter: PipelineInitializer.HandlerWrapper =
+    val inboundConnectionFilter =
       new InboundConnectionFilter(peerDatabase, settings.networkSettings.maxInboundConnections, settings.networkSettings.maxConnectionsPerHost)
 
     val (messageObserver, networkMessages)            = MessageObserver()
@@ -104,30 +105,37 @@ object NetworkServer extends ScorexLogging {
       } else PeerSynchronizer.Disabled
     }
 
+    def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
+      lengthFieldPrepender,
+      new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
+      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
+      channelClosedHandler,
+      trafficWatcher,
+      discardingHandler,
+      messageCodec,
+      trafficLogger,
+      writeErrorHandler,
+      peerSynchronizer,
+      historyReplier,
+      messageObserver,
+      fatalErrorHandler
+    )
+
     val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
       new ServerBootstrap()
         .group(bossGroup, workerGroup)
         .channel(classOf[NioServerSocketChannel])
-        .childHandler(new PipelineInitializer[SocketChannel](Seq(
-          inboundConnectionFilter,
-          new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
-          new HandshakeDecoder(peerDatabase),
-          new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
-          serverHandshakeHandler,
-          lengthFieldPrepender,
-          new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-          new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
-          channelClosedHandler,
-          trafficWatcher,
-          discardingHandler,
-          messageCodec,
-          trafficLogger,
-          writeErrorHandler,
-          peerSynchronizer,
-          historyReplier,
-          messageObserver,
-          fatalErrorHandler
-        )))
+        .childHandler(
+          new PipelineInitializer(
+            Seq(
+              inboundConnectionFilter,
+              new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
+              new HandshakeDecoder(peerDatabase),
+              new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
+              serverHandshakeHandler
+            ) ++ pipelineTail
+          )
+        )
         .bind(settings.networkSettings.bindAddress)
         .channel()
     }
@@ -140,25 +148,16 @@ object NetworkServer extends ScorexLogging {
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
       .group(workerGroup)
       .channel(classOf[NioSocketChannel])
-      .handler(new PipelineInitializer[SocketChannel](Seq(
-        new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
-        new HandshakeDecoder(peerDatabase),
-        new HandshakeTimeoutHandler(if (peerConnections.isEmpty) 1.second else settings.networkSettings.handshakeTimeout),
-        clientHandshakeHandler,
-        lengthFieldPrepender,
-        new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-        new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
-        channelClosedHandler,
-        trafficWatcher,
-        discardingHandler,
-        messageCodec,
-        trafficLogger,
-        writeErrorHandler,
-        peerSynchronizer,
-        historyReplier,
-        messageObserver,
-        fatalErrorHandler
-      )))
+      .handler(
+        new PipelineInitializer(
+          Seq(
+            new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
+            new HandshakeDecoder(peerDatabase),
+            new HandshakeTimeoutHandler(if (peerConnections.isEmpty) AverageHandshakePeriod else settings.networkSettings.handshakeTimeout),
+            clientHandshakeHandler
+          ) ++ pipelineTail
+        )
+      )
 
     def formatOutgoingChannelEvent(channel: Channel, event: String) = s"${id(channel)} $event, outgoing channel count: ${outgoingChannels.size()}"
 
@@ -170,8 +169,11 @@ object NetworkServer extends ScorexLogging {
         log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
       else
         log.debug(
-          formatOutgoingChannelEvent(closeFuture.channel(),
-                                     s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"))
+          formatOutgoingChannelEvent(
+            closeFuture.channel(),
+            s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"
+          )
+        )
     }
 
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
@@ -189,7 +191,8 @@ object NetworkServer extends ScorexLogging {
               formatOutgoingChannelEvent(
                 thisConnFuture.channel(),
                 s"Channel closed by connection issue: ${Option(e.getMessage).getOrElse("no message")}"
-              ))
+              )
+            )
           case other => log.debug(formatOutgoingChannelEvent(thisConnFuture.channel(), other.getMessage))
         }
       }
@@ -207,10 +210,9 @@ object NetworkServer extends ScorexLogging {
       )
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
-      val delay = (if (peerConnections.isEmpty) 1.second else 5.seconds) +
+      val delay = (if (peerConnections.isEmpty) AverageHandshakePeriod else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
       log.trace(s"Next connection attempt in $delay")
-
 
       workerGroup.schedule(delay) {
         import scala.collection.JavaConverters._
