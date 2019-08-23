@@ -7,10 +7,8 @@ import java.nio.file.{Files, Paths}
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
-import com.wavesplatform.features.BlockchainFeatures.ReduceNFTFee
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -207,13 +205,7 @@ object UtilApp {
 
     //noinspection ScalaDeprecation
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
-      val estimator =
-        if (settings.featuresSettings.supported.contains(ReduceNFTFee.id))
-          ScriptEstimatorV2
-        else
-          ScriptEstimatorV1
-
-      ScriptCompiler(new String(str), c.compileOptions.assetScript, estimator)
+      ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator())
         .map(_._1.bytes())
     }
 
