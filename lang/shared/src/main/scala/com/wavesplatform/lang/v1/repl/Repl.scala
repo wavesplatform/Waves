@@ -20,7 +20,7 @@ case class Repl(ver: StdLibVersion = V3) {
   def totalInfo: String = currentState.get()._2.totalCtx
 
   def execute(expr: String): Either[String, String] =
-    handle(
+    perform(
       currentState,
       view,
       (oldCtx: (CompilerContext, EvaluationContext)) =>
@@ -30,7 +30,7 @@ case class Repl(ver: StdLibVersion = V3) {
         }
     )
 
-  private def handle[S, R, V](
+  private def perform[S, R, V](
     value:      Atomic[(S, V)],
     view:       S => V,
     transition: S => (R, S)
