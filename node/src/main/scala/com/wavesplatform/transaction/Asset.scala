@@ -1,9 +1,7 @@
 package com.wavesplatform.transaction
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.protobuf.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
@@ -53,25 +51,10 @@ object Asset {
     maybeBStr.fold[Asset](Waves)(IssuedAsset)
   }
 
-  def fromProtoId(byteStr: ByteString): Asset = {
-    if (byteStr.isEmpty) Waves
-    else IssuedAsset(byteStr.toByteArray)
-  }
-
-  def fromProtoId(assetId: AssetId): Asset = assetId.asset match {
-    case AssetId.Asset.IssuedAsset(bs) => fromProtoId(bs)
-    case _ => Waves
-  }
-
   implicit class AssetIdOps(private val ai: Asset) extends AnyVal {
     def byteRepr: Array[Byte] = ai match {
       case Waves           => Array(0: Byte)
       case IssuedAsset(id) => (1: Byte) +: id.arr
-    }
-
-    def protoId: AssetId = ai match {
-      case IssuedAsset(id) => AssetId().withIssuedAsset(ByteString.copyFrom(id))
-      case Waves => AssetId().withWaves(com.google.protobuf.empty.Empty())
     }
 
     def compatId: Option[ByteStr] = ai match {

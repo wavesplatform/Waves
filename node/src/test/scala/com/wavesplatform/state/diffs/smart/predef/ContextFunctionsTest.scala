@@ -476,7 +476,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               masterAcc,
               Some(fc),
               Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
+              FeeValidation.FeeUnit * (FeeValidation.FeeUnits(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
               Waves,
               System.currentTimeMillis()
             )

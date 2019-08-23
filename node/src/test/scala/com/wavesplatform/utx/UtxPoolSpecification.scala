@@ -113,7 +113,7 @@ class UtxPoolSpecification
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
-    val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
+    val minFee    = FeeValidation.OldFeeUnits(TransferTransaction.typeId) + FeeValidation.OldFeeUnits(MassTransferTransaction.typeId) * transfers.size
     val txs = for { fee <- chooseNum(minFee, amount) } yield
       MassTransferTransaction.selfSigned(Waves, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).explicitGet()
     txs.label("transferWithRecipient")

@@ -84,7 +84,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
       if (approvedFeatures.nonEmpty) log.info(s"${displayFeatures(approvedFeatures)} APPROVED at height $height")
 
-      val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.implemented)
+      val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.Implemented)
       if (unimplementedApproved.nonEmpty) {
         log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedApproved)} APPROVED ON BLOCKCHAIN")
         log.warn("PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE")
@@ -93,7 +93,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
 
       val activatedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height)
 
-      val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
+      val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.Implemented)
       if (unimplementedActivated.nonEmpty) {
         log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
         log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
@@ -111,10 +111,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
   }
 
   override def processBlock(block: Block, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] = writeLock {
-    val notImplementedFeatures: Set[Short] =
-      blockchain
-        .activatedFeaturesAt(blockchain.height)
-        .diff(BlockchainFeatures.implemented)
+    val height                             = blockchain.height
+    val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.Implemented)
 
     Either
       .cond(

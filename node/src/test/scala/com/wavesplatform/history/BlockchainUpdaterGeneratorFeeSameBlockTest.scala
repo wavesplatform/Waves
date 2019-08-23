@@ -30,7 +30,7 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
   } yield (genesis, payment, generatorPaymentOnFee)
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {
-    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
+    assume(BlockchainFeatures.Implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments, DefaultWavesSettings) {
       case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
