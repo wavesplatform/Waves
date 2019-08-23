@@ -78,7 +78,7 @@ object BlockHeader extends ScorexLogging {
 
       val txCount = version match {
         case 1 | 2 => tBytes.head
-        case 3     => ByteBuffer.wrap(tBytes, 0, 4).getInt()
+        case 3 | 4 => ByteBuffer.wrap(tBytes, 0, 4).getInt()
       }
 
       position += tBytesLength
@@ -229,7 +229,7 @@ object Block extends ScorexLogging {
     } else {
       val v: (Array[Byte], Int) = version match {
         case 1 | 2 => (bytes.tail, bytes.head) //  127 max, won't work properly if greater
-        case 3 =>
+        case 3 | 4 =>
           val size = ByteBuffer.wrap(bytes, 0, 4).getInt()
           (bytes.drop(4), size)
         case _ => ???
