@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+
 import scala.concurrent.duration._
 
 object TestFunctionalitySettings {
@@ -31,4 +32,7 @@ object TestFunctionalitySettings {
 
   val EmptyFeaturesSettings: FeaturesSettings =
     FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
+
+  def withFeatures(features: BlockchainFeature*): FunctionalitySettings =
+    Enabled.copy(preActivatedFeatures = Enabled.preActivatedFeatures ++ features.map(_.id -> 0))
 }

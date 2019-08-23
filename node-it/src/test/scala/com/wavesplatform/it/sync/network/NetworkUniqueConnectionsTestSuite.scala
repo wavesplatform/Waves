@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync.network
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.api.Peer
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.{DockerBased, NodeConfigs}
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.concurrent._
 import scala.concurrent.duration._
 
 class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with DockerBased with ScorexLogging {
@@ -36,8 +36,8 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
     // Outgoing connection: first -> second (2)
     firstNode.connect(secondNode.containerNetworkAddress)
 
-    withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
-      intercept[TimeoutException] { firstNode.waitForPeers(2, 30.seconds) }
+    withClue("Should drop duplicate connection") {
+      firstNode.waitFor[Seq[Peer]](s"connectedPeers.size == 1")(_.connectedPeers, _.length == 1, 30.seconds)
     }
   }
 

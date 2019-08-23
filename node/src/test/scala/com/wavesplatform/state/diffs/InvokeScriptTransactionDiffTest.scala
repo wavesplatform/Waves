@@ -28,7 +28,6 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -48,8 +47,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   def ciFee(sc: Int = 0): Gen[Long] =
     Gen.choose(
-      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
-      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
+      FeeValidation.FeeUnit * FeeValidation.OldFeeUnits(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
+      FeeValidation.FeeUnit * FeeValidation.OldFeeUnits(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
     )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -667,7 +666,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   }
 
   val chainId   = AddressScheme.current.chainId
-  val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransactionV2.typeId) * FeeValidation.FeeUnit
+  val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.OldFeeUnits(IssueTransactionV2.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {
     forAll(for {
