@@ -1,8 +1,13 @@
 package com.wavesplatform.lang.v1
 
+import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import cats.implicits._
+import com.wavesplatform.lang.directives.values.StdLibVersion
 
 package object repl {
   val Global: BaseGlobal = com.wavesplatform.lang.Global
@@ -22,4 +27,9 @@ package object repl {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = unavailable
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
   }
+
+  def buildInitialCtx(version: StdLibVersion) =
+    CryptoContext.build(Global, version) |+|
+    PureContext.build(Global, version)   |+|
+    WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
 }
