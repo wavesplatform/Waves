@@ -607,19 +607,15 @@ object PureContext {
 
   lazy val unitVarName = "unit"
 
-  private def singleObj(ty: CASETYPEREF, v: Map[String,EVALUATED] = Map.empty) = {
-    ty -> LazyVal(EitherT.pure(CaseObj(ty, v))),
-  }
-
   private lazy val vars: Map[String, (FINAL, LazyVal)] = Map(
     (unitVarName, (UNIT, LazyVal(EitherT.pure(unit)))),
-    ("UP", singleObj(roundUp)),
-    ("HALFUP", singleObj(roundHalfUp)),
-    ("HALFDOWN", singleObj(roundHalfDown)),
-    ("DOWN", singleObj(roundDown)),
-    ("HALFEVEN", singleObj(roundHalfEven)),
-    ("CEILING", singleObj(roundCeiling)),
-    ("FLOOR", singleObj(roundFloor))
+    ("UP", (roundUp, LazyVal(EitherT.pure(CaseObj(roundUp, Map.empty))))),
+    ("HALFUP", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundHalfUp, Map.empty))))),
+    ("HALFDOWN", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundHalfDown, Map.empty))))),
+    ("DOWN", (roundDown, LazyVal(EitherT.pure(CaseObj(roundDown, Map.empty))))),
+    ("HALFEVEN", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundHalfEven, Map.empty))))),
+    ("CEILING", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundCeiling, Map.empty))))),
+    ("FLOOR", (roundHalfUp, LazyVal(EitherT.pure(CaseObj(roundFloor, Map.empty)))))
   )
 
   private lazy val ctx = CTX(
