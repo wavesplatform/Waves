@@ -13,7 +13,7 @@ trait TransactionsBlockField extends BlockField[Seq[Transaction]]
 object TransactionsBlockField {
   def apply(version: Int, value: Seq[Transaction]): TransactionsBlockField = version match {
     case 1 | 2 => TransactionsBlockFieldVersion1or2(value)
-    case 3     => TransactionsBlockFieldVersion3(value)
+    case 3 | 4 => TransactionsBlockFieldVersion3(value)
   }
 
   def serTxs(value: Seq[Transaction], serTxCount: Array[Byte]): Array[Byte] = {
