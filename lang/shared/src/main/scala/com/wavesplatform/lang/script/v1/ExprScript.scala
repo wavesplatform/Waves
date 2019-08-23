@@ -31,7 +31,7 @@ object ExprScript {
   def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     ExprScriptImpl(version, x)
       .asRight[String]
-      .flatTap(s => validateBytes(s.bytes().arr))
+      .flatTap(s => if (checkSize) validateBytes(s.bytes().arr) else Right(()))
 
   def estimate(
     expr:      EXPR,
