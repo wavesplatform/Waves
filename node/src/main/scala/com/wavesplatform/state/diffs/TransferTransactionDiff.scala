@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.transfer._
 import scala.util.{Right, Try}
 
 object TransferTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int, blockTime: Long)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Int, blockTime: Long, complexity: Long)(tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender)
 
     val isSmartAsset = tx.feeAssetId match {
@@ -27,9 +27,9 @@ object TransferTransactionDiff {
     }
 
     for {
-      recipient  <- blockchain.resolveAlias(tx.recipient)
-      _          <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
-      complexity <- DiffsCommon.countScriptsComplexity(blockchain, tx).leftMap(GenericError(_))
+      recipient <- blockchain.resolveAlias(tx.recipient)
+      _         <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
+
       _ <- validateOverflow(blockchain, tx)
       portfolios = (tx.assetId match {
         case Waves =>
