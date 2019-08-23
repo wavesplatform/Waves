@@ -558,6 +558,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, decompilerContext) shouldEq script
   }
 
+  property("concat with nil is hidden") {
+    val expected = """["a", "b"]"""
+    val Right((expr1, _)) = compile(""""a"::"b"::nil""")
+    val Right((expr2, _)) = compile("""cons("a", cons("b", nil))""")
+    Decompiler(expr1, decompilerContext) shouldEq expected
+    Decompiler(expr2, decompilerContext) shouldEq expected
+  }
+
   property("single value list") {
     val script = """["a"]"""
     val Right((expr, _)) = compile(script)
