@@ -92,7 +92,7 @@ object NetworkServer extends ScorexLogging {
     val inboundConnectionFilter: PipelineInitializer.HandlerWrapper =
       new InboundConnectionFilter(peerDatabase, settings.networkSettings.maxInboundConnections, settings.networkSettings.maxConnectionsPerHost)
 
-    val (messageObserver, networkMessages) = MessageObserver()
+    val (messageObserver, networkMessages)            = MessageObserver()
     val (channelClosedHandler, closedChannelsSubject) = ChannelClosedHandler()
     val discardingHandler                             = new DiscardingHandler(lastBlockInfos.map(_.ready))
     val peerConnections                               = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
@@ -143,7 +143,7 @@ object NetworkServer extends ScorexLogging {
       .handler(new PipelineInitializer[SocketChannel](Seq(
         new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
-        new HandshakeTimeoutHandler(() => if (peerConnections.isEmpty) AverageHandshakePeriod else settings.networkSettings.handshakeTimeout),
+        new HandshakeTimeoutHandler(if (peerConnections.isEmpty) 1.second else settings.networkSettings.handshakeTimeout),
         clientHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
@@ -207,14 +207,12 @@ object NetworkServer extends ScorexLogging {
       )
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
-      val connectDelay = {
-        val random = Random.nextInt(5000).millis
-        if (peerConnections.isEmpty) random / 5 else random
-      }
+      val delay = (if (peerConnections.isEmpty) 1.second else 5.seconds) +
+        (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
+      log.trace(s"Next connection attempt in $delay")
 
-      log.trace(s"Scheduling handshake, delay = $connectDelay")
 
-      workerGroup.schedule(connectDelay) {
+      workerGroup.schedule(delay) {
         import scala.collection.JavaConverters._
         val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
