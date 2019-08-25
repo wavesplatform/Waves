@@ -5,12 +5,6 @@ import devops.waves.*
 
 ut = new utils()
 
-def networkParam = ut.checkBox("network", // name
-                "mainnet,testnet,devnet", // values
-                "mainnet", //default value
-                0, //visible item cnt
-                "", // description
-                )
 def artifactsDir="out"
 def networks
 def artifacts
@@ -18,27 +12,14 @@ def shaSumField = "## SHA256 Checksums\n```\n"
 def user = "wavesplatform"
 def repo = "Waves"
 def repo_url = "https://github.com/${user}/${repo}"
-properties([
-    parameters([
-        string(defaultValue: 'v0.0.0', description: '', name: 'tag', trim: true),
-        networkParam,
-        gitParameter(
-            branch: '',
-            branchFilter: 'origin/(version-.*)',
-            defaultValue: 'no values in a list or failed to retrieve it', description: '',
-            name: 'branch',
-            quickFilterEnabled: false,
-            selectedValue: 'NONE',
-            sortMode: 'ASCENDING_SMART',
-            tagFilter: '*',
-            type: 'PT_BRANCH',
-            useRepository: repo_url
-        )
-    ])
-])
+
+
+project.addProperty(new ParametersDefinitionProperty(ut.gitParameterDefinitionObject('branch', 'origin/(version-.*)', 'ASCENDING_SMART', 'NONE', repo_url)))
+project.addProperty(new ParametersDefinitionProperty(ut.extendedChoiceParameterDefinitionObject("network", "mainnet,testnet,stagenet", "mainnet", 0, "" ))
+project.addProperty(new ParametersDefinitionProperty(string(defaultValue: 'v0.0.0', description: '', name: 'tag', trim: true))
 
 stage('Build information'){
-    if (! params.tag || ! params.branch || ! params.network )
+    if (! params.tag || params.branch.contains('No values in a list') || ! params.network )
     {
         echo "Aborting this build. Please run it again with the required parameters specified"
         currentBuild.result = Constants.PIPELINE_ABORTED
@@ -46,7 +27,7 @@ stage('Build information'){
     }
     else
     {
-        networks = network.split(',').collect{it.toLowerCase().capitalize()}
+        networks = network.split(',').collect{it.toLowerCase()}
          echo "Parameters are specified:\n" +
         "network: ${networks}\n" +
         "branch: ${branch}\n" +
@@ -70,7 +51,7 @@ node('wavesnode'){
                     sh 'env'
                     step([$class: 'WsCleanup'])
                     ut.checkout(branch, repo_url)
-                    sh "mkdir ${artifactsDir}"
+                    sh "mkdir -p ${artifactsDir}/all"
                 }
 
                 stage ('Build artifacts'){
@@ -79,14 +60,28 @@ node('wavesnode'){
                     withEnv(["SBT_OPTS=-Xmx2g -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=128m -Dnetwork=${it.toLowerCase()}"]) {
                         ut.sbt 'clean packageAll'
                     }
-                      sh """
-                        cp node/target/waves-all-*.jar ${artifactsDir}/
-                        cp node/target/waves*all.deb ${artifactsDir}/
-                        cp grpc-server/target/universal/*.tgz ${artifactsDir}/
-                        cp grpc-server/target/*.deb ${artifactsDir}/
+
+                    def filter = (it == 'mainnet') ? '' : it
+
+                    sh """
+                        mkdir -p ${artifactsDir}/${it}
+
+                        cp node/target/waves-all-*.jar ${artifactsDir}/all/
+
+                        find grpc-server/target/universal/ -name *${filter}*.tgz | grep -q . && \
+                            cp grpc-server/target/universal/*${filter}*.tgz ${artifactsDir}/all/ || true
+
+                        find node/target/ -name waves*${filter}*all.deb | grep -q . && \
+                            cp node/target/waves*${filter}*all.deb ${artifactsDir}/${it}/ || true
+
+                        find grpc-server/target/ -name *${filter}*.deb | grep -q . && \
+                            cp grpc-server/target/*${filter}*.deb ${artifactsDir}/${it}/ || true
+
+                        find ${artifactsDir}/${it}/ -name *.deb | grep -q . && \
+                            cp ${artifactsDir}/${it}/*.deb ${artifactsDir}/all/ || true
                         """
                     }
-                    dir (artifactsDir){
+                    dir (artifactsDir + '/all'){
                         artifacts = findFiles(glob: '**/*')
                         artifacts.each{
                             shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
@@ -96,11 +91,11 @@ node('wavesnode'){
 
                 stage ('Create a release'){
                     withCredentials([string(credentialsId: 'waves-release-github-token', variable: 'token')]) {
-                        dir (artifactsDir){
+                        dir (artifactsDir + '/all'){
                             def createReleaseBody = [
                                 tag_name: "${tag}",
                                 target_commitish: "${branch}",
-                                name: "Version ${tag.replace('v','')} (${networks.join(" + ")})",
+                                name: "Version ${tag.replace('v','')} (${networks.collect{ it.capitalize() }.join(" + ")})",
                                 body: "# In this release\n${shaSumField}```",
                                 draft: true,
                                 prerelease: false]
@@ -115,9 +110,20 @@ node('wavesnode'){
                             }
                         }
                     }
-
                 }
 
+                withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
+                    Constants.REMOTE.host = Constants.APT_REPO_CONTROLLER_SERVER
+                    Constants.REMOTE.name = Constants.APT_REPO_CONTROLLER_SERVER
+                    Constants.REMOTE.user = userName
+                    Constants.REMOTE.identityFile = identity
+                    stage ('Updating APT repo'){
+                        networks.each {
+                            ut.remotePut("${artifactsDir}/${it}", Constants.APT_PUBLISH_DIR)
+                        }
+                        ut.remoteExec "${Constants.APT_PUBLISH_DIR}/publish.sh"
+                    }
+                }
             }
             catch (err) {
                 currentBuild.result = Constants.PIPELINE_FAILURE
@@ -131,8 +137,8 @@ node('wavesnode'){
             }
             finally{
                 sh "tar -czvf artifacts.tar.gz -C ${artifactsDir} ."
-                archiveArtifacts artifacts: 'artifacts.tar.gz'
-                ut.notifySlack("mtuktarov-test", currentBuild.result)
+                // archiveArtifacts artifacts: 'artifacts.tar.gz'
+                ut.notifySlack("jenkins-notifications", currentBuild.result)
             }
         }
     }
