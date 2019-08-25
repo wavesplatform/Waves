@@ -16,7 +16,7 @@ def repo_url = "https://github.com/${user}/${repo}"
 
 project.addProperty(new ParametersDefinitionProperty(ut.gitParameterDefinitionObject('branch', 'origin/(version-.*)', 'ASCENDING_SMART', 'NONE', repo_url)))
 project.addProperty(new ParametersDefinitionProperty(ut.extendedChoiceParameterDefinitionObject("network", "mainnet,testnet,stagenet", "mainnet", 0, "" ))
-project.addProperty(new ParametersDefinitionProperty(string(defaultValue: 'v0.0.0', description: '', name: 'tag', trim: true))
+project.addProperty(new ParametersDefinitionProperty(string(defaultValue: 'v0.0.0', description: '', name: 'tag').trim()))
 
 stage('Build information'){
     if (! params.tag || params.branch.contains('No values in a list') || ! params.network )
