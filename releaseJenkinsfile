@@ -113,15 +113,16 @@ node('wavesnode'){
                 }
 
                 withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
-                    Constants.REMOTE.host = Constants.APT_REPO_CONTROLLER_SERVER
-                    Constants.REMOTE.name = Constants.APT_REPO_CONTROLLER_SERVER
-                    Constants.REMOTE.user = userName
-                    Constants.REMOTE.identityFile = identity
+                    def remote = [:]
+                    remote.host = Constants.APT_REPO_CONTROLLER_SERVER
+                    remote.name = Constants.APT_REPO_CONTROLLER_SERVER
+                    remote.user = userName
+                    remote.identityFile = identity
                     stage ('Updating APT repo'){
                         networks.each {
-                            ut.remotePut("${artifactsDir}/${it}", Constants.APT_PUBLISH_DIR)
+                            ut.remotePut(remote, "${artifactsDir}/${it}", Constants.APT_PUBLISH_DIR)
                         }
-                        ut.remoteExec "${Constants.APT_PUBLISH_DIR}/publish.sh"
+                        ut.remoteExec (remote, "${Constants.APT_PUBLISH_DIR}/publish.sh")
                     }
                 }
             }
