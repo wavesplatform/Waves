@@ -5,12 +5,6 @@ import devops.waves.*
 
 ut = new utils()
 
-def networkParam = ut.checkBox("network",   // name
-                "mainnet,testnet,stagenet", // values
-                "mainnet",                  //default value
-                0,                          //visible item cnt
-                "",                         // description
-                )
 def artifactsDir="out"
 def networks
 def artifacts
@@ -22,19 +16,20 @@ def repo_url = "https://github.com/${user}/${repo}"
 properties([
     parameters([
         string(defaultValue: 'v0.0.0', description: '', name: 'tag', trim: true),
-        networkParam,
-        gitParameter(
-            branch: '',
-            branchFilter: 'origin/(version-.*)',
-            defaultValue: 'no values in a list or failed to retrieve it', description: '',
-            name: 'branch',
-            quickFilterEnabled: false,
-            selectedValue: 'NONE',
-            sortMode: 'ASCENDING_SMART',
-            tagFilter: '*',
-            type: 'PT_BRANCH',
-            useRepository: repo_url
-        )
+        ut.extendedChoiceParameterDefinitionObject("network", "mainnet,testnet,stagenet", "mainnet", 0, "" ),
+        ut.gitParameterDefinitionObject('branch', 'origin/(version-.*)', 'ASCENDING_SMART', 'NONE', repo_url)
+        // gitParameter(
+        //     branch: '',
+        //     branchFilter: 'origin/(version-.*)',
+        //     defaultValue: 'no values in a list or failed to retrieve it', description: '',
+        //     name: 'branch',
+        //     quickFilterEnabled: false,
+        //     selectedValue: 'NONE',
+        //     sortMode: 'ASCENDING_SMART',
+        //     tagFilter: '*',
+        //     type: 'PT_BRANCH',
+        //     useRepository: repo_url
+        // )
     ])
 ])
 
