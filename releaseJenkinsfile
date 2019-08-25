@@ -19,9 +19,9 @@ properties([
     ut.buildDiscarderPropertyObject('14', '30'),
 
     parameters([
+        ut.stringParameterDefinitionObject('tag','v0.0.0'),
         ut.gitParameterDefinitionObject('branch', 'origin/(version-.*)', 'ASCENDING_SMART', 'NONE', repo_url),
-        ut.extendedChoiceParameterDefinitionObject("network", "mainnet,testnet,stagenet", "mainnet", 0, "" ),
-        ut.stringParameterDefinitionObject('tag','v0.0.0')
+        ut.extendedChoiceParameterDefinitionObject("network", "mainnet,testnet,stagenet", "mainnet", 0, "" )
     ]) 
 ])
 
