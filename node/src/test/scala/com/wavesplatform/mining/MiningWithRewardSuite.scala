@@ -14,6 +14,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{
   BlockRewardSettings,
   BlockchainSettings,
+  Constants,
   DBSettings,
   FunctionalitySettings,
   MinerSettings,
@@ -26,7 +27,9 @@ import com.wavesplatform.settings.{
 }
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TransactionGen, WithDB}
@@ -48,42 +51,75 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
 
   behavior of "Miner with activated reward feature"
 
-//  it should "generate valid empty blocks for version 4" in {
-//    withEnv(Seq.empty) {
-//      case Env(_, account, miner, blockchain) =>
-//        val generateBlock = generateBlockTask(miner)(account)
-//        val oldBalance    = blockchain.balance(account)
-//        val newBalance    = oldBalance + 2 * settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward
-//        for {
-//          _ <- generateBlock
-//          _ <- generateBlock
-//        } yield {
-//          blockchain.balance(account) should be(newBalance)
-//          blockchain.height should be(3)
-//          blockchain.blockAt(2).get.version should be(Block.RewardBlockVersion)
-//          blockchain.blockAt(3).get.version should be(Block.RewardBlockVersion)
-//        }
-//    }
-//  }
+  it should "generate valid empty blocks of version 4" in {
+    withEnv(Seq.empty) {
+      case Env(_, account, miner, blockchain) =>
+        val generateBlock = generateBlockTask(miner)(account)
+        val oldBalance    = blockchain.balance(account)
+        val newBalance    = oldBalance + 2 * settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward
+        for {
+          _ <- generateBlock
+          _ <- generateBlock
+        } yield {
+          blockchain.balance(account) should be(newBalance)
+          blockchain.height should be(3)
+          blockchain.blockAt(2).get.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(3).get.version should be(Block.RewardBlockVersion)
+        }
+    }
+  }
 
-//  it should "test" in {
-//    withEnv(Seq((ts, reference) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty))) {
-//      case Env(_, account, miner, blockchain) =>
-//        val generateBlock = generateBlockTask(miner)(account)
-//        val oldBalance    = blockchain.balance(account)
-//        val newBalance    = oldBalance + settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward
-//
-//        generateBlock.map { _ =>
-//          blockchain.balance(account) should be(newBalance)
-//          blockchain.height should be(3)
-//        }
-//    }
-//  }
+  it should "generate valid empty block of version 4 after block of version 3" in {
+    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion))) {
+      case Env(_, account, miner, blockchain) =>
+        val generateBlock = generateBlockTask(miner)(account)
+        val oldBalance    = blockchain.balance(account)
+        val newBalance    = oldBalance + settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward
 
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
+        generateBlock.map { _ =>
+          blockchain.balance(account) should be(newBalance)
+          blockchain.height should be(3)
+        }
+    }
+  }
 
-  private def withEnv(bps: Seq[BlockProducer])(f: Env => Task[Assertion]): Task[Assertion] =
+  it should "generate valid blocks with transactions of version 4" in {
+    val bps: Seq[BlockProducer] = Seq(
+      (ts, reference, account) => {
+        val recipient1 = createAccount.toAddress
+        val recipient2 = createAccount.toAddress
+        val tx1 = TransferTransactionV2
+          .selfSigned(Waves, account, recipient1, 10 * Constants.UnitsInWave, ts, Waves, 400000, Array())
+          .explicitGet()
+        val tx2 = TransferTransactionV2
+          .selfSigned(Waves, account, recipient2, 5 * Constants.UnitsInWave, ts, Waves, 400000, Array())
+          .explicitGet()
+        TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
+      }
+    )
+
+    val txs: Seq[TransactionProducer] = Seq(
+      (ts, account) => {
+        val recipient1 = createAccount.toAddress
+        TransferTransactionV2
+          .selfSigned(Waves, account, recipient1, 10 * Constants.UnitsInWave, ts, Waves, 400000, Array())
+          .explicitGet()
+      }
+    )
+    withEnv(bps, txs) {
+      case Env(_, account, miner, blockchain) =>
+        val generateBlock = generateBlockTask(miner)(account)
+        val oldBalance    = blockchain.balance(account)
+        val newBalance    = oldBalance + settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward - 10 * Constants.UnitsInWave
+
+        generateBlock.map { _ =>
+          blockchain.balance(account) should be(newBalance)
+          blockchain.height should be(3)
+        }
+    }
+  }
+
+  private def withEnv(bps: Seq[BlockProducer], txs: Seq[TransactionProducer] = Seq())(f: Env => Task[Assertion]): Task[Assertion] =
     resources.use {
       case (blockchainUpdater, _) =>
         for {
@@ -102,21 +138,25 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
             (ts + 1, Seq[Block](genesisBlock))
           } {
             case ((ts, chain), bp) =>
-              (ts + 3, bp(ts + 3, chain.head.uniqueId) +: chain)
+              (ts + 3, bp(ts + 3, chain.head.uniqueId, account) +: chain)
           }._2
-          added <- Task.traverse(blocks)(b => Task(blockchainUpdater.processBlock(b)))
-          _ = added.foreach(_.explicitGet())
+          added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b)))
+          _   = added.foreach(_.explicitGet())
+          _   = txs.foreach(tx => utxPool.putIfNew(tx(ts + 6, account)).resultE.explicitGet())
           env = Env(blocks, account, miner, blockchainUpdater)
           r <- f(env)
         } yield r
     }
+
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
+    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
 
   private def resources: Resource[Task, (BlockchainUpdater with NG, DB)] =
     Resource.make {
       val defaultWriter: LevelDbWriterWithReward       = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
       val blockchainUpdater: BlockchainUpdater with NG = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
       defaultWriter.saveReward(settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward)
-      Task.now(blockchainUpdater, db)
+      Task.now((blockchainUpdater, db))
     } {
       case (blockchainUpdater, db) =>
         Task {
@@ -130,7 +170,8 @@ object MiningWithRewardSuite {
   import TestFunctionalitySettings.Enabled
   import monix.execution.Scheduler.Implicits.global
 
-  type BlockProducer = (Long, ByteStr) => Block
+  type BlockProducer       = (Long, ByteStr, KeyPair) => Block
+  type TransactionProducer = (Long, KeyPair) => Transaction
 
   case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: BlockchainUpdater with NG)
 
