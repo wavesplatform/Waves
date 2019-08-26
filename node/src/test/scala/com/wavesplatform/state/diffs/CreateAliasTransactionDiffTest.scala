@@ -89,7 +89,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
       Asset.fromCompatId(maybeAsset.map(_.id())),
       Asset.fromCompatId(maybeFeeAsset.map(_.id()))
     )
-    lease <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
+    lease <- leaseAndCancelGeneratorP(master, alias).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)
 
   property("Can transfer to alias") {
