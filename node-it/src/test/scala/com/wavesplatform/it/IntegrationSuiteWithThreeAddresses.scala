@@ -4,6 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
@@ -91,7 +92,7 @@ trait IntegrationSuiteWithThreeAddresses
   def setContract(contractText: Option[String], acc: KeyPair): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
-      ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+      ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(acc, script, 0.014.waves, System.currentTimeMillis())
