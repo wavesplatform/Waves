@@ -28,7 +28,6 @@ object TestFunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    blockVersion4AfterHeight = Int.MaxValue,
     blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1)
   )
 

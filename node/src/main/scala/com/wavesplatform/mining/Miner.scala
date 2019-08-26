@@ -126,7 +126,6 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def getVersion(height: Int): Byte =
     if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion
-    else if (height <= blockchainSettings.functionalitySettings.blockVersion4AfterHeight) NgBlockVersion
     else RewardBlockVersion
 
   private def forgeBlock(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] = {

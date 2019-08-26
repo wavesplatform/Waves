@@ -128,7 +128,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       for {
         signedBlock <- Block
           .buildAndSign(
-            version = 3,
+            version = 4,
             timestamp = accumulatedBlock.timestamp,
             reference = accumulatedBlock.reference,
             consensusData = accumulatedBlock.consensusData,

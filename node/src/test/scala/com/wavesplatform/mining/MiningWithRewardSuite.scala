@@ -178,7 +178,6 @@ object MiningWithRewardSuite {
   val functionalitySettings: FunctionalitySettings =
     Enabled
       .copy(preActivatedFeatures = Enabled.preActivatedFeatures + (BlockchainFeatures.BlockReward.id -> 0))
-      .copy(blockVersion4AfterHeight = 0)
       .copy(blockRewardSettings = BlockRewardSettings.TESTNET)
 
   val commonSettings: WavesSettings                    = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))

@@ -74,7 +74,6 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  doubleFeaturesPeriodsAfterHeight: Int,
                                  maxTransactionTimeBackOffset: FiniteDuration,
                                  maxTransactionTimeForwardOffset: FiniteDuration,
-                                 blockVersion4AfterHeight: Int,
                                  blockRewardSettings: BlockRewardSettings) {
   val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
@@ -118,7 +117,6 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = 810000,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    blockVersion4AfterHeight = Int.MaxValue,
     blockRewardSettings = BlockRewardSettings.MAINNET
   )
 
@@ -138,7 +136,6 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
     maxTransactionTimeForwardOffset = 90.minutes,
-    blockVersion4AfterHeight = Int.MaxValue,
     blockRewardSettings = BlockRewardSettings.MAINNET
   )
 

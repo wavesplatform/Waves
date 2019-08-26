@@ -34,7 +34,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
                                                           |        double-features-periods-after-height = 21
                                                           |        max-transaction-time-back-offset = 55s
                                                           |        max-transaction-time-forward-offset = 12d
-                                                          |        block-version-4-after-height = 22
                                                           |        block-reward-settings {
                                                           |           min-reward = 0
                                                           |           max-reward = 800000000
