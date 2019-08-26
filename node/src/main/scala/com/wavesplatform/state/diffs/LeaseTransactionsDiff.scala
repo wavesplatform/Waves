@@ -13,7 +13,7 @@ import scala.util.{Left, Right}
 
 object LeaseTransactionsDiff {
 
-  def lease(blockchain: Blockchain, height: Int, complexity: Long)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
+  def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender)
     blockchain.resolveAlias(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
@@ -34,15 +34,14 @@ object LeaseTransactionsDiff {
               tx = tx,
               portfolios = portfolioDiff,
               leaseState = Map(tx.id() -> true),
-              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-              scriptsComplexity = complexity
+              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
             ))
         }
       }
     }
   }
 
-  def leaseCancel(blockchain: Blockchain, time: Long, height: Int, complexity: Long)(tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
+  def leaseCancel(blockchain: Blockchain, time: Long, height: Int)(tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
     val fs = blockchain.settings.functionalitySettings
 
     val leaseEi = blockchain.leaseDetails(tx.leaseId) match {
@@ -76,8 +75,7 @@ object LeaseTransactionsDiff {
         tx = tx,
         portfolios = portfolioDiff,
         leaseState = Map(tx.leaseId -> false),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = complexity
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
   }
 }

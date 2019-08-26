@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import scala.util.Right
 
 object SetScriptTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int, complexity: Long)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Int)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
     val scriptOpt = tx.script
     Right(
       Diff(
@@ -15,8 +15,7 @@ object SetScriptTransactionDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
         scripts = Map(tx.sender.toAddress    -> scriptOpt),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = complexity
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
     )
   }

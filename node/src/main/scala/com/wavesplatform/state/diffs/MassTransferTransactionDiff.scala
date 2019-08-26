@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.transfer._
 
 object MassTransferTransactionDiff {
 
-  def apply(blockchain: Blockchain, blockTime: Long, height: Int, complexity: Long)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- blockchain.resolveAlias(xfer.address)
@@ -49,7 +49,7 @@ object MassTransferTransactionDiff {
           tx,
           completePortfolio,
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-          scriptsComplexity = complexity),
+        ),
         GenericError(s"Attempt to transfer a nonexistent asset")
       )
     }
