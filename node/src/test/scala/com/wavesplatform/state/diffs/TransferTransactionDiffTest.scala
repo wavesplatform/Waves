@@ -113,7 +113,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                 Script.estimate(_, ScriptEstimatorV2).explicitGet()
               )
             )
-            val diffOrError = TransferTransactionDiff(state, state.height, System.currentTimeMillis(), complexity)(transfer)
+            val diffOrError = TransferTransactionDiff(state, state.height, System.currentTimeMillis())(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
           }
         }
