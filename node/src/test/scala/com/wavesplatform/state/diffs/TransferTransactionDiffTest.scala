@@ -5,8 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -108,11 +106,6 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (genesis, issue, fee, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
           case (_, state) => {
-            val complexity = transfer.assetId.fold(0L)(
-              state.assetScript(_).fold(0L)(
-                Script.estimate(_, ScriptEstimatorV2).explicitGet()
-              )
-            )
             val diffOrError = TransferTransactionDiff(state, state.height, System.currentTimeMillis())(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
           }
