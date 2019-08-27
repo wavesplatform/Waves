@@ -149,21 +149,14 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
-    AccountDataInfo((for {
-      key   <- accountDataKeys(address)
-      value <- accountData(address, key)
-    } yield key -> value).toMap)
-  }
-
-  override def accountDataKeys(address: Address): Seq[String] = readOnly { db =>
-    for {
+  override protected def loadAccountDataKeys(address: Address): Set[String] = readOnly(accountDataKeys(address, _))
+  private def accountDataKeys(address: Address, db: ReadOnlyDB): Set[String] =
+    (for {
       addressId <- addressId(address).toVector
       keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
       chunkNo <- Range(0, keyChunkCount)
       key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
-    } yield key
-  }
+    } yield key).toSet
 
   override protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]] = {
     val (address, key) = addressWithKey
@@ -174,6 +167,12 @@ class LevelDBWriter(private[database] val writableDB: DB,
       }
     }
   }
+
+  override def accountData(acc: Address): AccountDataInfo =
+    AccountDataInfo((for {
+      key   <- accountDataKeys(acc)
+      value <- accountData(acc, key)
+    } yield key -> value).toMap)
 
   protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
     addressId(req._1).fold(0L) { addressId =>
@@ -599,7 +598,12 @@ class LevelDBWriter(private[database] val writableDB: DB,
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
-        accountDataToInvalidate.result().foreach(discardAccountData)
+        accountDataToInvalidate.result().foreach {
+          case ak @ (addr, _) =>
+            discardAccountData(ak)
+            discardAccountDataKeys(addr)
+//            discardAccountDataInfo(addr)
+        }
         discardedBlock
       }
 

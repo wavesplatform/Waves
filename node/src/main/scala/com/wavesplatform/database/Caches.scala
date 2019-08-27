@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
@@ -168,10 +169,29 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
 
-  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, loadAccountData)
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]]           = accountDataCache.get((acc, key))
-  protected def discardAccountData(addressWithKey: (Address, String)): Unit           = accountDataCache.invalidate(addressWithKey)
+  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] =
+    CacheBuilder
+      .newBuilder()
+      .maximumSize(dbSettings.maxCacheSize)
+      .recordStats()
+      .build(new CacheLoader[(Address, String), Option[DataEntry[_]]] {
+        override def load(key: (Address, String)): Option[DataEntry[_]] = loadAccountData(key)
+      })
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = accountDataCache.get((acc, key))
+  protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]]
+
+  private val accountDataKeysCache: LoadingCache[Address, Set[String]] =
+    CacheBuilder
+      .newBuilder()
+      .maximumSize(dbSettings.maxCacheSize)
+      .recordStats()
+      .build(new CacheLoader[Address, Set[String]] {
+        override def load(key: Address): Set[String] = loadAccountDataKeys(key)
+      })
+  override def accountDataKeys(address: Address): Set[String] = accountDataKeysCache.get(address)
+  protected def loadAccountDataKeys(address: Address): Set[String]
+  protected def discardAccountDataKeys(address: Address): Unit = accountDataKeysCache.invalidate(address)
 
   private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
@@ -206,6 +226,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
+
+    if (newHeight % 1000 == 0) {
+      log.info("AccountDataCache")
+      log.info(s"EVICTION COUNT: ${accountDataCache.stats().evictionCount()}")
+      log.info(s"MISS COUNT: ${accountDataCache.stats().missCount()}")
+      log.info(s"MISS RATE: ${accountDataCache.stats().missRate()}")
+      log.info("*****")
+      log.info(s"AccountDataKeysCache")
+      log.info(s"EVICTION COUNT: ${accountDataKeysCache.stats().evictionCount()}")
+      log.info(s"MISS COUNT: ${accountDataKeysCache.stats().missCount()}")
+      log.info(s"MISS RATE: ${accountDataKeysCache.stats().missRate()}")
+    }
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
@@ -308,14 +340,22 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.scriptResults
     )
 
-    val newData: Map[(Address, String), Option[DataEntry[_]]] =
-      diff.accountData.toList.flatMap {
-        case (address, dataInfo) =>
-          dataInfo.data.map {
+    val emptyKeys = Map.empty[Address, Set[String]]
+    val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]
+
+    val (newKeys, newData) =
+      diff.accountData.foldLeft((emptyKeys, emptyData)) {
+        case ((keys, data), (a, d)) =>
+          val oldKeys = accountDataKeys(a)
+          val newKeys = d.data.keys.toList
+          val updKeys = keys + (a -> (oldKeys ++ newKeys))
+          val updData = data ++ d.data.map {
             case (k, v) =>
-              (address, k) -> v.some
+              (a, k) -> v.some
           }
-      }.toMap
+
+          (updKeys, updData)
+      }
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
@@ -326,7 +366,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)
+
+    accountDataKeysCache.putAll(newKeys.asJava)
     accountDataCache.putAll(newData.asJava)
+
     forgetBlocks()
   }
 
