@@ -126,7 +126,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def getVersion(height: Int): Byte =
     if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion
-    else RewardBlockVersion
+    else blockchainUpdater.featureActivationHeight(BlockchainFeatures.BlockReward.id).map(_ => RewardBlockVersion).getOrElse(NgBlockVersion)
 
   private def forgeBlock(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added

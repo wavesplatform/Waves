@@ -7,6 +7,7 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -89,6 +90,9 @@ object SyncHttpApi extends Assertions {
 
     def activationStatus: ActivationStatus =
       sync(async(n).activationStatus)
+
+    def rewardStatus: Option[RewardStatus] =
+      sync(async(n).rewardStatus)
 
     def seed(address: String): String =
       sync(async(n).seed(address))

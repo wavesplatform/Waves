@@ -27,14 +27,6 @@ case class BlockRewardSettings(
   require(rewardVotingPeriod > 0, "rewardVotingPeriod must be greater than 0")
   require(rewardVotingPeriod <= firstRewardPeriod, s"rewardVotingPeriod must be less than or equal to firstRewardPeriod($firstRewardPeriod)")
   require(rewardVotingPeriod <= rewardPeriod, s"rewardVotingPeriod must be less than or equal to rewardPeriod($rewardPeriod)")
-
-  def votingWindow(height: Int): Range =
-    if (height < 1) Range(0, 0)
-    else
-      Range.inclusive(
-        (height - 1) / rewardVotingPeriod * rewardVotingPeriod + 1,
-        ((height - 1) / rewardVotingPeriod + 1) * rewardVotingPeriod
-      )
 }
 
 object BlockRewardSettings {

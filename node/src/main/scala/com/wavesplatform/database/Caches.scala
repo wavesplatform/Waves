@@ -7,6 +7,7 @@ import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
@@ -183,7 +184,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   @volatile
   protected var blockRewardCache: Option[Long] = loadBlockReward()
   protected def loadBlockReward(): Option[Long]
-  override def blockReward: Long = blockRewardCache.getOrElse(0L)
+  override def blockReward: Long =
+    blockRewardCache
+      .orElse(activatedFeatures.get(BlockchainFeatures.BlockReward.id).collect {
+        case activatedAt if activatedAt + settings.functionalitySettings.blockRewardSettings.firstRewardPeriod >= height =>
+          settings.functionalitySettings.blockRewardSettings.firstReward
+      })
+      .getOrElse(0L)
 
   //noinspection ScalaStyle
   protected def doAppend(block: Block,

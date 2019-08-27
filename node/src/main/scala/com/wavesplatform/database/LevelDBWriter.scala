@@ -424,7 +424,27 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
     loadActivatedFeatures()
       .get(BlockchainFeatures.BlockReward.id)
-      .flatMap(blockRewardVotingPeriod)
+      .flatMap { activatedAt =>
+        import settings.functionalitySettings.blockRewardSettings._
+
+        val mayBeTimeToVote = height - (activatedAt + firstRewardPeriod)
+
+        activatedAt match {
+          case activatedAt if activatedAt + firstRewardPeriod == height =>
+            Some((blockRewardVotes(height), firstReward))
+          case activatedAt if height > activatedAt && mayBeTimeToVote > 0 && mayBeTimeToVote % rewardPeriod == 0 =>
+            Some((blockRewardVotes(height), loadBlockReward().getOrElse(firstReward)))
+          case _ => None
+        }
+      }
+      .map {
+        case (votes, currentReward) =>
+          import settings.functionalitySettings.blockRewardSettings._
+          if (minReward == maxReward) (votes.mapValues(_ => 0), currentReward)
+          else if (currentReward <= minReward) (votes.mapValues(v => if (v < 0) 0 else v), currentReward)
+          else if (currentReward >= maxReward) (votes.mapValues(v => if (v > 0) 0 else v), currentReward)
+          else (votes, currentReward)
+      }
       .foreach {
         case (votes, currentReward) =>
           import settings.functionalitySettings.blockRewardSettings._
@@ -461,23 +481,6 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
-    }
-  }
-
-  private def blockRewardVotingPeriod(activatedAt: Int): Option[(Map[Byte, Int], Long)] = {
-    import settings.functionalitySettings.blockRewardSettings._
-
-    def normalize(votes: Map[Byte, Int], reward: Long): Map[Byte, Int] =
-      votes.mapValues(v => if (reward <= minReward && v < 0) 0 else if (reward >= maxReward && v > 0) 0 else v)
-
-    activatedAt match {
-      case activatedAt if activatedAt + firstRewardPeriod == height =>
-        val reward = firstReward
-        Some((normalize(blockRewardVotes(height), reward), reward))
-      case activatedAt if height > activatedAt && (height - activatedAt) % rewardPeriod == 0 =>
-        val reward = loadBlockReward().get
-        Some((normalize(blockRewardVotes(height), reward), reward))
-      case _ => None
     }
   }
 
@@ -929,11 +932,12 @@ class LevelDBWriter(private[database] val writableDB: DB,
   }
 
   override def blockRewardVotes(height: Int): Map[Byte, Int] = readOnly { db =>
-    settings.functionalitySettings.blockRewardSettings
-      .votingWindow(height)
-      .flatMap { h =>
-        db.get(Keys.blockHeaderAndSizeAt(Height(h)))
+    Range(height - settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod, height)
+      .map { h =>
+        db
+          .get(Keys.blockHeaderAndSizeAt(Height(h)))
           .map(_._1.rewardVote)
+          .getOrElse(0.toByte)
       }
       .groupBy(identity)
       .mapValues(_.size)
