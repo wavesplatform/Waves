@@ -181,18 +181,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]]
 
-  private val accountDataKeysCache: LoadingCache[Address, Set[String]] =
-    CacheBuilder
-      .newBuilder()
-      .maximumSize(dbSettings.maxCacheSize)
-      .recordStats()
-      .build(new CacheLoader[Address, Set[String]] {
-        override def load(key: Address): Set[String] = loadAccountDataKeys(key)
-      })
-  override def accountDataKeys(address: Address): Set[String] = accountDataKeysCache.get(address)
-  protected def loadAccountDataKeys(address: Address): Set[String]
-  protected def discardAccountDataKeys(address: Address): Unit = accountDataKeysCache.invalidate(address)
-
   private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
   @volatile
@@ -232,11 +220,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       log.info(s"EVICTION COUNT: ${accountDataCache.stats().evictionCount()}")
       log.info(s"MISS COUNT: ${accountDataCache.stats().missCount()}")
       log.info(s"MISS RATE: ${accountDataCache.stats().missRate()}")
-      log.info("*****")
-      log.info(s"AccountDataKeysCache")
-      log.info(s"EVICTION COUNT: ${accountDataKeysCache.stats().evictionCount()}")
-      log.info(s"MISS COUNT: ${accountDataKeysCache.stats().missCount()}")
-      log.info(s"MISS RATE: ${accountDataKeysCache.stats().missRate()}")
+      log.info(s"HIT COUNT: ${accountDataCache.stats().hitCount()}")
     }
 
     val newAddresses = Set.newBuilder[Address]
@@ -367,7 +351,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)
 
-    accountDataKeysCache.putAll(newKeys.asJava)
     accountDataCache.putAll(newData.asJava)
 
     forgetBlocks()
