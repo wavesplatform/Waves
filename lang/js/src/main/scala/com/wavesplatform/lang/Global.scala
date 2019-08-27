@@ -5,7 +5,8 @@ import com.wavesplatform.lang.v1.BaseGlobal
 
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
-import java.math.BigDecimal
+import java.math.{BigDecimal, BigInteger}
+
 import scala.util.Try
 import cats.implicits._
 
@@ -74,10 +75,10 @@ object Global extends BaseGlobal {
         base     * Math.pow(10, baseScale),
         exponent * Math.pow(10, exponentScale)
       )
-      scaled(result, resultScale, round)
+      unscaled(result, resultScale, round)
     }.toEither.leftMap(_.toString)
 
-  private def scaled(
+  private def unscaled(
     value: Double,
     scale: Long,
     round: BaseGlobal.Rounds
@@ -89,6 +90,13 @@ object Global extends BaseGlobal {
     decimal
       .setScale(scale.toInt, roundMode(round))
       .unscaledValue
-      .longValueExact
+      .longExact
+  }
+
+  implicit class BigIntOps(v: BigInteger) {
+    // absent in scala.js BigInteger
+    def longExact: Long =
+      if (v.bitLength <= 63) v.longValue
+      else throw new ArithmeticException("BigInteger out of long range")
   }
 }
