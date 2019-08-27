@@ -5,6 +5,9 @@ import com.wavesplatform.lang.v1.BaseGlobal
 
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
+import java.math.BigDecimal
+import scala.util.Try
+import cats.implicits._
 
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base58Encode(toBuffer(input)))
@@ -52,6 +55,40 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
+  override def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    calcScaled(Math.pow)(b, bp, e, ep, rp, round)
+
+  override def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round)
+
+  private def calcScaled(calc: (Double, Double) => Double)(
+    base:          Long,
+    baseScale:     Long,
+    exponent:      Long,
+    exponentScale: Long,
+    resultScale:   Long,
+    round:         BaseGlobal.Rounds,
+  ): Either[String, Long] =
+    Try {
+      val result = calc(
+        base     * Math.pow(10, baseScale),
+        exponent * Math.pow(10, exponentScale)
+      )
+      scaled(result, resultScale, round)
+    }.toEither.leftMap(_.toString)
+
+  private def scaled(
+    value: Double,
+    scale: Long,
+    round: BaseGlobal.Rounds
+  ): Long = {
+    val decimal =
+      if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BigDecimal.valueOf(value.toLong)
+      else BigDecimal.valueOf(value)
+
+    decimal
+      .setScale(scale.toInt, roundMode(round))
+      .unscaledValue
+      .longValueExact
+  }
 }
