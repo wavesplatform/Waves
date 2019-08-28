@@ -13,10 +13,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{BlockRewardSettings, FunctionalitySettings}
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.utils.Implicits._
 import org.scalatest.{FreeSpecLike, Matchers}
-
-import scala.concurrent.duration._
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
@@ -114,23 +111,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     }
   }
 
-  private[this] def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
-      allowTemporaryNegativeUntil = 0L,
-      generationBalanceDepthFrom50To1000AfterHeight = 0,
-      minimalGeneratingBalanceAfter = 0L,
-      allowTransactionsFromFutureUntil = Long.MaxValue,
-      allowUnissuedAssetsUntil = 0L,
-      allowInvalidReissueInSameBlockUntilTimestamp = 0L,
-      allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
-      resetEffectiveBalancesAtHeight = 0,
-      blockVersion3AfterHeight = 0,
-      preActivatedFeatures = Map[Short, Int](BlockchainFeatures.NG at ngAtHeight, BlockchainFeatures.BlockReward at ngAtHeight),
+      preActivatedFeatures = Map[Short, Int]((BlockchainFeatures.NG.id, ngAtHeight), (BlockchainFeatures.BlockReward.id, ngAtHeight)),
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-      maxTransactionTimeBackOffset = 120.minutes,
-      maxTransactionTimeForwardOffset = 90.minutes,
       blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1)
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)

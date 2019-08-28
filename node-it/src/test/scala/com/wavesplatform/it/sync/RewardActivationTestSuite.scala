@@ -86,7 +86,7 @@ object RewardActivationTestSuite {
     s"""waves {
        |  blockchain.custom.functionality {
        |    pre-activated-features = {
-       |      14 = $activationHeight
+       |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
        |    }
        |    block-reward-settings {
        |      min-reward = 0

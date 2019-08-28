@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-final case class BlockchainFeature private (id: Short, description: String)
+case class BlockchainFeature private (id: Short, description: String)
 
 object BlockchainFeatures {
 
@@ -17,12 +17,13 @@ object BlockchainFeatures {
   val Ride4DApps                      = BlockchainFeature(11, "RIDE 4 DAPPS")
   val OrderV3                         = BlockchainFeature(12, "Order Version 3")
   val ReduceNFTFee                    = BlockchainFeature(13, "Reduce NFT fee")
-  val BlockReward                     = BlockchainFeature(14, "Block Reward and Community Driven Monetary Policy")
+  val ChangeMinimumFees               = BlockchainFeature(14, "Change minimum tx fees")
+  val BlockReward                     = BlockchainFeature(15, "Block Reward and Community Driven Monetary Policy")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
-  val DummyFeature = BlockchainFeature(-1, "Non Votable!")
+  val Dummy = BlockchainFeature(-1, "Non Votable!")
 
-  private val dict = Seq(
+  private[this] val FeaturesMap = Seq(
     SmallerMinimalGeneratingBalance,
     NG,
     MassTransfer,
@@ -36,10 +37,11 @@ object BlockchainFeatures {
     Ride4DApps,
     OrderV3,
     ReduceNFTFee,
+    ChangeMinimumFees,
     BlockReward
   ).map(f => f.id -> f).toMap
 
-  val implemented: Set[Short] = dict.keySet
+  val Implemented: Set[Short] = FeaturesMap.keySet
 
-  def feature(id: Short): Option[BlockchainFeature] = dict.get(id)
+  def feature(id: Short): Option[BlockchainFeature] = FeaturesMap.get(id)
 }

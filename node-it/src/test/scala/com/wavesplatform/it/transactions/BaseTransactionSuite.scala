@@ -5,17 +5,16 @@ import java.io.File
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import monix.eval.Coeval
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-abstract class BaseTransactionSuite
-    extends FunSuite
-    with WaitForHeight2
+trait BaseTransactionSuiteLike
+    extends WaitForHeight2
     with IntegrationSuiteWithThreeAddresses
     with BeforeAndAfterAll
-    with NodesFromDocker {
+    with NodesFromDocker { this: Suite =>
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
@@ -49,3 +48,5 @@ abstract class BaseTransactionSuite
     super.beforeAll()
   }
 }
+
+abstract class BaseTransactionSuite extends FunSuite with BaseTransactionSuiteLike

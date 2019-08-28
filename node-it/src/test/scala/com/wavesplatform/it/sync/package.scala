@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Req
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -40,7 +41,7 @@ package object sync {
 
   val supportedVersions: List[Byte] = List(1, 2)
 
-  val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false).explicitGet()._1
+  val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String = script.bytes.value.base64
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"

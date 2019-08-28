@@ -21,6 +21,11 @@ object Alias {
 
   val AliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
+  def apply(name: String): Alias = {
+    import com.wavesplatform.common.utils._
+    create(name).explicitGet()
+  }
+
   def create(name: String): Either[ValidationError, Alias] = {
     createWithChainId(name, currentChainId)
   }

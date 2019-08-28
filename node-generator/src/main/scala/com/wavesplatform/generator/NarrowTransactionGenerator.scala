@@ -11,6 +11,7 @@ import com.wavesplatform.generator.utils.{Gen, Universe}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
 import scala.util.Random
 
-class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair]) extends TransactionGenerator {
+class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
   private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
 
@@ -320,7 +321,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
           case SetScriptTransaction =>
             for {
               sender <- randomFrom(accounts)
-              script = Gen.script(complexity = false)
+              script = Gen.script(complexity = false, estimator)
               tx <- logOption(
                 SetScriptTransaction.selfSigned(
                   sender,
@@ -336,7 +337,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair])
               for {
                 assetTx <- randomFrom(validIssueTxs ++ Universe.IssuedAssets).filter(_.script.isDefined)
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
-                script = Gen.script(complexity = false)
+                script = Gen.script(complexity = false, estimator)
                 tx <- logOption(
                   SetAssetScriptTransaction.selfSigned(
                     AddressScheme.current.chainId,

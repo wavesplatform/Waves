@@ -101,6 +101,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
+    resolvers += Resolver.sonatypeRepo("snapshots"), // TODO remove
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",

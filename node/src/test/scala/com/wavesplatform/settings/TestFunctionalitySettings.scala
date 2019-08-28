@@ -1,38 +1,26 @@
 package com.wavesplatform.settings
 
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.utils.Implicits._
-
-import scala.concurrent.duration._
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 
 object TestFunctionalitySettings {
   val Enabled = FunctionalitySettings(
     featureCheckBlocksPeriod = 10000,
     blocksForFeatureActivation = 9000,
-    allowTemporaryNegativeUntil = 0L,
-    generationBalanceDepthFrom50To1000AfterHeight = 0,
-    minimalGeneratingBalanceAfter = 0L,
-    allowTransactionsFromFutureUntil = Long.MaxValue,
-    allowUnissuedAssetsUntil = 0L,
-    allowInvalidReissueInSameBlockUntilTimestamp = 0L,
-    allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
-    resetEffectiveBalancesAtHeight = 0,
-    blockVersion3AfterHeight = 0,
-    preActivatedFeatures = Seq(
-      BlockchainFeatures.SmartAccounts,
-      BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.FairPoS,
-      BlockchainFeatures.Ride4DApps,
-      // BlockchainFeatures.BlockReward
-    ).map(_ at 0).toMap,
+    preActivatedFeatures = Map(
+      BlockchainFeatures.SmartAccounts.id -> 0,
+      BlockchainFeatures.SmartAssets.id   -> 0,
+      BlockchainFeatures.FairPoS.id       -> 0,
+      BlockchainFeatures.Ride4DApps.id    -> 0
+    ),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-    maxTransactionTimeBackOffset = 120.minutes,
-    maxTransactionTimeForwardOffset = 90.minutes,
-    blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1)
+    blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1),
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
 
   val EmptyFeaturesSettings: FeaturesSettings =
     FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
+
+  def withFeatures(features: BlockchainFeature*): FunctionalitySettings =
+    Enabled.copy(preActivatedFeatures = Enabled.preActivatedFeatures ++ features.map(_.id -> 0))
 }

@@ -1,4 +1,4 @@
-package com.wavesplatform.transaction.smart.script
+package com.wavesplatform.transaction.smart.script.estimator
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, PublicKey}
@@ -6,14 +6,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, _}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.diffs.smart.predef.scriptWithAllV1Functions
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
@@ -26,11 +27,10 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.Base64
 
-class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
-  private def estimate(expr: Terms.EXPR, ctx: CTX, funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
-    ScriptEstimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
-  }
+  private def estimate(expr: Terms.EXPR, ctx: CTX, funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] =
+    estimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
 
   private val ctxV1 = {
     utils.functionCosts(V1)

@@ -23,6 +23,7 @@ import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.api.ActivationApiRoute
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
@@ -49,7 +50,6 @@ import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import org.bouncycastle.util.encoders.Hex
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
 
@@ -237,7 +237,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
-        UtilsApiRoute(time, settings.restAPISettings),
+        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
         AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         DebugApiRoute(
