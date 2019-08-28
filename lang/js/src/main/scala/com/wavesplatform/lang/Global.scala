@@ -70,19 +70,25 @@ object Global extends BaseGlobal {
     resultScale:   Long,
     round:         BaseGlobal.Rounds,
   ): Either[String, Long] =
-    Try {
+    tryEi {
       val result = calc(
-        base     * Math.pow(10, baseScale),
-        exponent * Math.pow(10, exponentScale)
+        base     * Math.pow(10, -baseScale),
+        exponent * Math.pow(10, -exponentScale)
       )
       unscaled(result, resultScale, round)
-    }.toEither.leftMap(_.toString)
+    }
+
+  private def tryEi[R](r: => Either[String, R]): Either[String, R] =
+    Try(r)
+      .toEither
+      .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
+      .flatten
 
   private def unscaled(
     value: Double,
     scale: Long,
     round: BaseGlobal.Rounds
-  ): Long = {
+  ): Either[String, Long] = {
     val decimal =
       if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BigDecimal.valueOf(value.toLong)
       else BigDecimal.valueOf(value)
@@ -95,8 +101,11 @@ object Global extends BaseGlobal {
 
   implicit class BigIntOps(v: BigInteger) {
     // absent in scala.js BigInteger
-    def longExact: Long =
-      if (v.bitLength <= 63) v.longValue
-      else throw new ArithmeticException("BigInteger out of long range")
+    def longExact: Either[String, Long] =
+      Either.cond(
+        v.bitLength <= 63,
+        v.longValue,
+        "BigInteger out of long range"
+      )
   }
 }
