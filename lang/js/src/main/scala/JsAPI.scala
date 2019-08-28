@@ -14,9 +14,11 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.{CTX, ContractLimits, Repl}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
 import scala.scalajs.js
 import scala.scalajs.js.{Any, Dictionary}
@@ -172,7 +174,7 @@ object JsAPI {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds)
+      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
       compiled    <- compileScript(ds, linkedInput)
     } yield compiled
     r.fold(
@@ -181,12 +183,14 @@ object JsAPI {
     )
   }
 
+  val estimator = ScriptEstimatorV2
+
   private def compileScript(ds: DirectiveSet, input: String) = {
     val ver = ds.stdLibVersion
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = false)
+        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -197,7 +201,7 @@ object JsAPI {
           }
       case Library =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isDecl = true)
+        Global.compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -208,14 +212,14 @@ object JsAPI {
           }
       case DAppType =>
         // Just ignore stdlib version here
-        Global.compileContract(input, fullContractContext.compilerContext, ver)
+        Global.compileContract(input, fullContractContext.compilerContext, ver, estimator)
           .map {
             case (bytes, ast, complexity, complexityByFunc) =>
               js.Dynamic.literal(
                 "result" -> Global.toBuffer(bytes),
                 "ast" -> toJs(ast),
                 "complexity" -> complexity,
-                "complexityByFunc" -> complexityByFunc
+                "complexityByFunc" -> complexityByFunc.toJSDictionary
               )
           }
     }
@@ -249,8 +253,10 @@ object JsAPI {
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
-      "evaluate" -> (repl.execute _ andThen mapResult),
-      "clear"    -> repl.clear _
+      "evaluate"  -> (repl.execute _ andThen mapResult),
+      "info"      -> repl.info _,
+      "totalInfo" -> repl.totalInfo _,
+      "clear"     -> repl.clear _
     )
 
   private def mapResult(eval: Either[String, String]): js.Dynamic =

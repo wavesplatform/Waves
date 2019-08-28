@@ -3,18 +3,18 @@ package com.wavesplatform.lang.script
 import cats.data.NonEmptyChain
 import cats.kernel.CommutativeSemigroup
 import cats.implicits._
-import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser, DirectiveSet}
-import com.wavesplatform.lang.directives.values.{Imports, Library, ScriptType}
+import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
+import com.wavesplatform.lang.directives.values.{Imports, Library}
 
 object ScriptPreprocessor {
   def apply(
     scriptText: String,
     libraries:  Map[String, String],
-    ds:         DirectiveSet
+    imports:    Imports
   ): Either[String, String] =
     for {
-      matchedLibraries <- resolveLibraries(libraries, ds.imports)
-      _                <- checkLibrariesDirectives(matchedLibraries, ds.scriptType)
+      matchedLibraries <- resolveLibraries(libraries, imports)
+      _                <- checkLibrariesDirectives(matchedLibraries)
     } yield gatherScriptText(scriptText, matchedLibraries)
 
   private def resolveLibraries(
@@ -31,24 +31,21 @@ object ScriptPreprocessor {
   }
 
   private def checkLibrariesDirectives(
-    matchedLibraries: Map[String, String],
-    scriptType:       ScriptType
+    matchedLibraries: Map[String, String]
   ): Either[String, List[Unit]] =
     matchedLibraries
-      .map { case (name, src) => checkLibraryDirectives(scriptType, name, src) }
+      .map { case (name, src) => checkLibraryDirectives(name, src) }
       .toList
       .sequence
 
   private def checkLibraryDirectives(
-    scriptType:  ScriptType,
     libraryName: String,
     librarySrc:  String
   ): Either[String, Unit] =
     for {
       directives <- DirectiveParser(librarySrc)
       ds         <- Directive.extractDirectives(directives)
-      _          <- Either.cond(ds.contentType == Library,   (), s"CONTENT_TYPE of `$libraryName` is not LIBRARY")
-      _          <- Either.cond(ds.scriptType == scriptType, (), s"SCRIPT_TYPE of `$libraryName` is ${ds.scriptType.text} should be the same with script")
+      _          <- Either.cond(ds.contentType == Library, (), s"CONTENT_TYPE of `$libraryName` is not LIBRARY")
     } yield ()
 
   private val importRegex = s"\\${DirectiveParser.start}\\s*${DirectiveKey.IMPORT.text}.*${DirectiveParser.end}"

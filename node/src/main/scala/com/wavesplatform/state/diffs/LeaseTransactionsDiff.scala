@@ -33,8 +33,7 @@ object LeaseTransactionsDiff {
               tx = tx,
               portfolios = portfolioDiff,
               leaseState = Map(tx.id() -> true),
-              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-              scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
+              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
             ))
         }
       }
@@ -75,8 +74,7 @@ object LeaseTransactionsDiff {
         tx = tx,
         portfolios = portfolioDiff,
         leaseState = Map(tx.leaseId -> false),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
   }
 }

@@ -558,6 +558,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, decompilerContext) shouldEq script
   }
 
+  property("concat with nil is hidden") {
+    val expected = """["a", "b"]"""
+    val Right((expr1, _)) = compile(""""a"::"b"::nil""")
+    val Right((expr2, _)) = compile("""cons("a", cons("b", nil))""")
+    Decompiler(expr1, decompilerContext) shouldEq expected
+    Decompiler(expr2, decompilerContext) shouldEq expected
+  }
+
   property("single value list") {
     val script = """["a"]"""
     val Right((expr, _)) = compile(script)
@@ -577,4 +585,65 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val Right((expr, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
+
+  property("list element access") {
+    val script =
+      """let arr = [1, 2, 3]
+        |arr[1]""".stripMargin
+    val Right((expr, _)) = compile(script)
+    val Right((expr2, _)) = compile(
+      """let arr = [1, 2, 3]
+        |arr.getElement(1)""".stripMargin
+    )
+    Decompiler(expr, decompilerContext) shouldEq script
+    Decompiler(expr2, decompilerContext) shouldEq script
+  }
+
+  property("get state values") {
+    val script =
+      """let bin = getBinary(this, "key")
+        |let boo = getBoolean(this, "key")
+        |let int = getInteger(this, "key")
+        |let str = getString(this, "key")
+        |let binV = getBinaryValue(this, "key")
+        |let booV = getBooleanValue(this, "key")
+        |let intV = getIntegerValue(this, "key")
+        |let strV = getStringValue(this, "key")
+        |boo""".stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
+
+  property("get DataEntry list values by key") {
+    val script =
+      """let list = [DataEntry("k1", fromBase58String("3ye1XJ")), DataEntry("k2", true), DataEntry("k3", 42), DataEntry("k4", "true")]
+        |let bin = getBinary(list, "k1")
+        |let boo = getBoolean(list, "k2")
+        |let int = getInteger(list, "k3")
+        |let str = getString(list, "k4")
+        |let binV = getBinaryValue(list, "k1")
+        |let booV = getBooleanValue(list, "k2")
+        |let intV = getIntegerValue(list, "k3")
+        |let strV = getStringValue(list, "k4")
+        |boo""".stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
+
+  property("get DataEntry list values by index") {
+    val script =
+      """let list = [DataEntry("k1", fromBase58String("3ye1XJ")), DataEntry("k2", true), DataEntry("k3", 42), DataEntry("k4", "true")]
+        |let bin = getBinary(list, 0)
+        |let boo = getBoolean(list, 1)
+        |let int = getInteger(list, 2)
+        |let str = getString(list, 3)
+        |let binV = getBinaryValue(list, 0)
+        |let booV = getBooleanValue(list, 1)
+        |let intV = getIntegerValue(list, 2)
+        |let strV = getStringValue(list, 3)
+        |boo""".stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq script
+  }
+
 }

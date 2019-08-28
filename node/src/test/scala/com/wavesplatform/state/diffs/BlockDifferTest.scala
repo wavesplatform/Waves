@@ -14,8 +14,6 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
 
-import scala.concurrent.duration._
-
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
   private val TransactionFee = 10
@@ -116,19 +114,8 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
-      allowTemporaryNegativeUntil = 0L,
-      generationBalanceDepthFrom50To1000AfterHeight = 0,
-      minimalGeneratingBalanceAfter = 0L,
-      allowTransactionsFromFutureUntil = Long.MaxValue,
-      allowUnissuedAssetsUntil = 0L,
-      allowInvalidReissueInSameBlockUntilTimestamp = 0L,
-      allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
-      resetEffectiveBalancesAtHeight = 0,
-      blockVersion3AfterHeight = 0,
       preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-      maxTransactionTimeBackOffset = 120.minutes,
-      maxTransactionTimeForwardOffset = 90.minutes
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

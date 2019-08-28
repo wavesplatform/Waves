@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
@@ -20,6 +21,8 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
+  val estimator = ScriptEstimatorV2
+
   var assetWOScript    = ""
   var assetWScript     = ""
   private val accountB = pkByAddress(secondAddress)
@@ -28,7 +31,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
                                                |match tx {
                                                |case s : SetAssetScriptTransaction => false
                                                |case _ => true}""".stripMargin,
-    isAssetScript = true
+    isAssetScript = true,
+    estimator
   ).explicitGet()._1
 
   protected override def beforeAll(): Unit = {
@@ -99,7 +103,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
               pkByAddress(secondAddress).publicKey).toString
             }')
                                         |case _ => false}""".stripMargin,
-            isAssetScript = true
+            isAssetScript = true,
+            estimator
           ).explicitGet()._1.bytes.value.base64)
       )
       .id
@@ -134,7 +139,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
            |  case _ => false
            |}
          """.stripMargin,
-      isAssetScript = true
+      isAssetScript = true,
+      estimator
     ).explicitGet()._1.bytes.value.base64
 
     val (balance, eff) = miner.accountBalances(firstAddress)
@@ -266,7 +272,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
                                 |match tx {
                                 |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
                                 |case _ => true}""".stripMargin,
-            isAssetScript = false
+            isAssetScript = false,
+            estimator
           ).explicitGet()._1),
         setScriptFee,
         System.currentTimeMillis()

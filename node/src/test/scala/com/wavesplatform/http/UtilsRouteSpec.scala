@@ -13,6 +13,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
@@ -23,12 +24,14 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue}
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
+  private val estimator = ScriptEstimatorV2
   private val route = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
       def getTimestamp(): Long  = System.currentTimeMillis()
     },
-    restAPISettings
+    restAPISettings,
+    estimator
   ).route
 
   val script = FUNCTION_CALL(
@@ -209,7 +212,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
           | let a = 5
           | inc(a) == a + 1
         """.stripMargin
-      val compiled = ScriptCompiler.compile(expectedScript)
+      val compiled = ScriptCompiler.compile(expectedScript, ScriptEstimatorV2)
 
       val json         = responseAs[JsValue]
       val base64Result = Script.fromBase64String((json \ "script").as[String])

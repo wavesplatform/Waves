@@ -1,4 +1,3 @@
-import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport.isScalaJSProject
 import sbt.Keys._
 import sbt._
 
@@ -10,9 +9,6 @@ object CommonSettings extends AutoPlugin {
 
   // These options doesn't work for ScalaJS
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
-    javaOptions ++= {
-      if (isScalaJSProject.value || !fork.value) Seq.empty else ModernJavaSettings.options
-    },
     packageSource := sourceDirectory.value / "package"
   )
 }

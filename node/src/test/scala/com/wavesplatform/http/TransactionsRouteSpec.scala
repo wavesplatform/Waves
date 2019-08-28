@@ -68,7 +68,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
@@ -104,7 +104,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
@@ -136,7 +136,7 @@ class TransactionsRouteSpec
         val blockchain = mock[Blockchain]
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
@@ -164,9 +164,9 @@ class TransactionsRouteSpec
           preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 0)
         )
         val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
+        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(false).once()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
         (blockchain.assetDescription _)
           .expects(assetId)
@@ -212,9 +212,9 @@ class TransactionsRouteSpec
         )
 
         val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
+        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).anyNumberOfTimes()
         (blockchain.hasScript _).expects(sender.toAddress).returning(true).once()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures).anyNumberOfTimes()
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET))
         (blockchain.assetDescription _)
           .expects(assetId)
@@ -247,7 +247,7 @@ class TransactionsRouteSpec
 
   routePath("/address/{address}/limit/{limit}") - {
     val bytes32StrGen = bytes32gen.map(Base58.encode)
-    val addressGen    = accountGen.map(_.address)
+    val addressGen    = accountGen.map(_.stringRepr)
 
     "handles parameter errors with corresponding responses" - {
       "invalid address" in {
@@ -410,8 +410,8 @@ class TransactionsRouteSpec
         val ist = Json.obj(
           "type"       -> InvokeScriptTransaction.typeId,
           "version"    -> 1,
-          "sender"     -> acc1.address,
-          "dApp"       -> acc2.address,
+          "sender"     -> acc1.stringRepr,
+          "dApp"       -> acc2.stringRepr,
           "call"       -> func,
           "payment"    -> Seq[Payment](),
           "fee"        -> 500000,
