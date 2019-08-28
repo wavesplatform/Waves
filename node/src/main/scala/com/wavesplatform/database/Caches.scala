@@ -324,21 +324,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.scriptResults
     )
 
-    val emptyKeys = Map.empty[Address, Set[String]]
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]
 
-    val (newKeys, newData) =
-      diff.accountData.foldLeft((emptyKeys, emptyData)) {
-        case ((keys, data), (a, d)) =>
-          val oldKeys = accountDataKeys(a)
-          val newKeys = d.data.keys.toList
-          val updKeys = keys + (a -> (oldKeys ++ newKeys))
+    val newData =
+      diff.accountData.foldLeft(emptyData) {
+        case (data, (a, d)) =>
           val updData = data ++ d.data.map {
             case (k, v) =>
               (a, k) -> v.some
           }
 
-          (updKeys, updData)
+          updData
       }
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
