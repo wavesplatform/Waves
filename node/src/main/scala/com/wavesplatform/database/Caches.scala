@@ -169,14 +169,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
 
-  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] =
-    CacheBuilder
-      .newBuilder()
-      .maximumSize(dbSettings.maxCacheSize)
-      .recordStats()
-      .build(new CacheLoader[(Address, String), Option[DataEntry[_]]] {
-        override def load(key: (Address, String)): Option[DataEntry[_]] = loadAccountData(key)
-      })
+  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, loadAccountData)
+
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = accountDataCache.get((acc, key))
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]]
@@ -214,14 +208,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
-
-    if (newHeight % 1000 == 0) {
-      log.info("AccountDataCache")
-      log.info(s"EVICTION COUNT: ${accountDataCache.stats().evictionCount()}")
-      log.info(s"MISS COUNT: ${accountDataCache.stats().missCount()}")
-      log.info(s"MISS RATE: ${accountDataCache.stats().missRate()}")
-      log.info(s"HIT COUNT: ${accountDataCache.stats().hitCount()}")
-    }
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
