@@ -10,8 +10,8 @@ trait ProvenTransaction extends Transaction with Proven {
   protected def jsonBase(): JsObject =
     Json.obj(
       "type"            -> builder.typeId,
-      "id" -> id().toString,
-      "sender"          -> sender.address,
+      "id"              -> id().toString,
+      "sender"          -> sender.stringRepr,
       "senderPublicKey" -> Base58.encode(sender),
       "fee"             -> assetFee._2,
       "feeAssetId"      -> assetFee._1.maybeBase58Repr,

@@ -6,6 +6,7 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -49,7 +50,7 @@ object InvokeScriptTransactionDiff {
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(v, contract, _))) =>
+      case Right(Some(sc @ ContractScriptImpl(v, contract))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val environment = new WavesEnvironment(
@@ -72,6 +73,7 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
               directives <- DirectiveSet(v, Account, DAppType).leftMap((_, List.empty[LogItem]))
               evaluator <- ContractEvaluator(
                 Monoid
@@ -86,13 +88,30 @@ object InvokeScriptTransactionDiff {
                 contract,
                 invocation
               )
-            } yield evaluator
+            } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
           })
         for {
-          scriptResult <- TracedResult(scriptResultE, List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE)))
-          ScriptResult(ds, ps) = scriptResult
+          scriptResult <- TracedResult(
+            scriptResultE,
+            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1)))
+          )
+          (ScriptResult(ds, ps), invocationComplexity) = scriptResult
+
+          verifierComplexity <- TracedResult {
+            blockchain
+              .accountScript(tx.sender)
+              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
+              .leftMap(GenericError(_))
+          }
+          assetsComplexity <- TracedResult {
+            (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
+              .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
+              .toList
+              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
+              .leftMap(GenericError(_))
+          }
 
           dataEntries = ds.map {
             case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
@@ -141,51 +160,24 @@ object InvokeScriptTransactionDiff {
               (),
               GenericError(s"Unissued assets are not allowed")
             ))
+          scriptsInvoked = {
+            tx.checkedAssets()
+              .collect { case asset@IssuedAsset(_) => asset }
+              .count(blockchain.hasAssetScript) +
+              ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+              (if (blockchain.hasScript(tx.sender)) 1 else 0)
+          }
           _ <- TracedResult {
-            val totalScriptsInvoked =
-              tx.checkedAssets()
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) 1 else 0)
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val minWaves = scriptsInvoked * ScriptExtraFee + FeeValidation.feeUnits(blockchain)(InvokeScriptTransaction.typeId) * FeeUnit
             val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             Either.cond(
               minWaves <= wavesFee,
               (),
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for $txName with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in ${
+                tx.assetFee._1
+                  .fold("WAVES")(_.toString)
+              } for $txName with $scriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
             )
-          }
-          scriptsInvoked <- TracedResult {
-            val totalScriptsInvoked =
-              tx.checkedAssets()
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            Either.cond(
-              minWaves <= wavesFee,
-              totalScriptsInvoked,
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
-            )
-          }
-
-          scriptsComplexity = {
-            val assetsComplexity = (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
-              .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
-              .map(DiffsCommon.verifierComplexity)
-              .sum
-
-            val accountComplexity = blockchain
-              .accountScript(tx.sender)
-              .fold(0L)(DiffsCommon.verifierComplexity)
-
-            val funcComplexity = DiffsCommon.functionComplexity(sc, tx.funcCallOpt)
-
-            assetsComplexity + accountComplexity + funcComplexity
           }
 
           _ <- foldScriptTransfers(blockchain, tx, dAppAddress)(ps, dataAndPaymentDiff)
@@ -205,7 +197,7 @@ object InvokeScriptTransactionDiff {
           dataAndPaymentDiff.copy(
             transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
             scriptsRun = scriptsInvoked + 1,
-            scriptsComplexity = scriptsComplexity
+            scriptsComplexity = invocationComplexity + verifierComplexity.getOrElse(0L) + assetsComplexity.sum
           ) |+| transferSetDiff
         }
       case Left(l) => TracedResult(Left(l))

@@ -8,40 +8,42 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.diffs._
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside {
-
+  private val estimator = ScriptEstimatorV2
+  
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
   property("use version 2 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {
     val script = scriptWithVersion("8".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value 8 for key STDLIB_VERSION")
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value 8 for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {
     val script = scriptWithVersion("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
   }
 
   property("fails on incorrect content type value") {
     val script = scriptWithContentType("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
   }
 
   property("fails on incorrect script type value") {
     val script = scriptWithScriptType("oOooOps".some)
-    ScriptCompiler.compile(script) shouldBe Left("Illegal directive value oOooOps for key SCRIPT_TYPE")
+    ScriptCompiler.compile(script, estimator) shouldBe Left("Illegal directive value oOooOps for key SCRIPT_TYPE")
   }
 
   property("fails with right error position") {
@@ -51,7 +53,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | let a = 1000
         | a > b
       """.stripMargin
-    ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 46-47")
+    ScriptCompiler.compile(script, estimator) shouldBe Left("Compilation failed: A definition of 'b' is not found in 46-47")
   }
 
   property("fails with contract for asset") {
@@ -61,7 +63,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | {-# CONTENT_TYPE DAPP #-}
         | {-# SCRIPT_TYPE ASSET #-}
       """.stripMargin
-    ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
+    ScriptCompiler.compile(script, estimator) should produce("Inconsistent set of directives")
   }
 
   property("fails with contract with wrong stdlib") {
@@ -71,7 +73,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | {-# CONTENT_TYPE DAPP #-}
         | {-# SCRIPT_TYPE ACCOUNT #-}
       """.stripMargin
-    ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
+    ScriptCompiler.compile(script, estimator) should produce("Inconsistent set of directives")
   }
 
   property("default V3 (+account+expression) contains `tx`") {
@@ -84,6 +86,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case tx:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
+        estimator
       ) shouldBe 'right
   }
 
@@ -100,6 +103,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case tx:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
+        estimator
       ) shouldBe 'right
   }
 
@@ -117,6 +121,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case tx:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
+        estimator
       ) shouldBe 'right
   }
 
@@ -160,7 +165,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         )
       )
     )
-    ScriptCompiler.compile(script) shouldBe Right((ExprScript(V3, resultExpr).explicitGet(), 35))
+    ScriptCompiler.compile(script, estimator) shouldBe Right((ExprScript(V3, resultExpr).explicitGet(), 35))
   }
 
   property("binary operations priority == > <") {
@@ -176,7 +181,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | a > b == true
       """.stripMargin
 
-    ScriptCompiler.compile(script) shouldBe 'left
+    ScriptCompiler.compile(script, estimator) shouldBe 'left
   }
 
   property("complexity border") {
@@ -225,8 +230,8 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
       val validScript          = directives + buildScript(assigns, conjunctions,     withVerifier)
       val exceedingLimitScript = directives + buildScript(assigns, conjunctions + 1, withVerifier)
 
-      inside(ScriptCompiler.compile(validScript)) { case Right((_, c)) => c shouldBe complexity }
-      ScriptCompiler.compile(exceedingLimitScript) should produce(s"${complexity + 2} > $complexity")
+      inside(ScriptCompiler.compile(validScript, estimator)) { case Right((_, c)) => c shouldBe complexity }
+      ScriptCompiler.compile(exceedingLimitScript, estimator) should produce(s"${complexity + 2} > $complexity")
     }
 
     checkComplexityBorder(V3, DApp,       Account, 4000)
@@ -258,8 +263,8 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
           |
       """.stripMargin
 
-      val c1 = ScriptCompiler.compile(scriptWithoutTransactionById).explicitGet()._2
-      val c2 = ScriptCompiler.compile(scriptWithTransactionById).explicitGet()._2
+      val c1 = ScriptCompiler.compile(scriptWithoutTransactionById, estimator).explicitGet()._2
+      val c2 = ScriptCompiler.compile(scriptWithTransactionById, estimator).explicitGet()._2
       c2 - c1
     }
 
@@ -279,7 +284,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | func sq(a: Int) = a * a
       """.stripMargin
 
-    ScriptCompiler.compile(script) shouldBe 'right
+    ScriptCompiler.compile(script, estimator) shouldBe 'right
   }
 
   private val expectedExpr = LET_BLOCK(
