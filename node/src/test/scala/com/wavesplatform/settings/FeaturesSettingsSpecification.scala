@@ -2,9 +2,10 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}
 
-class FeaturesSettingsSpecification extends FlatSpec with Matchers with CustomValueReaders {
+class FeaturesSettingsSpecification extends FlatSpec with Matchers {
   "FeaturesSettings" should "read values" in {
     val config = ConfigFactory.parseString("""
         |waves {

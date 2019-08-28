@@ -1,8 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.api.NodeFeatureStatus
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -28,7 +27,9 @@ class RewardActivationTestSuite
     val featureInfo = nodes.map(_.featureActivationStatus(BlockchainFeatures.BlockReward.id))
     featureInfo.foreach { si =>
       si.description shouldBe BlockchainFeatures.BlockReward.description
-      assertActivatedStatus(si, activationHeight, NodeFeatureStatus.Implemented)
+      withClue("blockchainStatus") {
+        si.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
+      }
     }
 
     val statusInfo = nodes.map(_.rewardStatus)
@@ -97,7 +98,7 @@ object RewardActivationTestSuite {
        |      reward-voting-period = $rewardVotingPeriod
        |    }
        |  }
-       |  features.reward = $rewardSupport
+       |  reward.supported = $rewardSupport
        |  miner.quorum = 1
        |}""".stripMargin
   )

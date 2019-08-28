@@ -20,6 +20,7 @@ case class WavesSettings(directory: String,
                          synchronizationSettings: SynchronizationSettings,
                          utxSettings: UtxSettings,
                          featuresSettings: FeaturesSettings,
+                         rewardSettings: RewardSettings,
                          metrics: Metrics.Settings,
                          config: Config)
 
@@ -40,6 +41,7 @@ object WavesSettings extends CustomValueReaders {
     val synchronizationSettings   = waves.as[SynchronizationSettings]("synchronization")
     val utxSettings               = waves.as[UtxSettings]("utx")
     val featuresSettings          = waves.as[FeaturesSettings]("features")
+    val rewardSettings            = waves.as[RewardSettings]("reward")
     val metrics                   = rootConfig.as[Metrics.Settings]("metrics") // TODO: Move to waves section
 
     WavesSettings(
@@ -56,6 +58,7 @@ object WavesSettings extends CustomValueReaders {
       synchronizationSettings,
       utxSettings,
       featuresSettings,
+      rewardSettings,
       metrics,
       rootConfig
     )

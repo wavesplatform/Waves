@@ -48,20 +48,23 @@ object BlockDiffer extends ScorexLogging {
 
     lazy val currentBlockFeeDistr: Option[Portfolio] =
       if (stateHeight < ngHeight)
-        Some(block.feesPortfolio())
+        Some(block.feesPortfolio()).map { p =>
+          if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward))
+            p |+| Portfolio.build(Asset.Waves, blockchain.blockReward)
+          else p
+        }
       else
         None
 
     for {
       _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
-      r <- createDiff(
+      r <- apply(
         CompositeBlockchain(blockchain, newBlock = Some(block)),
         constraint,
         maybePrevBlock.map(_.timestamp),
         prevBlockFeeDistr,
         currentBlockFeeDistr,
         block.transactionData,
-        fullBlock = true,
         verify
       )
     } yield r
@@ -90,27 +93,25 @@ object BlockDiffer extends ScorexLogging {
           ActivationError(s"MicroBlocks are not yet activated")
         ))
       _ <- TracedResult(micro.signaturesValid())
-      r <- createDiff(
+      r <- apply(
         blockchain,
         constraint,
         prevBlockTimestamp,
         None,
         None,
         micro.transactionData,
-        fullBlock = false,
         verify
       )
     } yield r
   }
 
-  private[this] def createDiff[Constraint <: MiningConstraint](blockchain: Blockchain,
-                                                               initConstraint: Constraint,
-                                                               prevBlockTimestamp: Option[Long],
-                                                               prevBlockFeeDistr: Option[Portfolio],
-                                                               currentBlockFeeDistr: Option[Portfolio],
-                                                               txs: Seq[Transaction],
-                                                               fullBlock: Boolean,
-                                                               verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
+  private[this] def apply[Constraint <: MiningConstraint](blockchain: Blockchain,
+                                                          initConstraint: Constraint,
+                                                          prevBlockTimestamp: Option[Long],
+                                                          prevBlockFeeDistr: Option[Portfolio],
+                                                          currentBlockFeeDistr: Option[Portfolio],
+                                                          txs: Seq[Transaction],
+                                                          verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
       constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
 
@@ -118,19 +119,9 @@ object BlockDiffer extends ScorexLogging {
     val timestamp          = blockchain.lastBlockTimestamp.get
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress
-    val reward             = blockchain.blockReward
 
-    val initDiff = {
-      val generatorFeePf = currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty
-      val generatorPf =
-        if (fullBlock && blockchain.isFeatureActivated(BlockchainFeatures.BlockReward))
-          generatorFeePf |+| Portfolio.build(Asset.Waves, reward)
-        else
-          generatorFeePf
-
-      Diff.empty.copy(portfolios = Map(blockGenerator -> generatorPf))
-    }
-
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
+    val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
     val hasNg          = currentBlockFeeDistr.isEmpty
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
@@ -154,7 +145,6 @@ object BlockDiffer extends ScorexLogging {
       if (hasSponsorship) ngPf else ngPf.copy(_2 = 0L)
     }
 
-    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc

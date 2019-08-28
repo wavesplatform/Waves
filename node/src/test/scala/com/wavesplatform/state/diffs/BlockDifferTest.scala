@@ -131,7 +131,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
       maxTransactionTimeBackOffset = 120.minutes,
       maxTransactionTimeForwardOffset = 90.minutes,
-      blockRewardSettings = BlockRewardSettings.TESTNET
+      blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1)
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

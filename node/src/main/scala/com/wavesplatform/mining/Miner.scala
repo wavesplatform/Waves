@@ -124,10 +124,6 @@ class MinerImpl(allChannels: ChannelGroup,
       .leftMap(_.toString)
   }
 
-  private def getVersion(height: Int): Byte =
-    if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion
-    else blockchainUpdater.featureActivationHeight(BlockchainFeatures.BlockReward.id).map(_ => RewardBlockVersion).getOrElse(NgBlockVersion)
-
   private def forgeBlock(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height              = blockchainUpdater.height
@@ -177,7 +173,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def blockRewardVote(version: Byte): Byte =
     if (version < RewardBlockVersion) 0.toByte
-    else settings.featuresSettings.reward
+    else settings.rewardSettings.supported
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)

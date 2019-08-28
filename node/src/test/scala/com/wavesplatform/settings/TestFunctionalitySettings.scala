@@ -34,5 +34,5 @@ object TestFunctionalitySettings {
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
 
   val EmptyFeaturesSettings: FeaturesSettings =
-    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty, 0.toByte)
+    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 }
