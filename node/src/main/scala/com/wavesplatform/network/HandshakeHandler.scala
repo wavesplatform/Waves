@@ -55,9 +55,9 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
     super.channelRegistered(ctx)
   }
 
-  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
+  override def channelUnregistered(ctx: ChannelHandlerContext): Unit = {
     cancelTimeout()
-    super.channelInactive(ctx)
+    super.channelUnregistered(ctx)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
