@@ -108,16 +108,57 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
             s.balance(signerB) shouldBe 50
         }
       }
+
+      /*
+      | N | fee | reward | signer | A receive | A balance | B receive | B balance |
+      |--:|:---:|:------:|:------:|----------:|----------:|----------:|-----------|
+      |1  |0    |0       |A       |0          |0          |0          |0          | <- genesis
+      |2  |10   |0       |B       |0          |0          |10         |+10        |
+      |3  |10   |0       |A       |10         |+10        |0          |0          |
+      |4  |10   |0       |B       |0          |10         |+10        |10+10=20   |
+      |---------------------- Enable NG and BlockReward --------------------------|
+      |5  |10   |0       |A       |4          |10+4=14    |0          |20         |
+      |6  |10   |6       |B       |0          |14         |+4+6+6=10  |20+16=36   |
+      |7  |10   |6       |A       |4+6+6=16   |14+16=30   |0          |36         |
+      |8  |10   |6       |B       |0          |30         |+4+6+6=16  |36+16=52   |
+      |9  |10   |6       |A       |4+6+6=16   |30+16=46   |0          |52         | <- 1st check
+      |10 |10   |6       |B       |0          |46         |+4+6+6=16  |52+16=68   | <- 2nd check
+       */
+      "height > BlockReward activation - a miner should receive 60% of previous block's fee and 40% of the current one + reward" in {
+        val rewardSettings = BlockRewardSettings(0, 8, 6, 25000, 10, 10, 2)
+        assertDiff(testChain.init, 4, rewardSettings) {
+          case (_, s) =>
+            s.balance(signerA) shouldBe 46
+        }
+
+        assertDiff(testChain, 4, rewardSettings) {
+          case (_, s) =>
+            s.balance(signerB) shouldBe 68
+        }
+      }
     }
   }
 
-  private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit =
+    assertDiff(blocks, ngAtHeight / 2, Map((BlockchainFeatures.NG.id, ngAtHeight)), BlockRewardSettings(0, 0, 0, 1, 1, 1, 1))(assertion)
+
+  private def assertDiff(blocks: Seq[Block], rewardAtHeight: Int, settings: BlockRewardSettings)(assertion: (Diff, Blockchain) => Unit): Unit = {
+    val features = Map((BlockchainFeatures.NG.id, rewardAtHeight), (BlockchainFeatures.BlockReward.id, rewardAtHeight))
+    assertDiff(blocks, rewardAtHeight / 2, features, settings)(assertion)
+  }
+
+  private def assertDiff(
+      blocks: Seq[Block],
+      featuresCheckBlocksPeriod: Int,
+      preActivatedFeatures: Map[Short, Int],
+      blockRewardSettings: BlockRewardSettings
+  )(assertion: (Diff, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
-      featureCheckBlocksPeriod = ngAtHeight / 2,
+      featureCheckBlocksPeriod = featuresCheckBlocksPeriod,
       blocksForFeatureActivation = 1,
-      preActivatedFeatures = Map[Short, Int]((BlockchainFeatures.NG.id, ngAtHeight), (BlockchainFeatures.BlockReward.id, ngAtHeight)),
+      preActivatedFeatures = preActivatedFeatures,
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-      blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1)
+      blockRewardSettings = blockRewardSettings
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import cats.kernel.Monoid
 import cats.syntax.either.catsSyntaxEitherId
+import cats.syntax.option.catsSyntaxOptionId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -37,22 +38,25 @@ object BlockDiffer extends ScorexLogging {
 
     // height switch is next after activation
     val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
+    val rewardHeight      = blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id).getOrElse(Int.MaxValue)
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+
+    lazy val minerRewardDistr: Option[Portfolio] =
+      if (stateHeight < rewardHeight)
+        None
+      else
+        Portfolio.build(Asset.Waves, blockchain.blockReward).some
 
     lazy val prevBlockFeeDistr: Option[Portfolio] =
       if (stateHeight >= sponsorshipHeight)
-        Some(Portfolio.empty.copy(balance = blockchain.carryFee))
+        Portfolio.empty.copy(balance = blockchain.carryFee).some |+| minerRewardDistr
       else if (stateHeight > ngHeight)
-        maybePrevBlock.map(_.prevBlockFeePart())
+        maybePrevBlock.map(_.prevBlockFeePart()) |+| minerRewardDistr
       else None
 
     lazy val currentBlockFeeDistr: Option[Portfolio] =
       if (stateHeight < ngHeight)
-        Some(block.feesPortfolio()).map { p =>
-          if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward))
-            p |+| Portfolio.build(Asset.Waves, blockchain.blockReward)
-          else p
-        }
+        block.feesPortfolio().some |+| minerRewardDistr
       else
         None
 

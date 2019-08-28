@@ -187,7 +187,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def blockReward: Long =
     blockRewardCache
       .orElse(activatedFeatures.get(BlockchainFeatures.BlockReward.id).collect {
-        case activatedAt if activatedAt + settings.functionalitySettings.blockRewardSettings.firstRewardPeriod >= height =>
+        case activatedAt if activatedAt <= height && activatedAt + settings.functionalitySettings.blockRewardSettings.firstRewardPeriod >= height =>
           settings.functionalitySettings.blockRewardSettings.firstReward
       })
       .getOrElse(0L)

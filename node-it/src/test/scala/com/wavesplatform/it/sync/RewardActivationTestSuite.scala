@@ -32,6 +32,7 @@ class RewardActivationTestSuite
       }
     }
 
+    nodes.waitForHeight(activationHeight + 1)
     val statusInfo = nodes.map(_.rewardStatus)
     statusInfo.foreach { ri =>
       ri.value.reward should be(firstReward)
