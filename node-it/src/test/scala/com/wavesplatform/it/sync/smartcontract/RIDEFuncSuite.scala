@@ -286,12 +286,11 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
            |      case _ => throw("Can't parse header!")
            |    }
            |  }
-           |""".stripMargin
-      )
+           |""".stripMargin, estimator)
     }.explicitGet()._1
 
     val newAddress = sender.createAddress()
-    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.toAddress.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val header: BlockHeader = blockheaderGen.sample.get
 
