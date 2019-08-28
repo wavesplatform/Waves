@@ -1,5 +1,8 @@
 package com.wavesplatform.lang.v1.repl
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
@@ -7,6 +10,10 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 
 case class EnvironmentHttpClient(settings: NodeConnectionSettings) extends Environment {
+  private val mapper = new ObjectMapper() with ScalaObjectMapper
+  mapper
+    .registerModule(DefaultScalaModule)
+
   val url = settings.url
 
   override def height: Long = ???
