@@ -1,0 +1,5 @@
+package com.wavesplatform.transaction.smart.script.estimator
+
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+
+class ContractScriptComplexityV2Test extends ContractScriptComplexityTest(ScriptEstimatorV2)

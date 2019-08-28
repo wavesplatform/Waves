@@ -4,6 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -38,7 +39,8 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
                  |  case s : $tx => true
                  |  case _ => true
                  |}""".stripMargin,
-              isAssetScript = true
+              isAssetScript = true,
+              ScriptEstimatorV2
             ).explicitGet()._1.bytes.value.base64),
           waitForTx = true
         )

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
@@ -38,6 +39,8 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       featureCheckBlocksPeriod = 1,
       blocksForFeatureActivation = 1
     )
+
+  private val estimator = ScriptEstimatorV2
 
   property("sponsorship works when used by scripted accounts") {
     forAll(separateContractAndSponsor) {
@@ -97,7 +100,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       gen2 = GenesisTransaction
         .create(recipient, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"false", isAssetScript = false).explicitGet()
+      (script, _) = ScriptCompiler(s"false", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = contract,
@@ -165,7 +168,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       gen2 = GenesisTransaction
         .create(sponsor, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"true", isAssetScript = false).explicitGet()
+      (script, _) = ScriptCompiler(s"true", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = sponsor,

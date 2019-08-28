@@ -18,7 +18,7 @@ class WalletSpecification extends FunSuite with Matchers {
     w.generateNewAccounts(walletSize)
 
     w.privateKeyAccounts.size shouldBe walletSize
-    w.privateKeyAccounts.map(_.address) shouldBe Seq(
+    w.privateKeyAccounts.map(_.stringRepr) shouldBe Seq(
       "3MqMwwHW4v2nSEDHVWoh8RCQL8QrsWLkkeB",
       "3MuwVgJA8EXHukxo6rcakT5tD6FpvACtitG",
       "3MuAvUG4EAsG9RP9jaWjewCVmggaQD2t39B",

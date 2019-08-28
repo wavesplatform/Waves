@@ -41,6 +41,9 @@ object TestBlock {
   def create(signer: KeyPair, txs: Seq[Transaction], features: Set[Short]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
 
+  def create(signer: KeyPair, txs: Seq[Transaction], ref: ByteStr): Block =
+    create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer, ref = ref)
+
   def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
 
   def create(time: Long, txs: Seq[Transaction], signer: KeyPair): Block = create(time, randomSignature(), txs, signer)

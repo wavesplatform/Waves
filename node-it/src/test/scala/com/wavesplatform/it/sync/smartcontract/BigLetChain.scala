@@ -10,6 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
 class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
   test("big let assignment chain") {
@@ -27,13 +28,13 @@ class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
          | }
        """.stripMargin
 
-    val compiledScript = ScriptCompiler.compile(scriptText).explicitGet()._1
+    val compiledScript = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
 
     val newAddress   = sender.createAddress()
     val acc0         = pkByAddress(firstAddress)
     val pkNewAddress = pkByAddress(newAddress)
 
-    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val scriptSet = SetScriptTransaction.selfSigned(
       pkNewAddress,

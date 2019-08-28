@@ -1,9 +1,10 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
+import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -32,8 +33,10 @@ object TransactionDiffer {
     func(blockchain, tx)
   }
 
-  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long)(blockchain: Blockchain,
-                                                                              tx: Transaction): TracedResult[ValidationError, Diff] = {
+  def verified(
+      prevBlockTimestamp: Option[Long],
+      currentBlockTimestamp: Long
+  )(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
     for {
       _ <- Verifier(blockchain)(tx)
       _ <- TracedResult(
@@ -57,28 +60,45 @@ object TransactionDiffer {
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
-  def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
+  private def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction =>
           PaymentTransactionDiff(blockchain)(ptx)
-        case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain)(itx)
-        case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
-        case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain)(btx)
-        case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockTimestamp)(ttx)
-        case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp)(mtx)
-        case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain)(ltx)
-        case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp)(ltx)
-        case etx: ExchangeTransaction        => ExchangeTransactionDiff(blockchain)(etx)
-        case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain)(atx)
-        case dtx: DataTransaction            => DataTransactionDiff(blockchain)(dtx)
-        case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx)
-        case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTimestamp)(sstx)
-        case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockTimestamp)(stx)
-        case ci: InvokeScriptTransaction     => InvokeScriptTransactionDiff.apply(blockchain)(ci)
-        case _                               => Left(UnsupportedTransactionType)
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain)(ci)
+        case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx)
+        case otherTx: ProvenTransaction =>
+          complexityDiff(blockchain, otherTx) |+|
+            unverifiedWithEstimate(currentBlockTimestamp)(blockchain, otherTx)
+        case _ => Left(UnsupportedTransactionType)
       }
     }
-  }
+
+  private def complexityDiff(
+      blockchain: Blockchain,
+      tx: ProvenTransaction
+  ): TracedResult[ValidationError, Diff] =
+    TracedResult(DiffsCommon.countScriptsComplexity(blockchain, tx))
+      .map(c => Diff(tx, scriptsComplexity = c))
+      .leftMap(GenericError(_))
+
+  private def unverifiedWithEstimate(
+      currentBlockTimestamp: Long
+  )(blockchain: Blockchain, tx: ProvenTransaction): TracedResult[ValidationError, Diff] =
+    tx match {
+      case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain)(itx)
+      case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
+      case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain)(btx)
+      case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockTimestamp)(ttx)
+      case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp)(mtx)
+      case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain)(ltx)
+      case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp)(ltx)
+      case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain)(atx)
+      case dtx: DataTransaction            => DataTransactionDiff(blockchain)(dtx)
+      case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx)
+      case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTimestamp)(sstx)
+      case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockTimestamp)(stx)
+      case _                               => Left(UnsupportedTransactionType)
+    }
 }

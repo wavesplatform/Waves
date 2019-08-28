@@ -22,9 +22,9 @@ class BlockchainUpdaterBadReferencesTest
     recipient <- accountGen
     ts        <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    payment: TransferTransactionV1  <- wavesTransferGeneratorP(master, recipient)
-    payment2: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
-    payment3: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
+    payment: TransferTransactionV1  <- wavesTransferGeneratorP(ts, master, recipient)
+    payment2: TransferTransactionV1 <- wavesTransferGeneratorP(ts, master, recipient)
+    payment3: TransferTransactionV1 <- wavesTransferGeneratorP(ts, master, recipient)
   } yield (genesis, payment, payment2, payment3)
 
   property("microBlock: referenced (micro)block doesn't exist") {
@@ -119,7 +119,7 @@ class BlockchainUpdaterBadReferencesTest
   }
 
   property("block: incorrect or non-existing block when liquid exists") {
-    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
+    assume(BlockchainFeatures.Implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, payment, payment2, payment3)) =>
         val blocks   = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))

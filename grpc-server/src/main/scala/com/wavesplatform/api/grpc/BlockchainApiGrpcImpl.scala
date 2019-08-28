@@ -22,7 +22,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
       functionalitySettings.activationWindow(request.height).last,
       (blockchain.featureVotes(request.height).keySet ++
         blockchain.approvedFeatures.keySet ++
-        BlockchainFeatures.implemented).toSeq.sorted.map(id => {
+        BlockchainFeatures.Implemented).toSeq.sorted.map(id => {
         val status = blockchain.featureStatus(id, request.height) match {
           case BlockchainFeatureStatus.Undefined => FeatureActivationStatus.BlockchainFeatureStatus.UNDEFINED
           case BlockchainFeatureStatus.Approved  => FeatureActivationStatus.BlockchainFeatureStatus.APPROVED
@@ -33,7 +33,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
           id,
           BlockchainFeatures.feature(id).fold("Unknown feature")(_.description),
           status,
-          (BlockchainFeatures.implemented.contains(id), featuresSettings.supported.contains(id)) match {
+          (BlockchainFeatures.Implemented.contains(id), featuresSettings.supported.contains(id)) match {
             case (false, _) => FeatureActivationStatus.NodeFeatureStatus.NOT_IMPLEMENTED
             case (_, true)  => FeatureActivationStatus.NodeFeatureStatus.VOTED
             case _          => FeatureActivationStatus.NodeFeatureStatus.IMPLEMENTED
