@@ -13,7 +13,7 @@ Is your feature request related to a problem? Please describe.
 **Motivation and Purposes**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...].
 
-** Specification**
+**Specification**
 A clear and concise description of what you want to happen. Describe alternatives you've considered
 
 **Backwards Compatibility**
