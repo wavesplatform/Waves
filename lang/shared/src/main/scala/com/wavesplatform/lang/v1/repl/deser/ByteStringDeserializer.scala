@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.lang.v1.repl.model.transactions.ByteString
+import com.wavesplatform.lang.v1.repl.model.transaction.ByteString
 
 object ByteStringDeserializer extends StdDeserializer[ByteString] {
   override def deserialize(p: JsonParser, ctxt: DeserializationContext): ByteString = {

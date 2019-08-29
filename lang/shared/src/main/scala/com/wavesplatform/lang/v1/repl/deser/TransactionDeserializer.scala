@@ -6,14 +6,30 @@ import com.fasterxml.jackson.databind.node.{NullNode, ObjectNode}
 import com.fasterxml.jackson.databind.{DeserializationContext, ObjectMapper}
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.wavesplatform.lang.v1.repl.model.Transaction
-import com.wavesplatform.lang.v1.repl.model.transactions._
+import com.wavesplatform.lang.v1.repl.model.transaction._
 
 case class TransactionDeserializer(
   objectMapper: ObjectMapper with ScalaObjectMapper,
   chainIdP: Byte
-) extends StdDeserializer[Transaction] {
-  override def deserialize(jsonParser: JsonParser, deserializationContext: DeserializationContext): Transaction = {
+) extends StdDeserializer(classOf[Option[Transaction]]) {
+  val notExistCode = 311
+
+  override def deserialize(jsonParser: JsonParser, deserializationContext: DeserializationContext): Option[Transaction] = {
     val treeNode: TreeNode = jsonParser.getCodec.readTree(jsonParser)
+    val errorField = treeNode.get("error")
+    if (errorField == null)
+      Some(deserializeTx(treeNode))
+    else {
+      val code = objectMapper.treeToValue[Int](errorField)
+      if (code == notExistCode) None
+      else {
+        val message = objectMapper.treeToValue[String](treeNode.get("message"))
+        throw new RuntimeException(s"Error when deserializing tx: code=$code, $message")
+      }
+    }
+  }
+
+  private def deserializeTx(treeNode: TreeNode): Transaction = {
     val `type`   = objectMapper.treeToValue[Int](treeNode.get("type"))
     val version  = objectMapper.treeToValue[Int](treeNode.get("version"))
 
