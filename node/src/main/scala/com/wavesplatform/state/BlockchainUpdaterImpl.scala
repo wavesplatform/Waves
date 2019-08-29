@@ -565,11 +565,16 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
-  override def accountDataKeys(address: Address): Seq[String] = {
+  override def accountDataKeys(address: Address): Set[String] = {
     ngState.fold(blockchain.accountDataKeys(address)) { ng =>
       val fromInner = blockchain.accountDataKeys(address)
-      val fromDiff  = ng.bestLiquidDiff.accountData.get(address).toVector.flatMap(_.data.keys)
-      (fromInner ++ fromDiff).distinct
+      val fromDiff  = ng.bestLiquidDiff
+        .accountData
+        .getOrElse(address, AccountDataInfo.accountDataInfoMonoid.empty)
+        .data
+        .keySet
+
+      (fromInner ++ fromDiff)
     }
   }
 
@@ -657,7 +662,10 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
   }
 }
 
-object BlockchainUpdaterImpl extends ScorexLogging with AddressTransactions.Prov[BlockchainUpdaterImpl] with Distributions.Prov[BlockchainUpdaterImpl] {
+object BlockchainUpdaterImpl
+    extends ScorexLogging
+    with AddressTransactions.Prov[BlockchainUpdaterImpl]
+    with Distributions.Prov[BlockchainUpdaterImpl] {
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
