@@ -171,10 +171,10 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
     }
   }
 
-  override def accountDataKeys(acc: Address): Seq[String] = {
+  override def accountDataKeys(acc: Address): Set[String] = {
     val fromInner = inner.accountDataKeys(acc)
     val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    (fromInner ++ fromDiff).distinct
+    (fromInner ++ fromDiff)
   }
 
   override def accountData(acc: Address): AccountDataInfo = {

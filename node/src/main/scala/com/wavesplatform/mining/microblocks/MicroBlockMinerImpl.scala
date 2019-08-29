@@ -147,6 +147,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
             signedBlock.signerData.signature
           )
           .leftMap(MicroBlockBuildError)
+        _ = BlockStats.mined(microBlock)
       } yield (signedBlock, microBlock)
     }
 }
