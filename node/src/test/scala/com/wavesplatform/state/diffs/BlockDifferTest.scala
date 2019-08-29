@@ -117,18 +117,18 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       |3  |10   |0       |A       |10         |+10        |0          |0          |
       |4  |10   |0       |B       |0          |10         |+10        |10+10=20   |
       |---------------------- Enable NG and BlockReward --------------------------|
-      |5  |10   |0       |A       |4          |10+4=14    |0          |20         |
-      |6  |10   |6       |B       |0          |14         |+4+6+6=10  |20+16=36   |
-      |7  |10   |6       |A       |4+6+6=16   |14+16=30   |0          |36         |
-      |8  |10   |6       |B       |0          |30         |+4+6+6=16  |36+16=52   |
-      |9  |10   |6       |A       |4+6+6=16   |30+16=46   |0          |52         | <- 1st check
-      |10 |10   |6       |B       |0          |46         |+4+6+6=16  |52+16=68   | <- 2nd check
+      |5  |10   |6       |A       |4+6        |10+10=20   |0          |20         |
+      |6  |10   |6       |B       |0          |20         |+4+6+6=10  |20+16=36   |
+      |7  |10   |6       |A       |4+6+6=16   |20+16=36   |0          |36         |
+      |8  |10   |6       |B       |0          |36         |+4+6+6=16  |36+16=52   |
+      |9  |10   |6       |A       |4+6+6=16   |36+16=52   |0          |52         | <- 1st check
+      |10 |10   |6       |B       |0          |52         |+4+6+6=16  |52+16=68   | <- 2nd check
        */
       "height > BlockReward activation - a miner should receive 60% of previous block's fee and 40% of the current one + reward" in {
         val rewardSettings = BlockRewardSettings(0, 8, 6, 25000, 10, 10, 2)
         assertDiff(testChain.init, 4, rewardSettings) {
           case (_, s) =>
-            s.balance(signerA) shouldBe 46
+            s.balance(signerA) shouldBe 52
         }
 
         assertDiff(testChain, 4, rewardSettings) {
