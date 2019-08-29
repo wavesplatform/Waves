@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model
 
-import com.wavesplatform.lang.v1.repl.model.transactions.{ByteString, Signable}
+import com.wavesplatform.lang.v1.repl.model.transactions.ByteString
 
 trait Order extends Signable {
   def matcherPublicKey: Account

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transactions
 
-import com.wavesplatform.lang.v1.repl.model.{Order, WithId}
+import com.wavesplatform.lang.v1.repl.model.{Order, Signable, Transaction, WithId}
 
 object ExchangeTransaction {
   val EXCHANGE = 7

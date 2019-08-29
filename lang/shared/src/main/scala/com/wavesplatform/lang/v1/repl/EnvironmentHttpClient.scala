@@ -1,18 +1,26 @@
 package com.wavesplatform.lang.v1.repl
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.repl.deser.{ByteStringDeserializer, TransactionDeserializer}
+import com.wavesplatform.lang.v1.repl.model.Transaction
+import com.wavesplatform.lang.v1.repl.model.transactions.ByteString
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 case class EnvironmentHttpClient(settings: NodeConnectionSettings) extends Environment {
   private val mapper = new ObjectMapper() with ScalaObjectMapper
   mapper
     .registerModule(DefaultScalaModule)
+    .registerModule(new SimpleModule()
+      .addDeserializer(classOf[Transaction], TransactionDeserializer(mapper, settings.networkByte))
+      .addDeserializer(classOf[ByteString], ByteStringDeserializer)
+    )
 
   val url = settings.url
 

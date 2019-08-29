@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transactions
 
-import com.wavesplatform.lang.v1.repl.model.{Account, WithId, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.{Account, Transaction, WithId, WithProofs}
 
 object DataTransaction {
   val DATA        = 12

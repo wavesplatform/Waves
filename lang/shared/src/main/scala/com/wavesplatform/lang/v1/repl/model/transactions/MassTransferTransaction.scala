@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transactions
 
-import com.wavesplatform.lang.v1.repl.model.{Account, Transfer, WithId, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.{Account, Transaction, Transfer, WithId, WithProofs}
 
 object MassTransferTransaction {
   val MASS_TRANSFER = 11
@@ -17,5 +17,6 @@ case class MassTransferTransaction(
   proofs: List[ByteString],
   senderPublicKey: Account,
   transfers: List[Transfer],
-  attachment: ByteString
+  attachment: ByteString,
+  assetId: String
 ) extends Transaction with WithProofs with WithId

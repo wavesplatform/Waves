@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.repl.model.transactions
+package com.wavesplatform.lang.v1.repl.model
 
 object Transaction {
   val V1 = 1

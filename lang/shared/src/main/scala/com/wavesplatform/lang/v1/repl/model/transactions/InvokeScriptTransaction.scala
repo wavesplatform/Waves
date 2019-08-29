@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transactions
 
-import com.wavesplatform.lang.v1.repl.model.{Account, FunctionCall, WithId, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.{Account, FunctionCall, Transaction, WithId, WithProofs}
 
 case class InvokeScriptTransaction(
     id: ByteString,
@@ -14,3 +14,7 @@ case class InvokeScriptTransaction(
     dApp: String,
     call: FunctionCall
 ) extends Transaction with WithProofs with WithId
+
+object InvokeScriptTransaction {
+  val CONTRACT_INVOKE = 16
+}
