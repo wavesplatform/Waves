@@ -10,7 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
-// TODO: Add reward to proto
+// TODO: NODE-1860: Add reward to proto
 object PBBlocks {
   def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
     def create(version: Int,
@@ -35,7 +35,6 @@ object PBBlocks {
         NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
         transactions,
         header.featureVotes.map(intToShort).toSet,
-//        intToByte(header.rewardVote),
         PublicKey(header.generator.toByteArray),
         ByteStr(block.signature.toByteArray)
       )
@@ -88,9 +87,4 @@ object PBBlocks {
     require(int >= 0 && int <= 65535, s"Short overflow: $int")
     int.toShort
   }
-
-//  private[this] def intToByte(int: Int): Byte = {
-//    require(int >= Byte.MinValue && int <= Byte.MaxValue, s"Byte overflow: $int")
-//    int.toByte
-//  }
 }

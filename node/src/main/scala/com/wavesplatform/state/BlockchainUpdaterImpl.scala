@@ -338,15 +338,13 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
-  override def blockReward: Long = blockchain.blockReward
+  override def blockReward(height: Int): Option[Long] = blockchain.blockReward(height)
 
-  override def blockRewardVotes(height: Int): Map[Byte, Int] = readLock {
+  override def blockRewardVotes(height: Int): Seq[Long] = readLock {
     val innerVotes = blockchain.blockRewardVotes(height)
     ngState match {
-      case Some(ng) if this.height <= height =>
-        val ngVote = ng.base.rewardVote
-        innerVotes + (ngVote -> (innerVotes.getOrElse(ngVote, 0) + 1))
-      case None => innerVotes
+      case Some(ng) if this.height <= height => innerVotes :+ ng.base.rewardVote
+      case None                              => innerVotes
     }
   }
 

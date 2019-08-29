@@ -106,6 +106,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           .explicitGet()
       }
     )
+
     withEnv(bps, txs) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
@@ -201,8 +202,7 @@ object MiningWithRewardSuite {
       override val dbSettings: DBSettings
   ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
     def saveReward(newReward: Long): Unit = {
-      blockRewardCache = Some(newReward)
-      db.put(Keys.blockReward.keyBytes, Keys.blockReward.encode(blockRewardCache))
+      db.put(Keys.blockReward(1).keyBytes, Keys.blockReward(0).encode(Some(newReward)))
     }
   }
 

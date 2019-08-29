@@ -13,7 +13,7 @@ object TestFunctionalitySettings {
       BlockchainFeatures.Ride4DApps.id    -> 0
     ),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-    blockRewardSettings = BlockRewardSettings(0, 0, 0, 1, 1, 1, 1),
+    blockRewardSettings = BlockRewardSettings(0, 0, 1, 1, 1),
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

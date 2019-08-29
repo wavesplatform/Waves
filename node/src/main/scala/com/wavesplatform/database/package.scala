@@ -287,7 +287,7 @@ package object database extends ScorexLogging {
     bh.featureVotes.foreach(s => ndo.writeShort(s))
 
     if (bh.version > 3)
-      ndo.writeByte(bh.rewardVote)
+      ndo.writeLong(bh.rewardVote)
 
     ndo.write(bh.signerData.generator)
     ndo.writeByteStr(bh.signerData.signature)
@@ -312,7 +312,7 @@ package object database extends ScorexLogging {
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
 
-    val rewardVote        = if (version > 3) ndi.readByte() else 0.toByte
+    val rewardVote        = if (version > 3) ndi.readLong() else 0L
 
     val generator         = ndi.readPublicKey
     val signature         = ndi.readSignature
@@ -325,6 +325,9 @@ package object database extends ScorexLogging {
                                  transactionCount,
                                  featureVotes,
                                  rewardVote)
+
+    log.error(s"HEY, rewardVote = $rewardVote")
+    log.error(s"HEY, header = $header")
 
     (header, size)
   }

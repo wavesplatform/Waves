@@ -10,53 +10,42 @@ import net.ceedubs.ficus.readers.ValueReader
 import scala.concurrent.duration._
 
 case class BlockRewardSettings(
-                                minReward: Long,
-                                maxReward: Long,
-                                firstReward: Long,
-                                rewardStep: Long,
-                                firstRewardPeriod: Int,
-                                rewardPeriod: Int,
-                                rewardVotingPeriod: Int
-                              ) {
+    minReward: Long,
+    firstReward: Long,
+    rewardStep: Long,
+    rewardPeriod: Int,
+    rewardVotingPeriod: Int
+) {
   require(minReward >= 0, "minReward must be greater than or equal to 0")
-  require(maxReward >= minReward, s"maxReward must be greater than or equal to minReward($minReward)")
-  require(firstReward >= minReward && firstReward <= maxReward, s"firstReward must be between minReward($minReward) and maxReward($maxReward)")
+  require(firstReward >= minReward, s"firstReward must be between minReward($minReward)")
   require(rewardStep > 0, "rewardStep must be greater than 0")
-  require(firstRewardPeriod > 0, "firstRewardPeriod must be greater than 0")
   require(rewardPeriod > 0, "rewardPeriod must be greater than 0")
   require(rewardVotingPeriod > 0, "rewardVotingPeriod must be greater than 0")
-  require(rewardVotingPeriod <= firstRewardPeriod, s"rewardVotingPeriod must be less than or equal to firstRewardPeriod($firstRewardPeriod)")
   require(rewardVotingPeriod <= rewardPeriod, s"rewardVotingPeriod must be less than or equal to rewardPeriod($rewardPeriod)")
 }
 
 object BlockRewardSettings {
   val MAINNET = apply(
     0,
-    8 * Constants.UnitsInWave,
     6 * Constants.UnitsInWave,
-    25000000,
-    250000,
-    150000,
+    50000000,
+    100000,
     10000
   )
 
   val TESTNET = apply(
     0,
-    8 * Constants.UnitsInWave,
     6 * Constants.UnitsInWave,
-    25000000,
-    250000,
-    150000,
+    50000000,
+    100000,
     10000
   )
 
   val STAGENET = apply(
     0,
-    8 * Constants.UnitsInWave,
     6 * Constants.UnitsInWave,
-    25000000,
-    250000,
-    150000,
+    50000000,
+    100000,
     10000
   )
 }

@@ -167,5 +167,7 @@ object Keys {
   def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
     Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 
-  val blockReward: Key[Option[Long]] = Key.opt("block-reward",  Array[Byte](0, 57), Longs.fromByteArray, Longs.toByteArray)
+  val BlockRewardPrefix: Short = 57
+  def blockReward(height: Int): Key[Option[Long]] =
+    Key.opt("block-reward", h(BlockRewardPrefix, height), Longs.fromByteArray, Longs.toByteArray)
 }

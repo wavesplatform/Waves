@@ -218,7 +218,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadBlockReward(): Option[Long] = readOnly(_.get(Keys.blockReward))
+  override def blockReward(height: Int): Option[Long] = readOnly(_.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
@@ -422,38 +422,42 @@ class LevelDBWriter(private[database] val writableDB: DB,
       }
     }
 
+    // saving reward for the next block generation
     loadActivatedFeatures()
       .get(BlockchainFeatures.BlockReward.id)
       .flatMap { activatedAt =>
         import settings.functionalitySettings.blockRewardSettings._
 
-        val mayBeTimeToVote = height - (activatedAt + firstRewardPeriod)
+        val mayBeReward     = rw.get(Keys.blockReward(height))
+        val mayBeTimeToVote = height - activatedAt
 
-        activatedAt match {
-          case activatedAt if activatedAt + firstRewardPeriod == height =>
-            Some((blockRewardVotes(height), firstReward))
-          case activatedAt if height > activatedAt && mayBeTimeToVote > 0 && mayBeTimeToVote % rewardPeriod == 0 =>
-            Some((blockRewardVotes(height), loadBlockReward().getOrElse(firstReward)))
-          case _ => None
+        mayBeReward match {
+          case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % rewardPeriod == 0 =>
+            val votes       = blockRewardVotes(height - 1)
+            val currentVote = block.rewardVote
+            Some((votes :+ currentVote , reward))
+          case None if mayBeTimeToVote == 0 =>
+            rw.put(Keys.blockReward(height + 1), Some(firstReward))
+            None
+          case r @ Some(_) if mayBeTimeToVote > 0 =>
+            rw.put(Keys.blockReward(height + 1), r)
+            None
+          case None =>
+            None
         }
-      }
-      .map {
-        case (votes, currentReward) =>
-          import settings.functionalitySettings.blockRewardSettings._
-          if (minReward == maxReward) (votes.mapValues(_ => 0), currentReward)
-          else if (currentReward <= minReward) (votes.mapValues(v => if (v < 0) 0 else v), currentReward)
-          else if (currentReward >= maxReward) (votes.mapValues(v => if (v > 0) 0 else v), currentReward)
-          else (votes, currentReward)
       }
       .foreach {
         case (votes, currentReward) =>
           import settings.functionalitySettings.blockRewardSettings._
+          val lt = votes.count(_ < currentReward).toDouble / rewardVotingPeriod
+          val gt = votes.count(_ > currentReward).toDouble / rewardVotingPeriod
 
-          val coefficient = Math.round(votes.foldLeft(0.0) { case (r, (d, cnt)) => r + d * cnt } / rewardVotingPeriod)
-          val newReward   = Some(Math.min(Math.max(currentReward + rewardStep * coefficient, minReward), maxReward))
+          val newReward =
+            if (lt > 0.5) currentReward - rewardStep
+            else if (gt > 0.5) currentReward + rewardStep
+            else currentReward
 
-          blockRewardCache = newReward
-          rw.put(Keys.blockReward, newReward)
+          rw.put(Keys.blockReward(height + 1), Some(math.max(minReward, newReward)))
       }
 
     for ((asset, sp: SponsorshipValue) <- sponsorship) {
@@ -931,16 +935,13 @@ class LevelDBWriter(private[database] val writableDB: DB,
       .mapValues(_.size)
   }
 
-  override def blockRewardVotes(height: Int): Map[Byte, Int] = readOnly { db =>
-    Range(height - settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod, height)
+  override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
+    Range(height - settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod + 1, height)
       .map { h =>
-        db
-          .get(Keys.blockHeaderAndSizeAt(Height(h)))
+        db.get(Keys.blockHeaderAndSizeAt(Height(h)))
           .map(_._1.rewardVote)
-          .getOrElse(0.toByte)
+          .get
       }
-      .groupBy(identity)
-      .mapValues(_.size)
   }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =

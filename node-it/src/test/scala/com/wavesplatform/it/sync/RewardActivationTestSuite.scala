@@ -7,6 +7,7 @@ import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.settings.Constants
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 
 class RewardActivationTestSuite
@@ -32,54 +33,50 @@ class RewardActivationTestSuite
       }
     }
 
+    val firstVoteHeight = activationHeight + rewardPeriod
     nodes.waitForHeight(activationHeight + 1)
-    val statusInfo = nodes.map(_.rewardStatus)
+    val statusInfo = nodes.map(_.rewardStatus(activationHeight + 1))
     statusInfo.foreach { ri =>
       ri.value.reward should be(firstReward)
+      ri.value.periodStart should be(activationHeight + 1)
+      ri.value.periodEnd should be(firstVoteHeight)
+      ri.value.votingPeriodStart should be(firstVoteHeight - rewardVotingPeriod + 1)
       ri.value.isVotingPeriod should be(false)
     }
 
-    nodes.waitForHeight(activationHeight + firstRewardPeriod - rewardVotingPeriod)
-    val firstVotingPeriodStatusInfo = nodes.map(_.rewardStatus)
+    val firstVoteStartHeight = firstVoteHeight - rewardVotingPeriod + 1
+    nodes.waitForHeight(firstVoteStartHeight)
+    val firstVotingPeriodStatusInfo = nodes.map(_.rewardStatus(firstVoteStartHeight))
     firstVotingPeriodStatusInfo.foreach { ri =>
       ri.value.reward should be(firstReward)
+      ri.value.periodStart should be(activationHeight + 1)
+      ri.value.periodEnd should be(firstVoteHeight)
+      ri.value.votingPeriodStart should be(firstVoteHeight - rewardVotingPeriod + 1)
       ri.value.isVotingPeriod should be(true)
-      ri.value.blocksBeforeNextVote should be <= rewardVotingPeriod
     }
 
-    val firstVoteHeight = activationHeight + firstRewardPeriod
-
-    nodes.waitForHeight(firstVoteHeight + 1)
-
+    nodes.waitForHeight(firstVoteHeight)
     nodes.foreach(_.blockSeq(firstVoteHeight - rewardVotingPeriod, firstVoteHeight).foreach { b =>
-      b.reward.value should be(rewardSupport)
+      b.reward.value should be((rewardSupport * Constants.UnitsInWave).toLong)
     })
 
-    val firstVoteStatusInfo = nodes.map(_.rewardStatus)
+    nodes.waitForHeight(firstVoteHeight + 1)
+    val firstVoteStatusInfo = nodes.map(_.rewardStatus(firstVoteHeight + 1))
     firstVoteStatusInfo.foreach { ri =>
-      ri.value.reward should be(firstReward + rewardStep * rewardSupport)
-    }
-
-    nodes.waitForHeight(firstVoteHeight + rewardPeriod + 1)
-    val nextVoteStatusInfo = nodes.map(_.rewardStatus)
-    nextVoteStatusInfo.foreach { ri =>
-      ri.value.reward should be(firstReward + rewardStep * (rewardSupport + 1))
-    }
-
-    nodes.waitForHeight(firstVoteHeight + rewardPeriod * 2 + 1)
-    val lastVoteStatusInfo = nodes.map(_.rewardStatus)
-    lastVoteStatusInfo.foreach { ri =>
-      ri.value.reward should be(firstReward + rewardStep * (rewardSupport + 1))
+      ri.value.reward should be(firstReward + rewardStep)
+      ri.value.periodStart should be(firstVoteHeight + 1)
+      ri.value.periodEnd should be(firstVoteHeight + rewardPeriod)
+      ri.value.votingPeriodStart should be(firstVoteHeight + rewardPeriod - rewardVotingPeriod + 1)
+      ri.value.isVotingPeriod should be(false)
     }
   }
 }
 
 object RewardActivationTestSuite {
   private val activationHeight   = 4
-  private val rewardSupport      = 3.toByte
-  private val rewardStep         = 25000000
+  private val rewardSupport      = 6.5
+  private val rewardStep         = 50000000
   private val firstReward        = 600000000
-  private val firstRewardPeriod  = 10
   private val rewardPeriod       = 8
   private val rewardVotingPeriod = 4
 
@@ -91,10 +88,8 @@ object RewardActivationTestSuite {
        |    }
        |    block-reward-settings {
        |      min-reward = 0
-       |      max-reward = ${firstReward + rewardStep * 4}
        |      first-reward = $firstReward
        |      reward-step = $rewardStep
-       |      first-reward-period = $firstRewardPeriod
        |      reward-period = $rewardPeriod
        |      reward-voting-period = $rewardVotingPeriod
        |    }

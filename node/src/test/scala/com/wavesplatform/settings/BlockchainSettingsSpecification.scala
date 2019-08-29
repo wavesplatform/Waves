@@ -30,11 +30,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        max-transaction-time-forward-offset = 12d
         |        block-reward-settings {
         |           min-reward = 0
-        |           max-reward = 800000000
         |           first-reward = 600000000
-        |           reward-step = 25000000
-        |           first-reward-period = 250000
-        |           reward-period = 150000
+        |           reward-step = 50000000
+        |           reward-period = 100000
         |           reward-voting-period = 10000
         |        }
         |      }
@@ -66,11 +64,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(55.seconds)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(12.days)
     settings.functionalitySettings.blockRewardSettings.minReward should be(0)
-    settings.functionalitySettings.blockRewardSettings.maxReward should be(800000000)
     settings.functionalitySettings.blockRewardSettings.firstReward should be(600000000)
-    settings.functionalitySettings.blockRewardSettings.rewardStep should be(25000000)
-    settings.functionalitySettings.blockRewardSettings.firstRewardPeriod should be(250000)
-    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(150000)
+    settings.functionalitySettings.blockRewardSettings.rewardStep should be(50000000)
+    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(100000)
     settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
@@ -100,11 +96,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
     settings.functionalitySettings.blockRewardSettings.minReward should be(0)
-    settings.functionalitySettings.blockRewardSettings.maxReward should be(800000000)
     settings.functionalitySettings.blockRewardSettings.firstReward should be(600000000)
-    settings.functionalitySettings.blockRewardSettings.rewardStep should be(25000000)
-    settings.functionalitySettings.blockRewardSettings.firstRewardPeriod should be(250000)
-    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(150000)
+    settings.functionalitySettings.blockRewardSettings.rewardStep should be(50000000)
+    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(100000)
     settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1478000000000L)
@@ -140,11 +134,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
     settings.functionalitySettings.blockRewardSettings.minReward should be(0)
-    settings.functionalitySettings.blockRewardSettings.maxReward should be(800000000)
     settings.functionalitySettings.blockRewardSettings.firstReward should be(600000000)
-    settings.functionalitySettings.blockRewardSettings.rewardStep should be(25000000)
-    settings.functionalitySettings.blockRewardSettings.firstRewardPeriod should be(250000)
-    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(150000)
+    settings.functionalitySettings.blockRewardSettings.rewardStep should be(50000000)
+    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(100000)
     settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)

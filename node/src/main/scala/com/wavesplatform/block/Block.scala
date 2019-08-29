@@ -30,7 +30,7 @@ class BlockHeader(val timestamp: Long,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
                   val featureVotes: Set[Short],
-                  val rewardVote: Byte) {
+                  val rewardVote: Long) {
   protected val versionField: ByteBlockField               = ByteBlockField("version", version)
   protected val timestampField: LongBlockField             = LongBlockField("timestamp", timestamp)
   protected val referenceField: BlockIdField               = BlockIdField("reference", reference.arr)
@@ -96,11 +96,11 @@ object BlockHeader extends ScorexLogging {
         supportedFeaturesIds = arr.toSet
       }
 
-      var rewardVote = 0.toByte
+      var rewardVote = 0.toLong
 
       if (version >= Block.RewardBlockVersion) {
-        rewardVote = bytes(position)
-        position += 1
+        rewardVote = Longs.fromByteArray(bytes.slice(position, position + 8))
+        position += 8
       }
 
       val genPK = bytes.slice(position, position + KeyLength)
@@ -134,7 +134,7 @@ case class Block private[block] (override val timestamp: Long,
                                  override val consensusData: NxtLikeConsensusBlockData,
                                  transactionData: Seq[Transaction],
                                  override val featureVotes: Set[Short],
-                                 override val rewardVote: Byte)
+                                 override val rewardVote: Long)
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
     with Signed {
 
@@ -217,7 +217,6 @@ object Block extends ScorexLogging {
   val MaxFeaturesInBlock: Int              = 64
   val BaseTargetLength: Int                = 8
   val GeneratorSignatureLength: Int        = 32
-  val AllowedRewardVotes: Set[Byte]        = (-4 to 4).map(_.toByte).toSet
 
   val BlockIdLength: Int = SignatureLength
 
@@ -289,14 +288,14 @@ object Block extends ScorexLogging {
             transactionData: Seq[Transaction],
             signerData: SignerData,
             featureVotes: Set[Short],
-            rewardVote: Byte): Either[GenericError, Block] = {
+            rewardVote: Long): Either[GenericError, Block] = {
     (for {
       _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
       _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
       _ <- Either.cond(signerData.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-      _ <- Either.cond(AllowedRewardVotes.contains(rewardVote), (), s"Block could not contain other than $AllowedRewardVotes reward vote")
+      _ <- Either.cond(rewardVote >= 0, (), s"Block could not contain negative reward vote")
     } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes, rewardVote)).left.map(GenericError(_))
   }
 
@@ -307,7 +306,7 @@ object Block extends ScorexLogging {
                    transactionData: Seq[Transaction],
                    signer: KeyPair,
                    featureVotes: Set[Short],
-                   rewardVote: Byte): Either[GenericError, Block] =
+                   rewardVote: Long): Either[GenericError, Block] =
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes, rewardVote).right.map(unsigned =>
       unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
@@ -362,7 +361,7 @@ object Block extends ScorexLogging {
         consensusData = consensusGenesisData,
         transactionData = transactionGenesisData,
         featureVotes = Set.empty,
-        rewardVote = 0
+        rewardVote = 0L
       )
   }
 

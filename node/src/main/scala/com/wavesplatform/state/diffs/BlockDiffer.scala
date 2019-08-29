@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import cats.kernel.Monoid
 import cats.syntax.either.catsSyntaxEitherId
-import cats.syntax.option.catsSyntaxOptionId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -41,24 +40,26 @@ object BlockDiffer extends ScorexLogging {
     val rewardHeight      = blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id).getOrElse(Int.MaxValue)
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    lazy val minerRewardDistr: Option[Portfolio] =
+    val minerRewardDistr: Portfolio =
       if (stateHeight < rewardHeight)
-        None
+        Portfolio.empty
       else
-        Portfolio.build(Asset.Waves, blockchain.blockReward).some
+        blockchain.blockReward(stateHeight).map(Portfolio.build(Asset.Waves, _)).getOrElse(Portfolio.empty)
 
-    lazy val prevBlockFeeDistr: Option[Portfolio] =
+    val prevBlockFeeDistr: Portfolio =
       if (stateHeight >= sponsorshipHeight)
-        Portfolio.empty.copy(balance = blockchain.carryFee).some |+| minerRewardDistr
+        Portfolio.empty.copy(balance = blockchain.carryFee)
       else if (stateHeight > ngHeight)
-        maybePrevBlock.map(_.prevBlockFeePart()) |+| minerRewardDistr
-      else minerRewardDistr
+        maybePrevBlock.map(_.prevBlockFeePart()).getOrElse(Portfolio.empty)
+      else Portfolio.empty
 
-    lazy val currentBlockFeeDistr: Option[Portfolio] =
+    val currentBlockFeeDistr: Portfolio =
       if (stateHeight < ngHeight)
-        block.feesPortfolio().some |+| minerRewardDistr
+        block.feesPortfolio()
       else
-        None
+        Portfolio.empty
+
+    val initDiff = Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerRewardDistr |+| currentBlockFeeDistr |+| prevBlockFeeDistr)))
 
     for {
       _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
@@ -66,8 +67,8 @@ object BlockDiffer extends ScorexLogging {
         CompositeBlockchain(blockchain, newBlock = Some(block)),
         constraint,
         maybePrevBlock.map(_.timestamp),
-        prevBlockFeeDistr,
-        currentBlockFeeDistr,
+        initDiff,
+        stateHeight >= ngHeight,
         block.transactionData,
         verify
       )
@@ -101,8 +102,8 @@ object BlockDiffer extends ScorexLogging {
         blockchain,
         constraint,
         prevBlockTimestamp,
-        None,
-        None,
+        Diff.empty,
+        true,
         micro.transactionData,
         verify
       )
@@ -112,8 +113,8 @@ object BlockDiffer extends ScorexLogging {
   private[this] def apply[Constraint <: MiningConstraint](blockchain: Blockchain,
                                                           initConstraint: Constraint,
                                                           prevBlockTimestamp: Option[Long],
-                                                          prevBlockFeeDistr: Option[Portfolio],
-                                                          currentBlockFeeDistr: Option[Portfolio],
+                                                          initDiff: Diff,
+                                                          hasNg: Boolean,
                                                           txs: Seq[Transaction],
                                                           verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
@@ -125,8 +126,6 @@ object BlockDiffer extends ScorexLogging {
     val blockGenerator     = lastBlock.sender.toAddress
 
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
-    val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
-    val hasNg          = currentBlockFeeDistr.isEmpty
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     def clearSponsorship(blockchain: Blockchain, portfolio: Portfolio): (Portfolio, Long) = {

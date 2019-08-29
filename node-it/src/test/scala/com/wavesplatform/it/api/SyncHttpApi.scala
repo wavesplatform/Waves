@@ -91,8 +91,8 @@ object SyncHttpApi extends Assertions {
     def activationStatus: ActivationStatus =
       sync(async(n).activationStatus)
 
-    def rewardStatus: Option[RewardStatus] =
-      sync(async(n).rewardStatus)
+    def rewardStatus(height: Int): Option[RewardStatus] =
+      sync(async(n).rewardStatus(height))
 
     def seed(address: String): String =
       sync(async(n).seed(address))
