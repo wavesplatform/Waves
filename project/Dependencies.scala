@@ -104,7 +104,8 @@ object Dependencies {
     ) ++ protobuf.value
   )
 
-  lazy val itTest = scalaTest +: Seq(
+  lazy val it = scalaTest +: Seq(
+    logback,
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
     jacksonModule("dataformat", "dataformat-properties"),
@@ -113,7 +114,7 @@ object Dependencies {
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
-    logback.exclude("org.scala-js", "scalajs-library_2.12"),
+    logback,
     "org.scalacheck" %% "scalacheck" % "1.14.0",
     ("io.github.amrhassan" %% "scalacheck-cats" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
     "org.mockito"   % "mockito-all"                  % "1.10.19",
