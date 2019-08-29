@@ -6,6 +6,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
@@ -36,7 +37,7 @@ object Preconditions {
                                   issuedAssets: List[IssueTransaction] = Nil,
                                   leases: List[LeaseTransaction] = Nil)
 
-  def mk(settings: PGenSettings, time: Time): (UniverseHolder, List[Transaction]) = {
+  def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction]) = {
     settings.actions
       .sortBy(_.priority)(Ordering[Int].reverse)
       .foldLeft((UniverseHolder(), List.empty[Transaction])) {
@@ -51,7 +52,7 @@ object Preconditions {
             case IssueP(assetName, issuer, assetDescription, amount, decimals, reissueable, scriptFile) =>
               val script = Option(scriptFile)
                 .filter(_.nonEmpty)
-                .map(file => ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(file)))))
+                .map(file => ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(file))), estimator))
                 .flatMap(_.toOption)
                 .map(_._1)
 
@@ -78,7 +79,7 @@ object Preconditions {
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
-                val Right((script, _)) = ScriptCompiler.compile(scriptText)
+                val Right((script, _)) = ScriptCompiler.compile(scriptText, estimator)
                 val Right(tx)          = SetScriptTransaction.selfSigned(acc, Some(script), Fee, time.correctedTime())
                 (script, tx)
               }

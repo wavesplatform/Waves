@@ -7,6 +7,7 @@ import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
@@ -22,7 +23,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender
       .transfer(
         sender.address,
-        recipient = contract.address,
+        recipient = contract.stringRepr,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -35,7 +36,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender
       .transfer(
         sender.address,
-        recipient = contract.address,
+        recipient = contract.stringRepr,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -67,10 +68,10 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         |
         """.stripMargin
-    val script = ScriptCompiler.compile(scriptText).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(contract.address, Some(script), setScriptFee, waitForTx = true).id
+    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val setScriptId = sender.setScript(contract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(contract.address)
+    val acc0ScriptInfo = sender.addressScriptInfo(contract.stringRepr)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
@@ -83,8 +84,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     val arg               = ByteStr(Array(42: Byte))
 
     val _ = sender.invokeScript(
-      caller.address,
-      contract.address,
+      caller.stringRepr,
+      contract.stringRepr,
       func = Some("foo"),
       args = List(CONST_BYTESTR(arg).explicitGet()),
       payment = Seq(),
@@ -92,23 +93,23 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       waitForTx = true
     )
 
-    sender.getDataByKey(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
-    sender.getDataByKey(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+    sender.getDataByKey(contract.stringRepr, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getDataByKey(contract.stringRepr, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
   }
 
   test("contract caller invokes a default function on a contract") {
 
 
     val _ = sender.invokeScript(
-      caller.address,
-      contract.address,
+      caller.stringRepr,
+      contract.stringRepr,
       func = None,
       payment = Seq(),
       fee = 1.waves,
       waitForTx = true
     )
-    sender.getDataByKey(contract.address, "a") shouldBe StringDataEntry("a", "b")
-    sender.getDataByKey(contract.address, "sender") shouldBe StringDataEntry("sender", "senderId")
+    sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "b")
+    sender.getDataByKey(contract.stringRepr, "sender") shouldBe StringDataEntry("sender", "senderId")
   }
 
   test("verifier works") {
@@ -130,6 +131,6 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-    sender.getDataByKey(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
+    sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "OOO")
   }
 }

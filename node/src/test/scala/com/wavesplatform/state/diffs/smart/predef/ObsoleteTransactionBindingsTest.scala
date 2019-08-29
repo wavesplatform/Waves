@@ -30,7 +30,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |     let genTimestamp = gen.timestamp== ${g.timestamp}
       |     let genVersion = gen.version == 1
       |     let genAmount = gen.amount == ${g.amount}
-      |     let genRecipient = gen.recipient == Address(base58'${g.recipient.address}')
+      |     let genRecipient = gen.recipient == Address(base58'${g.recipient.stringRepr}')
       |     genId && genFee && genTimestamp && genVersion && genAmount && genRecipient
       |    case _ => false
       |  }
@@ -42,7 +42,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |     let payTimestamp = pay.timestamp== ${p.timestamp}
       |     let payVersion = pay.version == 1
       |     let payAmount = pay.amount == ${p.amount}
-      |     let payRecipient = pay.recipient == Address(base58'${p.recipient.address}')
+      |     let payRecipient = pay.recipient == Address(base58'${p.recipient.stringRepr}')
       |
       |     let bodyBytes = pay.bodyBytes == base64'${ByteStr(p.bodyBytes.apply()).base64}'
       |     let sender = pay.sender == addressFromPublicKey(base58'${ByteStr(p.sender).base58}')

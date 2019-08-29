@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.{cryptoContextScript, pureContextScript, wavesContextScript, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.DataTransaction
@@ -16,6 +17,8 @@ import org.scalatest.CancelAfterFailure
 import scorex.crypto.encode.Base64
 
 class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
+  private val estimator = ScriptEstimatorV2
+
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -46,7 +49,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
            |case s : SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${ByteStr(acc2.publicKey).base58}')
            |case _ => false}""".stripMargin,
-        isAssetScript = true
+        isAssetScript = true,
+        estimator
       ).explicitGet()._1.bytes.value.base64)
 
     val sAsset = sender
@@ -73,7 +77,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
            |case s : SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${ByteStr(acc1.publicKey).base58}')
            |case _ => false}""".stripMargin,
-        isAssetScript = true
+        isAssetScript = true,
+        estimator
       ).explicitGet()._1.bytes.value.base64)
 
     sender.setAssetScript(sAsset, firstAddress, setAssetScriptFee, sUpdated, waitForTx = true)
@@ -106,7 +111,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
                                         |case s : SetAssetScriptTransaction => true
                                         |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
                                         |case _ => false}""".stripMargin,
-        isAssetScript = true
+        isAssetScript = true,
+        estimator
       ).explicitGet()._1.bytes.value.base64)
 
     sender.setAssetScript(assetA, firstAddress, setAssetScriptFee, script, waitForTx = true)
@@ -147,9 +153,9 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("use all functions from RIDE for asset script") {
-    val script1 = Some(ScriptCompiler(cryptoContextScript(false), isAssetScript = true).explicitGet()._1.bytes.value.base64)
-    val script2 = Some(ScriptCompiler(pureContextScript(dtx, false), isAssetScript = true).explicitGet()._1.bytes.value.base64)
-    val script3 = Some(ScriptCompiler(wavesContextScript(dtx, false), isAssetScript = true).explicitGet()._1.bytes.value.base64)
+    val script1 = Some(ScriptCompiler(cryptoContextScript(false), isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64)
+    val script2 = Some(ScriptCompiler(pureContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64)
+    val script3 = Some(ScriptCompiler(wavesContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64)
 
     List(script1, script2, script3)
       .map { i =>

@@ -94,7 +94,7 @@ package object smartcontract {
        |     }
        |
        |     let aFromPK = addressFromPublicKey(ext.senderPublicKey) == ext.sender
-       |     let aFromStr = addressFromString("${dtx.sender.address}") == Address(base58'${dtx.sender.bytes.base58}')
+       |     let aFromStr = addressFromString("${dtx.sender.stringRepr}") == Address(base58'${dtx.sender.bytes.base58}')
        |
        |     #case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'')
        |

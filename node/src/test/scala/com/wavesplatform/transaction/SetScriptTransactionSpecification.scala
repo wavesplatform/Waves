@@ -16,7 +16,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
   }
 
   def assertTxs(first: SetScriptTransaction, second: SetScriptTransaction): Unit = {
-    first.sender.address shouldEqual second.sender.address
+    first.sender.stringRepr shouldEqual second.sender.stringRepr
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.version shouldEqual second.version

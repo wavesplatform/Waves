@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -78,7 +79,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     nodes.waitForHeightAriseAndTxPresent(dtx1_id)
 
-    val script = ScriptCompiler(scriptSrc, isAssetScript = false).explicitGet()._1
+    val script = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(smart, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()

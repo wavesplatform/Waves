@@ -3,6 +3,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -25,18 +26,16 @@ private[protobuf] object PBInternalImplicits {
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {
     case (IssuedAsset(assetId), amount) =>
       Amount()
-        .withAssetId(AssetId().withIssuedAsset(assetId))
+        .withAssetId(assetId)
         .withAmount(amount)
 
     case (Waves, amount) =>
-      Amount()
-        .withAssetId(AssetId().withWaves(com.google.protobuf.empty.Empty()))
-        .withAmount(amount)
+      Amount().withAmount(amount)
   }
 
   implicit class AmountImplicitConversions(a: Amount) {
-    def longAmount: Long = a.amount
-    def vanillaAssetId: Asset = PBAmounts.toVanillaAssetId(a.getAssetId)
+    def longAmount: Long      = a.amount
+    def vanillaAssetId: Asset = PBAmounts.toVanillaAssetId(a.assetId)
   }
 
   implicit class PBByteStringOps(bs: PBByteString) {

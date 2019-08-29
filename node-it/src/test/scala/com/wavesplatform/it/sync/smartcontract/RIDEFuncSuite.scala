@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -15,6 +16,8 @@ import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.CancelAfterFailure
 
 class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
+  private val estimator = ScriptEstimatorV2
+
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -25,13 +28,13 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("assetBalance() verification") {
     val asset = sender
-      .issue(acc0.address, "SomeCoin", "SomeDescription", someAssetAmount, 0, reissuable = false, issueFee, 2, waitForTx = true)
+      .issue(acc0.stringRepr, "SomeCoin", "SomeDescription", someAssetAmount, 0, reissuable = false, issueFee, 2, waitForTx = true)
       .id
 
     val newAddress   = sender.createAddress()
     val pkNewAddress = pkByAddress(newAddress)
 
-    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val scriptSrc =
       s"""
@@ -41,7 +44,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |}
       """.stripMargin
 
-    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false).explicitGet()._1
+    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, estimator).explicitGet()._1
 
     val tx =
       sender.signedBroadcast(
@@ -87,7 +90,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |}
       """.stripMargin
 
-    val updated = ScriptCompiler(udpatedScript, isAssetScript = false).explicitGet()._1
+    val updated = ScriptCompiler(udpatedScript, isAssetScript = false, estimator).explicitGet()._1
 
     val updTx =
       sender.signedBroadcast(
@@ -144,11 +147,11 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |  }
       """.stripMargin
 
-    val compiledScript = ScriptCompiler.compile(scriptText).explicitGet()._1
+    val compiledScript = ScriptCompiler.compile(scriptText, estimator).explicitGet()._1
 
     val newAddress   = sender.createAddress()
     val pkNewAddress = pkByAddress(newAddress)
-    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val scriptSet = SetScriptTransaction.selfSigned(
       pkNewAddress,
@@ -189,10 +192,10 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |    let checkHeightLast = lastBlock.height == height
          |    checkTs && checkHeight && checkHeightLast
          |  }
-      """.stripMargin).explicitGet()._1
+      """.stripMargin, estimator).explicitGet()._1
 
     val newAddress = sender.createAddress()
-    sender.transfer(acc0.address, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
     val setScript = sender.setScript(newAddress, Some(script.bytes().base64), setScriptFee)
     nodes.waitForHeightAriseAndTxPresent(setScript.id)
