@@ -295,7 +295,6 @@ object Block extends ScorexLogging {
       _ <- Either.cond(signerData.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-      _ <- Either.cond(rewardVote >= 0, (), s"Block could not contain negative reward vote")
     } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes, rewardVote)).left.map(GenericError(_))
   }
 
