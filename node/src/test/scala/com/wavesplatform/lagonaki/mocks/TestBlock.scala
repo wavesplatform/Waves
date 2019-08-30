@@ -55,7 +55,7 @@ object TestBlock {
              signer: KeyPair = defaultSigner,
              version: Byte = 2,
              features: Set[Short] = Set.empty[Short],
-             rewardVote: Byte = 0.toByte): Block =
+             rewardVote: Long = Long.MinValue): Block =
     sign(
       signer,
       Block(
@@ -80,7 +80,7 @@ object TestBlock {
             NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
             Seq.empty,
             Set.empty,
-            0.toByte)
+            Long.MinValue)
     )
 
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
@@ -93,6 +93,6 @@ object TestBlock {
             NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
             Seq.empty,
             features,
-            0.toByte)
+            Long.MinValue)
     )
 }

@@ -312,7 +312,7 @@ package object database extends ScorexLogging {
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
 
-    val rewardVote        = if (version > 3) ndi.readLong() else 0L
+    val rewardVote        = if (version > 3) ndi.readLong() else Long.MinValue
 
     val generator         = ndi.readPublicKey
     val signature         = ndi.readSignature

@@ -440,7 +440,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
           case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % rewardPeriod == 0 =>
             val votes       = blockRewardVotes(height - 1)
             val currentVote = block.rewardVote
-            Some(((votes :+ currentVote).filter(_ >= 0) , reward))
+            Some(((votes :+ currentVote).filter(_ >= minReward) , reward))
           case None if mayBeTimeToVote == 0 =>
             rw.put(Keys.blockReward(height + 1), Some(firstReward))
             None

@@ -96,7 +96,7 @@ object BlockHeader extends ScorexLogging {
         supportedFeaturesIds = arr.toSet
       }
 
-      var rewardVote = 0.toLong
+      var rewardVote = Long.MinValue
 
       if (version >= Block.RewardBlockVersion) {
         rewardVote = Longs.fromByteArray(bytes.slice(position, position + 8))
@@ -360,7 +360,7 @@ object Block extends ScorexLogging {
         consensusData = consensusGenesisData,
         transactionData = transactionGenesisData,
         featureVotes = Set.empty,
-        rewardVote = 0L
+        rewardVote = Long.MinValue
       )
   }
 

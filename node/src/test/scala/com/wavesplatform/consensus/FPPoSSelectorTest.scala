@@ -276,7 +276,7 @@ object FPPoSSelectorTest {
           Seq.empty,
           miner,
           Set.empty,
-          0.toByte
+          Long.MinValue
         )
         .explicitGet()
 

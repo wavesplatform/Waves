@@ -68,7 +68,7 @@ package object history {
         transactionData = txs,
         signer = signer,
         Set.empty,
-        0.toByte
+        Long.MinValue
       )
       .explicitGet()
 

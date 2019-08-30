@@ -108,7 +108,7 @@ object GenesisBlockGenerator extends App {
         transactionData = genesisTxs,
         signer = genesisSigner,
         featureVotes = Set.empty,
-        rewardVote = 0
+        rewardVote = Long.MinValue
       )
       .explicitGet()
   }
