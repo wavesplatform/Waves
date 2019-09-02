@@ -33,6 +33,10 @@ class RewardActivationTestSuite
       }
     }
 
+    nodes.map(_.wavesAmount(activationHeight)).foreach { amount =>
+      amount should be(BigInt(Constants.TotalWaves * Constants.UnitsInWave))
+    }
+
     val firstVoteHeight = activationHeight + rewardPeriod
     nodes.waitForHeight(activationHeight + 1)
     val statusInfo = nodes.map(_.rewardStatus(activationHeight + 1))
@@ -69,6 +73,10 @@ class RewardActivationTestSuite
       ri.value.votingPeriodStart should be(firstVoteHeight + rewardPeriod - rewardVotingPeriod + 1)
       ri.value.isVotingPeriod should be(false)
     }
+
+    nodes.map(_.wavesAmount(firstVoteHeight)).foreach { amount =>
+      amount should be(BigInt(Constants.TotalWaves * Constants.UnitsInWave + rewardPeriod * firstReward))
+    }
   }
 }
 
@@ -86,15 +94,14 @@ object RewardActivationTestSuite {
        |    pre-activated-features = {
        |      ${BlockchainFeatures.BlockReward.id} = $activationHeight
        |    }
-       |    block-reward-settings {
-       |      min-reward = 0
-       |      first-reward = $firstReward
-       |      reward-step = $rewardStep
-       |      reward-period = $rewardPeriod
-       |      reward-voting-period = $rewardVotingPeriod
-       |    }
        |  }
-       |  reward.supported = $rewardSupport
+       |  blockchain.custom.rewards {
+       |    term = $rewardPeriod
+       |    initial = $firstReward
+       |    min-increment = $rewardStep
+       |    voting-interval = $rewardVotingPeriod
+       |  }
+       |  rewards.target = $rewardSupport
        |  miner.quorum = 1
        |}""".stripMargin
   )

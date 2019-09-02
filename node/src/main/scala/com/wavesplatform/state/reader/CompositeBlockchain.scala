@@ -19,8 +19,13 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carry: Long = 0)
-    extends Blockchain {
+final case class CompositeBlockchain(
+    inner: Blockchain,
+    maybeDiff: Option[Diff] = None,
+    newBlock: Option[Block] = None,
+    carry: Long = 0,
+    reward: Option[Long] = None
+) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
@@ -232,9 +237,13 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
 
   /** Block reward related */
-  override def blockReward(height: Int): Option[Long] = inner.blockReward(height)
+  override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse inner.blockReward(height)
+
+  override def lastBlockReward: Option[Long] = reward.orElse(inner.lastBlockReward)
 
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
+
+  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {

@@ -47,7 +47,10 @@ trait Blockchain {
 
   /** Block reward related */
   def blockReward(height: Int): Option[Long]
+  def lastBlockReward: Option[Long]
   def blockRewardVotes(height: Int): Seq[Long]
+
+  def wavesAmount(height: Int): BigInt
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]

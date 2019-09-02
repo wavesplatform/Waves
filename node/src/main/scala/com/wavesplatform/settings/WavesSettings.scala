@@ -41,7 +41,7 @@ object WavesSettings extends CustomValueReaders {
     val synchronizationSettings   = waves.as[SynchronizationSettings]("synchronization")
     val utxSettings               = waves.as[UtxSettings]("utx")
     val featuresSettings          = waves.as[FeaturesSettings]("features")
-    val rewardSettings            = waves.as[RewardSettings]("reward")
+    val rewardsSettings           = waves.as[RewardSettings]("rewards")
     val metrics                   = rootConfig.as[Metrics.Settings]("metrics") // TODO: Move to waves section
 
     WavesSettings(
@@ -58,7 +58,7 @@ object WavesSettings extends CustomValueReaders {
       synchronizationSettings,
       utxSettings,
       featuresSettings,
-      rewardSettings,
+      rewardsSettings,
       metrics,
       rootConfig
     )

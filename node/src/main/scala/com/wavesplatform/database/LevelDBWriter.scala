@@ -14,7 +14,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
+import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -85,7 +85,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
   // Only for tests
   def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
-    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET), dbSettings)
+    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
@@ -223,6 +223,13 @@ class LevelDBWriter(private[database] val writableDB: DB,
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
+  override protected def loadLastBlockReward(): Option[Long] = blockReward(height)
+
+  override def wavesAmount(height: Int): BigInt = readOnly { db =>
+    if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
+    else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
+  }
+
   override def blockReward(height: Int): Option[Long] = readOnly(_.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
@@ -251,6 +258,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
                                   aliases: Map[Alias, BigInt],
                                   sponsorship: Map[IssuedAsset, Sponsorship],
                                   totalFee: Long,
+                                  reward: Option[Long],
                                   scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
@@ -427,43 +435,11 @@ class LevelDBWriter(private[database] val writableDB: DB,
       }
     }
 
-    // saving reward for the next block generation
-    loadActivatedFeatures()
-      .get(BlockchainFeatures.BlockReward.id)
-      .flatMap { activatedAt =>
-        import settings.functionalitySettings.blockRewardSettings._
-
-        val mayBeReward     = rw.get(Keys.blockReward(height))
-        val mayBeTimeToVote = height - activatedAt
-
-        mayBeReward match {
-          case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % rewardPeriod == 0 =>
-            val votes       = blockRewardVotes(height - 1)
-            val currentVote = block.rewardVote
-            Some(((votes :+ currentVote).filter(_ >= minReward) , reward))
-          case None if mayBeTimeToVote == 0 =>
-            rw.put(Keys.blockReward(height + 1), Some(firstReward))
-            None
-          case r @ Some(_) if mayBeTimeToVote > 0 =>
-            rw.put(Keys.blockReward(height + 1), r)
-            None
-          case None =>
-            None
-        }
-      }
-      .foreach {
-        case (votes, currentReward) =>
-          import settings.functionalitySettings.blockRewardSettings._
-          val lt = votes.count(_ < currentReward).toDouble / rewardVotingPeriod
-          val gt = votes.count(_ > currentReward).toDouble / rewardVotingPeriod
-
-          val newReward =
-            if (lt > 0.5) currentReward - rewardStep
-            else if (gt > 0.5) currentReward + rewardStep
-            else currentReward
-
-          rw.put(Keys.blockReward(height + 1), Some(math.max(minReward, newReward)))
-      }
+    lastBlockRewardCache = reward
+    reward.foreach { lastReward =>
+      rw.put(Keys.blockReward(height), Some(lastReward))
+      rw.put(Keys.wavesAmount(height), wavesAmount(height) + lastReward)
+    }
 
     for ((asset, sp: SponsorshipValue) <- sponsorship) {
       rw.put(Keys.sponsorship(asset)(height), sp)
@@ -947,7 +923,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
   }
 
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
-    Range(height - settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod + 1, height)
+    Range(height - settings.rewardsSettings.votingInterval + 1, height)
       .map { h =>
         db.get(Keys.blockHeaderAndSizeAt(Height(h)))
           .map(_._1.rewardVote)

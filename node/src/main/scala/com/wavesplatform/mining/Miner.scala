@@ -12,7 +12,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network._
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction._
@@ -172,12 +172,8 @@ class MinerImpl(allChannels: ChannelGroup,
   }
 
   private def blockRewardVote(version: Byte): Long =
-    if (version < RewardBlockVersion) Long.MinValue
-    else settings.rewardSettings.supported
-      .map(s => (Constants.UnitsInWave * s).toLong).collect{
-        case s if s % settings.blockchainSettings.functionalitySettings.blockRewardSettings.rewardStep == 0 => s
-      }
-      .getOrElse(Long.MinValue)
+    if (version < RewardBlockVersion) -1L
+    else settings.rewardSettings.target.getOrElse(-1L)
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)

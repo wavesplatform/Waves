@@ -19,8 +19,9 @@ object FeatureProvider {
       else BlockchainFeatureStatus.Undefined
 
     def currentBlockVersion: Byte =
-      if (provider.height <= provider.settings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion
-      else featureActivationHeight(BlockchainFeatures.BlockReward.id).map(_ => RewardBlockVersion).getOrElse(NgBlockVersion)
+      if (isFeatureActivated(BlockchainFeatures.BlockReward)) RewardBlockVersion
+      else if (isFeatureActivated(BlockchainFeatures.NG)) NgBlockVersion
+      else PlainBlockVersion
 
     def featureActivationHeight(feature: Short): Option[Int] = provider.activatedFeatures.get(feature)
     def featureApprovalHeight(feature: Short): Option[Int]   = provider.approvedFeatures.get(feature)

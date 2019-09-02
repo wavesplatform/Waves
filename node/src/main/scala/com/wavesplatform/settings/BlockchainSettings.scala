@@ -9,43 +9,38 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration._
 
-case class BlockRewardSettings(
-    minReward: Long,
-    firstReward: Long,
-    rewardStep: Long,
-    rewardPeriod: Int,
-    rewardVotingPeriod: Int
+case class RewardsSettings(
+    term: Int,
+    initial: Long,
+    minIncrement: Long,
+    votingInterval: Int
 ) {
-  require(minReward >= 0, "minReward must be greater than or equal to 0")
-  require(firstReward >= minReward, s"firstReward must be between minReward($minReward)")
-  require(rewardStep > 0, "rewardStep must be greater than 0")
-  require(rewardPeriod > 0, "rewardPeriod must be greater than 0")
-  require(rewardVotingPeriod > 0, "rewardVotingPeriod must be greater than 0")
-  require(rewardVotingPeriod <= rewardPeriod, s"rewardVotingPeriod must be less than or equal to rewardPeriod($rewardPeriod)")
+  require(initial >= 0, "initial must be greater than or equal to 0")
+  require(minIncrement > 0, "minIncrement must be greater than 0")
+  require(term > 0, "term must be greater than 0")
+  require(votingInterval > 0, "votingInterval must be greater than 0")
+  require(votingInterval <= term, s"votingInterval must be less than or equal to term($term)")
 }
 
-object BlockRewardSettings {
+object RewardsSettings {
   val MAINNET = apply(
-    0,
+    100000,
     6 * Constants.UnitsInWave,
     50000000,
-    100000,
     10000
   )
 
   val TESTNET = apply(
-    0,
+    100000,
     6 * Constants.UnitsInWave,
     50000000,
-    100000,
     10000
   )
 
   val STAGENET = apply(
-    0,
+    100000,
     6 * Constants.UnitsInWave,
     50000000,
-    100000,
     10000
   )
 }
@@ -60,8 +55,7 @@ case class FunctionalitySettings(
     doubleFeaturesPeriodsAfterHeight: Int,
     maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
-    lastTimeBasedForkParameter: Long = 0L,
-    blockRewardSettings: BlockRewardSettings
+    lastTimeBasedForkParameter: Long = 0L
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -102,8 +96,7 @@ object FunctionalitySettings {
     lastTimeBasedForkParameter = 1530161445559L,
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
-    doubleFeaturesPeriodsAfterHeight = 810000,
-    blockRewardSettings = BlockRewardSettings.MAINNET
+    doubleFeaturesPeriodsAfterHeight = 810000
   )
 
   val TESTNET = apply(
@@ -112,16 +105,14 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 51500,
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-    lastTimeBasedForkParameter = 1492560000000L,
-    blockRewardSettings = BlockRewardSettings.TESTNET
+    lastTimeBasedForkParameter = 1492560000000L
   )
 
   val STAGENET = apply(
     featureCheckBlocksPeriod = 100,
     blocksForFeatureActivation = 40,
     doubleFeaturesPeriodsAfterHeight = 1000000000,
-    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
-    blockRewardSettings = BlockRewardSettings.STAGENET
+    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap
   )
 
   val configPath = "waves.blockchain.custom.functionality"
@@ -189,7 +180,12 @@ object GenesisSettings {
   )
 }
 
-case class BlockchainSettings(addressSchemeCharacter: Char, functionalitySettings: FunctionalitySettings, genesisSettings: GenesisSettings)
+case class BlockchainSettings(
+    addressSchemeCharacter: Char,
+    functionalitySettings: FunctionalitySettings,
+    genesisSettings: GenesisSettings,
+    rewardsSettings: RewardsSettings
+)
 
 object BlockchainType extends Enumeration {
   val STAGENET = Value("STAGENET")
@@ -207,24 +203,26 @@ object BlockchainSettings {
 
   private[this] def fromConfig(config: Config): BlockchainSettings = {
     val blockchainType = config.as[BlockchainType.Value]("type")
-    val (addressSchemeCharacter, functionalitySettings, genesisSettings) = blockchainType match {
+    val (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings) = blockchainType match {
       case BlockchainType.STAGENET =>
-        ('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET)
+        ('S', FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
       case BlockchainType.TESTNET =>
-        ('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET)
+        ('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
       case BlockchainType.MAINNET =>
-        ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
+        ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
       case BlockchainType.CUSTOM =>
         val addressSchemeCharacter = config.as[String](s"custom.address-scheme-character").charAt(0)
         val functionalitySettings  = config.as[FunctionalitySettings](s"custom.functionality")
         val genesisSettings        = config.as[GenesisSettings](s"custom.genesis")
-        (addressSchemeCharacter, functionalitySettings, genesisSettings)
+        val rewardsSettings        = config.as[RewardsSettings](s"custom.rewards")
+        (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
     }
 
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
       functionalitySettings = functionalitySettings,
-      genesisSettings = genesisSettings
+      genesisSettings = genesisSettings,
+      rewardsSettings = rewardsSettings
     )
   }
 }

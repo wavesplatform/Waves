@@ -12,7 +12,7 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{
-  BlockRewardSettings,
+  RewardsSettings,
   BlockchainSettings,
   Constants,
   DBSettings,
@@ -56,7 +56,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
         val oldBalance    = blockchain.balance(account)
-        val newBalance    = oldBalance + 2 * settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward
+        val newBalance    = oldBalance + 2 * settings.blockchainSettings.rewardsSettings.initial
         for {
           _ <- generateBlock
           _ <- generateBlock
@@ -74,7 +74,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
         val oldBalance    = blockchain.balance(account)
-        val newBalance    = oldBalance + settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward
+        val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial
 
         generateBlock.map { _ =>
           blockchain.balance(account) should be(newBalance)
@@ -111,7 +111,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
         val oldBalance    = blockchain.balance(account)
-        val newBalance    = oldBalance + settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward - 10 * Constants.UnitsInWave
+        val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial - 10 * Constants.UnitsInWave
 
         generateBlock.map { _ =>
           blockchain.balance(account) should be(newBalance)
@@ -156,7 +156,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     Resource.make {
       val defaultWriter: LevelDbWriterWithReward       = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
       val blockchainUpdater: BlockchainUpdater with NG = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
-      defaultWriter.saveReward(settings.blockchainSettings.functionalitySettings.blockRewardSettings.firstReward)
+      defaultWriter.saveReward(settings.blockchainSettings.rewardsSettings.initial)
       Task.now((blockchainUpdater, db))
     } {
       case (blockchainUpdater, db) =>
@@ -176,17 +176,20 @@ object MiningWithRewardSuite {
 
   case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: BlockchainUpdater with NG)
 
+  val commonSettings: WavesSettings                    = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+  val minerSettings: MinerSettings                     = commonSettings.minerSettings.copy(quorum = 0, intervalAfterLastBlockThenGenerationIsAllowed = 1 hour)
+  val synchronizationSettings: SynchronizationSettings = commonSettings.synchronizationSettings
+  val utxSettings: UtxSettings                         = commonSettings.utxSettings
+
   val functionalitySettings: FunctionalitySettings =
     Enabled
       .copy(preActivatedFeatures = Enabled.preActivatedFeatures + (BlockchainFeatures.BlockReward.id -> 0))
-      .copy(blockRewardSettings = BlockRewardSettings.TESTNET)
+  val blockchainSettings: BlockchainSettings =
+    commonSettings.blockchainSettings
+      .copy(functionalitySettings = functionalitySettings)
+      .copy(rewardsSettings = RewardsSettings.TESTNET)
 
-  val commonSettings: WavesSettings                    = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-  val minerSettings: MinerSettings                     = commonSettings.minerSettings.copy(quorum = 0, intervalAfterLastBlockThenGenerationIsAllowed = 1 hour)
-  val blockchainSettings: BlockchainSettings           = commonSettings.blockchainSettings.copy(functionalitySettings = functionalitySettings)
-  val synchronizationSettings: SynchronizationSettings = commonSettings.synchronizationSettings
-  val utxSettings: UtxSettings                         = commonSettings.utxSettings
-  val settings: WavesSettings                          = commonSettings.copy(minerSettings = minerSettings, blockchainSettings = blockchainSettings)
+  val settings: WavesSettings = commonSettings.copy(minerSettings = minerSettings, blockchainSettings = blockchainSettings)
 
   def createAccount: KeyPair =
     Gen

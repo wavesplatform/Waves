@@ -158,6 +158,8 @@ object AsyncHttpApi extends Assertions {
 
     def rewardStatus(height: Int): Future[Option[RewardStatus]] = get(s"/reward/status/$height").as[Option[RewardStatus]]
 
+    def wavesAmount(height: Int): Future[BigInt] = get(s"/reward/wavesAmount/$height").as[JsObject].map(_.value("amount").as[BigInt])
+
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
     def balanceDetails(address: String): Future[BalanceDetails] = get(s"/addresses/balance/details/$address").as[BalanceDetails]

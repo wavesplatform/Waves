@@ -37,14 +37,13 @@ object BlockDiffer extends ScorexLogging {
 
     // height switch is next after activation
     val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val rewardHeight      = blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id).getOrElse(Int.MaxValue)
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    val rewardHeight      = blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id).getOrElse(Int.MaxValue)
 
     val minerRewardDistr: Portfolio =
-      if (stateHeight < rewardHeight)
-        Portfolio.empty
-      else
-        blockchain.blockReward(stateHeight).map(Portfolio.build(Asset.Waves, _)).getOrElse(Portfolio.empty)
+      if (stateHeight > rewardHeight)
+        blockchain.lastBlockReward.map(Portfolio.build(Asset.Waves, _)).getOrElse(Portfolio.empty)
+      else Portfolio.empty
 
     val prevBlockFeeDistr: Portfolio =
       if (stateHeight >= sponsorshipHeight)

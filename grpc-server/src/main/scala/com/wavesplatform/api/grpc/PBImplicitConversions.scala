@@ -50,7 +50,7 @@ trait PBImplicitConversions {
         NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
         0,
         header.featureVotes.map(intToShort).toSet,
-        /*header.rewardVote*/Long.MinValue
+        /*header.rewardVote*/-1L
       )
     }
   }

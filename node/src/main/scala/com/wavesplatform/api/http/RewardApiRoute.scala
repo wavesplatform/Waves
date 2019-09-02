@@ -14,7 +14,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   import RewardApiRoute._
 
   override lazy val route: Route = pathPrefix("reward") {
-    status ~ statusAtHeight
+    status ~ statusAtHeight ~ wavesAmount ~ wavesAmountAtHeight
   }
 
   @Path("/status")
@@ -39,24 +39,55 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
     complete(getStatus(height))
   }
 
+  @Path("/wavesAmount")
+  @ApiOperation(value = "Current waves amount", notes = "Get current waves amount", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json reward status")
+    )
+  )
+  def wavesAmount: Route = (get & path("wavesAmount")) {
+    complete(getWavesAmount(blockchain.height))
+  }
+
+  @Path("/wavesAmount/{{height}}")
+  @ApiOperation(value = "Waves amount", notes = "Get waves amount at height", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json reward status")
+    )
+  )
+  def wavesAmountAtHeight: Route = (get & path("wavesAmount" / IntNumber)) { height =>
+    complete(getWavesAmount(height))
+  }
+
   private def getStatus(height: Int): JsValue =
     Json.toJson {
-      val settings = blockchain.settings.functionalitySettings.blockRewardSettings
+      val settings = blockchain.settings.rewardsSettings
       for {
         activatedAt <- blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id)
         reward      <- blockchain.blockReward(height)
         start = {
           val diff = height - activatedAt
-          activatedAt + diff / settings.rewardPeriod * settings.rewardPeriod + 1
+          activatedAt + diff / settings.term * settings.term + 1
         }
-        end         = start + settings.rewardPeriod - 1
-        votingStart = end - settings.rewardVotingPeriod + 1
-        isVoting    = Range.inclusive(end - settings.rewardVotingPeriod, end).contains(height)
+        end         = start + settings.term - 1
+        votingStart = end - settings.votingInterval + 1
+        isVoting    = Range.inclusive(end - settings.votingInterval, end).contains(height)
       } yield RewardStatus(reward, start, votingStart, end, isVoting)
+    }
+
+  private def getWavesAmount(height: Int): JsValue =
+    Json.toJson {
+      if (height < blockchain.height)
+        Json.obj("status" -> "error", "details" -> "No amount for this height")
+      else
+        Json.obj("amount" -> blockchain.wavesAmount(height))
     }
 }
 
 object RewardApiRoute {
+
   import play.api.libs.json._
 
   final case class RewardStatus(reward: Long, periodStart: Int, votingPeriodStart: Int, periodEnd: Int, isVotingPeriod: Boolean)
@@ -78,4 +109,23 @@ object RewardApiRoute {
           case None    => Json.obj()
         }
     }
+
+  final case class Reward(
+      height: Int,
+      totalWavesAmount: Long,
+      currentReward: Long,
+      minIncrement: Long,
+      term: Int,
+      nextCheck: Int,
+      votingIntervalStart: Int,
+      votingInterval: Int,
+      votingThreshold: Int,
+      votes: RewardVotes
+  )
+
+  final case class RewardVotes(increase: Int, decrease: Int)
+
+  implicit val rewardVotesFormat: Format[RewardVotes] = Json.format
+  implicit val rewardFormat: Format[Reward]           = Json.format
+
 }

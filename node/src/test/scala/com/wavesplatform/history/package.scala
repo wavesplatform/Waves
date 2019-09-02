@@ -19,7 +19,8 @@ package object history {
   val DefaultBlockchainSettings = BlockchainSettings(
     addressSchemeCharacter = 'N',
     functionalitySettings = TestFunctionalitySettings.Enabled,
-    genesisSettings = null
+    genesisSettings = null,
+    rewardsSettings = null
   )
 
   val config   = ConfigFactory.load()
@@ -68,7 +69,7 @@ package object history {
         transactionData = txs,
         signer = signer,
         Set.empty,
-        Long.MinValue
+        -1L
       )
       .explicitGet()
 

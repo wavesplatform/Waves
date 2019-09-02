@@ -94,6 +94,9 @@ object SyncHttpApi extends Assertions {
     def rewardStatus(height: Int): Option[RewardStatus] =
       sync(async(n).rewardStatus(height))
 
+    def wavesAmount(height: Int): BigInt =
+      sync(async(n).wavesAmount(height))
+
     def seed(address: String): String =
       sync(async(n).seed(address))
 

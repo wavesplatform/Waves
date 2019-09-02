@@ -37,7 +37,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
           txs,
           signer,
           Set.empty,
-          Long.MinValue
+          -1L
         )
         .explicitGet()
 

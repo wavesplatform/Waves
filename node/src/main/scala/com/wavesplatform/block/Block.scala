@@ -77,8 +77,8 @@ object BlockHeader extends ScorexLogging {
       val tBytes = bytes.slice(position, position + tBytesLength)
 
       val txCount = version match {
-        case 1 | 2 => tBytes.head
-        case 3 | 4 => ByteBuffer.wrap(tBytes, 0, 4).getInt()
+        case Block.GenesisBlockVersion | Block.PlainBlockVersion => tBytes.head
+        case Block.NgBlockVersion | Block.RewardBlockVersion     => ByteBuffer.wrap(tBytes, 0, 4).getInt()
       }
 
       position += tBytesLength
@@ -96,7 +96,7 @@ object BlockHeader extends ScorexLogging {
         supportedFeaturesIds = arr.toSet
       }
 
-      var rewardVote = Long.MinValue
+      var rewardVote = -1L
 
       if (version >= Block.RewardBlockVersion) {
         rewardVote = Longs.fromByteArray(bytes.slice(position, position + 8))
@@ -195,7 +195,7 @@ case class Block private[block] (override val timestamp: Long,
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String =
-    s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes), reward=$rewardVote"
+    s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes, reward=$rewardVote)"
 
   def getHeader(): BlockHeader =
     new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
@@ -360,7 +360,7 @@ object Block extends ScorexLogging {
         consensusData = consensusGenesisData,
         transactionData = transactionGenesisData,
         featureVotes = Set.empty,
-        rewardVote = Long.MinValue
+        rewardVote = -1L
       )
   }
 

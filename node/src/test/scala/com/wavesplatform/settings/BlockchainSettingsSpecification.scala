@@ -28,13 +28,12 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        double-features-periods-after-height = 21
         |        max-transaction-time-back-offset = 55s
         |        max-transaction-time-forward-offset = 12d
-        |        block-reward-settings {
-        |           min-reward = 0
-        |           first-reward = 600000000
-        |           reward-step = 50000000
-        |           reward-period = 100000
-        |           reward-voting-period = 10000
-        |        }
+        |      }
+        |      rewards {
+        |        term = 100000
+        |        initial = 600000000
+        |        min-increment = 50000000
+        |        voting-interval = 10000
         |      }
         |      genesis {
         |        timestamp = 1460678400000
@@ -63,11 +62,10 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.doubleFeaturesPeriodsAfterHeight should be(21)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(55.seconds)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(12.days)
-    settings.functionalitySettings.blockRewardSettings.minReward should be(0)
-    settings.functionalitySettings.blockRewardSettings.firstReward should be(600000000)
-    settings.functionalitySettings.blockRewardSettings.rewardStep should be(50000000)
-    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(100000)
-    settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod should be(10000)
+    settings.rewardsSettings.initial should be(600000000)
+    settings.rewardsSettings.minIncrement should be(50000000)
+    settings.rewardsSettings.term should be(100000)
+    settings.rewardsSettings.votingInterval should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("BASE58BLKSGNATURE").toOption)
@@ -95,11 +93,10 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.blockVersion3AfterHeight should be(161700)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
-    settings.functionalitySettings.blockRewardSettings.minReward should be(0)
-    settings.functionalitySettings.blockRewardSettings.firstReward should be(600000000)
-    settings.functionalitySettings.blockRewardSettings.rewardStep should be(50000000)
-    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(100000)
-    settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod should be(10000)
+    settings.rewardsSettings.initial should be(600000000)
+    settings.rewardsSettings.minIncrement should be(50000000)
+    settings.rewardsSettings.term should be(100000)
+    settings.rewardsSettings.votingInterval should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1478000000000L)
     settings.genesisSettings.signature should be(
@@ -133,11 +130,10 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
-    settings.functionalitySettings.blockRewardSettings.minReward should be(0)
-    settings.functionalitySettings.blockRewardSettings.firstReward should be(600000000)
-    settings.functionalitySettings.blockRewardSettings.rewardStep should be(50000000)
-    settings.functionalitySettings.blockRewardSettings.rewardPeriod should be(100000)
-    settings.functionalitySettings.blockRewardSettings.rewardVotingPeriod should be(10000)
+    settings.rewardsSettings.initial should be(600000000)
+    settings.rewardsSettings.minIncrement should be(50000000)
+    settings.rewardsSettings.term should be(100000)
+    settings.rewardsSettings.votingInterval should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)
     settings.genesisSettings.signature should be(

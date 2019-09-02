@@ -85,7 +85,8 @@ class UtxPoolSpecification
             BlockchainFeatures.SmartAccounts.id -> 0,
             BlockchainFeatures.Ride4DApps.id    -> 0
           )),
-        genesisSettings
+        genesisSettings,
+        RewardsSettings.TESTNET
       ),
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
