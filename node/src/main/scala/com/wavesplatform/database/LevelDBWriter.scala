@@ -742,7 +742,7 @@ class LevelDBWriter(
     }
 
     for {
-      (txId, _)                 <- results.toVector.sortBy(_._2)
+      (txId, _)                 <- results.toVector
       (_, tx: LeaseTransaction) <- transactionInfo(txId, db) if pf.isDefinedAt(tx)
     } yield pf(tx)
   }

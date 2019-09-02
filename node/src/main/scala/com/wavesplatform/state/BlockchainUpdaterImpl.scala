@@ -16,7 +16,7 @@ import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.{CompositeBlockchain, LockedCompositeBlockchain}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
@@ -28,8 +28,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     extends BlockchainUpdater
     with NG
     with ScorexLogging
-    with CompositeBlockchain
-    with LockedCompositeBlockchain {
+    with CompositeBlockchain {
 
   import com.wavesplatform.state.BlockchainUpdaterImpl._
   import wavesSettings.blockchainSettings.functionalitySettings

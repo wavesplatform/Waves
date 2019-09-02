@@ -2,8 +2,16 @@ package com.wavesplatform.features
 
 import com.wavesplatform.state.Blockchain
 
+trait FeatureProvider {
+  def isFeatureActivated(feature: BlockchainFeature, height: Int): Boolean
+  def activatedFeaturesAt(height: Int): Set[Short]
+  def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus
+  def featureActivationHeight(feature: Short): Option[Int]
+  def featureApprovalHeight(feature: Short): Option[Int]
+}
+
 object FeatureProvider {
-  implicit class FeatureProviderExt(provider: Blockchain) {
+  implicit class FeatureProviderExt(provider: Blockchain) extends FeatureProvider {
     def isFeatureActivated(feature: BlockchainFeature, height: Int = provider.height): Boolean =
       provider.activatedFeatures.get(feature.id).exists(_ <= height)
 

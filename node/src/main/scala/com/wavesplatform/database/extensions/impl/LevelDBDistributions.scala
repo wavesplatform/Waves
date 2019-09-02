@@ -168,7 +168,7 @@ private final class LevelDBWriterDistributions(ldb: LevelDBWriter) extends Distr
   private[this] def loadPortfolio(address: Address): Portfolio = readOnly { db =>
     val excludeNFT = ldb.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
 
-    addressId(address).fold(Portfolio.empty) { addressId =>
+    db.get(Keys.addressId(address)).fold(Portfolio.empty) { addressId =>
       if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)
       else loadFullPortfolio(db, addressId)
     }
