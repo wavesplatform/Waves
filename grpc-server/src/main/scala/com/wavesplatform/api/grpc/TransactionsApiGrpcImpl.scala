@@ -31,18 +31,14 @@ class TransactionsApiGrpcImpl(
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, publishTransaction)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
-    val senderTxs =
-      if (request.sender.isEmpty) Observable.empty
-      else commonApi.transactionsByAddress(request.sender.toAddress)
+    val transactions =
+      if (!request.sender.isEmpty) commonApi.transactionsByAddress(request.sender.toAddress)
+      else if (request.recipient.isDefined) commonApi.transactionsByAddress(request.getRecipient.toAddress)
+      else Observable.empty
 
-    val recipientTxs =
-      if (request.recipient.isEmpty || request.getRecipient.toAddressOrAlias == request.sender) Observable.empty
-      else commonApi.transactionsByAddress(request.getRecipient.toAddress)
-
-    val txIds = request.transactionIds.toSet
-
-    val stream = (senderTxs ++ recipientTxs).collect {
-      case (height, transaction) if transactionFilter(request.sender, None, txIds, transaction) =>
+    val filter = transactionFilter(request.sender, request.recipient, request.transactionIds.toSet, _)
+    val stream = transactions.collect {
+      case (height, transaction) if filter(transaction) =>
         TransactionResponse(transaction.id(), height, Some(transaction.toPB))
     }
 
