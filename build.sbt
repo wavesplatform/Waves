@@ -16,7 +16,8 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
   .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.common.value,
-    coverageExcludedPackages := ""
+    coverageExcludedPackages := "",
+    updateOptions := updateOptions.value.withLatestSnapshots(true)
   )
 
 lazy val commonJS  = common.js

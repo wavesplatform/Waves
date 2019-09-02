@@ -1,6 +1,5 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
@@ -12,13 +11,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils.BlockchainAddressTransactionsList
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -332,97 +330,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       } finally {
         bcu.shutdown()
         db.close()
-      }
-    }
-  }
-
-  "addressTransactions" - {
-
-    "return txs in correct ordering without fromId" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 2
-
-        txs.sorted(ordering) shouldBe txs
-      }
-    }
-
-    "correctly applies transaction type filter" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "return txs in correct ordering starting from a given id" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        // using pagination
-        val firstTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
-          .explicitGet()
-          .head
-
-        val secondTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
-          .explicitGet()
-          .head
-
-        // without pagination
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
-          .explicitGet()
-
-        txs shouldBe Seq(firstTx, secondTx)
-      }
-    }
-
-    "return an empty Seq when paginating from the last transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
-          .explicitGet()
-
-        val txsFromLast = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
-          .explicitGet()
-
-        txs.length shouldBe 2
-        txsFromLast shouldBe Seq.empty
-      }
-    }
-
-    "dont parse irrelevant transactions in transferById" in {
-      val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-
-      forAll(randomTransactionGen) { tx =>
-        val transactionId = tx.id()
-        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
-
-        writer.transferById(transactionId) shouldBe None
-
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
-        intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
       }
     }
   }

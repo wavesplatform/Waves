@@ -5,8 +5,7 @@ import java.nio.file.Files
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.LevelDBFactory
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.Implicits.SubjectOps
-import monix.reactive.subjects.Subject
+import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{BeforeAndAfterEach, TestSuite}
 
@@ -18,7 +17,7 @@ trait WithDB extends BeforeAndAfterEach {
 
   def db: DB = currentDBInstance
 
-  protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
+  protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
 
   override def beforeEach(): Unit = {
     currentDBInstance = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
