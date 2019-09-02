@@ -34,6 +34,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
 import scala.util.Try
+import scala.util.control.NonFatal
 
 object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distributions.Prov[LevelDBWriter] {
 
@@ -76,11 +77,12 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
     new LevelDBDistributions(ldb)
 }
 
-class LevelDBWriter(private[database] val writableDB: DB,
-                    spendableBalanceChanged: Observer[(Address, Asset)],
-                    val settings: BlockchainSettings,
-                    val dbSettings: DBSettings)
-    extends Caches(spendableBalanceChanged)
+class LevelDBWriter(
+    private[database] val writableDB: DB,
+    spendableBalanceChanged: Observer[(Address, Asset)],
+    val settings: BlockchainSettings,
+    val dbSettings: DBSettings
+) extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
   // Only for tests
@@ -233,23 +235,25 @@ class LevelDBWriter(private[database] val writableDB: DB,
   }
 
   //noinspection ScalaStyle
-  override protected def doAppend(block: Block,
-                                  carry: Long,
-                                  newAddresses: Map[Address, BigInt],
-                                  wavesBalances: Map[BigInt, Long],
-                                  assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
-                                  leaseBalances: Map[BigInt, LeaseBalance],
-                                  addressTransactions: Map[AddressId, List[TransactionId]],
-                                  leaseStates: Map[ByteStr, Boolean],
-                                  reissuedAssets: Map[IssuedAsset, AssetInfo],
-                                  filledQuantity: Map[ByteStr, VolumeAndFee],
-                                  scripts: Map[BigInt, Option[Script]],
-                                  assetScripts: Map[IssuedAsset, Option[Script]],
-                                  data: Map[BigInt, AccountDataInfo],
-                                  aliases: Map[Alias, BigInt],
-                                  sponsorship: Map[IssuedAsset, Sponsorship],
-                                  totalFee: Long,
-                                  scriptResults: Map[ByteStr, InvokeScriptResult]): Unit = readWrite { rw =>
+  override protected def doAppend(
+      block: Block,
+      carry: Long,
+      newAddresses: Map[Address, BigInt],
+      wavesBalances: Map[BigInt, Long],
+      assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
+      leaseBalances: Map[BigInt, LeaseBalance],
+      addressTransactions: Map[AddressId, List[TransactionId]],
+      leaseStates: Map[ByteStr, Boolean],
+      reissuedAssets: Map[IssuedAsset, AssetInfo],
+      filledQuantity: Map[ByteStr, VolumeAndFee],
+      scripts: Map[BigInt, Option[Script]],
+      assetScripts: Map[IssuedAsset, Option[Script]],
+      data: Map[BigInt, AccountDataInfo],
+      aliases: Map[Alias, BigInt],
+      sponsorship: Map[IssuedAsset, Sponsorship],
+      totalFee: Long,
+      scriptResults: Map[ByteStr, InvokeScriptResult]
+  ): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -443,7 +447,11 @@ class LevelDBWriter(private[database] val writableDB: DB,
           .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-        rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+        try rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+        catch {
+          case NonFatal(e) =>
+            throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
+        }
     }
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
