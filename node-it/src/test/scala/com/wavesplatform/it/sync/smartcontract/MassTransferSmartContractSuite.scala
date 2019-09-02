@@ -6,6 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -57,7 +58,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         """.stripMargin
 
     // set script
-    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     notMiner.setScript(notMiner.address, Some(script), setScriptFee, waitForTx = true).id
 
     notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false

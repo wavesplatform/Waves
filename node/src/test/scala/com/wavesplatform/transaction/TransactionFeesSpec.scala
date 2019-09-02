@@ -105,7 +105,7 @@ class TransactionFeesSpec
     (valid, invalid)
   }
 
-  val functionalitySettings = TestFunctionalitySettings.withFeatures(BlockchainFeatures.ChangeMinimalFees, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.FeeSponsorship)
+  val functionalitySettings = TestFunctionalitySettings.withFeatures(BlockchainFeatures.ChangeMinimumFees, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.FeeSponsorship)
     .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1)
 
   property("transactions with sufficient fee processed") {

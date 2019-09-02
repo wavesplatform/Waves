@@ -87,11 +87,12 @@ class LevelDBWriter(private[database] val writableDB: DB,
   @inline
   private[this] def withNodeStopOnError[A](f: => A): A = {
     try f
-    catch { case e: DBException =>
-      val message = "Fatal DB error, force stopping node"
-      log.error(message, e)
-      com.wavesplatform.utils.forceStopApplication(FatalDBError)
-      throw new RuntimeException(message, e)
+    catch {
+      case e: DBException =>
+        val message = "Fatal DB error, force stopping node"
+        log.error(message, e)
+        com.wavesplatform.utils.forceStopApplication(FatalDBError)
+        throw new RuntimeException(message, e)
     }
   }
 
@@ -149,18 +150,22 @@ class LevelDBWriter(private[database] val writableDB: DB,
     } yield key -> value).toMap)
   }
 
-  override def accountDataKeys(address: Address): Seq[String] = readOnly { db =>
-    for {
+  override def accountDataKeys(address: Address): Set[String] = readOnly { db =>
+    (for {
       addressId <- addressId(address).toVector
       keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
       chunkNo <- Range(0, keyChunkCount)
       key <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
-    } yield key
+    } yield key).toSet
   }
 
-  override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
-    addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
-      db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+  override protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]] = {
+    val (address, key) = addressWithKey
+
+    readOnly { db =>
+      addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
+        db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+      }
     }
   }
 
@@ -452,7 +457,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
         val assetInfoToInvalidate = Seq.newBuilder[IssuedAsset]
         val ordersToInvalidate = Seq.newBuilder[ByteStr]
         val scriptsToDiscard = Seq.newBuilder[Address]
-        val assetScriptsToDiscard = Seq.newBuilder[IssuedAsset]
+        val assetScriptsToDiscard = Seq.newBuilder[IssuedAsset]val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
 
         val h = Height(currentHeight)
 
@@ -477,6 +482,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
+              accountDataToInvalidate += (address -> k)
               rw.delete(Keys.data(addressId, k)(currentHeight))
               rw.filterHistory(Keys.dataHistory(addressId, k), currentHeight)
             }
@@ -585,6 +591,10 @@ class LevelDBWriter(private[database] val writableDB: DB,
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
+        accountDataToInvalidate.result().foreach {
+          case ak @ (addr, _) =>
+            discardAccountData(ak)
+        }
         discardedBlock
       }
 
@@ -623,7 +633,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
       txBytes <- db.get(Keys.transactionBytesAt(height, num))
-      isTransfer <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
+      isTransfer    <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
     } yield height -> TransactionParsers.parseBytes(txBytes).get.asInstanceOf[TransferTransaction]
   }
 

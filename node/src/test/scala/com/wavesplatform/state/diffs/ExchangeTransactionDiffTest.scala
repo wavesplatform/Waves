@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
@@ -45,6 +46,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   val fsOrderV3MassTransfer =
     fsWithOrderV3Feature.copy(preActivatedFeatures = fsWithOrderV3Feature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
+
+  private val estimator = ScriptEstimatorV2
 
   property("Validation fails when OrderV3 feature is not activation yet") {
 
@@ -745,10 +748,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   property("Disable use OrderV1 on SmartAccount") {
     val enoughFee        = 100000000
     val script           = "true"
-    val txScriptCompiled = ScriptCompiler(script, isAssetScript = false).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1
 
-    val sellerScript = Some(ScriptCompiler(script, isAssetScript = false).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(script, isAssetScript = false).explicitGet()._1)
+    val sellerScript = Some(ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1)
+    val buyerScript  = Some(ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 
@@ -860,11 +863,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     for {
       txScript <- txScript
-      txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
+      txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false, estimator).explicitGet()._1
       sellerScriptSrc <- sellerScriptSrc
-      sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
+      sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false, estimator).explicitGet()._1)
       buyerScriptSrc <- buyerScriptSrc
-      buyerScript = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
+      buyerScript = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false, estimator).explicitGet()._1)
 
       buyer  <- accountGen
       seller <- accountGen

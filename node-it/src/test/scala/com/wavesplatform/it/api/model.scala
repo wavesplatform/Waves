@@ -328,11 +328,6 @@ object MarketStatusResponse {
   implicit val marketResponseFormat: Format[MarketStatusResponse] = Json.format
 }
 
-case class DebugInfo(stateHeight: Long, stateHash: Long)
-object DebugInfo {
-  implicit val debugInfoFormat: Format[DebugInfo] = Json.format
-}
-
 case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
 object BlacklistedPeer {
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format

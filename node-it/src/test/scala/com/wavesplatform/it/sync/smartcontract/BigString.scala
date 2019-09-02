@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.LeaseTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -42,7 +43,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
         }
         """.stripMargin
 
-    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+    val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()

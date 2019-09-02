@@ -4,6 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset
@@ -66,20 +67,18 @@ object ExchangeTransactionDiff {
           addressScripted +
           ordersScripted
       }
-      scriptsComplexity = {
-        val assetsComplexity = assets.toSeq
-          .flatten
-          .flatMap(_.script)
-          .map(DiffsCommon.verifierComplexity)
-          .sum
+      assetsComplexity <- assets.toList
+        .flatten
+        .flatMap(_.script)
+        .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
+        .leftMap(GenericError(_))
 
-        val accountsComplexity = Seq(tx.sender.toAddress, buyer, seller)
-          .flatMap(blockchain.accountScript)
-          .map(DiffsCommon.verifierComplexity)
-          .sum
+      accountsComplexity <- List(tx.sender.toAddress, buyer, seller)
+        .flatMap(blockchain.accountScript)
+        .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
+        .leftMap(GenericError(_))
 
-        assetsComplexity + accountsComplexity
-      }
+      scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {

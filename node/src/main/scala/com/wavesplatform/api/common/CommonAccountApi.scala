@@ -1,6 +1,8 @@
 package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.extensions.ApiExtensions
@@ -52,7 +54,7 @@ private[api] class CommonAccountApi(blockchain: Blockchain, ae: ApiExtensions) {
     AddressScriptInfo(
       script = script.map(_.bytes()),
       scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
-      complexity = script.map(_.complexity).getOrElse(0),
+      complexity = script.map(Script.estimate(_, blockchain.estimator).explicitGet()).getOrElse(0L),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }

@@ -17,7 +17,8 @@ class BlockchainUpdaterLiquidBlockTest
     with DomainScenarioDrivenPropertyCheck
     with Matchers
     with TransactionGen
-    with BlocksTransactionsHelpers {
+    with BlocksTransactionsHelpers
+    with NoShrink {
   import QuickTX._
   import UnsafeBlocks._
 
@@ -26,7 +27,7 @@ class BlockchainUpdaterLiquidBlockTest
       richAccount        <- accountGen
       totalTxNumber      <- Gen.chooseNum(minTx, maxTx)
       txNumberInKeyBlock <- Gen.chooseNum(0, Block.MaxTransactionsPerBlockVer3)
-      allTxs             <- Gen.listOfN(totalTxNumber, transfer(richAccount))
+      allTxs             <- Gen.listOfN(totalTxNumber, transfer(richAccount, timestamp = Gen.delay(Gen.const(ntpTime.getTimestamp()))))
     } yield {
       val (keyBlockTxs, microTxs) = allTxs.splitAt(txNumberInKeyBlock)
       val txNumberInMicros        = totalTxNumber - txNumberInKeyBlock
@@ -45,7 +46,7 @@ class BlockchainUpdaterLiquidBlockTest
         micros = microTxs.grouped(math.max(1, txNumberInMicros / 5)).toSeq,
         signer = TestBlock.defaultSigner,
         version = 3,
-        timestamp = System.currentTimeMillis()
+        timestamp = ntpNow
       )
 
       (prevBlock, keyBlock, microBlocks)
@@ -74,7 +75,8 @@ class BlockchainUpdaterLiquidBlockTest
                 fail(
                   s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionCount}, " +
                     s"microblock txs: ${txNumberByMicroBlock.mkString(", ")} (total: ${txNumberByMicroBlock.sum}), " +
-                    s"total txs: ${keyBlock.transactionCount + txNumberByMicroBlock.sum}")
+                    s"total txs: ${keyBlock.transactionCount + txNumberByMicroBlock.sum}"
+                )
             }
           }
         }
@@ -83,9 +85,11 @@ class BlockchainUpdaterLiquidBlockTest
 
   property("miner settings don't interfere with micro block processing") {
     val oneTxPerMicroSettings = MicroblocksActivatedAt0WavesSettings
-      .copy(minerSettings = MicroblocksActivatedAt0WavesSettings.minerSettings.copy(
+      .copy(
+        minerSettings = MicroblocksActivatedAt0WavesSettings.minerSettings.copy(
           maxTransactionsInMicroBlock = 1
-        ))
+        )
+      )
     forAll(preconditionsAndPayments(10, Block.MaxTransactionsPerBlockVer3)) {
       case (genBlock, keyBlock, microBlocks) =>
         withDomain(oneTxPerMicroSettings) { d =>

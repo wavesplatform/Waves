@@ -15,8 +15,8 @@ object SetScriptTransactionDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
         scripts = Map(tx.sender.toAddress    -> scriptOpt),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
-      ))
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+      )
+    )
   }
 }

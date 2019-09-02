@@ -7,6 +7,7 @@ import com.wavesplatform.it.sync.setScriptFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalatest.CancelAfterFailure
@@ -65,7 +66,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
         |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
         |    )
         |}
-      """.stripMargin).explicitGet()._1.bytes().base64
+      """.stripMargin, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(contract.stringRepr, Some(script), setScriptFee, waitForTx = true)
 
     initCallerTxs = sender.transactionsByAddress(caller.stringRepr, 100).length
@@ -132,7 +133,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     val callerStateChanges    = sender.debugStateChangesByAddress(caller.stringRepr, 100)
     val dAppStateChanges      = sender.debugStateChangesByAddress(contract.stringRepr, 100)
     val recipientStateChanges = sender.debugStateChangesByAddress(recipient.stringRepr, 100)
-    
+
     callerTxs.length shouldBe initCallerTxs + 2
     callerTxs.length shouldBe callerStateChanges.length
     dAppTxs.length shouldBe initDAppTxs + 2

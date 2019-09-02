@@ -43,6 +43,8 @@ class AddressRouteSpec
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.stringRepr)
   private val blockchain   = stub[Blockchain]
+  (blockchain.activatedFeatures _).when().returning(Map())
+
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
 
   private val route =
@@ -213,7 +215,7 @@ class AddressRouteSpec
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val dataKeys = List(
+    val dataKeys = Set(
       "abc",
       "aBcD",
       "ABD",

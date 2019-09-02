@@ -14,26 +14,26 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private val settings =
-    TestFunctionalitySettings.Enabled.copy(resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
+    TestFunctionalitySettings.Enabled.copy(resetEffectiveBalancesAtHeight = 5, lastTimeBasedForkParameter = Long.MaxValue / 2)
 
   property("CancelAllLeases cancels all active leases and its effects including those in the block") {
-    val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransactionV1, LeaseTransaction)] =
+    val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransactionV1, LeaseTransaction, Long)] =
       for {
         master        <- accountGen
         recipient     <- accountGen suchThat (_ != master)
         otherAccount  <- accountGen
         otherAccount2 <- accountGen
-        ts            <- timestampGen
+        ts            <- Gen.choose(0, settings.lastTimeBasedForkParameter)
         genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
         genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).explicitGet()
-        (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
+        (lease, _) <- leaseAndCancelGeneratorP(master, recipient, ts)
         fee2       <- smallFeeGen
         unleaseOther = LeaseCancelTransactionV1.selfSigned(otherAccount, lease.id(), fee2, ts + 1).explicitGet()
-        (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, master)
-      } yield (genesis, genesis2, lease, unleaseOther, lease2)
+        (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, ts)
+      } yield (genesis, genesis2, lease, unleaseOther, lease2, ts)
 
-    forAll(setupAndLeaseInResetBlock, timestampGen retryUntil (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
-      case ((genesis, genesis2, lease, unleaseOther, lease2), blockTime) =>
+    forAll(setupAndLeaseInResetBlock) {
+      case (genesis, genesis2, lease, unleaseOther, lease2, blockTime) =>
         assertDiffAndState(
           Seq(
             TestBlock.create(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),

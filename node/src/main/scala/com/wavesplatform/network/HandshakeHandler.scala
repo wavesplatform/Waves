@@ -31,16 +31,13 @@ class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void
 
 case object HandshakeTimeoutExpired
 
-class HandshakeTimeoutHandler(handshakeTimeout: () => FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  def this(const: FiniteDuration) = this(() => const)
-
+class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var timeout: Option[ScheduledFuture[_]] = None
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
 
   override def channelRegistered(ctx: ChannelHandlerContext): Unit = {
-    val handshakeTimeoutV = handshakeTimeout()
-    log.trace(s"${id(ctx)} Scheduling handshake timeout, timeout = $handshakeTimeoutV")
+    log.trace(s"${id(ctx)} Scheduling handshake timeout in $handshakeTimeout")
     timeout = Some(
       ctx
         .channel()
@@ -50,7 +47,7 @@ class HandshakeTimeoutHandler(handshakeTimeout: () => FiniteDuration) extends Ch
             log.trace(s"${id(ctx)} Firing handshake timeout expired")
             ctx.fireChannelRead(HandshakeTimeoutExpired)
           },
-          handshakeTimeoutV.toMillis,
+          handshakeTimeout.toMillis,
           TimeUnit.MILLISECONDS
         )
     )
@@ -58,9 +55,9 @@ class HandshakeTimeoutHandler(handshakeTimeout: () => FiniteDuration) extends Ch
     super.channelRegistered(ctx)
   }
 
-  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
+  override def channelUnregistered(ctx: ChannelHandlerContext): Unit = {
     cancelTimeout()
-    super.channelInactive(ctx)
+    super.channelUnregistered(ctx)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
