@@ -6,7 +6,12 @@ import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.LetLogCallback
 import shapeless.{Lens, lens}
 
-case class EvaluationContext(typeDefs: Map[String, FINAL], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
+case class EvaluationContext(
+  typeDefs:  Map[String, FINAL],
+  letDefs:   Map[String, LazyVal],
+  functions: Map[FunctionHeader, BaseFunction],
+  callChain: Set[String] = Set()
+)
 
 case class LoggedEvaluationContext(l: LetLogCallback, ec: EvaluationContext)
 
@@ -15,6 +20,7 @@ object LoggedEvaluationContext {
     val types: Lens[LoggedEvaluationContext, Map[String, FINAL]]          = lens[LoggedEvaluationContext] >> 'ec >> 'typeDefs
     val lets: Lens[LoggedEvaluationContext, Map[String, LazyVal]]               = lens[LoggedEvaluationContext] >> 'ec >> 'letDefs
     val funcs: Lens[LoggedEvaluationContext, Map[FunctionHeader, BaseFunction]] = lens[LoggedEvaluationContext] >> 'ec >> 'functions
+    val callChain: Lens[LoggedEvaluationContext, Set[String]]                   = lens[LoggedEvaluationContext] >> 'ec >> 'callChain
   }
 }
 

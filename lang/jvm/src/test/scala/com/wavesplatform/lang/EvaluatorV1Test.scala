@@ -10,6 +10,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -900,5 +901,98 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     // sub(7, dub(x))
     val expr2 = FUNCTION_CALL(subFn.header, List(CONST_LONG(7), FUNCTION_CALL(doubleFn.header, List(REF("x")))))
     ev[EVALUATED](context, expr2) shouldBe evaluated(1)
+  }
+
+  property("recursive func block") {
+    val expr =
+      BLOCK(
+        FUNC("x", Nil, FUNCTION_CALL(User("y"), Nil)),
+        BLOCK(
+          FUNC("y", Nil, FUNCTION_CALL(User("z"), Nil)),
+          BLOCK(
+            FUNC("z", Nil, FUNCTION_CALL(User("x"), Nil)),
+            FUNCTION_CALL(User("z"), Nil)
+          )
+        )
+      )
+    ev[EVALUATED](pureEvalContext, expr) should produce("Recursive call")
+  }
+
+  property("recursive let block") {
+    val expr =
+      BLOCK(
+        LET("x", REF("y")),
+        BLOCK(
+          LET("y", REF("z")),
+          BLOCK(
+            LET("z", REF("x")),
+            REF("z")
+          )
+        )
+    )
+    ev[EVALUATED](pureEvalContext, expr) shouldBe 'left
+  }
+
+  property("recursion with let and func") {
+    val expr =
+      BLOCK(
+        FUNC("f", List("x"), REF("a")),
+        BLOCK(
+          LET("a", FUNCTION_CALL(User("f"), List(CONST_LONG(1)))),
+          REF("a")
+        )
+      )
+    ev[EVALUATED](pureEvalContext, expr) shouldBe 'left
+  }
+
+  property("function overlap (possible false-positive recursion error)") {
+    val expr =
+      BLOCK(
+        FUNC(
+          "f",
+          Nil,
+          BLOCK(
+            FUNC(
+              "f",
+              Nil,
+              BLOCK(
+                FUNC("f", Nil, CONST_LONG(1)),
+                FUNCTION_CALL(User("f"), Nil)
+              ),
+            ),
+            FUNCTION_CALL(User("f"), Nil)
+          ),
+        ),
+        FUNCTION_CALL(User("f"), Nil)
+      )
+
+    ev[EVALUATED](pureEvalContext, expr) shouldBe Right(CONST_LONG(1))
+  }
+
+  property("function overlap with recursion") {
+    val expr =
+      BLOCK(
+        FUNC(
+          "f",
+          Nil,
+          BLOCK(
+            FUNC("g", Nil, FUNCTION_CALL(User("f"), Nil)),
+            BLOCK(
+              FUNC(
+                "f",
+                Nil,
+                BLOCK(
+                  FUNC("f", Nil, FUNCTION_CALL(User("g"), Nil)),
+                  FUNCTION_CALL(User("f"), Nil)
+                ),
+              ),
+              FUNCTION_CALL(User("f"), Nil)
+            )
+          )
+        ),
+        FUNCTION_CALL(User("f"), Nil)
+      )
+
+    ev[EVALUATED](pureEvalContext, expr) should produce("Recursive call")
   }
 }

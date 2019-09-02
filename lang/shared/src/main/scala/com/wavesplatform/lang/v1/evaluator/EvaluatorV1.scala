@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.Monad
 import cats.implicits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -29,8 +28,11 @@ object EvaluatorV1 {
     val funcHeader = FunctionHeader.User(func.name)
     val function   = UserFunction(func.name, 0, null, func.args.map(n => (n, null)): _*)(func.body)
     local {
-      modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
-        .flatMap(_ => evalExprWithCtx(inner))
+      modify[LoggedEvaluationContext, ExecutionError] {
+        (funcs ~ callChain).modify(_) { case (f, chain) =>
+          (f.updated(funcHeader, function), chain - func.name)
+        }
+      }.flatMap(_ => evalExprWithCtx(inner))
     }
   }
 
@@ -68,16 +70,23 @@ object EvaluatorV1 {
         .get(header)
         .map {
           case func: UserFunction =>
-            args
-              .traverse[EvalM, EVALUATED](evalExpr)
-              .flatMap { args =>
-                val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
-                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l(s"$argName")))
+            if (ctx.ec.callChain.contains(func.name))
+              raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Recursive call ${func.name}()")
+            else {
+              args
+                .traverse[EvalM, EVALUATED](evalExpr)
+                .flatMap { args =>
+                  val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
+                    case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l(s"$argName")))
+                  }
+                  local {
+                    val newCtx = (lets ~ callChain)
+                      .modify(ctx) { case (_, calls) => (letDefsWithArgs, calls + func.internalName) }
+
+                    set(newCtx).flatMap(_ => evalExpr(func.ev))
+                  }
                 }
-                local {
-                  set(LoggedEvaluationContext.Lenses.lets.set(ctx)(letDefsWithArgs)).flatMap(_ => evalExpr(func.ev))
-                }
-              }
+            }
           case func: NativeFunction =>
             args
               .traverse[EvalM, EVALUATED] { x =>
