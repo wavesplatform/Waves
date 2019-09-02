@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
 import com.wavesplatform.lang.v1.repl.model.order.Order
-import com.wavesplatform.lang.v1.repl.model.{Account, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithSignature}
 
 case class ExchangeTransactionV1(
     id: ByteString,

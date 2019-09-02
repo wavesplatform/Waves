@@ -1,9 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import java.nio.ByteBuffer
-
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.wavesplatform.lang.v1.repl.model.{Account, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithSignature}
 
 object LeaseTransactionV1 {
   val LEASE = 8

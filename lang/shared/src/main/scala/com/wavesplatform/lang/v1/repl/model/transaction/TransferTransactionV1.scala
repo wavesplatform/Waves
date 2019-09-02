@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.tx.TransferTransaction
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithSignature}
 
 case class TransferTransactionV1(
     id: ByteString,

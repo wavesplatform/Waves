@@ -136,8 +136,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
 
   property("state reassign") {
     import com.wavesplatform.lang.v1.repl._
-    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'W'.toByte, "adr")
+    val settings = NodeConnectionSettings("nodes.wavesplatform.com", 'W'.toByte, "adr")
     val client = WebEnvironment(settings)
-    println(client.height)
+    println(client.transactionById(Array(1,2,3)))
   }
 }

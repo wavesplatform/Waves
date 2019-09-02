@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.order
 
-import com.wavesplatform.lang.v1.repl.model.transaction.ByteString
-import com.wavesplatform.lang.v1.repl.model.{Account, AssetPair, OrderType, WithProofs, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, AssetPair, ByteString, OrderType, WithProofs, WithSignature}
 
 case class OrderV2(
   matcherPublicKey: Account,

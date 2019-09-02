@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, Alias, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.{Account, Alias, ByteString, WithProofs}
 
 object AliasTransactionV2 {
   val MAX_TX_SIZE = 1024

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, Transaction, Transfer, WithId, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, Transaction, Transfer, WithId, WithProofs}
 
 object MassTransferTransaction {
   val MASS_TRANSFER = 11

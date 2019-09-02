@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, Alias, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, Alias, ByteString, WithSignature}
 
 case class AliasTransactionV1(
     id: ByteString,

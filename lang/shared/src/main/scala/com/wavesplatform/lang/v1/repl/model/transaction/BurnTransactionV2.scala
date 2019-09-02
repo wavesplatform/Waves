@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithProofs}
 
 object BurnTransactionV2 {
   val MAX_TX_SIZE = 1024

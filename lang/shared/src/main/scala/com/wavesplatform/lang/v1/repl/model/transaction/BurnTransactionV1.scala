@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithSignature}
 
 case class BurnTransactionV1(
     id: ByteString,

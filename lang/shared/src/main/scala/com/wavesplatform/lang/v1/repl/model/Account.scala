@@ -3,9 +3,10 @@ package com.wavesplatform.lang.v1.repl.model
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.utils.Base58
+import io.circe.Decoder.Result
+import io.circe.{Decoder, HCursor}
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.{Blake2bDigest, KeccakDigest, SHA256Digest}
-import upickle.default
 
 case class Account(
   publicKey: Array[Byte],
@@ -13,14 +14,13 @@ case class Account(
 )
 
 object Account {
-  implicit val r: default.Reader[Account] =
-    upickle.default.reader[String]
-      .map[Account](str => {
-        val pk = Base58.decode(str)
-        Account(pk, c => Base58.encode(address(pk)(c)))
-      })
+  implicit val r: Decoder[Account] = (c: HCursor) => Right {
+    val str = c.value.asString.get
+    val pk = Base58.decode(str)
+    Account(pk, c => Base58.encode(address(pk, c)))
+  }
 
-  private def address(publicKey: Array[Byte])(chainId: Byte): Array[Byte] = {
+  private def address(publicKey: Array[Byte],chainId: Byte): Array[Byte] = {
     val buf = ByteBuffer.allocate(26)
     val hash = secureHash(publicKey, 0, publicKey.length)
     buf.put(1.toByte).put(chainId.toByte).put(hash, 0, 20)

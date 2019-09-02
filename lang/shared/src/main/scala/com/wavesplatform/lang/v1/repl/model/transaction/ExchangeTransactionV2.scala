@@ -6,7 +6,7 @@ import java.util.Collections
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.wavesplatform.lang.v1.repl.model.order.Order
-import com.wavesplatform.lang.v1.repl.model.{Account, WithProofs, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithProofs, WithSignature}
 
 object ExchangeTransactionV2 {
   val EXCHANGE = 7

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, Transaction, WithId, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, Transaction, WithId, WithSignature}
 
 case class UnknownTransaction(
   fee: Long,

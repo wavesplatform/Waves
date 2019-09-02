@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import com.wavesplatform.lang.v1.repl.model.{Account, WithProofs, WithSignature}
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithProofs}
 
 object LeaseCancelTransactionV2 {
   val LEASE_CANCEL = 9

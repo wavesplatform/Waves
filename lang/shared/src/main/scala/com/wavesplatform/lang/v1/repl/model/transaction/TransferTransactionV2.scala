@@ -5,7 +5,8 @@ import java.util
 import java.util.Collections
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.wavesplatform.lang.v1.repl.model.{Account, WithProofs}
+import com.wavesplatform.lang.v1.repl.model.tx.TransferTransaction
+import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithProofs}
 
 object TransferTransactionV2 {
   private val MAX_TX_SIZE = 1024
