@@ -1,17 +1,20 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import java.math.{MathContext, RoundingMode, BigDecimal => BD}
+
+import ch.obermuhlner.math.big.BigDecimalMath
+import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError, Request, Response, SttpBackend}
+import com.softwaremill.sttp.testing.SttpBackendStub
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.utils.Merkle
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
+import scala.concurrent.Future
 import scala.util.Try
-
-import java.math.{MathContext, RoundingMode, BigDecimal => BD}
-import ch.obermuhlner.math.big.BigDecimalMath
 
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] =
@@ -68,4 +71,18 @@ object Global extends BaseGlobal {
         val res = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128), MathContext.DECIMAL128)
         res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
       }).toEither.left.map(_.toString)
+
+  override val sttpBackend: SttpBackend[Future, Nothing] = new SttpBackend[Future, Nothing] {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    val internal = HttpURLConnectionBackend()
+
+    override def send[T](request: Request[T, Nothing]): Future[Response[T]] =
+      Future(internal.send(request))
+
+    override def close(): Unit =
+      internal.close()
+
+    override def responseMonad: MonadError[Future] = ???
+  }
 }

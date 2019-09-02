@@ -4,12 +4,12 @@ import com.fasterxml.jackson.core.{JsonParser, TreeNode}
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.node.{NullNode, ObjectNode}
 import com.fasterxml.jackson.databind.{DeserializationContext, ObjectMapper}
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.wavesplatform.lang.v1.repl.model.Transaction
 import com.wavesplatform.lang.v1.repl.model.transaction._
 
+/*
 case class TransactionDeserializer(
-  objectMapper: ObjectMapper with ScalaObjectMapper,
+  objectMapper: ObjectMapper,
   chainIdP: Byte
 ) extends StdDeserializer(classOf[Option[Transaction]]) {
   val notExistCode = 311
@@ -90,3 +90,4 @@ case class TransactionDeserializer(
     objectMapper.treeToValue(treeNode, t).asInstanceOf[Transaction]
   }
 }
+*/

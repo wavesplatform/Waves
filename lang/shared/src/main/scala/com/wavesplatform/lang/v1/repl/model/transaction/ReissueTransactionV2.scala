@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.repl.model.{Account, WithProofs}
 
 object ReissueTransactionV2 {
   val REISSUE             = 5
-  private val MAX_TX_SIZE = KBYTE
+  private val MAX_TX_SIZE = 1024
 }
 
 case class ReissueTransactionV2(

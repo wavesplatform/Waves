@@ -135,9 +135,9 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
   }
 
   property("state reassign") {
-    val repl = Repl()
-    repl.execute("let a = 5")
-    repl.execute("1")
-    repl.execute("a") shouldBe Right("res2: Int = 5")
+    import com.wavesplatform.lang.v1.repl._
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'W'.toByte, "adr")
+    val client = WebEnvironment(settings)
+    println(client.height)
   }
 }

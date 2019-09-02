@@ -1,8 +1,10 @@
 package com.wavesplatform.lang
 
+import com.softwaremill.sttp.{FetchBackend, FetchOptions, SttpBackend}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.BaseGlobal
 
+import scala.concurrent.Future
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 
@@ -54,4 +56,6 @@ object Global extends BaseGlobal {
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
+
+  override val sttpBackend: SttpBackend[Future, Nothing] = FetchBackend(FetchOptions.Default)
 }

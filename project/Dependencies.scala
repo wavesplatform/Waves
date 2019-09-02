@@ -101,8 +101,8 @@ object Dependencies {
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
-      "org.http4s" % "blaze-http_2.12" % "0.14.8",
-      jacksonModuleScala
+      "com.lihaoyi" %%% "upickle" % "0.7.5",
+      "com.softwaremill.sttp" %%% "core" % "1.6.4"
     ) ++ protobuf.value
   )
 

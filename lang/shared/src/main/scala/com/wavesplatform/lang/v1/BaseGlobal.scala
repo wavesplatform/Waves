@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import cats.implicits._
+import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
+import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -9,9 +11,10 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import cats.implicits._
-import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+
+import scala.concurrent.Future
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -157,6 +160,8 @@ trait BaseGlobal {
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
+
+  implicit val sttpBackend: SttpBackend[Future, Nothing]
 }
 
 object BaseGlobal {
