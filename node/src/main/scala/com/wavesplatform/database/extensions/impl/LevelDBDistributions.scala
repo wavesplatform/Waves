@@ -73,10 +73,12 @@ private final class LevelDBWriterDistributions(ldb: LevelDBWriter) extends Distr
     AssetDistribution(dst)
   }
 
-  override def assetDistributionAtHeight(asset: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
+  override def assetDistributionAtHeight(
+      asset: IssuedAsset,
+      height: Int,
+      count: Int,
+      fromAddress: Option[Address]
+  ): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
     lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))

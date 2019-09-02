@@ -27,14 +27,15 @@ package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   private[state] def extractLevelDB(b: Blockchain): LevelDBWriter = b match {
-    case ldb: LevelDBWriter => ldb
+    case ldb: LevelDBWriter      => ldb
     case cb: CompositeBlockchain => extractLevelDB(cb.stableBlockchain)
-    case _ => ???
+    case _                       => ???
   }
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
       address: Address,
-      maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = {
+      maybeAfter: Option[IssuedAsset]
+  ): Observable[IssueTransaction] = {
 
     def nonZeroBalance(asset: IssuedAsset): Boolean = {
       val balanceFromDiff = for {
@@ -83,18 +84,18 @@ package object state {
 
     maybeDiff.fold(nftFromBlockchain) { diff =>
       maybeAfter match {
-        case None                                         => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
+        case None                                            => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
         case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case _                                            => nftFromBlockchain
+        case _                                               => nftFromBlockchain
       }
     }
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsCompose(at: AddressTransactions, fromDiffIter: Observable[(Height, Transaction, Set[Address])])(
-      address: Address,
-      types: Set[TransactionParser],
-      fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
+  def addressTransactionsCompose(
+      at: AddressTransactions,
+      fromDiffIter: Observable[(Height, Transaction, Set[Address])]
+  )(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {

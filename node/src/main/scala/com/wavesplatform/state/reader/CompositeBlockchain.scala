@@ -35,11 +35,12 @@ trait CompositeBlockchain extends Blockchain {
     cats.Monoid.combine(stableBlockchain.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(stableBlockchain.assetScript(asset))
+  override def assetScript(asset: IssuedAsset): Option[Script] =
+    maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(stableBlockchain.assetScript(asset))
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
-    case None => stableBlockchain.hasAssetScript(asset)
+    case None    => stableBlockchain.hasAssetScript(asset)
   }
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
@@ -50,7 +51,7 @@ trait CompositeBlockchain extends Blockchain {
           .get(asset)
           .map { newAssetInfo =>
             val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume)
-            val combination = Monoid.combine(oldAssetInfo, newAssetInfo)
+            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
             ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
           }
           .orElse(Some(ad.copy(script = script)))
@@ -65,7 +66,7 @@ trait CompositeBlockchain extends Blockchain {
       case None =>
         val sponsorship = diff.sponsorship.get(asset).fold(0L) {
           case SponsorshipValue(sp) => sp
-          case SponsorshipNoInfo => 0L
+          case SponsorshipNoInfo    => 0L
         }
         diff.transactions
           .get(asset.id)
@@ -113,9 +114,9 @@ trait CompositeBlockchain extends Blockchain {
     stableBlockchain.height + heightOffset
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = stableBlockchain.resolveAlias(alias) match {
-    case l@Left(AliasIsDisabled(_)) => l
-    case Right(addr) => Right(diff.aliases.getOrElse(alias, addr))
-    case Left(_) => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
+    case l @ Left(AliasIsDisabled(_)) => l
+    case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
+    case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
   override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
@@ -156,37 +157,37 @@ trait CompositeBlockchain extends Blockchain {
       stableBlockchain.balanceSnapshots(address, from, to)
     } else {
       val balance = this.balance(address)
-      val lease = this.leaseBalance(address)
-      val bs = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
+      val lease   = this.leaseBalance(address)
+      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
       if (stableBlockchain.height > 0 && from < this.height) bs +: stableBlockchain.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
 
   override def accountScript(address: Address): Option[Script] = {
     diff.scripts.get(address) match {
-      case None => stableBlockchain.accountScript(address)
-      case Some(None) => None
+      case None            => stableBlockchain.accountScript(address)
+      case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }
   }
 
   override def hasScript(address: Address): Boolean = {
     diff.scripts.get(address) match {
-      case None => stableBlockchain.hasScript(address)
-      case Some(None) => false
+      case None          => stableBlockchain.hasScript(address)
+      case Some(None)    => false
       case Some(Some(_)) => true
     }
   }
 
   override def accountDataKeys(acc: Address): Set[String] = {
     val fromInner = stableBlockchain.accountDataKeys(acc)
-    val fromDiff = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
+    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
     (fromInner ++ fromDiff)
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = stableBlockchain.accountData(acc)
-    val fromDiff = diff.accountData.get(acc).orEmpty
+    val fromDiff  = diff.accountData.get(acc).orEmpty
     fromInner.combine(fromDiff)
   }
 
@@ -241,9 +242,19 @@ trait CompositeBlockchain extends Blockchain {
 }
 
 object CompositeBlockchain {
-  private[this] class CompositeBlockchainImpl(val stableBlockchain: Blockchain, val maybeDiff: Option[Diff] = None, val newBlock: Option[Block] = None, val carryFee: Long = 0) extends CompositeBlockchain
+  private[this] class CompositeBlockchainImpl(
+      val stableBlockchain: Blockchain,
+      val maybeDiff: Option[Diff] = None,
+      val newBlock: Option[Block] = None,
+      val carryFee: Long = 0
+  ) extends CompositeBlockchain
 
-  def apply(stableBlockchain: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carryFee: Option[Long] = None): CompositeBlockchain = stableBlockchain match {
+  def apply(
+      stableBlockchain: Blockchain,
+      maybeDiff: Option[Diff] = None,
+      newBlock: Option[Block] = None,
+      carryFee: Option[Long] = None
+  ): CompositeBlockchain = stableBlockchain match {
     case cb: CompositeBlockchain if cb.newBlock.isEmpty || cb.newBlock == newBlock =>
       val diff = cb.maybeDiff |+| maybeDiff
       new CompositeBlockchainImpl(cb.stableBlockchain, diff, newBlock, carryFee.getOrElse(cb.carryFee))

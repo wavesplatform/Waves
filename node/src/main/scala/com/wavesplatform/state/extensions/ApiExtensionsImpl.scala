@@ -39,16 +39,20 @@ object ApiExtensionsImpl {
     new AddressTransactions with Distributions {
       override def portfolio(a: Address): Portfolio                               = d.portfolio(a)
       override def assetDistribution(asset: Asset.IssuedAsset): AssetDistribution = d.assetDistribution(asset)
-      override def assetDistributionAtHeight(asset: Asset.IssuedAsset,
-                                             height: Int,
-                                             count: Int,
-                                             fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
+      override def assetDistributionAtHeight(
+          asset: Asset.IssuedAsset,
+          height: Int,
+          count: Int,
+          fromAddress: Option[Address]
+      ): Either[ValidationError, AssetDistributionPage] =
         d.assetDistributionAtHeight(asset, height, count, fromAddress)
       override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]                    = d.wavesDistribution(height)
       override def nftObservable(address: Address, from: Option[Asset.IssuedAsset]): Observable[IssueTransaction] = d.nftObservable(address, from)
-      override def addressTransactionsObservable(address: Address,
-                                                 types: Set[TransactionParser],
-                                                 fromId: Option[ByteStr]): Observable[(Height, Transaction)] =
+      override def addressTransactionsObservable(
+          address: Address,
+          types: Set[TransactionParser],
+          fromId: Option[ByteStr]
+      ): Observable[(Height, Transaction)] =
         at.addressTransactionsObservable(address, types, fromId)
     }
   }

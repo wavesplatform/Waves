@@ -42,8 +42,14 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, ae: ApiExtensions, time: Time)
-    extends ApiRoute
+case class AssetsApiRoute(
+    settings: RestAPISettings,
+    wallet: Wallet,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    blockchain: Blockchain,
+    ae: ApiExtensions,
+    time: Time
+) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
 

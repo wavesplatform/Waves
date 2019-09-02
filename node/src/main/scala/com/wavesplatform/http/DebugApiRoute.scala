@@ -52,17 +52,17 @@ case class DebugApiRoute(
     wallet: Wallet,
     ng: NG,
     apiExtensions: ApiExtensions,
-                         peerDatabase: PeerDatabase,
-                         establishedConnections: ConcurrentMap[Channel, PeerInfo],
-                         rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
-                         allChannels: ChannelGroup,
-                         utxStorage: UtxPool,
-                         miner: Miner with MinerDebugInfo,
-                         historyReplier: HistoryReplier,
-                         extLoaderStateReporter: Coeval[RxExtensionLoader.State],
-                         mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
-                         scoreReporter: Coeval[RxScoreObserver.Stats],
-                         configRoot: ConfigObject
+    peerDatabase: PeerDatabase,
+    establishedConnections: ConcurrentMap[Channel, PeerInfo],
+    rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
+    allChannels: ChannelGroup,
+    utxStorage: UtxPool,
+    miner: Miner with MinerDebugInfo,
+    historyReplier: HistoryReplier,
+    extLoaderStateReporter: Coeval[RxExtensionLoader.State],
+    mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
+    scoreReporter: Coeval[RxScoreObserver.Stats],
+    configRoot: ConfigObject
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
