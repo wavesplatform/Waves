@@ -33,7 +33,7 @@ trait LockedCompositeBlockchain extends CompositeBlockchain {
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readLock(super.balanceSnapshots(address, from, to))
   override def accountScript(address: Address): Option[Script] = readLock(super.accountScript(address))
   override def hasScript(address: Address): Boolean = readLock(super.hasScript(address))
-  override def accountDataKeys(acc: Address): Seq[String] = readLock(super.accountDataKeys(acc))
+  override def accountDataKeys(acc: Address): Set[String] = readLock(super.accountDataKeys(acc))
   override def accountData(acc: Address): AccountDataInfo = readLock(super.accountData(acc))
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock(super.accountData(acc, key))
   override def lastBlock: Option[Block] = readLock(super.lastBlock)
