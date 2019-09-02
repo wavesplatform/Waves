@@ -457,7 +457,8 @@ class LevelDBWriter(private[database] val writableDB: DB,
         val assetInfoToInvalidate = Seq.newBuilder[IssuedAsset]
         val ordersToInvalidate = Seq.newBuilder[ByteStr]
         val scriptsToDiscard = Seq.newBuilder[Address]
-        val assetScriptsToDiscard = Seq.newBuilder[IssuedAsset]val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
+        val assetScriptsToDiscard = Seq.newBuilder[IssuedAsset]
+        val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
 
         val h = Height(currentHeight)
 
