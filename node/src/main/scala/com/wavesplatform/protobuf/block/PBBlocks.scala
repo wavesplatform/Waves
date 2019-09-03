@@ -10,7 +10,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
-// TODO: NODE-1860: Add reward to proto
 object PBBlocks {
   def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
     def create(version: Int,
@@ -19,7 +18,7 @@ object PBBlocks {
                consensusData: NxtLikeConsensusBlockData,
                transactionData: Seq[VanillaTransaction],
                featureVotes: Set[Short],
-               //rewardVote: Byte,
+               rewardVote: Long,
                generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
       VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes, -1L)
@@ -35,6 +34,7 @@ object PBBlocks {
         NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
         transactions,
         header.featureVotes.map(intToShort).toSet,
+        header.rewardVote,
         PublicKey(header.generator.toByteArray),
         ByteStr(block.signature.toByteArray)
       )
@@ -56,7 +56,8 @@ object PBBlocks {
           featureVotes.map(shortToInt).toSeq,
           timestamp,
           version,
-          ByteString.copyFrom(generator)
+          ByteString.copyFrom(generator),
+          rewardVote
         )),
       ByteString.copyFrom(signature),
       transactionData.map(PBTransactions.protobuf)
