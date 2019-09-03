@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.functionCosts
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -192,5 +193,64 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
     val costs = functionCosts(V3)
 
     estimate(costs, script("xxx")) shouldBe estimate(costs, script("y"))
+  }
+
+  property("backward func invoke") {
+    val script =
+      """
+        | func f(a: Int) = 1
+        | func g(a: Int) = 2
+        |
+        | f(g(1))
+        |
+        |""".stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(23)
+  }
+
+  property("overlapped func") {
+    val script =
+      """
+        | func f() = {
+        |   func f() = {
+        |     func f() = {
+        |       1
+        |     }
+        |     f()
+        |   }
+        |   f()
+        | }
+        | f()
+        |
+        |""".stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(16)
+  }
+
+  property("overlapped func with recursion") {
+    val expr =
+      BLOCK(
+        FUNC(
+          "f",
+          Nil,
+          BLOCK(
+            FUNC("g", Nil, FUNCTION_CALL(User("f"), Nil)),
+            BLOCK(
+              FUNC(
+                "f",
+                Nil,
+                BLOCK(
+                  FUNC("f", Nil, FUNCTION_CALL(User("g"), Nil)),
+                  FUNCTION_CALL(User("f"), Nil)
+                ),
+              ),
+              FUNCTION_CALL(User("f"), Nil)
+            )
+          )
+        ),
+        FUNCTION_CALL(User("f"), Nil)
+      )
+
+    estimate(functionCosts(V3), expr) shouldBe 'left
   }
 }
