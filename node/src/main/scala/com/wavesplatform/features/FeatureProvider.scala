@@ -20,7 +20,7 @@ object FeatureProvider {
 
     def currentBlockVersion: Byte =
       if (isFeatureActivated(BlockchainFeatures.BlockReward)) RewardBlockVersion
-      else if (isFeatureActivated(BlockchainFeatures.NG)) NgBlockVersion
+      else if (provider.settings.functionalitySettings.blockVersion3AfterHeight < provider.height) NgBlockVersion
       else PlainBlockVersion
 
     def featureActivationHeight(feature: Short): Option[Int] = provider.activatedFeatures.get(feature)

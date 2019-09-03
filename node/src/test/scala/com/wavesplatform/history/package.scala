@@ -9,7 +9,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{BlockchainSettings, TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings._
 import com.wavesplatform.transaction.Transaction
 
 package object history {
@@ -19,8 +19,8 @@ package object history {
   val DefaultBlockchainSettings = BlockchainSettings(
     addressSchemeCharacter = 'N',
     functionalitySettings = TestFunctionalitySettings.Enabled,
-    genesisSettings = null,
-    rewardsSettings = null
+    genesisSettings = GenesisSettings.TESTNET,
+    rewardsSettings = RewardsSettings.TESTNET
   )
 
   val config   = ConfigFactory.load()

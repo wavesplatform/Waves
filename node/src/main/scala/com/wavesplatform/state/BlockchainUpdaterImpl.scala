@@ -142,7 +142,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
 
         mayBeReward match {
           case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
-            Some((votes , reward))
+            Some((votes, reward))
           case None if mayBeTimeToVote == 0 =>
             Some((Seq(), settings.initial))
           case _ => None
@@ -150,12 +150,13 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
       }
       .flatMap {
         case (votes, currentReward) =>
-          val lt = votes.count(_ < currentReward).toDouble / settings.votingInterval
-          val gt = votes.count(_ > currentReward).toDouble / settings.votingInterval
+          val lt        = votes.count(_ < currentReward)
+          val gt        = votes.count(_ > currentReward)
+          val threshold = settings.votingInterval / 2 + 1
 
-          if (lt > 0.5)
+          if (lt > threshold)
             Some(math.max(currentReward - settings.minIncrement, 0))
-          else if (gt > 0.5)
+          else if (gt > threshold)
             Some(currentReward + settings.minIncrement)
           else
             Some(currentReward)

@@ -11,20 +11,7 @@ import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{
-  RewardsSettings,
-  BlockchainSettings,
-  Constants,
-  DBSettings,
-  FunctionalitySettings,
-  MinerSettings,
-  SynchronizationSettings,
-  TestFunctionalitySettings,
-  UtxSettings,
-  WalletSettings,
-  WavesSettings,
-  loadConfig
-}
+import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
