@@ -6,14 +6,14 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionSpec
 import play.api.libs.json.{JsArray, JsObject, Json}
-import com.wavesplatform.block.BlockField
+import com.wavesplatform.block.{Block, BlockField}
 
 trait TransactionsBlockField extends BlockField[Seq[Transaction]]
 
 object TransactionsBlockField {
   def apply(version: Int, value: Seq[Transaction]): TransactionsBlockField = version match {
-    case 1 | 2 => TransactionsBlockFieldVersion1or2(value)
-    case 3 | 4 => TransactionsBlockFieldVersion3(value)
+    case Block.GenesisBlockVersion | Block.PlainBlockVersion => TransactionsBlockFieldVersion1or2(value)
+    case Block.NgBlockVersion | Block.RewardBlockVersion     => TransactionsBlockFieldVersion3(value)
   }
 
   def serTxs(value: Seq[Transaction], serTxCount: Array[Byte]): Array[Byte] = {
