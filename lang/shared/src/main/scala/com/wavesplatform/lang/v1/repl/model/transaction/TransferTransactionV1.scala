@@ -5,16 +5,18 @@ import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithSignature}
 
 case class TransferTransactionV1(
     id: ByteString,
-    signature: ByteString,
     recipient: String,
     amount: Long,
-    assetId: String,
-    feeAssetId: String,
+    assetId: Option[String],
+    feeAssetId: Option[String],
     attachment: ByteString,
     fee: Long,
     timestamp: Long,
     height: Int,
     `type`: Byte,
     version: Byte,
-    senderPublicKey: Account
-) extends TransferTransaction with WithSignature
+    senderPublicKey: Account,
+    signature: ByteString
+) extends TransferTransaction {
+    override def proofs: List[ByteString] = List(signature)
+}

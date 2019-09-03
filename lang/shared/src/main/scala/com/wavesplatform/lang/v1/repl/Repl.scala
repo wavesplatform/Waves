@@ -1,16 +1,12 @@
 package com.wavesplatform.lang.v1.repl
 
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.execution.atomic.Atomic
 
-case class Repl(
-  version:     StdLibVersion = V3,
-  environment: Environment = failFastBlockchainEnv
-) {
-  private val initialCtx = buildInitialCtx(version, environment)
+case class Repl(environment: Environment = failFastBlockchainEnv) {
+  private val initialCtx = buildInitialCtx(environment)
   private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext), view)
   private val currentState = Atomic(initialState)
 

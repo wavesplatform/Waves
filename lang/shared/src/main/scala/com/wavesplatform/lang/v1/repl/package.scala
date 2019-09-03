@@ -7,10 +7,10 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import cats.implicits._
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 
 package object repl {
-  val Global: BaseGlobal = com.wavesplatform.lang.Global
+  val global: BaseGlobal = com.wavesplatform.lang.Global
   val failFastBlockchainEnv = new Environment {
     lazy val unavailable = throw new RuntimeException(s"Blockchain state is unavailable from REPL")
     override def height: Long                                                                                    = 0
@@ -28,11 +28,8 @@ package object repl {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
   }
 
-  def buildInitialCtx(
-    version:     StdLibVersion,
-    environment: Environment
-  ): CTX =
-    CryptoContext.build(Global, version) |+|
-    PureContext.build(Global, version)   |+|
+  def buildInitialCtx(environment: Environment): CTX =
+    CryptoContext.build(global, V3) |+|
+    PureContext.build(global, V3)   |+|
     WavesContext.build(contractDirectiveSet, environment)
 }

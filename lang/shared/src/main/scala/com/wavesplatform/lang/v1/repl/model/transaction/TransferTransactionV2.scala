@@ -1,10 +1,5 @@
 package com.wavesplatform.lang.v1.repl.model.transaction
 
-import java.nio.ByteBuffer
-import java.util
-import java.util.Collections
-
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.wavesplatform.lang.v1.repl.model.tx.TransferTransaction
 import com.wavesplatform.lang.v1.repl.model.{Account, ByteString, WithProofs}
 
@@ -17,8 +12,8 @@ case class TransferTransactionV2(
   proofs: List[ByteString],
   recipient: String,
   amount: Long,
-  assetId: String,
-  feeAssetId: String,
+  assetId: Option[String],
+  feeAssetId: Option[String],
   attachment: ByteString,
   fee: Long,
   timestamp: Long,

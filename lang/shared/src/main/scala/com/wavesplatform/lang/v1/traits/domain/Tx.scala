@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 
 case class TransferItem(recipient: Recipient, amount: Long)
 
-trait Tx
+trait  Tx
 
 object Tx {
   case class ScriptTransfer(assetId: Option[ByteStr],

@@ -10,15 +10,19 @@ import org.bouncycastle.crypto.digests.{Blake2bDigest, KeccakDigest, SHA256Diges
 
 case class Account(
   publicKey: Array[Byte],
-  address: Byte => String
+  addressFomChainId: Byte => String
 )
 
 object Account {
-  implicit val r: Decoder[Account] = (c: HCursor) => Right {
+  implicit val decoder: Decoder[Account] = (c: HCursor) => Right {
     val str = c.value.asString.get
     val pk = Base58.decode(str)
     Account(pk, c => Base58.encode(address(pk, c)))
   }
+
+  private val BLAKE2B256 = new ThreadLocal[Digest]
+  private val KECCAK256 = new ThreadLocal[Digest]
+  private val SHA256 = new ThreadLocal[Digest]
 
   private def address(publicKey: Array[Byte],chainId: Byte): Array[Byte] = {
     val buf = ByteBuffer.allocate(26)
@@ -28,11 +32,6 @@ object Account {
     buf.put(checksum, 0, 4)
     buf.array
   }
-
-  private val BLAKE2B256 = new ThreadLocal[Digest]
-  private val KECCAK256 = new ThreadLocal[Digest]
-  private val SHA256 = new ThreadLocal[Digest]
-
 
   private def secureHash(message: Array[Byte], ofs: Int, len: Int): Array[Byte] = {
     val blake2b = hash(message, ofs, len, BLAKE2B256)
