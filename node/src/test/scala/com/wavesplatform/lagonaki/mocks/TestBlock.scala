@@ -28,7 +28,8 @@ object TestBlock {
         consensusData = b.consensusData,
         transactionData = b.transactionData,
         signer = signer,
-        featureVotes = b.featureVotes
+        featureVotes = b.featureVotes,
+        rewardVote = b.rewardVote
       )
       .explicitGet()
   }
@@ -53,7 +54,8 @@ object TestBlock {
              txs: Seq[Transaction],
              signer: KeyPair = defaultSigner,
              version: Byte = 2,
-             features: Set[Short] = Set.empty[Short]): Block =
+             features: Set[Short] = Set.empty[Short],
+             rewardVote: Long = -1L): Block =
     sign(
       signer,
       Block(
@@ -63,7 +65,8 @@ object TestBlock {
         signerData = SignerData(signer, ByteStr.empty),
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
-        featureVotes = features
+        featureVotes = features,
+        rewardVote = rewardVote
       )
     )
 
@@ -76,7 +79,8 @@ object TestBlock {
             SignerData(defaultSigner, ByteStr.empty),
             NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
             Seq.empty,
-            Set.empty)
+            Set.empty,
+            -1L)
     )
 
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
@@ -88,6 +92,7 @@ object TestBlock {
             SignerData(defaultSigner, ByteStr.empty),
             NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
             Seq.empty,
-            features)
+            features,
+            -1L)
     )
 }
