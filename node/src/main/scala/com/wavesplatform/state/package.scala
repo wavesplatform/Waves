@@ -6,10 +6,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -25,12 +23,6 @@ import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
-
-  private[state] def extractLevelDB(b: Blockchain): LevelDBWriter = b match {
-    case ldb: LevelDBWriter      => ldb
-    case cb: CompositeBlockchain => extractLevelDB(cb.stableBlockchain)
-    case _                       => ???
-  }
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
       address: Address,
