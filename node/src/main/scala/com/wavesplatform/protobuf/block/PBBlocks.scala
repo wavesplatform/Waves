@@ -21,7 +21,7 @@ object PBBlocks {
                rewardVote: Long,
                generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes, -1L)
+      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes, rewardVote)
     }
 
     for {
