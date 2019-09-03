@@ -65,7 +65,7 @@ private[api] class CommonAccountApi(blockchain: Blockchain, ae: ApiExtensions) {
 
   def dataStream(address: Address, keyFilter: String => Boolean = _ => true): Observable[DataEntry[_]] = {
     Observable
-      .defer(Observable.fromIterable(concurrent.blocking(blockchain.accountDataKeys(address))))
+      .defer(Observable.fromIterable(concurrent.blocking(ae.accountDataKeys(address))))
       .filter(keyFilter)
       .map(blockchain.accountData(address, _))
       .flatMap(Observable.fromIterable(_))

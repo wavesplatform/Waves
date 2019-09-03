@@ -8,11 +8,13 @@ import com.wavesplatform.transaction.{Transaction, TransactionParser}
 import monix.reactive.Observable
 
 private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, getDiff: () => Option[Diff]) extends AddressTransactions {
-  override def addressTransactionsObservable(address: Address,
-                                             types: Set[TransactionParser],
-                                             fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
+  override def addressTransactionsObservable(
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]
+  ): Observable[(Height, Transaction)] = {
     val fromDiff = for {
-      diff <- getDiff().toIterable
+      diff                    <- getDiff().toIterable
       (height, tx, addresses) <- diff.transactions.values.toVector.reverse
     } yield (Height(height), tx, addresses)
 

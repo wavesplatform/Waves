@@ -67,9 +67,7 @@ trait Blockchain {
   def assetScript(id: IssuedAsset): Option[Script]
   def hasAssetScript(id: IssuedAsset): Boolean
 
-  def accountDataKeys(address: Address): Set[String]
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
-  def accountData(acc: Address): AccountDataInfo
 
   def leaseBalance(address: Address): LeaseBalance
 

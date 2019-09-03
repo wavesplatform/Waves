@@ -144,22 +144,6 @@ class LevelDBWriter(
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
-    AccountDataInfo((for {
-      key   <- accountDataKeys(address)
-      value <- accountData(address, key)
-    } yield key -> value).toMap)
-  }
-
-  override def accountDataKeys(address: Address): Set[String] = readOnly { db =>
-    (for {
-      addressId <- addressId(address).toVector
-      keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
-      chunkNo <- Range(0, keyChunkCount)
-      key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
-    } yield key).toSet
-  }
-
   override protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]] = {
     val (address, key) = addressWithKey
 

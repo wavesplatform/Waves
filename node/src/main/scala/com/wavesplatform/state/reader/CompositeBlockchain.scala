@@ -179,18 +179,6 @@ trait CompositeBlockchain extends Blockchain {
     }
   }
 
-  override def accountDataKeys(acc: Address): Set[String] = {
-    val fromInner = stableBlockchain.accountDataKeys(acc)
-    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    (fromInner ++ fromDiff)
-  }
-
-  override def accountData(acc: Address): AccountDataInfo = {
-    val fromInner = stableBlockchain.accountData(acc)
-    val fromDiff  = diff.accountData.get(acc).orEmpty
-    fromInner.combine(fromDiff)
-  }
-
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = diff.accountData.get(acc).orEmpty
     diffData.data.get(key).orElse(stableBlockchain.accountData(acc, key))

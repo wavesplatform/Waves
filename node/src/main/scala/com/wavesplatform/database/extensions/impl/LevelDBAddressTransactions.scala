@@ -17,7 +17,7 @@ import monix.reactive.Observable
 import scala.util.Success
 import scala.util.control.NonFatal
 
-private final class LevelDBWriterAddressTransactions(levelDBWriter: LevelDBWriter) extends AddressTransactions {
+private final class LevelDBAddressTransactions(levelDBWriter: LevelDBWriter) extends AddressTransactions {
 
   import levelDBWriter.{dbSettings, readOnlyNoClose}
 
@@ -121,6 +121,6 @@ private final class LevelDBWriterAddressTransactions(levelDBWriter: LevelDBWrite
     }
 }
 
-object LevelDBWriterAddressTransactions {
-  def apply(ldb: LevelDBWriter): AddressTransactions = new LevelDBWriterAddressTransactions(ldb)
+object LevelDBAddressTransactions {
+  def apply(ldb: LevelDBWriter): AddressTransactions = new LevelDBAddressTransactions(ldb)
 }

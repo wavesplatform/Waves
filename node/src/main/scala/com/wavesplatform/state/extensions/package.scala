@@ -1,8 +1,8 @@
 package com.wavesplatform.state
 
 package object extensions {
-  final type ApiExtensions = AddressTransactions with Distributions
+  final type ApiExtensions = AddressTransactions with Distributions with AccountAggregations
   object ApiExtensions {
-    val empty: ApiExtensions = ApiExtensionsImpl.fromAddressTransactionsAndDistributions(AddressTransactions.empty, Distributions.empty)
+    val empty: ApiExtensions = ApiExtensionsImpl.compose(AddressTransactions.empty, Distributions.empty, AccountAggregations.empty)
   }
 }

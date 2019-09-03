@@ -2,11 +2,10 @@ package com.wavesplatform.database.extensions.impl
 
 import cats.effect.Resource
 import com.wavesplatform.account.Address
-import com.wavesplatform.database.{Keys, LevelDBWriter, ReadOnlyDB}
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionPage, Portfolio}
+import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionPage}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -14,13 +13,8 @@ import com.wavesplatform.utils.Paged
 import monix.eval.Task
 import monix.reactive.Observable
 
-private final class LevelDBWriterDistributions(ldb: LevelDBWriter) extends Distributions {
-  import LevelDBWriter._
-  import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
+private final class LevelDBDistributions(ldb: LevelDBWriter) extends Distributions {
   import ldb._
-
-  def portfolio(a: Address): Portfolio =
-    loadPortfolio(a)
 
   def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
     def openIterator() = readOnlyNoClose { (snapshot, db) =>
@@ -150,31 +144,8 @@ private final class LevelDBWriterDistributions(ldb: LevelDBWriter) extends Distr
     )
   }
 
-  private[this] def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      asset <- db.get(Keys.assetList(addressId))
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
-  )
-
-  private def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-    assets = (for {
-      issuedAsset <- db.get(Keys.assetList(addressId))
-      asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
-      }
-    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
-  )
-
-  private[this] def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    val excludeNFT = ldb.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
-
-    addressId(address).fold(Portfolio.empty) { addressId =>
-      if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)
-      else loadFullPortfolio(db, addressId)
-    }
-  }
 }
 
-object LevelDBWriterDistributions {
-  def apply(ldb: LevelDBWriter): Distributions = new LevelDBWriterDistributions(ldb)
+object LevelDBDistributions {
+  def apply(ldb: LevelDBWriter): Distributions = new LevelDBDistributions(ldb)
 }
