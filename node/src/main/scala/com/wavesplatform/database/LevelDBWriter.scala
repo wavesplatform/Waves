@@ -33,6 +33,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{immutable, mutable}
 import scala.util.Try
+import scala.util.control.NonFatal
 
 object LevelDBWriter {
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
@@ -424,7 +425,11 @@ class LevelDBWriter(
           .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-        rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+        try rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+        catch {
+          case NonFatal(e) =>
+            throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
+        }
     }
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))

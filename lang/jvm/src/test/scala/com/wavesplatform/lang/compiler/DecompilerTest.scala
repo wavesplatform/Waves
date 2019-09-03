@@ -646,4 +646,16 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, decompilerContext) shouldEq script
   }
 
+  property("list func params") {
+    val script =
+      """
+        | func f(a: List[String], b: String) = a[0] + b
+        | f(["a", "b"], "c")
+      """.stripMargin
+    val Right((expr, _)) = compile(script)
+    Decompiler(expr, decompilerContext) shouldEq
+      """func f (a,b) = (a[0] + b)
+        |
+        |f(["a", "b"], "c")""".stripMargin
+  }
 }

@@ -44,15 +44,15 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
-    local {
-      for {
-        ctx <- get
-        _   <- modify[EstimatorContext, ExecutionError](userFuncs.modify(_)(storeFuncCtx(_, func, ctx)))
-        r   <- evalExpr(inner)
-      } yield r + 5
-    }
+    for {
+      ctx <- get
+      _   <- modify[EstimatorContext, ExecutionError]((userFuncs ~ callChain).modify(_) {
+        case (funcs, calls) => (storeFuncArgsCtx(funcs, func, ctx), calls - func.name)
+      })
+      r   <- evalExpr(inner)
+    } yield r + 5
 
-  private def storeFuncCtx(
+  private def storeFuncArgsCtx(
     funcDef: Map[FunctionHeader, (FUNC, EstimatorContext)],
     func:    FUNC,
     ctx:     EstimatorContext
@@ -90,24 +90,29 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     for {
       ctx <- get
       bodyComplexity <- predefFuncs.get(ctx).get(header).map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
-        .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, ctx, args)))
+        .orElse(userFuncs.get(ctx).get(header)
+          .map { case (func, funcCtx) =>
+            if (ctx.callChain.contains(func.name))
+              raiseError[EstimatorContext, ExecutionError, Long](s"Recursive call ${func.name}()")
+            else
+              evalUserFuncCall(func, funcCtx, args)
+          })
         .getOrElse(raiseError(s"function '$header' not found"))
     } yield bodyComplexity
 
   private def evalUserFuncCall(
-    localFuncCtx: (FUNC, EstimatorContext),
-    baseCtx:      EstimatorContext,
-    args:         List[EXPR]
-  ): EvalM[Long] = {
-    val (f, localCtx) = localFuncCtx
+    func:    FUNC,
+    funcCtx: EstimatorContext,
+    args:    List[EXPR]
+  ): EvalM[Long] =
     for {
-      _ <- modify[EstimatorContext, ExecutionError](userFuncs.set(_)(localCtx.userFuncs))
       argsComplexity <- evalFuncArgs(args)
-      _ <- modify[EstimatorContext, ExecutionError](lets.modify(_)(_ ++ localCtx.letDefs))
-      bodyComplexity <- evalExpr(f.body).map(_ + f.args.size * 5)
-      _ <- modify[EstimatorContext, ExecutionError](userFuncs.set(_)(baseCtx.userFuncs))
+      _              <- modify[EstimatorContext, ExecutionError]((lets ~ callChain).modify(_) {
+        case (l, c) => (l ++ funcCtx.letDefs, c + func.name)
+      })
+      bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
+      _              <- modify[EstimatorContext, ExecutionError](callChain.modify(_)(_ - func.name))
     } yield bodyComplexity + argsComplexity
-  }
 
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =
     args.traverse(evalExpr).map(_.sum)

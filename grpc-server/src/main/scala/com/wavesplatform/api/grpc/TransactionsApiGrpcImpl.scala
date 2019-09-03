@@ -1,14 +1,16 @@
 package com.wavesplatform.api.grpc
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.{InvokeScriptResult, PBSignedTransaction, PBTransaction, VanillaTransaction}
 import com.wavesplatform.state.extensions.AddressTransactions
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
@@ -31,19 +33,28 @@ class TransactionsApiGrpcImpl(
   private[this] val commonApi = new CommonTransactionsApi(blockchain, addressTransactions, utx, wallet, publishTransaction)
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
-    val stream = commonApi
-      .transactionsByAddress(request.sender.toAddress)
-      .map {
-        case (height, transaction) if transactionFilter(request, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB))
-      }
+    val transactions =
+      if (!request.sender.isEmpty) commonApi.transactionsByAddress(request.sender.toAddress)
+      else if (request.recipient.isDefined) commonApi.transactionsByAddress(request.getRecipient.toAddress)
+      else Observable.empty
+
+    val filter = transactionFilter(request.sender, request.recipient, request.transactionIds.toSet, _)
+    val stream = transactions.collect {
+      case (height, transaction) if filter(transaction) =>
+        TransactionResponse(transaction.id(), height, Some(transaction.toPB))
+    }
 
     responseObserver.completeWith(stream)
   }
 
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
-    val stream = Observable(commonApi.unconfirmedTransactions(): _*)
-      .filter(transactionFilter(request, _))
-      .map(tx => TransactionResponse(tx.id(), transaction = Some(tx.toPB)))
+    val stream = {
+      val txIds = request.transactionIds.toSet
+
+      Observable(commonApi.unconfirmedTransactions(): _*)
+        .filter(transactionFilter(request.sender, request.recipient, txIds, _))
+        .map(tx => TransactionResponse(tx.id(), transaction = Some(tx.toPB)))
+    }
 
     responseObserver.completeWith(stream)
   }
@@ -93,18 +104,27 @@ class TransactionsApiGrpcImpl(
       .explicitGetErr()
   }
 
-  private[this] def transactionFilter(request: TransactionsRequest, tx: VanillaTransaction): Boolean = {
-    val senderMatches = request.sender.isEmpty || (tx match {
-      case a: AuthorizedTransaction => request.sender.isEmpty || a.sender.toAddress == request.sender.toAddress
+  private[this] def transactionFilter(
+      sender: ByteString,
+      recipient: Option[Recipient],
+      transactionIds: Set[ByteString],
+      tx: VanillaTransaction
+  ): Boolean = {
+    val senderMatches = sender.isEmpty || (tx match {
+      case a: AuthorizedTransaction => sender.isEmpty || a.sender.toAddress == sender.toAddress
       case _                        => false
     })
 
-    val recipientMatches = tx match {
-      case tt: TransferTransaction => request.recipient.isEmpty || tt.recipient == request.getRecipient.toAddressOrAlias
-      case _                       => request.recipient.isEmpty
-    }
+    lazy val recipientAddr = recipient.get.toAddressOrAlias
+    val recipientMatches = recipient.isEmpty || (tx match {
+      case tt: TransferTransaction      => tt.recipient == recipientAddr
+      case lt: LeaseTransaction         => lt.recipient == recipientAddr
+      case mtt: MassTransferTransaction => mtt.transfers.map(_.address).contains(recipientAddr)
+      case tx: AuthorizedTransaction    => recipientAddr == tx.sender.toAddress
+      case _                            => false
+    })
 
-    val transactionIdMatches = request.transactionIds.isEmpty || request.transactionIds.contains(tx.id().toPBByteString)
+    val transactionIdMatches = transactionIds.isEmpty || transactionIds.contains(tx.id().toPBByteString)
     senderMatches && recipientMatches && transactionIdMatches
   }
 }
