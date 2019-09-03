@@ -132,7 +132,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
       .filter(_ <= height)
       .flatMap { activatedAt =>
         def votes: Seq[Long] = {
-          val votes       = blockchain.blockRewardVotes(blockchain.height)
+          val votes       = blockchain.blockRewardVotes(height - 1)
           val currentVote = block.rewardVote
           (votes :+ currentVote).filter(_ >= 0)
         }
@@ -144,7 +144,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
           case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
             Some((votes , reward))
           case None if mayBeTimeToVote == 0 =>
-            Some((votes, settings.initial))
+            Some((Seq(), settings.initial))
           case _ => None
         }
       }
@@ -392,10 +392,11 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
   }
 
   override def blockRewardVotes(height: Int): Seq[Long] = readLock {
-    val innerVotes = blockchain.blockRewardVotes(height)
     ngState match {
-      case Some(ng) if this.height <= height => innerVotes :+ ng.base.rewardVote
-      case None                              => innerVotes
+      case Some(ng) if this.height == height =>
+        blockchain.blockRewardVotes(height - 1).tail :+ ng.base.rewardVote
+      case _                                 =>
+        blockchain.blockRewardVotes(height)
     }
   }
 

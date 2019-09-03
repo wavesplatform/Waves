@@ -325,10 +325,6 @@ package object database extends ScorexLogging {
                                  transactionCount,
                                  featureVotes,
                                  rewardVote)
-
-    log.error(s"HEY, rewardVote = $rewardVote")
-    log.error(s"HEY, header = $header")
-
     (header, size)
   }
 

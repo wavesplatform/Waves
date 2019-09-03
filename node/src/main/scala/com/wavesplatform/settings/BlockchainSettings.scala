@@ -20,6 +20,21 @@ case class RewardsSettings(
   require(term > 0, "term must be greater than 0")
   require(votingInterval > 0, "votingInterval must be greater than 0")
   require(votingInterval <= term, s"votingInterval must be less than or equal to term($term)")
+
+  def nearestTermEnd(activatedAt: Int, height: Int): Int = {
+    require(height >= activatedAt)
+    val diff = height - activatedAt
+    val mul  = math.ceil(diff.toDouble / term).toInt
+    val next = activatedAt + mul * term
+    if (next == height) next + term else next
+  }
+
+  def votingWindow(activatedAt: Int, height: Int): Range = {
+    val end   = nearestTermEnd(activatedAt, height)
+    val start = end - votingInterval + 1
+    if (height >= start) Range.inclusive(start, height)
+    else Range(0, 0)
+  }
 }
 
 object RewardsSettings {

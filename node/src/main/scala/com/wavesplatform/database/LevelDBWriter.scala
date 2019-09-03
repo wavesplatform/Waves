@@ -230,7 +230,14 @@ class LevelDBWriter(private[database] val writableDB: DB,
     else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
   }
 
-  override def blockReward(height: Int): Option[Long] = readOnly(_.get(Keys.blockReward(height)))
+  override def blockReward(height: Int): Option[Long] =
+    readOnly(_.db.get(Keys.blockReward(height))).orElse {
+    activatedFeatures.get(BlockchainFeatures.BlockReward.id)
+        .collect {
+          case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
+        }
+    }
+
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
@@ -438,7 +445,7 @@ class LevelDBWriter(private[database] val writableDB: DB,
     lastBlockRewardCache = reward
     reward.foreach { lastReward =>
       rw.put(Keys.blockReward(height), Some(lastReward))
-      rw.put(Keys.wavesAmount(height), wavesAmount(height) + lastReward)
+      rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
     }
 
     for ((asset, sp: SponsorshipValue) <- sponsorship) {
@@ -595,6 +602,8 @@ class LevelDBWriter(private[database] val writableDB: DB,
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
+          rw.delete(Keys.blockReward(currentHeight))
+          rw.delete(Keys.wavesAmount(currentHeight))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
@@ -923,12 +932,15 @@ class LevelDBWriter(private[database] val writableDB: DB,
   }
 
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
-    Range(height - settings.rewardsSettings.votingInterval + 1, height)
-      .map { h =>
-        db.get(Keys.blockHeaderAndSizeAt(Height(h)))
-          .map(_._1.rewardVote)
-          .get
-      }
+    activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
+      case Some(activatedAt) if activatedAt <= height =>
+        settings.rewardsSettings.votingWindow(activatedAt, height)
+          .flatMap { h =>
+            db.get(Keys.blockHeaderAndSizeAt(Height(h)))
+              .map(_._1.rewardVote)
+          }
+      case _ => Seq()
+    }
   }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =

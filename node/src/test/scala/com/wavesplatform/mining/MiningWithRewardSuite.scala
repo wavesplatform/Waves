@@ -205,7 +205,7 @@ object MiningWithRewardSuite {
       override val dbSettings: DBSettings
   ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
     def saveReward(newReward: Long): Unit = {
-      db.put(Keys.blockReward(1).keyBytes, Keys.blockReward(0).encode(Some(newReward)))
+      db.put(Keys.blockReward(0).keyBytes, Keys.blockReward(0).encode(Some(newReward)))
     }
   }
 
