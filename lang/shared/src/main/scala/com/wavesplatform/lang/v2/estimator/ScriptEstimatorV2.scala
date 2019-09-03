@@ -44,13 +44,15 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
-    for {
-      ctx <- get
-      _   <- modify[EstimatorContext, ExecutionError]((userFuncs ~ callChain).modify(_) {
-        case (funcs, calls) => (storeFuncArgsCtx(funcs, func, ctx), calls - func.name)
-      })
-      r   <- evalExpr(inner)
-    } yield r + 5
+    local {
+      for {
+        ctx <- get
+        _ <- modify[EstimatorContext, ExecutionError]((userFuncs ~ callChain).modify(_) {
+          case (funcs, calls) => (storeFuncArgsCtx(funcs, func, ctx), calls - func.name)
+        })
+        r <- evalExpr(inner)
+      } yield r + 5
+    }
 
   private def storeFuncArgsCtx(
     funcDef: Map[FunctionHeader, (FUNC, EstimatorContext)],
