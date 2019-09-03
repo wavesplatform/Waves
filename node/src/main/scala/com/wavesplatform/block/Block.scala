@@ -227,8 +227,8 @@ object Block extends ScorexLogging {
       Seq.empty
     } else {
       val v: (Array[Byte], Int) = version match {
-        case 1 | 2 => (bytes.tail, bytes.head) //  127 max, won't work properly if greater
-        case 3 | 4 =>
+        case Block.GenesisBlockVersion | Block.PlainBlockVersion => (bytes.tail, bytes.head) //  127 max, won't work properly if greater
+        case Block.NgBlockVersion | Block.RewardBlockVersion =>
           val size = ByteBuffer.wrap(bytes, 0, 4).getInt()
           (bytes.drop(4), size)
         case _ => ???
