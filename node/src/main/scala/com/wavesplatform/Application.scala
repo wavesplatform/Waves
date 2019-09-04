@@ -277,7 +277,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
-        AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater)
+        AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
+        RewardApiRoute(blockchainUpdater),
       )
 
       val apiTypes: Set[Class[_]] = Set(
@@ -293,7 +294,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         classOf[AssetsApiRoute],
         classOf[ActivationApiRoute],
         classOf[LeaseApiRoute],
-        classOf[AliasApiRoute]
+        classOf[AliasApiRoute],
+        classOf[RewardApiRoute]
       )
 
       val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute

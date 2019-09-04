@@ -3,7 +3,7 @@ import WavesDockerKeys._
 enablePlugins(WavesDockerPlugin, ItTestPlugin)
 
 description := "NODE integration tests"
-libraryDependencies ++= Dependencies.itTest
+libraryDependencies ++= Dependencies.it
 
 inTask(docker)(
   Seq(

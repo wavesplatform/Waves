@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 
+import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
 import com.wavesplatform.common.utils.EitherExt2
@@ -154,6 +155,8 @@ object AsyncHttpApi extends Assertions {
     def status: Future[Status] = get("/node/status").as[Status]
 
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
+
+    def rewardStatus(height: Int): Future[RewardStatus] = get(s"/blockchain/rewards/$height").as[RewardStatus]
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 

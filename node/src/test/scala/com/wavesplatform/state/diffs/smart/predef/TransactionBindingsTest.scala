@@ -499,7 +499,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val s = s"""
                  |match tx {
                  | case t : Order =>
-                 |   let id = t.id == base58'${t.id()}'
+                 |   let id = t.id == base58'${t.id().base58}'
                  |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender).toString}')
                  |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender).toString}'
                  |   let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(t.matcherPublicKey).toString}'

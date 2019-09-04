@@ -28,7 +28,8 @@ object TestBlock {
         consensusData = b.consensusData,
         transactionData = b.transactionData,
         signer = signer,
-        featureVotes = b.featureVotes
+        featureVotes = b.featureVotes,
+        rewardVote = b.rewardVote
       )
       .explicitGet()
   }
@@ -41,9 +42,6 @@ object TestBlock {
   def create(signer: KeyPair, txs: Seq[Transaction], features: Set[Short]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
 
-  def create(signer: KeyPair, txs: Seq[Transaction], ref: ByteStr): Block =
-    create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer, ref = ref)
-
   def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
 
   def create(time: Long, txs: Seq[Transaction], signer: KeyPair): Block = create(time, randomSignature(), txs, signer)
@@ -53,7 +51,8 @@ object TestBlock {
              txs: Seq[Transaction],
              signer: KeyPair = defaultSigner,
              version: Byte = 2,
-             features: Set[Short] = Set.empty[Short]): Block =
+             features: Set[Short] = Set.empty[Short],
+             rewardVote: Long = -1L): Block =
     sign(
       signer,
       Block(
@@ -63,7 +62,8 @@ object TestBlock {
         signerData = SignerData(signer, ByteStr.empty),
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
-        featureVotes = features
+        featureVotes = features,
+        rewardVote = rewardVote
       )
     )
 
@@ -76,7 +76,8 @@ object TestBlock {
             SignerData(defaultSigner, ByteStr.empty),
             NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
             Seq.empty,
-            Set.empty)
+            Set.empty,
+            -1L)
     )
 
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
@@ -88,6 +89,7 @@ object TestBlock {
             SignerData(defaultSigner, ByteStr.empty),
             NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
             Seq.empty,
-            features)
+            features,
+            -1L)
     )
 }

@@ -4,6 +4,7 @@ import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
@@ -128,13 +129,14 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
       for {
         signedBlock <- Block
           .buildAndSign(
-            version = 3,
+            version = blockchainUpdater.currentBlockVersion,
             timestamp = accumulatedBlock.timestamp,
             reference = accumulatedBlock.reference,
             consensusData = accumulatedBlock.consensusData,
             transactionData = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account,
-            featureVotes = accumulatedBlock.featureVotes
+            featureVotes = accumulatedBlock.featureVotes,
+            rewardVote = accumulatedBlock.rewardVote
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock
@@ -145,6 +147,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
             signedBlock.signerData.signature
           )
           .leftMap(MicroBlockBuildError)
+        _ = BlockStats.mined(microBlock)
       } yield (signedBlock, microBlock)
     }
 }

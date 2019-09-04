@@ -23,7 +23,7 @@ package object diffs extends WithState with Matchers {
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, precondition)
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.diff))
@@ -35,7 +35,7 @@ package object diffs extends WithState with Matchers {
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, precondition)
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.diff))
@@ -48,7 +48,7 @@ package object diffs extends WithState with Matchers {
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
-      state.append(diff, fees, totalFee, curBlock)
+      state.append(diff, fees, totalFee, None, curBlock)
       Some(curBlock)
     }
 
@@ -56,7 +56,7 @@ package object diffs extends WithState with Matchers {
     val cb              = CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 
-    state.append(diff, fees, totalFee, block)
+    state.append(diff, fees, totalFee, None, block)
     assertion(diff, state)
   }
 
@@ -74,7 +74,7 @@ package object diffs extends WithState with Matchers {
 
       test(txs => {
         val block = TestBlock.create(txs)
-        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, block))
+        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block))
       })
     }
 

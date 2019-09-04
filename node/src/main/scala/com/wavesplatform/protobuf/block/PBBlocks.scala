@@ -18,9 +18,10 @@ object PBBlocks {
                consensusData: NxtLikeConsensusBlockData,
                transactionData: Seq[VanillaTransaction],
                featureVotes: Set[Short],
+               rewardVote: Long,
                generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
+      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes, rewardVote)
     }
 
     for {
@@ -33,6 +34,7 @@ object PBBlocks {
         NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
         transactions,
         header.featureVotes.map(intToShort).toSet,
+        header.rewardVote,
         PublicKey(header.generator.toByteArray),
         ByteStr(block.signature.toByteArray)
       )
@@ -54,7 +56,8 @@ object PBBlocks {
           featureVotes.map(shortToInt).toSeq,
           timestamp,
           version,
-          ByteString.copyFrom(generator)
+          ByteString.copyFrom(generator),
+          rewardVote
         )),
       ByteString.copyFrom(signature),
       transactionData.map(PBTransactions.protobuf)
