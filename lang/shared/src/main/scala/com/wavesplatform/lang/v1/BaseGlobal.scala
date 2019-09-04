@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 import cats.implicits._
 import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
+import com.wavesplatform.lang.v1.parser.Expressions
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -98,20 +99,20 @@ trait BaseGlobal {
                         restrictToLetBlockOnly: Boolean,
                         stdLibVersion: StdLibVersion,
                         isDecl: Boolean
-                       ): Either[String, (Array[Byte], Terms.EXPR, Long)] = {
+                       ): Either[String, (Array[Byte], (Terms.EXPR, Expressions.EXPR), Long)] = {
     val compiler =
       if (isDecl) ExpressionCompiler.compileDecls _
       else ExpressionCompiler.compile _
     for {
-      ex <- compiler(input, context)
-      illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
+      compilationRes <- compiler(input, context)
+      illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(compilationRes._1)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      x = serializeExpression(ex, stdLibVersion)
+      serializedExpr = serializeExpression(compilationRes._1, stdLibVersion)
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion)
-      complexity <- ScriptEstimator(vars, costs, ex)
-    } yield (x, ex, complexity)
+      complexity <- ScriptEstimator(vars, costs, compilationRes._1)
+    } yield (serializedExpr, compilationRes, complexity)
   }
 
   type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])

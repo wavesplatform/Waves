@@ -55,7 +55,7 @@ case class Repl(ver: StdLibVersion = V3) {
         { case (_, _, err) => Left(err.traced.toString) },
         { case (result, _) => Right(result) }
       )
-      (compiled, cType) <- tryEi(ExpressionCompiler(ctx.compilerContext, parsed))
+      (compiled, cType, _) <- tryEi(ExpressionCompiler(ctx.compilerContext, parsed))
       eval              <- tryEi(EvaluatorV1[EVALUATED](ctx.evaluationContext, compiled))
     } yield (eval.prettyString(0), cType)
 

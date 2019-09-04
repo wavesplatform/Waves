@@ -23,7 +23,7 @@ object JavaAdapter {
       .compile(input, ctx)
       .fold(
         error => throw new IllegalArgumentException(error),
-        expr => expr
+        res => res._1
       )
   }
 }

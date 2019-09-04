@@ -135,24 +135,24 @@ trait ScriptGen {
   }
 
   def toString(expr: EXPR): Gen[String] = expr match {
-    case CONST_LONG(_, x)    => withWhitespaces(s"$x")
-    case REF(_, x)           => withWhitespaces(toString(x))
-    case CONST_STRING(_, x)  => withWhitespaces(s"""\"${toString(x)}\"""")
-    case CONST_BYTESTR(_, x) => withWhitespaces(s"""base58'${toString(x)}'""")
+    case CONST_LONG(_, x, _)    => withWhitespaces(s"$x")
+    case REF(_, x, _)           => withWhitespaces(toString(x))
+    case CONST_STRING(_, x, _)  => withWhitespaces(s"""\"${toString(x)}\"""")
+    case CONST_BYTESTR(_, x, _) => withWhitespaces(s"""base58'${toString(x)}'""")
     case _: TRUE             => withWhitespaces("true")
     case _: FALSE            => withWhitespaces("false")
-    case BINARY_OP(_, x, op: BinaryOperation, y) =>
+    case BINARY_OP(_, x, op: BinaryOperation, y, _) =>
       for {
         arg1 <- toString(x)
         arg2 <- toString(y)
       } yield s"($arg1${opsToFunctions(op)}$arg2)"
-    case IF(_, cond, x, y) =>
+    case IF(_, cond, x, y, _) =>
       for {
         c <- toString(cond)
         t <- toString(x)
         f <- toString(y)
       } yield s"(if ($c) then $t else $f)"
-    case BLOCK(_, let: LET, body) =>
+    case BLOCK(_, let: LET, body, _) =>
       for {
         v         <- toString(let.value)
         b         <- toString(body)
@@ -160,9 +160,9 @@ trait ScriptGen {
         sep       <- if (isNewLine) Gen.const("\n") else withWhitespaces(";")
       } yield s"let ${toString(let.name)} = $v$sep$b"
 
-    case FUNCTION_CALL(_, PART.VALID(_, "-"), List(CONST_LONG(_, v))) if v >= 0 =>
+    case FUNCTION_CALL(_, PART.VALID(_, "-"), List(CONST_LONG(_, v, _)), _) if v >= 0 =>
       s"-($v)"
-    case FUNCTION_CALL(_, op, List(e)) => toString(e).map(e => s"${toString(op)}$e")
+    case FUNCTION_CALL(_, op, List(e), _) => toString(e).map(e => s"${toString(op)}$e")
 
     case x => throw new NotImplementedError(s"toString for ${x.getClass.getSimpleName}")
   }

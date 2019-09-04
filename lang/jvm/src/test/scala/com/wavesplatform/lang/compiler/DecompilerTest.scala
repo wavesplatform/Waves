@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -487,7 +487,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |}""".stripMargin
   }
 
-  def compile(code: String): Either[String, (EXPR, TYPE)] = {
+  def compile(code: String): Either[String, (EXPR, TYPE, Expressions.EXPR)] = {
     val untyped = Parser.parseExpr(code).get.value
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed
@@ -500,7 +500,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x : PointC => 2
     }"""
 
-    val Right((expr, ty)) = compile(script)
+    val Right((expr, ty, _)) = compile(script)
  
     val rev = Decompiler(expr, decompilerContext)
 
@@ -521,7 +521,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x => 2
     }"""
 
-    val Right((expr, ty)) = compile(script)
+    val Right((expr, ty, _)) = compile(script)
  
     val rev = Decompiler(expr, decompilerContext)
 
@@ -540,7 +540,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x => 2
     }"""
 
-    val Right((expr, ty)) = compile(script)
+    val Right((expr, ty, _)) = compile(script)
  
     val rev = Decompiler(expr, decompilerContext)
 
@@ -554,13 +554,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("multiple value list") {
     val script = """["a", "b", "c", "d"]"""
-    val Right((expr, _)) = compile(script)
+    val Right((expr, _, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
 
   property("single value list") {
     val script = """["a"]"""
-    val Right((expr, _)) = compile(script)
+    val Right((expr, _, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
 
@@ -568,13 +568,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val script =
       """let list = ["b", "c", "d"]
         |"a" :: list""".stripMargin
-    val Right((expr, _)) = compile(script)
+    val Right((expr, _, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
 
   property("extracted functions") {
     val script = """addressFromStringValue("abcd")"""
-    val Right((expr, _)) = compile(script)
+    val Right((expr, _, _)) = compile(script)
     Decompiler(expr, decompilerContext) shouldEq script
   }
 }

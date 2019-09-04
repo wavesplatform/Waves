@@ -88,7 +88,7 @@ object Parser {
           else PART.INVALID(Pos(start + 1, end - 1), errors.mkString(";"))
         (Pos(start, end), r)
     }
-    .map(Function.tupled(CONST_STRING))
+    .map(posAndVal => CONST_STRING(posAndVal._1, posAndVal._2))
 
   val correctVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
     .filter { case (_, x, _) => !keywords.contains(x) }
@@ -159,7 +159,7 @@ object Parser {
   val functionCallArgs: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
 
   val maybeFunctionCallP: P[EXPR] = (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
-    case (start, REF(_, functionName), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
+    case (start, REF(_, functionName, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
     case (_, id, None, _)                                     => id
   }
 
