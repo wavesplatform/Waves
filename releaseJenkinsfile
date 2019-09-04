@@ -125,6 +125,7 @@ node('wavesnode'){
                     remote.name = Constants.APT_REPO_CONTROLLER_SERVER
                     remote.user = userName
                     remote.identityFile = identity
+                    remote.allowAnyHosts = true
                     stage ('Updating APT repo'){
                         networks.each {
                             ut.remotePut(remote, "${artifactsDir}/${it}", Constants.APT_PUBLISH_DIR)
