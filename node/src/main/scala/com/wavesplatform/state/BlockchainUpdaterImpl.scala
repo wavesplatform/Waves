@@ -113,7 +113,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     val settings = blockchain.settings.rewardsSettings
     val height   = blockchain.height + 1
 
-    blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id)
+    blockchain
+      .featureActivationHeight(BlockchainFeatures.BlockReward.id)
       .filter(_ <= height)
       .flatMap { activatedAt =>
         def votes: Seq[Long] = {
@@ -171,8 +172,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(blockchain, height)
-                  val reward            = rewardForBlock(block)BlockDiffer
-                    .fromBlock(CompositeBlockchain(blockchain, reward = reward),blockchain.lastBlock, block, miningConstraints.total, verify)
+                  val reward            = rewardForBlock(block)
+
+                  BlockDiffer
+                    .fromBlock(CompositeBlockchain(blockchain, reward = reward), blockchain.lastBlock, block, miningConstraints.total, verify)
                     .map(r => Option((r, Seq.empty[Transaction], reward)))
               }
             case Some(ng) =>
@@ -225,9 +228,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                         miningConstraints.total
                       }
 
-                      val reward = rewardForBlock(block)val diff = BlockDiffer
+                      val reward = rewardForBlock(block)
+                      val diff = BlockDiffer
                         .fromBlock(
-                          CompositeBlockchain(blockchain, Some(referencedLiquidDiff), Some(referencedForgedBlock), Some(carry, reward)),
+                          CompositeBlockchain(blockchain, Some(referencedLiquidDiff), Some(referencedForgedBlock), Some(carry), reward),
                           Some(referencedForgedBlock),
                           block,
                           constraint,
@@ -374,15 +378,13 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  override def lastBlockReward: Option[Long] = readLock {
-    ngState.flatMap(_.reward) orElse blockchain.lastBlockReward
-  }
+  override def reward: Option[Long] = ngState.flatMap(_.reward)
 
   override def blockRewardVotes(height: Int): Seq[Long] = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
         blockchain.blockRewardVotes(height - 1).tail :+ ng.base.rewardVote
-      case _                                 =>
+      case _ =>
         blockchain.blockRewardVotes(height)
     }
   }

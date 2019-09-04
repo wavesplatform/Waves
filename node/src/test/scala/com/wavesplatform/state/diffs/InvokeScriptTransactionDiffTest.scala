@@ -28,7 +28,6 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -510,8 +509,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) => {
             blockDiff.scriptsRun shouldBe 1
-            newState.accountData(genesis(0).recipient, "sender") shouldBe BinaryDataEntry("sender", ci.sender.toAddress.bytes)
-            newState.accountData(genesis(0).recipient, "argument") shouldBe BinaryDataEntry("argument", ci.funcCallOpt.get.args(0).asInstanceOf[CONST_BYTESTR].bs)
+            newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
+            newState.accountData(genesis(0).recipient, "argument") shouldBe Some(BinaryDataEntry("argument", ci.funcCallOpt.get.args(0).asInstanceOf[CONST_BYTESTR].bs))
 
             blockDiff.transactions(ci.id())._3.contains(setScript.sender) shouldBe true
           }

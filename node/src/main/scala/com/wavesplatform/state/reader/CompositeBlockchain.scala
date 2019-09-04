@@ -228,13 +228,13 @@ trait CompositeBlockchain extends Blockchain {
   override def featureVotes(height: Int): Map[Short, Int] = stableBlockchain.featureVotes(height)
 
   /** Block reward related */
-  override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse inner.blockReward(height)
+  override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse stableBlockchain.blockReward(height)
 
-  override def lastBlockReward: Option[Long] = reward.orElse(inner.lastBlockReward)
+  override def lastBlockReward: Option[Long] = reward.orElse(stableBlockchain.lastBlockReward)
 
-  override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
+  override def blockRewardVotes(height: Int): Seq[Long] = stableBlockchain.blockRewardVotes(height)
 
-  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
+  override def wavesAmount(height: Int): BigInt = stableBlockchain.wavesAmount(height)
 }
 
 object CompositeBlockchain {
