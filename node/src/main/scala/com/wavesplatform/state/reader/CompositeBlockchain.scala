@@ -19,10 +19,9 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 
 trait CompositeBlockchain extends Blockchain {
   def stableBlockchain: Blockchain
-
   def newBlock: Option[Block]
-
   def maybeDiff: Option[Diff]
+  def reward: Option[Long]
 
   final def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
@@ -227,6 +226,15 @@ trait CompositeBlockchain extends Blockchain {
   override def activatedFeatures: Map[Short, Int] = stableBlockchain.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = stableBlockchain.featureVotes(height)
+
+  /** Block reward related */
+  override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse inner.blockReward(height)
+
+  override def lastBlockReward: Option[Long] = reward.orElse(inner.lastBlockReward)
+
+  override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
+
+  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 }
 
 object CompositeBlockchain {
@@ -234,20 +242,22 @@ object CompositeBlockchain {
       val stableBlockchain: Blockchain,
       val maybeDiff: Option[Diff] = None,
       val newBlock: Option[Block] = None,
-      val carryFee: Long = 0
+      val carryFee: Long = 0,
+      val reward: Option[Long] = None
   ) extends CompositeBlockchain
 
   def apply(
       stableBlockchain: Blockchain,
       maybeDiff: Option[Diff] = None,
       newBlock: Option[Block] = None,
-      carryFee: Option[Long] = None
+      carryFee: Option[Long] = None,
+      reward: Option[Long] = None
   ): CompositeBlockchain = stableBlockchain match {
     case cb: CompositeBlockchain if cb.newBlock.isEmpty || cb.newBlock == newBlock =>
       val diff = cb.maybeDiff |+| maybeDiff
-      new CompositeBlockchainImpl(cb.stableBlockchain, diff, newBlock, carryFee.getOrElse(cb.carryFee))
+      new CompositeBlockchainImpl(cb.stableBlockchain, diff, newBlock, carryFee.getOrElse(cb.carryFee), reward)
 
     case _ =>
-      new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee.getOrElse(0L))
+      new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee.getOrElse(0L), reward)
   }
 }

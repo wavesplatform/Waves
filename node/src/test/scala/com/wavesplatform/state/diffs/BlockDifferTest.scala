@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{RewardsSettings, FunctionalitySettings}
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
@@ -115,7 +115,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
       preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+      doubleFeaturesPeriodsAfterHeight = Int.MaxValue
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

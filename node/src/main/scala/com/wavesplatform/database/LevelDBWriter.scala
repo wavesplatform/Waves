@@ -14,7 +14,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings}
+import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -80,7 +80,7 @@ class LevelDBWriter(
 
   // Only for tests
   def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
-    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET), dbSettings)
+    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
 
@@ -203,6 +203,22 @@ class LevelDBWriter(
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
+  override protected def loadLastBlockReward(): Option[Long] = blockReward(height)
+
+  override def wavesAmount(height: Int): BigInt = readOnly { db =>
+    if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
+    else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
+  }
+
+  override def blockReward(height: Int): Option[Long] =
+    readOnly(_.db.get(Keys.blockReward(height))).orElse {
+    activatedFeatures.get(BlockchainFeatures.BlockReward.id)
+        .collect {
+          case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
+        }
+    }
+
+
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
 
@@ -230,6 +246,7 @@ class LevelDBWriter(
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
+      reward: Option[Long],
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
@@ -407,6 +424,12 @@ class LevelDBWriter(
       }
     }
 
+    lastBlockRewardCache = reward
+    reward.foreach { lastReward =>
+      rw.put(Keys.blockReward(height), Some(lastReward))
+      rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
+    }
+
     for ((asset, sp: SponsorshipValue) <- sponsorship) {
       rw.put(Keys.sponsorship(asset)(height), sp)
       expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
@@ -565,6 +588,8 @@ class LevelDBWriter(
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
+          rw.delete(Keys.blockReward(currentHeight))
+          rw.delete(Keys.wavesAmount(currentHeight))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
@@ -882,6 +907,18 @@ class LevelDBWriter(
       }
       .groupBy(identity)
       .mapValues(_.size)
+  }
+
+  override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
+    activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
+      case Some(activatedAt) if activatedAt <= height =>
+        settings.rewardsSettings.votingWindow(activatedAt, height)
+          .flatMap { h =>
+            db.get(Keys.blockHeaderAndSizeAt(Height(h)))
+              .map(_._1.rewardVote)
+          }
+      case _ => Seq()
+    }
   }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =

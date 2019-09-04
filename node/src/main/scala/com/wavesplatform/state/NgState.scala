@@ -13,8 +13,15 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
-class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val baseBlockTotalFee: Long, val approvedFeatures: Set[Short])
-    extends ScorexLogging {
+class NgState(
+    val base: Block,
+    val baseBlockDiff: Diff,
+    val baseBlockCarry: Long,
+    val baseBlockTotalFee: Long,
+    val approvedFeatures: Set[Short],
+    val reward: Option[Long]
+) extends ScorexLogging {
+
   private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
   private[this] val MaxTotalDiffs = 15
 

@@ -184,6 +184,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
+  @volatile
+  protected var lastBlockRewardCache: Option[Long] = loadLastBlockReward()
+  protected def loadLastBlockReward(): Option[Long]
+  override def lastBlockReward: Option[Long] = loadLastBlockReward()
+
   //noinspection ScalaStyle
   protected def doAppend(block: Block,
                          carry: Long,
@@ -201,9 +206,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[IssuedAsset, Sponsorship],
                          totalFee: Long,
+                         reward: Option[Long],
                          scriptResults: Map[ByteStr, InvokeScriptResult]): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
+  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -304,6 +310,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship,
       totalFee,
+      reward,
       diff.scriptResults
     )
 
