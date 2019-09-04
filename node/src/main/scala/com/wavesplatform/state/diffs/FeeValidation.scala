@@ -1,10 +1,10 @@
 package com.wavesplatform.state.diffs
 
+import cats.data.Chain
 import cats.implicits._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,8 +15,6 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
-
-import cats.data.Chain
 
 object FeeValidation {
 
@@ -49,11 +47,8 @@ object FeeValidation {
     if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         feeDetails <- getMinFee(blockchain, tx)
-        minWaves   = feeDetails.minFeeInWaves
-        minFee     = feeDetails.minFeeInAsset
-        feeAssetId = feeDetails.asset
         _ <- Either.cond(
-          minFee <= tx.assetFee._2,
+          feeDetails.minFeeInAsset <= tx.assetFee._2,
           (),
           notEnoughFeeError(tx.builder.typeId, feeDetails, tx.assetFee._2)
         )
@@ -86,11 +81,8 @@ object FeeValidation {
             val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
           case itx: IssueTransaction =>
-            lazy val nftActivated = blockchain.activatedFeatures
-              .get(BlockchainFeatures.ReduceNFTFee.id)
-              .exists(_ <= height)
-
-            val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+            lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+            val multiplier        = if (itx.isNFT && nftActivated) NFTMultiplier else 1
 
             (baseFee * multiplier).toLong
           case _ => baseFee

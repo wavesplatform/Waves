@@ -13,7 +13,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
+import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
@@ -25,6 +25,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observer
+import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
@@ -142,7 +143,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   private def resources: Resource[Task, (BlockchainUpdater with NG, DB)] =
     Resource.make {
       val defaultWriter: LevelDbWriterWithReward       = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
-      val blockchainUpdater: BlockchainUpdater with NG = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
+      val blockchainUpdater: BlockchainUpdater with NG = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, PublishSubject[BlockchainUpdated])
       defaultWriter.saveReward(settings.blockchainSettings.rewardsSettings.initial)
       Task.now((blockchainUpdater, db))
     } {

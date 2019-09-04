@@ -53,16 +53,16 @@ class BlockDiffWithRewardTest extends FreeSpecLike with Matchers with BlockGen w
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue
     )
     withLevelDBWriter(fs) { state =>
-      def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.GenResult] =
+      def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
         BlockDiffer.fromBlock(CompositeBlockchain(blockchain, reward = Some(6)), prevBlock, b, MiningConstraint.Unlimited)
 
       chain.init.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-        val BlockDiffer.Result(diff, fees, totalFee, _) = differ(state, prevBlock, curBlock).explicitGet()
+        val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
         state.append(diff, fees, totalFee, None, curBlock)
         Some(curBlock)
       }
 
-      val BlockDiffer.Result(diff, fees, totalFee, _) = differ(state, chain.init.lastOption, chain.last).explicitGet()
+      val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, chain.init.lastOption, chain.last).explicitGet()
       val cb                                          = CompositeBlockchain(state, Some(diff))
       test(cb)
 

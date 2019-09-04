@@ -9,7 +9,6 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
