@@ -45,6 +45,13 @@ trait Blockchain {
   def activatedFeatures: Map[Short, Int]
   def featureVotes(height: Int): Map[Short, Int]
 
+  /** Block reward related */
+  def blockReward(height: Int): Option[Long]
+  def lastBlockReward: Option[Long]
+  def blockRewardVotes(height: Int): Seq[Long]
+
+  def wavesAmount(height: Int): BigInt
+
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
@@ -68,7 +75,7 @@ trait Blockchain {
   def assetScript(id: IssuedAsset): Option[Script]
   def hasAssetScript(id: IssuedAsset): Boolean
 
-  def accountDataKeys(address: Address): Seq[String]
+  def accountDataKeys(address: Address): Set[String]
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
   def accountData(acc: Address): AccountDataInfo
 

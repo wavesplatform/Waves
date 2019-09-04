@@ -115,7 +115,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
       preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+      doubleFeaturesPeriodsAfterHeight = Int.MaxValue
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

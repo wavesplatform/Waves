@@ -10,7 +10,8 @@ import shapeless.{Lens, lens}
 case class EstimatorContext(
   letDefs:     Map[String, (Boolean, EvalM[Long])],
   predefFuncs: Map[FunctionHeader, Long],
-  userFuncs:   Map[FunctionHeader, (FUNC, EstimatorContext)] = Map.empty
+  userFuncs:   Map[FunctionHeader, (FUNC, EstimatorContext)] = Map.empty,
+  callChain:   Set[String] = Set()
 )
 
 object EstimatorContext {
@@ -20,5 +21,6 @@ object EstimatorContext {
     val lets: Lens[EstimatorContext, Map[String, (Boolean, EvalM[Long])]]                = lens[EstimatorContext] >> 'letDefs
     val userFuncs: Lens[EstimatorContext, Map[FunctionHeader, (FUNC, EstimatorContext)]] = lens[EstimatorContext] >> 'userFuncs
     val predefFuncs: Lens[EstimatorContext, Map[FunctionHeader, Long]]                   = lens[EstimatorContext] >> 'predefFuncs
+    val callChain:   Lens[EstimatorContext, Set[String]]                                 = lens[EstimatorContext] >> 'callChain
   }
 }

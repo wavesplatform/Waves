@@ -214,7 +214,7 @@ class AddressRouteSpec
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val dataKeys = List(
+    val dataKeys = Set(
       "abc",
       "aBcD",
       "ABD",

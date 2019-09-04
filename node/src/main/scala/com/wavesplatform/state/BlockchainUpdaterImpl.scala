@@ -99,7 +99,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
 
       if (approvedFeatures.nonEmpty) log.info(s"${displayFeatures(approvedFeatures)} APPROVED at height $height")
 
-      val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.Implemented)
+      val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.implemented)
       if (unimplementedApproved.nonEmpty) {
         log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedApproved)} APPROVED ON BLOCKCHAIN")
         log.warn("PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE")
@@ -108,7 +108,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
 
       val activatedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height)
 
-      val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.Implemented)
+      val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
       if (unimplementedActivated.nonEmpty) {
         log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
         log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
@@ -125,9 +125,49 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
+  private def rewardForBlock(block: Block): Option[Long] = {
+    val settings = blockchain.settings.rewardsSettings
+    val height   = blockchain.height + 1
+
+    blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id)
+      .filter(_ <= height)
+      .flatMap { activatedAt =>
+        def votes: Seq[Long] = {
+          val votes       = blockchain.blockRewardVotes(height - 1)
+          val currentVote = block.rewardVote
+          (votes :+ currentVote).filter(_ >= 0)
+        }
+
+        val mayBeReward     = lastBlockReward
+        val mayBeTimeToVote = height - activatedAt
+
+        mayBeReward match {
+          case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
+            Some((votes, reward))
+          case None if mayBeTimeToVote == 0 =>
+            Some((Seq(), settings.initial))
+          case _ => None
+        }
+      }
+      .flatMap {
+        case (votes, currentReward) =>
+          val lt        = votes.count(_ < currentReward)
+          val gt        = votes.count(_ > currentReward)
+          val threshold = settings.votingInterval / 2 + 1
+
+          if (lt > threshold)
+            Some(math.max(currentReward - settings.minIncrement, 0))
+          else if (gt > threshold)
+            Some(currentReward + settings.minIncrement)
+          else
+            Some(currentReward)
+      }
+      .orElse(lastBlockReward)
+  }
+
   override def processBlock(block: Block, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] = writeLock {
     val height                             = blockchain.height
-    val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.Implemented)
+    val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
 
     Either
       .cond(
@@ -146,9 +186,10 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
               case lastBlockId =>
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
+                val reward            = rewardForBlock(block)
                 BlockDiffer
-                  .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                  .map(r => Some((r, Seq.empty[Transaction])))
+                  .fromBlock(CompositeBlockchain(blockchain, reward = reward), blockchain.lastBlock, block, miningConstraints.total, verify)
+                  .map(r => Option((r, Seq.empty[Transaction], reward)))
             }
           case Some(ng) =>
             if (ng.base.reference == block.reference) {
@@ -163,7 +204,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
                   .map { r =>
                     log.trace(
                       s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
-                    Some((r, ng.transactions))
+                    Some((r, ng.transactions, ng.reward))
                   }
               } else if (areVersionsOfSameBlock(block, ng.base)) {
                 if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -179,7 +220,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
 
                   BlockDiffer
                     .fromBlock(blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                    .map(r => Some((r, Seq.empty[Transaction])))
+                    .map(r => Some((r, Seq.empty[Transaction], None)))
                 }
               } else
                 Left(BlockAppendError(
@@ -204,9 +245,11 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
                       miningConstraints.total
                     }
 
+                    val reward = rewardForBlock(block)
+
                     val diff = BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain(blockchain, Some(referencedLiquidDiff), Some(referencedForgedBlock), carry),
+                        CompositeBlockchain(blockchain, Some(referencedLiquidDiff), Some(referencedForgedBlock), carry, reward),
                         Some(referencedForgedBlock),
                         block,
                         constraint,
@@ -214,9 +257,9 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
                       )
 
                     diff.map { hardenedDiff =>
-                      blockchain.append(referencedLiquidDiff, carry, totalFee, referencedForgedBlock)
+                      blockchain.append(referencedLiquidDiff, carry, totalFee, reward, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
-                      Some((hardenedDiff, discarded.flatMap(_.transactionData)))
+                      Some((hardenedDiff, discarded.flatMap(_.transactionData), reward))
                     }
                   } else {
                     val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
@@ -226,11 +269,11 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
               }
         }).map {
           _ map {
-            case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded) =>
+            case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded, reward) =>
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
-              ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block)))
+              ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block), reward))
               notifyChangedSpendable(prevNgState, ngState)
               publishLastBlockInfo()
 
@@ -351,6 +394,30 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
         innerVotes ++ ngVotes
       case _ => innerVotes
     }
+  }
+
+  override def blockReward(height: Int): Option[Long] = readLock {
+   blockchain.blockReward(height) match {
+     case r @ Some(_) => r
+     case None        => ngState.collect { case ng if blockchain.height + 1 == height => ng.reward }.flatten
+   }
+  }
+
+  override def lastBlockReward: Option[Long] = readLock {
+    ngState.flatMap(_.reward) orElse blockchain.lastBlockReward
+  }
+
+  override def blockRewardVotes(height: Int): Seq[Long] = readLock {
+    ngState match {
+      case Some(ng) if this.height == height =>
+        blockchain.blockRewardVotes(height - 1).tail :+ ng.base.rewardVote
+      case _                                 =>
+        blockchain.blockRewardVotes(height)
+    }
+  }
+
+  override def wavesAmount(height: Int): BigInt = readLock {
+    blockchain.wavesAmount(height - ngState.fold(0)(_ => 1)) + ngState.flatMap(s => s.reward).map(BigInt(_)).getOrElse(BigInt(0))
   }
 
   private def liquidBlockHeaderAndSize() = ngState.map { s =>
@@ -580,11 +647,16 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
-  override def accountDataKeys(address: Address): Seq[String] = {
+  override def accountDataKeys(address: Address): Set[String] = {
     ngState.fold(blockchain.accountDataKeys(address)) { ng =>
       val fromInner = blockchain.accountDataKeys(address)
-      val fromDiff  = ng.bestLiquidDiff.accountData.get(address).toVector.flatMap(_.data.keys)
-      (fromInner ++ fromDiff).distinct
+      val fromDiff  = ng.bestLiquidDiff
+        .accountData
+        .getOrElse(address, AccountDataInfo.accountDataInfoMonoid.empty)
+        .data
+        .keySet
+
+      (fromInner ++ fromDiff)
     }
   }
 
@@ -672,7 +744,10 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
   }
 }
 
-object BlockchainUpdaterImpl extends ScorexLogging with AddressTransactions.Prov[BlockchainUpdaterImpl] with Distributions.Prov[BlockchainUpdaterImpl] {
+object BlockchainUpdaterImpl
+    extends ScorexLogging
+    with AddressTransactions.Prov[BlockchainUpdaterImpl]
+    with Distributions.Prov[BlockchainUpdaterImpl] {
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
