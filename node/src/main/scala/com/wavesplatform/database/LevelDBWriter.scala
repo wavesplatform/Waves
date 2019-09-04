@@ -791,6 +791,38 @@ class LevelDBWriter(
     results.result()
   }
 
+  override def leasesAtHeight(height: Int): (Set[ByteStr], Set[ByteStr]) = readOnly { db =>
+    import collection.mutable
+
+    val leasedTxs = mutable.Set.empty[ByteStr]
+    val canceledTxs = mutable.Set.empty[ByteStr]
+
+    val prefix = ByteBuffer
+      .allocate(6)
+      .putShort(Keys.LeaseStatusPrefix)
+      .putInt(height)
+      .array()
+
+    db.iterateOver(prefix) { entry =>
+      val k = entry.getKey
+      val v = entry.getValue
+
+      for {
+        (leaseId, status) <- Some((ByteStr(k.drop(6)), v(0) == 1))
+        (height, txNum)   <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
+        lease             <- db.get(Keys.transactionAt(height, txNum)).collect { case tx: LeaseTransaction => tx }
+      } if (status) leasedTxs += leaseId else canceledTxs += leaseId
+    }
+
+    (leasedTxs.toSet, canceledTxs.toSet)
+  }
+
+  override def leasesAtRange(from: Int, to: Int): (Set[ByteStr], Set[ByteStr]) =
+    Range.inclusive(from, to).foldLeft((Set.empty[ByteStr], Set.empty[ByteStr])) { case ((leased, canceled), h) =>
+      val (ls, cs) = leasesAtHeight(h)
+      (leased -- cs ++ ls, canceled ++ cs)
+    }
+
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
     val b = Map.newBuilder[Address, A]
     for (id <- BigInt(1) to db.get(Keys.lastAddressId).getOrElse(BigInt(0))) {

@@ -102,6 +102,10 @@ case object EmptyBlockchain extends Blockchain {
 
   override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = Nil
 
+  override def leasesAtHeight(height: Int): (Set[ByteStr], Set[ByteStr]) = (Set.empty, Set.empty)
+
+  override def leasesAtRange(from: Int, to: Int): (Set[ByteStr], Set[ByteStr]) = (Set.empty, Set.empty)
+
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */

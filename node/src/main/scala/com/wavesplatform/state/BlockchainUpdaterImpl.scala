@@ -672,6 +672,10 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
+  override def leasesAtHeight(height: Int): (Set[BlockId], Set[BlockId]) = ???
+
+  override def leasesAtRange(from: Int, to: Int): (Set[BlockId], Set[BlockId]) = ???
+
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
