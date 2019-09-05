@@ -13,7 +13,9 @@ import scala.concurrent.duration._
 import scala.language.higherKinds
 
 case class NodeClient(baseUrl: String) {
-  def get[F[_] : Functor : λ[F[_] => Response[String] => F[String]], R : Decoder](path: String): F[R] =
+  type ResponseWrapper[F[_]] = Response[String] => F[String]
+
+  def get[F[_] : Functor : ResponseWrapper, R : Decoder](path: String): F[R] =
     (getRaw(path): F[String])
       .map(decode[R])
       .map(_.explicitGet())
@@ -33,8 +35,8 @@ case class NodeClient(baseUrl: String) {
 
 object NodeClient {
   implicit val optionResponse: Response[String] => Option[String] = {
-    case Response(_, 404, _, _, _)  => None
-    case Response(body, _, _, _, _) => Some(body.explicitGet())
+    case r if r.code == 404 => None
+    case r                  => Some(r.body.explicitGet())
   }
 
   implicit val eitherResponse: Response[String] => Either[String, String] =

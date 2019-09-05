@@ -1,10 +1,9 @@
 import cats.kernel.Monoid
-import com.wavesplatform.lang.{Global, Version}
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
-import com.wavesplatform.lang.Global
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, RecKeyValue, RecKeyValueFolder, Single}
+import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
@@ -14,17 +13,17 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.repl.Repl
+import com.wavesplatform.lang.v1.repl.{NodeConnectionSettings, Repl}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
 import scala.scalajs.js
-import scala.scalajs.js.{Any, Dictionary}
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
+import scala.scalajs.js.{Any, Dictionary, UndefOr}
 
 object JsAPI {
   private def toJs(ast: EXPR): js.Object = {
@@ -248,7 +247,7 @@ object JsAPI {
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
 
   @JSExportTopLevel("repl")
-  def repl(): js.Dynamic = asJs(Repl())
+  def repl(settings: UndefOr[NodeConnectionSettings]): js.Dynamic = asJs(Repl(settings.toOption))
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(

@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.traits.domain
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 

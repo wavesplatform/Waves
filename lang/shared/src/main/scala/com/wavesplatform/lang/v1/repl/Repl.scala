@@ -5,8 +5,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.execution.atomic.Atomic
 
-case class Repl(environment: Environment = failFastBlockchainEnv) {
-  private val initialCtx = buildInitialCtx(environment)
+case class Repl(settings: Option[NodeConnectionSettings] = None) {
+  private val initialCtx = buildInitialCtx(settings)
   private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext), view)
   private val currentState = Atomic(initialState)
 

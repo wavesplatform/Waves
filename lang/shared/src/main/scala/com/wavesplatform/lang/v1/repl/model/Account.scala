@@ -8,23 +8,22 @@ import io.circe.{Decoder, HCursor}
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.{Blake2bDigest, KeccakDigest, SHA256Digest}
 
-case class Account(
-  publicKey: Array[Byte],
-  addressFomChainId: Byte => String
-)
+case class Account(publicKey: Array[Byte]) {
+  def address(chainId: Byte): Array[Byte] = Account.address(publicKey, chainId)
+}
 
 object Account {
   implicit val decoder: Decoder[Account] = (c: HCursor) => Right {
     val str = c.value.asString.get
     val pk = Base58.decode(str)
-    Account(pk, c => Base58.encode(address(pk, c)))
+    Account(pk)
   }
 
   private val BLAKE2B256 = new ThreadLocal[Digest]
   private val KECCAK256 = new ThreadLocal[Digest]
   private val SHA256 = new ThreadLocal[Digest]
 
-  private def address(publicKey: Array[Byte],chainId: Byte): Array[Byte] = {
+  private def address(publicKey: Array[Byte], chainId: Byte): Array[Byte] = {
     val buf = ByteBuffer.allocate(26)
     val hash = secureHash(publicKey, 0, publicKey.length)
     buf.put(1.toByte).put(chainId.toByte).put(hash, 0, 20)

@@ -5,7 +5,8 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import io.circe.{Decoder, HCursor}
 
 case class ByteString(bytes: Array[Byte] = Array(0)) {
-  override def toString: String = ByteStr.fromByteArray(bytes).toString
+  lazy val byteStr: ByteStr = ByteStr(bytes)
+  override def toString: String = byteStr.toString
 }
 
 object ByteString {

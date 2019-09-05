@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl.model
 
-case class Block(
+case class BlockInfoResponse(
   timestamp: Long,
   height: Int,
   `nxt-consensus`: NxtData,
