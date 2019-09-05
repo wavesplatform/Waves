@@ -111,8 +111,6 @@ object Global extends BaseGlobal {
         "BigInteger out of long range"
       )
   }
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
 
   override val sttpBackend: SttpBackend[Future, Nothing] = FetchBackend(FetchOptions.Default)
   override implicit val fastRunExecutionContext: ExecutionContext = JSExecutionContext.runNow
