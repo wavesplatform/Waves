@@ -7,7 +7,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
+import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -81,28 +81,6 @@ package object state {
         case _                                               => nftFromBlockchain
       }
     }
-  }
-
-  // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsCompose(
-      at: AddressTransactions,
-      fromDiffIter: Observable[(Height, Transaction, Set[Address])]
-  )(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
-
-    def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
-      fromId match {
-        case None     => txs
-        case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
-      }
-
-    def withFilterAndLimit(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] =
-      txs
-        .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
-
-    Observable(
-      withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
-      at.addressTransactionsObservable(address, types, fromId)
-    ).concat
   }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {

@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.extensions.ApiExtensionsImpl
+import com.wavesplatform.state.extensions.impl.CompositeApiExtensions
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 import scala.concurrent.duration.Duration
@@ -14,10 +14,9 @@ package object utils {
                             types: Set[Transaction.Type],
                             count: Int,
                             fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]] = {
-      import monix.execution.Scheduler.Implicits.global
 
       def createTransactionsList(): Seq[(Height, Transaction)] =
-        ApiExtensionsImpl(b).addressTransactionsObservable(address, TransactionParsers.forTypeSet(types), fromId)
+        CompositeApiExtensions(b).addressTransactionsObservable(address, TransactionParsers.forTypeSet(types), fromId)
           .take(count)
           .toListL
           .runSyncUnsafe(Duration.Inf)

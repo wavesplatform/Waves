@@ -9,7 +9,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
-import com.wavesplatform.state.extensions.ApiExtensionsImpl
+import com.wavesplatform.state.extensions.impl.CompositeApiExtensions
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -117,7 +117,7 @@ object Explorer extends ScorexLogging {
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
     val db               = openDB(settings.dbSettings.directory)
     val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val ae = ApiExtensionsImpl.fromLevelDB(reader)
+    val ae = CompositeApiExtensions.fromLevelDB(reader)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")

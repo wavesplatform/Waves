@@ -34,9 +34,10 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.extensions.{ApiExtensions, ApiExtensionsImpl}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.state.extensions.ApiExtensions
+import com.wavesplatform.state.extensions.impl.CompositeApiExtensions
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils.{LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -73,7 +74,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
 
-  private val apiExtensions = ApiExtensionsImpl(blockchainUpdater)
+  private val apiExtensions = CompositeApiExtensions.fromBlockchainUpdater(blockchainUpdater)
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
