@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import java.util
 
 import cats.syntax.monoid._
+import cats.syntax.option._
 import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -123,7 +124,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
   private[database] val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, _ => ???)
-  protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
+  protected def discardPortfolio(address: Address): Unit                 = portfolioCache.invalidate(address)
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
@@ -168,6 +169,12 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
 
+  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, loadAccountData)
+
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = accountDataCache.get((acc, key))
+  protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
+  protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]]
+
   private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
   @volatile
@@ -179,6 +186,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
+
+  @volatile
+  protected var lastBlockRewardCache: Option[Long] = loadLastBlockReward()
+  protected def loadLastBlockReward(): Option[Long]
+  override def lastBlockReward: Option[Long] = loadLastBlockReward()
 
   //noinspection ScalaStyle
   protected def doAppend(block: Block,
@@ -197,9 +209,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[IssuedAsset, Sponsorship],
                          totalFee: Long,
+                         reward: Option[Long],
                          scriptResults: Map[ByteStr, InvokeScriptResult]): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, block: Block): Unit = {
+  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -300,8 +313,22 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship,
       totalFee,
+      reward,
       diff.scriptResults
     )
+
+    val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]
+
+    val newData =
+      diff.accountData.foldLeft(emptyData) {
+        case (data, (a, d)) =>
+          val updData = data ++ d.data.map {
+            case (k, v) =>
+              (a, k) -> v.some
+          }
+
+          updData
+      }
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
@@ -312,6 +339,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)
+
+    accountDataCache.putAll(newData.asJava)
+
     forgetBlocks()
   }
 

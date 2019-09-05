@@ -15,6 +15,9 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
+import java.math.{MathContext, BigDecimal => BD}
+import ch.obermuhlner.math.big.BigDecimalMath
+
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] =
     if (input.length > MaxBase58Bytes) Left(s"base58Encode input exceeds $MaxBase58Bytes")
@@ -45,18 +48,6 @@ object Global extends BaseGlobal {
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
   // Math functions
-  def roundMode(round: BaseGlobal.Rounds) : RoundingMode = {
-    round match {
-      case BaseGlobal.RoundUp() => RoundingMode.UP
-      case BaseGlobal.RoundHalfUp() => RoundingMode.HALF_UP
-      case BaseGlobal.RoundHalfDown() => RoundingMode.HALF_DOWN
-      case BaseGlobal.RoundDown() => RoundingMode.DOWN
-      case BaseGlobal.RoundHalfEven() => RoundingMode.HALF_EVEN
-      case BaseGlobal.RoundCeiling() => RoundingMode.CEILING
-      case BaseGlobal.RoundFloor() => RoundingMode.FLOOR
-    }
-  }
-
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = (Try {
         val base = BD.valueOf(b, bp.toInt)
         val exp = BD.valueOf(e, ep.toInt)

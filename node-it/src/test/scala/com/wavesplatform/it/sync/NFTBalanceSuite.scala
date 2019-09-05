@@ -19,7 +19,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-//noinspection ScalaStyle
 class NFTBalanceSuite
     extends FreeSpec with BaseTransactionSuiteLike {
 
@@ -122,7 +121,7 @@ class NFTBalanceSuite
         .map(_.assetId.base58)
         .toSet
 
-      def assertion(node: Node) = for {
+      val assertion = for {
         pagedIds    <- getNFTPaged(node, issuer.stringRepr, 10).map(_.toSet)
         nonPagedIds <- getNFTPage(node, issuer.stringRepr, 1000, None).map(_.toSet)
       } yield {
@@ -131,8 +130,7 @@ class NFTBalanceSuite
       }
 
       Await.result(
-        node.waitFor("nft sync")(a => assertion(a.n).map(_ => true).recover { case _ => false }, (b: Boolean) => b, 30 seconds),
-        10.minutes
+        assertion, 1.minute
       )
     }
 

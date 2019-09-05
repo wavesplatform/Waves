@@ -8,10 +8,10 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject
 import org.iq80.leveldb.{DB, Options}
-import org.scalatest.{BeforeAndAfterEach, TestSuite}
+import org.scalatest.{BeforeAndAfterEach, Suite}
 
 trait WithDB extends BeforeAndAfterEach {
-  this: TestSuite =>
+  this: Suite =>
 
   private val path                  = Files.createTempDirectory("lvl").toAbsolutePath
   private var currentDBInstance: DB = _

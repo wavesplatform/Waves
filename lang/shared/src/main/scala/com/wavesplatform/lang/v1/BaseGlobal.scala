@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1
 
+import java.math.RoundingMode
+
 import cats.implicits._
 import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
@@ -160,6 +162,19 @@ trait BaseGlobal {
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
+
+  import RoundingMode._
+
+  protected def roundMode(round: BaseGlobal.Rounds) : RoundingMode =
+    round match {
+      case BaseGlobal.RoundUp()       => UP
+      case BaseGlobal.RoundHalfUp()   => HALF_UP
+      case BaseGlobal.RoundHalfDown() => HALF_DOWN
+      case BaseGlobal.RoundDown()     => DOWN
+      case BaseGlobal.RoundHalfEven() => HALF_EVEN
+      case BaseGlobal.RoundCeiling()  => CEILING
+      case BaseGlobal.RoundFloor()    => FLOOR
+    }
 
   implicit val sttpBackend: SttpBackend[Future, Nothing]
   implicit val fastRunExecutionContext: ExecutionContext
