@@ -4,7 +4,6 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.v1.repl.NodeConnectionSettings
 import com.wavesplatform.lang.v1.repl.http.NodeClient._
 import com.wavesplatform.lang.v1.repl.http.response._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
