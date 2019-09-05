@@ -167,6 +167,8 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
   override def processBlock(block: Block, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] = writeLock {
     val height                             = blockchain.height
     val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
+    val leasesToCancel: Set[ByteStr]       = Set()
+    // val leasesToCancel: Set[ByteStr]       = leasesAtRange(2, functionalitySettings.leaseTerm)._2
 
     Either
       .cond(
@@ -264,7 +266,7 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
-              ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block), reward))
+              ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block), reward, leasesToCancel))
               notifyChangedSpendable(prevNgState, ngState)
               publishLastBlockInfo()
 
@@ -672,9 +674,24 @@ class BlockchainUpdaterImpl(private val blockchain: LevelDBWriter,
     }
   }
 
-  override def leasesAtHeight(height: Int): (Set[BlockId], Set[BlockId]) = ???
+  override def leasesAtHeight(height: Int): (Set[ByteStr], Set[ByteStr]) =
+    ngState match {
+      case Some(ng) if this.height == height =>
+        val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
+        (active.keySet, canceled.keySet)
+      case _ =>
+        blockchain.leasesAtHeight(height)
+    }
 
-  override def leasesAtRange(from: Int, to: Int): (Set[BlockId], Set[BlockId]) = ???
+  override def leasesAtRange(from: Int, to: Int): (Set[BlockId], Set[BlockId]) =
+    ngState match {
+      case Some(ng) if to >= this.height =>
+        val (innerActive, innerCanceled) = blockchain.leasesAtRange(from, to)
+        val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
+        (innerActive ++ active.keySet -- canceled.keySet, innerCanceled ++ canceled.keySet)
+      case _ =>
+        blockchain.leasesAtRange(from, to)
+    }
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

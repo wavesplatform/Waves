@@ -19,7 +19,8 @@ class NgState(
     val baseBlockCarry: Long,
     val baseBlockTotalFee: Long,
     val approvedFeatures: Set[Short],
-    val reward: Option[Long]
+    val reward: Option[Long],
+    val leasesToCancel: Set[ByteStr]
 ) extends ScorexLogging {
 
   private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
@@ -28,26 +29,31 @@ class NgState(
   private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty
   private[this] val microBlocks: MList[MicroBlock]             = MList.empty // fresh head
 
+  private[this] val diffWithCancelledLeases: Diff = Diff.empty.copy(leaseState = leasesToCancel.map(_ -> true).toMap)
+
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)
 
-  def diffFor(totalResBlockSig: BlockId): (Diff, Long, Long) =
-    if (totalResBlockSig == base.uniqueId)
-      (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
-    else
-      internalCaches.blockDiffCache.get(
-        totalResBlockSig, { () =>
-          microBlocks.find(_.totalResBlockSig == totalResBlockSig) match {
-            case Some(current) =>
-              val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.prevResBlockSig)
-              val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(totalResBlockSig)
-              (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
+  def diffFor(totalResBlockSig: BlockId): (Diff, Long, Long) = {
+    val (diff, carry, totalFee) =
+      if (totalResBlockSig == base.uniqueId)
+        (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
+      else
+        internalCaches.blockDiffCache.get(
+          totalResBlockSig, { () =>
+            microBlocks.find(_.totalResBlockSig == totalResBlockSig) match {
+              case Some(current) =>
+                val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.prevResBlockSig)
+                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(totalResBlockSig)
+                (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
-            case None =>
-              (Diff.empty, 0L, 0L)
+              case None =>
+                (Diff.empty, 0L, 0L)
+            }
           }
-        }
-      )
+        )
+    (Monoid.combine(diff, diffWithCancelledLeases), carry, totalFee)
+  }
 
   def bestLiquidBlockId: BlockId =
     microBlocks.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)

@@ -128,9 +128,21 @@ final case class CompositeBlockchain(
     fromDiff.toVector ++ fromInner
   }
 
-  override def leasesAtHeight(height: Int): (Set[BlockId], Set[BlockId]) = ???
+  override def leasesAtHeight(height: Int): (Set[BlockId], Set[BlockId]) =
+    if (height == this.height) {
+      val (active, canceled) = diff.leaseState.partition(_._2)
+      (active.keySet, canceled.keySet)
+    }
+    else inner.leasesAtHeight(height)
 
-  override def leasesAtRange(from: Int, to: Int): (Set[BlockId], Set[BlockId]) = ???
+
+  override def leasesAtRange(from: Int, to: Int): (Set[BlockId], Set[BlockId]) =
+    if (to >= this.height) {
+      val (innerActive, innerCanceled) = inner.leasesAtRange(from, to)
+      val (active, canceled) = diff.leaseState.partition(_._2)
+      (innerActive ++ active.keySet -- canceled.keySet, innerCanceled ++ canceled.keySet)
+    }
+    else inner.leasesAtRange(from, to)
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
     val b = Map.newBuilder[Address, A]

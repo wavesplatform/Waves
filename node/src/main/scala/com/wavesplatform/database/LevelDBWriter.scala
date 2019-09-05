@@ -234,12 +234,12 @@ class LevelDBWriter(
 
   override def blockReward(height: Int): Option[Long] =
     readOnly(_.db.get(Keys.blockReward(height))).orElse {
-    activatedFeatures.get(BlockchainFeatures.BlockReward.id)
+      activatedFeatures
+        .get(BlockchainFeatures.BlockReward.id)
         .collect {
           case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
         }
     }
-
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
@@ -794,7 +794,7 @@ class LevelDBWriter(
   override def leasesAtHeight(height: Int): (Set[ByteStr], Set[ByteStr]) = readOnly { db =>
     import collection.mutable
 
-    val leasedTxs = mutable.Set.empty[ByteStr]
+    val leasedTxs   = mutable.Set.empty[ByteStr]
     val canceledTxs = mutable.Set.empty[ByteStr]
 
     val prefix = ByteBuffer
@@ -807,20 +807,19 @@ class LevelDBWriter(
       val k = entry.getKey
       val v = entry.getValue
 
-      for {
-        (leaseId, status) <- Some((ByteStr(k.drop(6)), v(0) == 1))
-        (height, txNum)   <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-        lease             <- db.get(Keys.transactionAt(height, txNum)).collect { case tx: LeaseTransaction => tx }
-      } if (status) leasedTxs += leaseId else canceledTxs += leaseId
+      val (leaseId, status) = (ByteStr(k.drop(6)), v(0) == 1)
+
+      if (status) leasedTxs += leaseId else canceledTxs += leaseId
     }
 
     (leasedTxs.toSet, canceledTxs.toSet)
   }
 
   override def leasesAtRange(from: Int, to: Int): (Set[ByteStr], Set[ByteStr]) =
-    Range.inclusive(from, to).foldLeft((Set.empty[ByteStr], Set.empty[ByteStr])) { case ((leased, canceled), h) =>
-      val (ls, cs) = leasesAtHeight(h)
-      (leased -- cs ++ ls, canceled ++ cs)
+    Range.inclusive(from, to).foldLeft((Set.empty[ByteStr], Set.empty[ByteStr])) {
+      case ((leased, canceled), h) =>
+        val (ls, cs) = leasesAtHeight(h)
+        (leased -- cs ++ ls, canceled ++ cs)
     }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
@@ -974,7 +973,8 @@ class LevelDBWriter(
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
-        settings.rewardsSettings.votingWindow(activatedAt, height)
+        settings.rewardsSettings
+          .votingWindow(activatedAt, height)
           .flatMap { h =>
             db.get(Keys.blockHeaderAndSizeAt(Height(h)))
               .map(_._1.rewardVote)

@@ -91,6 +91,8 @@ trait Blockchain {
     */
   def leasesAtHeight(height: Int): (Set[ByteStr], Set[ByteStr])
   /**
+    * Inclusive range.
+    *
     * @return (leased transaction ids, canceled transaction ids)
     */
   def leasesAtRange(from: Int, to: Int): (Set[ByteStr], Set[ByteStr])
