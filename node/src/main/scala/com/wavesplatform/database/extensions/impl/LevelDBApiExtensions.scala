@@ -197,19 +197,19 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
   ): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
+    def takeAfter[T](txNums: Iterator[T])(getHeight: T => Height, getNum: T => TxNum): Iterator[T] =
+      maybeAfter match {
+        case None => txNums
+        case Some((filterHeight, filterNum)) =>
+          txNums
+            .dropWhile(v => getHeight(v) > filterHeight)
+            .dropWhile(v => getNum(v) >= filterNum && getHeight(v) >= filterHeight)
+      }
+
     db.get(Keys.addressId(address)).fold(Observable.empty[(Height, Transaction)]) { id =>
       val (heightAndTxs, closeF) = if (dbSettings.storeTransactionsByAddress) {
         def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
           if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
-
-        def takeAfter(txNums: Iterator[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]) =
-          maybeAfter match {
-            case None => txNums
-            case Some((filterHeight, filterNum)) =>
-              txNums
-                .dropWhile { case (streamHeight, _, _) => streamHeight > filterHeight }
-                .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterNum && streamHeight >= filterHeight }
-          }
 
         val addressId = AddressId(id)
         val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toIterator
@@ -222,21 +222,13 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
           )
 
         (
-          takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
+          takeAfter(takeTypes(heightNumStream, types.map(_.typeId)))(_._1, _._3)
             .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
           () => ()
         )
       } else {
-        def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
-          case None => txNums
-          case Some((filterHeight, filterNum)) =>
-            txNums
-              .dropWhile { case (streamHeight, _, _) => streamHeight > filterHeight }
-              .dropWhile { case (streamHeight, streamNum, _) => streamNum >= filterNum && streamHeight >= filterHeight }
-        }
-
         val (iter, close) = transactionsIterator(types.toVector, reverse = true)
-        (takeAfter(iter, maybeAfter), close)
+        (takeAfter(iter)(_._1, _._2), close)
       }
 
       val resource = Resource(Task((heightAndTxs.map { case (height, _, tx) => (height, tx) }, Task {
