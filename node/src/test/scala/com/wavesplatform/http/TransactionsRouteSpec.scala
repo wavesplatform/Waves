@@ -14,6 +14,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, WalletSettings}
+import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.Implicits._
@@ -44,7 +45,7 @@ class TransactionsRouteSpec
   private val blockchain = mock[Blockchain]
   private val utx = mock[UtxPool]
   private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
-  private val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+  private val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, stub[AddressTransactions], utx, utxPoolSynchronizer, new TestTime).route
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
@@ -87,7 +87,7 @@ object PBTransactions {
       case Data.Payment(PaymentTransactionData(recipient, amount)) =>
         for {
           addr <- PBRecipients.toAddress(recipient)
-          tx   <- vt.PaymentTransaction.create(sender, Address.fromBytes(recipient.toByteArray).right.get, amount, feeAmount, timestamp, signature)
+          tx   <- vt.PaymentTransaction.create(sender, addr, amount, feeAmount, timestamp, signature)
         } yield tx
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
