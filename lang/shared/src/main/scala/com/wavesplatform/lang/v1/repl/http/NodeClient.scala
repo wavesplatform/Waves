@@ -4,16 +4,21 @@ import cats.Functor
 import cats.implicits._
 import com.softwaremill.sttp.{Response, sttp, _}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v1.repl.global.{fastRunExecutionContext, sttpBackend}
+import com.wavesplatform.lang.v1.repl.global.sttpBackend
+
 import io.circe.Decoder
 import io.circe.parser.decode
-
 import scala.annotation.tailrec
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
 private[http] case class NodeClient(baseUrl: String) {
+  implicit val fastRunExecutionContext: ExecutionContext = new ExecutionContext {
+    override def execute(runnable: Runnable): Unit = runnable.run()
+    override def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
+  }
+
   type ResponseWrapper[F[_]] = Response[String] => F[String]
 
   def get[F[_] : Functor : ResponseWrapper, R : Decoder](path: String): F[R] =
@@ -30,6 +35,7 @@ private[http] case class NodeClient(baseUrl: String) {
       else "http://"
     val url = urlPrefix + baseUrl + path
     val header = List(("User-Agent", "Chrome"))
+
     val request = sttp.get(uri"$url").copy(
       headers = header,
       options = sttp.options.copy(readTimeout = timeout)

@@ -1,17 +1,16 @@
 package com.wavesplatform.lang
 
-import com.softwaremill.sttp.{FetchBackend, FetchOptions, SttpBackend}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
-import com.wavesplatform.lang.v1.BaseGlobal
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.scalajs.concurrent.JSExecutionContext
-import scala.scalajs.js.JSConverters._
-import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 import java.math.{BigDecimal, BigInteger}
 
-import scala.util.Try
 import cats.implicits._
+import com.softwaremill.sttp.{FetchBackend, FetchOptions, SttpBackend}
+import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+
+import scala.concurrent.Future
+import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
+import scala.util.Try
 
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base58Encode(toBuffer(input)))
@@ -113,5 +112,4 @@ object Global extends BaseGlobal {
   }
 
   override val sttpBackend: SttpBackend[Future, Nothing] = FetchBackend(FetchOptions.Default)
-  override implicit val fastRunExecutionContext: ExecutionContext = JSExecutionContext.runNow
 }
