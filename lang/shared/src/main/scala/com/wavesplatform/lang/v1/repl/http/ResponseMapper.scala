@@ -1,16 +1,15 @@
-package com.wavesplatform.lang.v1.repl.model.tx
+package com.wavesplatform.lang.v1.repl.http
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.repl.global
-import com.wavesplatform.lang.v1.repl.model.{AssetInfoResponse, BlockInfoResponse, ByteString}
+import com.wavesplatform.lang.v1.repl.http.response._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
 
-case class NetResponseMapper(chainId: Byte) {
+private[http] case class ResponseMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
     Transfer(
       proven(tx),
@@ -87,25 +86,26 @@ case class NetResponseMapper(chainId: Byte) {
     }
 
   private def bytesBase(tx: TransferTransaction): Array[Byte] =
-    Bytes.concat(
+    Seq(
       tx.senderPublicKey.bytes,
       bytes(tx.assetId),
       bytes(tx.feeAssetId),
-      Longs.toByteArray(tx.timestamp),
-      Longs.toByteArray(tx.amount),
-      Longs.toByteArray(tx.fee),
+      bytes(tx.timestamp),
+      bytes(tx.amount),
+      bytes(tx.fee),
       tx.recipient.bytes,
       serializeArray(tx.attachment.bytes)
-    )
+    ).reduce(_ ++ _)
 
   private def bytes(id: Option[ByteString]): Array[Byte] =
     id.map(_.bytes).getOrElse(Array[Byte](0))
 
+  private def bytes(l: Long): Array[Byte] =
+    ByteBuffer.allocate(8).putLong(l).array()
+
+  private def bytes(s: Short): Array[Byte] =
+    ByteBuffer.allocate(2).putShort(s).array()
+
   private def serializeArray(b: Array[Byte]): Array[Byte] =
-    if (b.length.isValidShort)
-      Bytes.concat(Shorts.toByteArray(b.length.toShort), b)
-    else
-      throw new IllegalArgumentException(
-        s"Attempting to serialize array with size, but the size($b.length) exceeds MaxShort(${Short.MaxValue})"
-      )
+    bytes(b.length.toShort) ++ b
 }

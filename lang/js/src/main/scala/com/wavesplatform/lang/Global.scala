@@ -4,7 +4,8 @@ import com.softwaremill.sttp.{FetchBackend, FetchOptions, SttpBackend}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.BaseGlobal
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
+import scala.scalajs.concurrent.JSExecutionContext
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 
@@ -58,4 +59,5 @@ object Global extends BaseGlobal {
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
 
   override val sttpBackend: SttpBackend[Future, Nothing] = FetchBackend(FetchOptions.Default)
+  override implicit val fastRunExecutionContext: ExecutionContext = JSExecutionContext.runNow
 }

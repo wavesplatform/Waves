@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, Ex
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -162,6 +162,7 @@ trait BaseGlobal {
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
 
   implicit val sttpBackend: SttpBackend[Future, Nothing]
+  implicit val fastRunExecutionContext: ExecutionContext
 }
 
 object BaseGlobal {

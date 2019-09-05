@@ -182,4 +182,8 @@ object Dependencies {
       "io.circe" %%% "circe-parser"
     ).map(_ % circeVersion)
   }
+
+  lazy val circeJsInterop = Def.setting {
+    "io.circe" %%% "not-java-time" % "0.2.0"
+  }
 }

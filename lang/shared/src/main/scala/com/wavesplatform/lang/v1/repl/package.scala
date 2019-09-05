@@ -7,7 +7,8 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import cats.implicits._
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.v1.repl.http.WebEnvironment
 
 package object repl {
   val global: BaseGlobal = com.wavesplatform.lang.Global

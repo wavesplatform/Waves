@@ -1,10 +1,9 @@
-package com.wavesplatform.lang.v1.repl.model.tx
+package com.wavesplatform.lang.v1.repl.http.response
 
-import com.wavesplatform.lang.v1.repl.model.ByteString
-import io.circe.{Decoder, DecodingFailure, HCursor}
 import io.circe.generic.auto._
+import io.circe.{Decoder, DecodingFailure, HCursor}
 
-trait TransferTransaction {
+private[http] trait TransferTransaction {
   def id: ByteString
   def recipient: ByteString
   def amount: Long
@@ -20,7 +19,7 @@ trait TransferTransaction {
   def proofs: List[ByteString]
 }
 
-case class TransferTransactionV1(
+private[http] case class TransferTransactionV1(
   id: ByteString,
   recipient: ByteString,
   amount: Long,
@@ -38,7 +37,7 @@ case class TransferTransactionV1(
   override def proofs: List[ByteString] = List(signature)
 }
 
-case class TransferTransactionV2(
+private[http] case class TransferTransactionV2(
   id: ByteString,
   recipient: ByteString,
   amount: Long,
@@ -54,7 +53,7 @@ case class TransferTransactionV2(
   proofs: List[ByteString]
 ) extends TransferTransaction
 
-object TransferTransaction {
+private[http] object TransferTransaction {
  implicit val decoder: Decoder[TransferTransaction] = (c: HCursor) =>
    for {
      version <- c.downField("version").as[Int]

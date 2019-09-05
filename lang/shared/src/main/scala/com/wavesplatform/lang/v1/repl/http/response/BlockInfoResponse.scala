@@ -1,13 +1,13 @@
-package com.wavesplatform.lang.v1.repl.model
+package com.wavesplatform.lang.v1.repl.http.response
 
-case class BlockInfoResponse(
+private[http] case class BlockInfoResponse(
   timestamp: Long,
   height: Int,
   `nxt-consensus`: NxtData,
   generator: ByteString
 )
 
-case class NxtData(
+private[http] case class NxtData(
   `base-target`: Long,
   `generation-signature`: ByteString
 )

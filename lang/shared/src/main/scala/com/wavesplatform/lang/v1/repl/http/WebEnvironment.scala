@@ -1,23 +1,21 @@
-package com.wavesplatform.lang.v1.repl
+package com.wavesplatform.lang.v1.repl.http
 
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v1.repl.http.NodeClient
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.lang.v1.repl.NodeConnectionSettings
 import com.wavesplatform.lang.v1.repl.http.NodeClient._
-import com.wavesplatform.lang.v1.repl.model.{AddressResponse, AssetInfoResponse, BalanceResponse, BlockInfoResponse, DataEntry, HeightResponse}
-import com.wavesplatform.lang.v1.repl.model.tx.{NetResponseMapper, TransferTransaction}
+import com.wavesplatform.lang.v1.repl.http.response._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.generic.auto._
 
-case class WebEnvironment(settings: NodeConnectionSettings) extends Environment {
+private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extends Environment {
   private val client = NodeClient(settings.url)
-  private val mapper = NetResponseMapper(settings.chainId)
+  private val mapper = ResponseMapper(settings.chainId)
 
   override def chainId: Byte = settings.chainId
   override def tthis: Address = Address(ByteStr.decodeBase58(settings.address).get)

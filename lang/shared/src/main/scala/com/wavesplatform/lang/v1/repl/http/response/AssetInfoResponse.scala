@@ -1,6 +1,6 @@
-package com.wavesplatform.lang.v1.repl.model
+package com.wavesplatform.lang.v1.repl.http.response
 
-case class AssetInfoResponse(
+private[http] case class AssetInfoResponse(
     assetId:              ByteString,
     quantity:             Long,
     decimals:             Int,
