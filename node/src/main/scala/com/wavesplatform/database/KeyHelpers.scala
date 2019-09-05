@@ -4,6 +4,8 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state.TxNum
 
 object KeyHelpers {
@@ -36,4 +38,15 @@ object KeyHelpers {
     Key(name, bytes(prefix, b), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
 
   def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
+
+  def scriptToBytes(bytes: Array[Byte]): (Script, Long) = {
+    val complexity = Longs.fromByteArray(bytes)
+    val script     = ScriptReader.fromBytes(bytes.drop(8)).explicitGet()
+    (script, complexity)
+  }
+
+  def bytesToScript(s: (Script, Long)): Array[Byte] = {
+    val (script, complexity) = s
+    Longs.toByteArray(complexity) ++ script.bytes().arr
+  }
 }
