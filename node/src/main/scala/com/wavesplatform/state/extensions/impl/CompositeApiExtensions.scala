@@ -3,6 +3,7 @@ package com.wavesplatform.state.extensions.impl
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.database.extensions.impl.LevelDBApiExtensions
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.ApiExtensions
@@ -18,34 +19,83 @@ final class CompositeApiExtensions(blockchain: Blockchain, baseProvider: ApiExte
       types: Set[TransactionParser],
       fromId: Option[ByteStr]
   ): Observable[(Height, Transaction)] = {
-    def addressTransactionsCompose(fromDiff: Iterable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] = {
-
-      def withPagination(txs: Iterable[(Height, Transaction, Set[Address])]): Iterable[(Height, Transaction, Set[Address])] =
-        fromId match {
-          case None     => txs
-          case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
-        }
-
-      def withFilterAndLimit(txs: Iterable[(Height, Transaction, Set[Address])]): Iterable[(Height, Transaction)] =
-        txs
-          .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
-
-      Observable(
-        Observable.fromIterable(withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2))),
-        baseProvider.addressTransactionsObservable(address, types, fromId)
-      ).concat
-    }
-
     val fromDiff = for {
       diff                    <- getDiff().toIterable
       (height, tx, addresses) <- diff.transactions.values.toVector.reverse
     } yield (Height(height), tx, addresses)
 
-    addressTransactionsCompose(baseProvider, Observable.fromIterable(fromDiff))(address, types, fromId)
+    def withPagination(txs: Iterable[(Height, Transaction, Set[Address])]): Iterable[(Height, Transaction, Set[Address])] =
+      fromId match {
+        case None     => txs
+        case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
+      }
+
+    def withFilterAndLimit(txs: Iterable[(Height, Transaction, Set[Address])]): Iterable[(Height, Transaction)] =
+      txs
+        .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
+
+    Observable(
+      Observable.fromIterable(withFilterAndLimit(withPagination(fromDiff)).map(tup => (tup._1, tup._2))),
+      baseProvider.addressTransactionsObservable(address, types, fromId)
+    ).concat
   }
 
-  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
-    com.wavesplatform.state.nftListFromDiff(blockchain, baseProvider, getDiff())(address, from)
+  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
+    val maybeDiff = getDiff()
+
+    def nonZeroBalance(asset: IssuedAsset): Boolean = {
+      val balanceFromDiff = for {
+        diff      <- maybeDiff
+        portfolio <- diff.portfolios.get(address)
+        balance   <- portfolio.assets.get(asset)
+      } yield balance
+
+      !balanceFromDiff.exists(_ < 0)
+    }
+    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
+      diff.transactions.get(id).map(_._2)
+    }
+
+    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
+      diff.portfolios
+        .get(address)
+        .toIterable
+        .flatMap(_.assets.keys)
+    }
+
+    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
+      maybeAfter
+        .fold(assetStreamFromDiff(diff)) { after =>
+          assetStreamFromDiff(diff)
+            .dropWhile(_ != after)
+            .drop(1)
+        }
+        .filter(nonZeroBalance)
+        .map { asset =>
+          transactionFromDiff(diff, asset.id)
+            .orElse(blockchain.transactionInfo(asset.id).map(_._2))
+        }
+        .collect {
+          case Some(itx: IssueTransaction) if itx.isNFT => itx
+        }
+    }
+
+    def nftFromBlockchain: Observable[IssueTransaction] =
+      baseProvider
+        .nftObservable(address, from)
+        .filter { itx =>
+          val asset = IssuedAsset(itx.assetId)
+          nonZeroBalance(asset)
+        }
+
+    maybeDiff.fold(nftFromBlockchain) { diff =>
+      from match {
+        case None                                            => Observable(nftFromDiff(diff, from), nftFromBlockchain).concat
+        case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, from), nftFromBlockchain).concat
+        case _                                               => nftFromBlockchain
+      }
+    }
+  }
 
   override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {
     val fromInner = baseProvider.assetDistribution(assetId)
@@ -103,7 +153,7 @@ final class CompositeApiExtensions(blockchain: Blockchain, baseProvider: ApiExte
 }
 
 object CompositeApiExtensions {
-  def fromBlockchainUpdater(bu: BlockchainUpdaterImpl): ApiExtensions = {
-    new CompositeApiExtensions(bu, new LevelDBApiExtensions(bu.stableBlockchain), () => bu.bestLiquidDiff)
+  def apply(bu: BlockchainUpdaterImpl): ApiExtensions = {
+    new CompositeApiExtensions(bu, new LevelDBApiExtensions(bu.stableBlockchain.asInstanceOf[LevelDBWriter]), () => bu.maybeDiff)
   }
 }

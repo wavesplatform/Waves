@@ -14,7 +14,7 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.StringDataEntry
-import com.wavesplatform.state.extensions.{AccountAggregations, AddressTransactions, Distributions}
+import com.wavesplatform.state.extensions.ApiExtensions
 
 import scala.util.Random
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
@@ -40,11 +40,10 @@ class AddressRouteSpec
     with TestWallet
     with NoShrink {
 
-  abstract class ApiExtensions1 extends AddressTransactions with Distributions with AccountAggregations
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.stringRepr)
   private val blockchain   = stub[Blockchain]
-  private val apiExtensions = stub[ApiExtensions1]
+  private val apiExtensions = stub[ApiExtensions]
   (blockchain.activatedFeatures _).when().returning(Map())
 
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting

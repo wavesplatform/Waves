@@ -31,7 +31,7 @@ class AssetsBroadcastRouteSpec
     stub[Wallet],
     DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
     stub[Blockchain],
-    ApiExtensions.empty,
+    stub[ApiExtensions],
     stub[Time]
   ).route
 
@@ -151,7 +151,7 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], ApiExtensions.empty, stub[Time]).route
+    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[ApiExtensions], stub[Time]).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

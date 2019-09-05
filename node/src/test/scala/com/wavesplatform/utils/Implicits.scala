@@ -10,6 +10,6 @@ object Implicits {
   implicit def blockchainToApiExtensions(b: Blockchain): ApiExtensions = b match {
     case ldb: LevelDBWriter => new LevelDBApiExtensions(ldb)
     case cb: BlockchainUpdaterImpl => new CompositeApiExtensions(cb, new LevelDBApiExtensions(cb.stableBlockchain), () => cb.bestLiquidDiff)
-    case _ =>
+    case _ => ???
   }
 }

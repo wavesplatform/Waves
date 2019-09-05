@@ -25,7 +25,7 @@ class AliasBroadcastRouteSpec
     with NoShrink {
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
-  val route = AliasApiRoute(restAPISettings, stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain], AddressTransactions.empty).route
+  val route = AliasApiRoute(restAPISettings, stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain], stub[AddressTransactions]).route
 
   "returns StateCheckFiled" - {
 

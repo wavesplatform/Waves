@@ -7,14 +7,10 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Paged
-import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
 
@@ -23,65 +19,6 @@ import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
-
-  private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
-      address: Address,
-      maybeAfter: Option[IssuedAsset]
-  ): Observable[IssueTransaction] = {
-
-    def nonZeroBalance(asset: IssuedAsset): Boolean = {
-      val balanceFromDiff = for {
-        diff      <- maybeDiff
-        portfolio <- diff.portfolios.get(address)
-        balance   <- portfolio.assets.get(asset)
-      } yield balance
-
-      !balanceFromDiff.exists(_ < 0)
-    }
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
-      diff.transactions.get(id).map(_._2)
-    }
-
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
-      diff.portfolios
-        .get(address)
-        .toIterable
-        .flatMap(_.assets.keys)
-    }
-
-    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
-      maybeAfter
-        .fold(assetStreamFromDiff(diff)) { after =>
-          assetStreamFromDiff(diff)
-            .dropWhile(_ != after)
-            .drop(1)
-        }
-        .filter(nonZeroBalance)
-        .map { asset =>
-          transactionFromDiff(diff, asset.id)
-            .orElse(blockchain.transactionInfo(asset.id).map(_._2))
-        }
-        .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT => itx
-        }
-    }
-
-    def nftFromBlockchain: Observable[IssueTransaction] =
-      distr
-        .nftObservable(address, maybeAfter)
-        .filter { itx =>
-          val asset = IssuedAsset(itx.assetId)
-          nonZeroBalance(asset)
-        }
-
-    maybeDiff.fold(nftFromBlockchain) { diff =>
-      maybeAfter match {
-        case None                                            => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case _                                               => nftFromBlockchain
-      }
-    }
-  }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {

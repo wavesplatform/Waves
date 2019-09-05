@@ -26,7 +26,7 @@ class LeaseBroadcastRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(t => TransactionValidationError(GenericError("foo"), t))
-  private[this] val route               = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], ApiExtensions.empty, utxPoolSynchronizer, stub[Time]).route
+  private[this] val route               = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], stub[ApiExtensions], utxPoolSynchronizer, stub[Time]).route
   "returns StateCheckFailed" - {
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
