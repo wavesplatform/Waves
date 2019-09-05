@@ -237,10 +237,18 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
     def addBlockFields(blockId: ByteStr): JsObject =
       json ++ blockchain
         .heightOf(blockId)
-        .map(height => Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))))
+        .map(height => Json.obj(
+          "height" -> height,
+          "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)),
+          "reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
+        ))
         .getOrElse(JsObject.empty)
 
     def addBlockFields(height: Int): JsObject =
-      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)))
+      json ++ Json.obj(
+        "height" -> height,
+        "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)),
+        "reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
+      )
   }
 }
