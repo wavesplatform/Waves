@@ -4,6 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.Implicits._
+import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.duration.Duration
 
