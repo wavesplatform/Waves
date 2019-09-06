@@ -1,6 +1,6 @@
 package com.wavesplatform.api
 
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.LinkedBlockingQueue
 
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
@@ -16,18 +16,16 @@ package object grpc extends PBImplicitConversions {
       import org.reactivestreams.{Subscriber, Subscription}
 
       val rxs = new Subscriber[T] with Cancelable {
-        private[this] val element = new AtomicReference[Option[T]](None)
+        private[this] val queue = new LinkedBlockingQueue[T](1024)
 
         @volatile
         private[this] var subscription: Subscription = _
 
         private[this] val observerReadyFunc: () => Boolean = streamObserver match {
           case callStreamObserver: CallStreamObserver[_] =>
-            () =>
-              callStreamObserver.isReady
+            () => callStreamObserver.isReady
           case _ =>
-            () =>
-              true
+            () => true
         }
 
         def isReady: Boolean = observerReadyFunc()
@@ -35,9 +33,10 @@ package object grpc extends PBImplicitConversions {
         override def onSubscribe(subscription: Subscription): Unit = {
           this.subscription = subscription
 
-          def pushElement(): Unit = element.get() match {
-            case v @ Some(value) if this.isReady =>
-              if (element.compareAndSet(v, None)) {
+          def pushElement(): Unit = Option(queue.peek()) match {
+            case Some(value) if this.isReady =>
+              val qv = queue.poll()
+              if (qv == value) {
                 streamObserver.onNext(value)
                 subscription.request(1)
               } else {
@@ -56,12 +55,10 @@ package object grpc extends PBImplicitConversions {
               scso.disableAutoInboundFlowControl()
               scso.setOnCancelHandler(() => subscription.cancel())
               scso.setOnReadyHandler(() => pushElement())
-            // subscription.request(1)
 
             case cso: CallStreamObserver[T] =>
               cso.disableAutoInboundFlowControl()
               cso.setOnReadyHandler(() => pushElement())
-            // subscription.request(1)
 
             case _ =>
               subscription.request(Long.MaxValue)
@@ -69,17 +66,11 @@ package object grpc extends PBImplicitConversions {
         }
 
         override def onNext(t: T): Unit = {
+          queue.add(t)
           if (isReady) {
-            val value = element.get()
-            if (value.nonEmpty) {
-              if (element.compareAndSet(value, Some(t))) streamObserver.onNext(value.get)
-              else onNext(t)
-            } else {
-              streamObserver.onNext(t)
-            }
+            val value = Option(queue.poll())
+            value.foreach(streamObserver.onNext)
             if (isReady) subscription.request(1)
-          } else if (!element.compareAndSet(None, Some(t))) {
-            throw new IllegalArgumentException("Buffer overflow")
           }
         }
 
