@@ -240,7 +240,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
         .map(height => Json.obj(
           "height" -> height,
           "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)),
-          "reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
+          "actualReward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
         ))
         .getOrElse(JsObject.empty)
 
@@ -248,7 +248,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain)
       json ++ Json.obj(
         "height" -> height,
         "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)),
-        "reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
+        "actualReward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
       )
   }
 }
