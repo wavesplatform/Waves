@@ -13,29 +13,29 @@ import play.api.libs.json.{Format, JsValue, Json}
 case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   import RewardApiRoute._
 
-  override lazy val route: Route = pathPrefix("blockchain") {
+  override lazy val route: Route = pathPrefix("blockchain" / "rewards") {
     rewards ~ rewardsAtHeight()
   }
 
-  @Path("/blockchain/rewards")
+  @Path("/")
   @ApiOperation(value = "Current reward status", notes = "Get current miner’s reward status", httpMethod = "GET")
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json reward status")
     )
   )
-  def rewards(): Route = (get & path("rewards")) {
+  def rewards(): Route = (get & pathEndOrSingleSlash) {
     complete(getRewards(blockchain.height))
   }
 
-  @Path("/blockchain/rewards/{{height}}")
+  @Path("/{{height}}")
   @ApiOperation(value = "Reward status", notes = "Get miner’s reward status at height", httpMethod = "GET")
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json reward status")
     )
   )
-  def rewardsAtHeight(): Route = (get & path("rewards" / IntNumber)) { height =>
+  def rewardsAtHeight(): Route = (get & path(IntNumber)) { height =>
     complete(getRewards(height))
   }
 
@@ -64,7 +64,6 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
 }
 
 object RewardApiRoute {
-
   final case class RewardStatus(
       height: Int,
       totalWavesAmount: BigInt,
