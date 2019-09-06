@@ -235,6 +235,9 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
         })))
 
         Observable.fromIterator(resource)
+
+      case None => // Address not found
+        Observable.empty
     }
   }
 
