@@ -125,9 +125,9 @@ object Dependencies {
     Seq(
       "commons-net"          % "commons-net" % "3.6",
       "com.iheart"           %% "ficus" % "1.4.2",
-      logback                % Runtime,
-      janino                 % Runtime,
-      "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
+      logback                % Compile,
+      janino                 % Compile,
+      "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Compile,
       kamonCore,
       kamonModule("system-metrics", "1.0.0"),
       kamonModule("influxdb", "1.0.2"),
@@ -140,7 +140,7 @@ object Dependencies {
       "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
       "org.bitlet" % "weupnp" % "0.1.4",
-      akkaModule("slf4j") % Runtime,
+      akkaModule("slf4j") % Compile,
       kindProjector,
       monixModule("reactive").value,
       nettyModule("handler"),
