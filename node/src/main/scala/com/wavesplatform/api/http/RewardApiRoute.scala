@@ -4,7 +4,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.state.Blockchain
-import io.swagger.annotations.{Api, ApiOperation, ApiResponse, ApiResponses}
+import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.{Format, JsValue, Json}
 
@@ -28,8 +28,12 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
     complete(getRewards(blockchain.height))
   }
 
-  @Path("/{{height}}")
+  @Path("/{height}")
   @ApiOperation(value = "Reward status", notes = "Get miner’s reward status at height", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "height", value = "Target block height", required = true, dataType = "integer", paramType = "path")
+    ))
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json reward status")
