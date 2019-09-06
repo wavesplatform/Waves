@@ -67,16 +67,15 @@ object ExchangeTransactionDiff {
           addressScripted +
           ordersScripted
       }
-      assetsComplexity <- assets.toList
-        .flatten
-        .flatMap(_.script)
-        .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
-        .leftMap(GenericError(_))
 
-      accountsComplexity <- List(tx.sender.toAddress, buyer, seller)
-        .flatMap(blockchain.accountScript)
-        .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
-        .leftMap(GenericError(_))
+      assetsComplexity = assetIds
+          .flatMap(blockchain.assetScriptWithComplexity)
+          .map(_._2)
+
+      accountsComplexity =
+        List(tx.sender.toAddress, buyer, seller)
+          .flatMap(blockchain.accountScriptWithComplexity)
+          .map(_._2)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {

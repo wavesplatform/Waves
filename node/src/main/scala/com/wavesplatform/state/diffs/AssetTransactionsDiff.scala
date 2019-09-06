@@ -9,41 +9,44 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
   def issue(blockchain: Blockchain, height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
-    Right(
-      Diff(
-        height = height,
-        tx = tx,
-        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
-        assetInfos = Map(asset               -> info),
-        assetScripts = Map(asset -> tx.script).filter(_._2.isDefined),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-      ))
+    DiffsCommon.countScriptComplexity(tx.script, blockchain)
+      .map(script =>
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
+          assetInfos = Map(asset -> info),
+          assetScripts = Map(asset -> script),
+          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+        )
+      )
   }
 
   def setAssetScript(blockchain: Blockchain, height: Int, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
-        Right(
-          Diff(
-            height = height,
-            tx = tx,
-            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-            assetScripts = Map(tx.asset          -> tx.script),
-            scriptsRun =
-              // Asset script doesn't count before Ride4DApps activation
-              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)) {
-                DiffsCommon.countScriptRuns(blockchain, tx)
-              } else {
-                Some(tx.sender.toAddress).count(blockchain.hasScript)
-              }
-          ))
+        DiffsCommon.countScriptComplexity(tx.script, blockchain)
+          .map(script =>
+            Diff(
+              height = height,
+              tx = tx,
+              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+              assetScripts = Map(tx.asset -> script),
+              scriptsRun =
+                // Asset script doesn't count before Ride4DApps activation
+                if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height)) {
+                  DiffsCommon.countScriptRuns(blockchain, tx)
+                } else {
+                  Some(tx.sender.toAddress).count(blockchain.hasScript)
+                }
+            )
+          )
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
       }
