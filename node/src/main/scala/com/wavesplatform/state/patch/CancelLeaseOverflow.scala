@@ -16,7 +16,8 @@ object CancelLeaseOverflow extends ScorexLogging {
 
     val leasesToCancel = concurrent.blocking {
       blockchain
-        .collectActiveLeases { case tx if addressSet.contains(tx.sender.toAddress) => tx.id() }
+        .collectActiveLeases(1, blockchain.height)(tx => addressSet(tx.sender.toAddress))
+        .map(_.id())
         .toVector
     }
 

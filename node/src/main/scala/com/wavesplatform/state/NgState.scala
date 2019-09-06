@@ -4,24 +4,24 @@ import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(
     val base: Block,
-    val baseBlockDiff: Diff,
-    val baseBlockCarry: Long,
-    val baseBlockTotalFee: Long,
+    baseBlockDiff: Diff,
+    baseBlockCarry: Long,
+    baseBlockTotalFee: Long,
     val approvedFeatures: Set[Short],
     val reward: Option[Long],
-    val leasesToCancel: Set[ByteStr]
-) extends ScorexLogging {
+    leasesToCancel: Map[ByteStr, Diff]
+) {
 
   private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
   private[this] val MaxTotalDiffs = 15
@@ -29,7 +29,13 @@ class NgState(
   private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty
   private[this] val microBlocks: MList[MicroBlock]             = MList.empty // fresh head
 
-  private[this] val diffWithCancelledLeases: Diff = Diff.empty.copy(leaseState = leasesToCancel.map(_ -> true).toMap)
+  def cancelExpiredLeases(diff: Diff): Diff =
+      leasesToCancel
+        .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
+        .foldLeft(diff) {
+          case (d, ld) =>
+            Monoid.combine(d, ld)
+        }
 
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)
@@ -52,7 +58,7 @@ class NgState(
             }
           }
         )
-    (Monoid.combine(diff, diffWithCancelledLeases), carry, totalFee)
+    (diff, carry, totalFee)
   }
 
   def bestLiquidBlockId: BlockId =
@@ -85,11 +91,14 @@ class NgState(
         (block, diff, carry, totalFee, discarded)
     }
 
-  def bestLiquidDiffAndFees: (Diff, Long, Long) =
-    microBlocks.headOption.fold((baseBlockDiff, baseBlockCarry, baseBlockTotalFee))(m => diffFor(m.totalResBlockSig))
+  /** HACK: this method returns LPOS portfolio as though expired leases have already been cancelled.
+    * It was added to make sure miner gets proper generating balance when scheduling next mining attempt.
+    */
+  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio = cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
 
-  def bestLiquidDiff: Diff =
-    bestLiquidDiffAndFees._1
+  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.uniqueId)(_.totalResBlockSig))
+
+  def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 

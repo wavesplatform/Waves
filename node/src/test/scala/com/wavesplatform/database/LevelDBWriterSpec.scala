@@ -4,7 +4,6 @@ import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
@@ -16,7 +15,6 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.BlockchainAddressTransactionsList
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
@@ -25,8 +23,6 @@ import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-
-import scala.util.Random
 
 //noinspection NameBooleanParameters
 class LevelDBWriterSpec
@@ -245,105 +241,6 @@ class LevelDBWriterSpec
     }
   }
 
-  "allActiveLeases" - {
-    "should return correct set of leases" in {
-      def precs: Gen[(KeyPair, Seq[LeaseTransaction], Seq[Block])] = {
-
-        val ts = ntpTime.correctedTime()
-
-        for {
-          leaser <- accountGen
-          genesisBlock = TestBlock
-            .create(ts, Seq(GenesisTransaction.create(leaser, ENOUGH_AMT, ts).explicitGet()))
-          leases <- Gen.listOfN(
-            100,
-            for {
-              rec   <- accountGen
-              lease <- createLease(leaser, ENOUGH_AMT / 1000, 1 * 10 ^ 8, ts, rec.toAddress)
-            } yield lease
-          )
-          zero = (Seq.empty[LeaseTransaction], Seq[Block](genesisBlock))
-          (leaseTxs, blocks) = leases.distinct
-            .sliding(10, 10)
-            .foldLeft(zero) {
-              case ((ls, b :: bs), txs) =>
-                val nextBlock = TestBlock
-                  .create(
-                    ts + 10 + (b :: bs).length,
-                    b.uniqueId,
-                    txs
-                  )
-
-                (ls ++ txs, nextBlock :: b :: bs)
-            }
-        } yield (leaser, leaseTxs, blocks.reverse)
-      }
-
-      val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-      val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-      val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-      val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
-      try {
-
-        val (leaser, leases, blocks) = precs.sample.get
-
-        blocks.foreach { block =>
-          bcu.processBlock(block).explicitGet()
-        }
-
-        bcu.allActiveLeases.toSet shouldBe leases.toSet
-
-        val emptyBlock = TestBlock
-          .create(
-            blocks.last.timestamp + 2,
-            blocks.last.uniqueId,
-            Seq.empty
-          )
-
-        // some leases in liquid state, we should add one block over to store them in db
-        bcu.processBlock(emptyBlock)
-
-        defaultWriter.allActiveLeases.toSet shouldBe leases.toSet
-
-        val l = leases(Random.nextInt(leases.length - 1))
-
-        val lc = LeaseCancelTransactionV1
-          .selfSigned(
-            leaser,
-            l.id(),
-            1 * 10 ^ 8,
-            ntpTime.correctedTime() + 1000
-          )
-          .explicitGet()
-
-        val b = TestBlock
-          .create(
-            emptyBlock.timestamp + 2,
-            emptyBlock.uniqueId,
-            Seq(lc)
-          )
-
-        val b2 = TestBlock
-          .create(
-            b.timestamp + 3,
-            b.uniqueId,
-            Seq.empty
-          )
-
-        bcu.processBlock(b)
-        bcu.processBlock(b2)
-
-        bcu.allActiveLeases.toSet shouldBe (leases.toSet - l)
-        defaultWriter.allActiveLeases.toSet shouldBe (leases.toSet - l)
-
-        bcu.shutdown()
-      } finally {
-        bcu.shutdown()
-        db.close()
-      }
-    }
-  }
-
   "addressTransactions" - {
 
     "return txs in correct ordering without fromId" in {
@@ -431,122 +328,6 @@ class LevelDBWriterSpec
 
         db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
-      }
-    }
-  }
-
-  "leasesAtHeight/AtRange" - {
-
-    def blocksWithTxs: Gen[(KeyPair, Seq[(Block, Seq[Transaction])])] = {
-      for {
-        leaser <- accountGen
-        currTs              = ntpTime.correctedTime()
-        genesisTransactions = Seq(GenesisTransaction.create(leaser, ENOUGH_AMT, currTs).explicitGet())
-        genesisBlock = TestBlock
-          .create(currTs, genesisTransactions)
-        leases <- Gen
-          .listOfN(
-            100,
-            for {
-              rec   <- accountGen
-              ts    <- Gen.choose(currTs + 1, currTs + 10)
-              lease <- createLease(leaser, ENOUGH_AMT / 1000, 1 * 10 ^ 8, ts, rec.toAddress)
-            } yield lease
-          )
-          .map(_.distinct)
-        leaseCancels <- for {
-          txOffset      <- Gen.choose(1, 10)
-          leases        <- Gen.atLeastOne(leases).map(_.map(tx => createLeaseCancel(leaser, tx.id(), 1 * 10 ^ 8, tx.timestamp + txOffset)))
-          cancellations <- Gen.sequence[List[LeaseCancelTransaction], LeaseCancelTransaction](leases)
-        } yield cancellations
-        transactions = (leases ++ leaseCancels).sortBy(_.timestamp)
-        blocksTs     = transactions.last.timestamp + 10
-        blocks = transactions
-          .grouped(10)
-          .foldLeft[Seq[(Block, Seq[Transaction])]](Seq((genesisBlock, genesisTransactions))) {
-            case (acc @ (b, _) :: _, txs) =>
-              val nextBlock = TestBlock
-                .create(
-                  blocksTs + acc.length,
-                  b.uniqueId,
-                  txs
-                )
-              (nextBlock, txs) +: acc
-          }
-      } yield (leaser, blocks.reverse)
-    }
-
-    def splitByStatus(txs: Seq[Transaction]): (Set[ByteStr], Set[ByteStr]) = {
-      val byLeaseId = txs.groupBy {
-        case tx: LeaseTransaction       => tx.id()
-        case tx: LeaseCancelTransaction => tx.leaseId
-      }
-
-      val activation = byLeaseId.collect {
-        case (id, Seq(_: LeaseTransaction)) => id
-      }.toSet
-
-      val cancellation = byLeaseId.collect {
-        case (id, Seq(_: LeaseCancelTransaction)) => id
-        case (id, txs) if txs.size > 1            => id
-      }.toSet
-
-      (activation, cancellation)
-    }
-
-    def writeStatuses(defaultWriter: LevelDBWriter, txsByBlock: Seq[Seq[Transaction]]): Unit = {
-      txsByBlock.zipWithIndex.foreach {
-        case (txs, idx) =>
-          txs.foreach {
-            case tx: LeaseTransaction =>
-              defaultWriter.writableDB.readWrite { db =>
-                db.put(Keys.leaseStatus(tx.id())(idx + 2), true)
-              }
-            case tx: LeaseCancelTransaction =>
-              defaultWriter.writableDB.readWrite { db =>
-                db.put(Keys.leaseStatus(tx.leaseId)(idx + 2), false)
-              }
-          }
-      }
-    }
-
-    "should return correct lease statuses at height" in {
-
-      val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-
-      try {
-        val (_, blocks) = blocksWithTxs.sample.get
-
-        writeStatuses(defaultWriter, blocks.tail.map(_._2))
-
-        blocks.tail.map(_._2).zipWithIndex.foreach {
-          case (txs, idx) =>
-            val (activation, cancellation) = splitByStatus(txs)
-            defaultWriter.leasesAtHeight(idx + 2) shouldBe ((activation, cancellation))
-        }
-      } finally {
-        ntpTime.close()
-      }
-    }
-
-    "should return correct lease statuses at range" in {
-
-      val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-
-      try {
-        val (_, blocks) = blocksWithTxs.sample.get
-
-        writeStatuses(defaultWriter, blocks.tail.map(_._2))
-
-        val (activation, cancellation) = blocks.tail.map(_._2).foldLeft((Set.empty[ByteStr], Set.empty[ByteStr])) {
-          case ((as, cs), txs) =>
-            val (ahs, chs) = splitByStatus(txs)
-            (as -- chs ++ ahs, cs ++ chs)
-        }
-
-        defaultWriter.leasesAtRange(2, blocks.size) shouldBe ((activation, cancellation))
-      } finally {
-        ntpTime.close()
       }
     }
   }

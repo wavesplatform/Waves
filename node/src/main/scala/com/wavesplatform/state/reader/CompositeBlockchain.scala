@@ -116,33 +116,8 @@ final case class CompositeBlockchain(
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
-    val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keys
-      .map(id => diff.transactions(id)._2)
-      .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
-
-    val fromInner = inner.collectActiveLeases {
-      case lt if !canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt)
-    }
-    fromDiff.toVector ++ fromInner
-  }
-
-  override def leasesAtHeight(height: Int): (Set[BlockId], Set[BlockId]) =
-    if (height == this.height) {
-      val (active, canceled) = diff.leaseState.partition(_._2)
-      (active.keySet, canceled.keySet)
-    }
-    else inner.leasesAtHeight(height)
-
-
-  override def leasesAtRange(from: Int, to: Int): (Set[BlockId], Set[BlockId]) =
-    if (to >= this.height) {
-      val (innerActive, innerCanceled) = inner.leasesAtRange(from, to)
-      val (active, canceled) = diff.leaseState.partition(_._2)
-      (innerActive ++ active.keySet -- canceled.keySet, innerCanceled ++ canceled.keySet)
-    }
-    else inner.leasesAtRange(from, to)
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
+    CompositeBlockchain.collectActiveLeases(inner, maybeDiff, height, from, to)(filter)
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
     val b = Map.newBuilder[Address, A]
@@ -268,4 +243,19 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
 
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
+
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+    val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
+    maybeDiff match {
+      case Some(ng) if to == height =>
+        val cancelledInLiquidBlock = ng.leaseState.collect {
+          case (id, false) => id
+        }.toSet
+        val addedInLiquidBlock = ng.transactions.collect {
+          case (id, (_, lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
+        }
+        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
+      case _ => innerActiveLeases
+    }
+  }
 }

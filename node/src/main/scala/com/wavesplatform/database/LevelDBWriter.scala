@@ -769,58 +769,36 @@ class LevelDBWriter(
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = readOnly { db =>
-    val results = Vector.newBuilder[T]
-    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
-      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+  @inline
+  private def heightMatches(key: Array[Byte], maxHeight: Int): Boolean =
+    key.startsWith(Shorts.toByteArray(Keys.LeaseStatusPrefix)) && Ints.fromByteArray(key.slice(2, 6)) <= maxHeight
 
-      val txOption = if (loadLeaseStatus(db, txId)) {
-        val heightNumBytes = kv.getValue
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
+    val iterator = db.iterator
+    iterator.seek(Shorts.toByteArray(Keys.LeaseStatusPrefix) ++ Ints.toByteArray(from))
+    val probablyActiveLeases = mutable.Set.empty[ByteStr]
 
-        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
-
-        db.get(Keys.transactionAt(height, txNum))
-      } else None
-
-      txOption match {
-        case Some(tx: LeaseTransaction) if pf.isDefinedAt(tx) => results += pf(tx)
-        case _                                                => // Skip
+    try while (iterator.hasNext && heightMatches(iterator.peekNext().getKey, to)) {
+      val entry   = iterator.next()
+      val leaseId = ByteStr(entry.getKey.drop(6))
+      if (entry.getValue.headOption.contains(1.toByte)) {
+        probablyActiveLeases += leaseId
+      } else {
+        probablyActiveLeases -= leaseId
       }
-    }
-    results.result()
+    } finally iterator.close()
+
+    val activeLeaseTransactions = for {
+      leaseId <- probablyActiveLeases
+      if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
+      (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
+      tx     <- db.get(Keys.transactionAt(h, n))
+    } yield tx
+
+    activeLeaseTransactions.collect {
+      case lt: LeaseTransaction if filter(lt) => lt
+    }.toSeq
   }
-
-  override def leasesAtHeight(height: Int): (Set[ByteStr], Set[ByteStr]) = readOnly { db =>
-    import collection.mutable
-
-    val leasedTxs   = mutable.Set.empty[ByteStr]
-    val canceledTxs = mutable.Set.empty[ByteStr]
-
-    val prefix = ByteBuffer
-      .allocate(6)
-      .putShort(Keys.LeaseStatusPrefix)
-      .putInt(height)
-      .array()
-
-    db.iterateOver(prefix) { entry =>
-      val k = entry.getKey
-      val v = entry.getValue
-
-      val (leaseId, status) = (ByteStr(k.drop(6)), v(0) == 1)
-
-      if (status) leasedTxs += leaseId else canceledTxs += leaseId
-    }
-
-    (leasedTxs.toSet, canceledTxs.toSet)
-  }
-
-  override def leasesAtRange(from: Int, to: Int): (Set[ByteStr], Set[ByteStr]) =
-    Range.inclusive(from, to).foldLeft((Set.empty[ByteStr], Set.empty[ByteStr])) {
-      case ((leased, canceled), h) =>
-        val (ls, cs) = leasesAtHeight(h)
-        (leased -- cs ++ ls, canceled ++ cs)
-    }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
     val b = Map.newBuilder[Address, A]
