@@ -197,46 +197,44 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
   ): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
-    def takeAfter[T](txNums: Iterator[T])(getHeight: T => Height, getNum: T => TxNum): Iterator[T] =
+    def takeAfter[T](txRefs: Iterator[T])(getHeight: T => Height, getNum: T => TxNum): Iterator[T] =
       maybeAfter match {
-        case None => txNums
+        case None => txRefs
         case Some((filterHeight, filterNum)) =>
-          txNums
+          txRefs
             .dropWhile(v => getHeight(v) > filterHeight)
             .dropWhile(v => getNum(v) >= filterNum && getHeight(v) >= filterHeight)
       }
 
-    db.get(Keys.addressId(address)).fold(Observable.empty[(Height, Transaction)]) { id =>
-      val (heightAndTxs, closeF) = if (dbSettings.storeTransactionsByAddress) {
-        def takeTypes(txNums: Iterator[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
-          if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
+    def readOptimized(addressId: AddressId): Iterator[(Height, TxNum, Transaction)] = {
+      def takeTypes(txRefs: Iterator[(Height, TxNum, Type)], types: Set[Type]) =
+        if (types.nonEmpty) txRefs.filter { case (_, _, tp) => types.contains(tp) } else txRefs
 
-        val addressId = AddressId(id)
-        val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toIterator
-          .flatMap(
-            seqNr =>
-              db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
-                case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
-                case None                   => Nil
-              }
-          )
+      val heightNumStream = for {
+        seqNr            <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toIterator
+        (height, txNums) <- db.get(Keys.addressTransactionHN(addressId, seqNr)).toIterable
+        (txType, txNum)  <- txNums
+      } yield (height, txNum, txType)
 
-        (
-          takeAfter(takeTypes(heightNumStream, types.map(_.typeId)))(_._1, _._3)
-            .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
-          () => ()
-        )
-      } else {
-        val (iter, close) = transactionsIterator(types.toVector, reverse = true)
-        (takeAfter(iter)(_._1, _._2), close)
-      }
+      takeAfter(takeTypes(heightNumStream, types.map(_.typeId)))(_._1, _._3)
+        .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
+    }
 
-      val resource = Resource(Task((heightAndTxs.map { case (height, _, tx) => (height, tx) }, Task {
-        closeF()
-        snapshot.close()
-      })))
+    db.get(Keys.addressId(address)).map(AddressId @@ _) match {
+      case Some(addressId) =>
+        val (heightAndTxs, closeF) = if (dbSettings.storeTransactionsByAddress) {
+          (readOptimized(addressId), () => ())
+        } else {
+          val (iter, close) = transactionsIterator(types.toVector, reverse = true)
+          (takeAfter(iter)(_._1, _._2), close)
+        }
 
-      Observable.fromIterator(resource)
+        val resource = Resource(Task((heightAndTxs.map { case (height, _, tx) => (height, tx) }, Task {
+          closeF()
+          snapshot.close()
+        })))
+
+        Observable.fromIterator(resource)
     }
   }
 
