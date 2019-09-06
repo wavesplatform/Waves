@@ -75,7 +75,7 @@ object TransactionDiffer extends ScorexLogging {
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
         case otherTx: ProvenTransaction  =>
           unverifiedWithEstimate(currentBlockTimestamp, currentBlockHeight)(blockchain, otherTx)
-            .map(_ |+| complexityDiff(currentBlockHeight, blockchain, otherTx))
+            .map(complexityDiff(currentBlockHeight, blockchain, otherTx) |+| _)
         case _  => Left(UnsupportedTransactionType)
       }
     }
