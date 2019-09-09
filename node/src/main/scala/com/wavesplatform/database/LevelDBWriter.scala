@@ -240,8 +240,8 @@ class LevelDBWriter(
       leaseStates: Map[ByteStr, Boolean],
       reissuedAssets: Map[IssuedAsset, AssetInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
-      scripts: Map[BigInt, Option[Script]],
-      assetScripts: Map[IssuedAsset, Option[Script]],
+      scripts: Map[BigInt, Option[(Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
@@ -356,12 +356,12 @@ class LevelDBWriter(
 
     for ((addressId, script) <- scripts) {
       expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
-      script.foreach(s => rw.put(Keys.addressScript(addressId)(height), Some(s)))
+      script.foreach { case (s, _) => rw.put(Keys.addressScript(addressId)(height), Some(s)) }
     }
 
     for ((asset, script) <- assetScripts) {
       expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-      script.foreach(s => rw.put(Keys.assetScript(asset)(height), Some(s)))
+      script.foreach { case (s, _) => rw.put(Keys.assetScript(asset)(height), Some(s)) }
     }
 
     for ((addressId, addressData) <- data) {

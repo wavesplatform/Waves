@@ -160,7 +160,10 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: AddressOrAlias) => Some(ExprScript(TRUE).explicitGet()))
+    (blockchain.accountScriptWithComplexity _)
+      .when(allAccounts(1).toAddress)
+      .onCall((_: AddressOrAlias) => Some((ExprScript(TRUE).explicitGet(), 1L)))
+
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
@@ -170,7 +173,10 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: AddressOrAlias) => None)
+    (blockchain.accountScriptWithComplexity _)
+      .when(allAccounts(2).toAddress)
+      .onCall((_: AddressOrAlias) => None)
+
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(2)
@@ -191,9 +197,9 @@ class AddressRouteSpec
       callableFuncs = List(),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    (blockchain.accountScript _)
+    (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))
+      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)

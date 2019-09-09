@@ -2,31 +2,17 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ProvenTransaction
 import cats.implicits._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 private[diffs] object DiffsCommon {
-  def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
-      .map(calcVerifierComplexity(script, _))
-
-  private def calcVerifierComplexity(
-    script:     Script,
-    complexity: (Long, Map[String, Long])
-  ): Long = {
-    val (totalComplexity, cm) = complexity
-    script match {
-      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
-      case _ => totalComplexity
-    }
-  }
-
   def functionComplexity(
     script:    Script,
     estimator: ScriptEstimator,
@@ -61,18 +47,25 @@ private[diffs] object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets().count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
 
-  def countScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Either[String, Long] =
-    for {
-      assetsComplexity <- tx
-        .checkedAssets()
-        .toList
-        .flatMap(blockchain.assetDescription)
-        .flatMap(_.script)
-        .traverse(verifierComplexity(_, blockchain.estimator))
+  def getScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
+    val assetsComplexity = tx
+      .checkedAssets()
+      .toList
+      .flatMap(blockchain.assetScriptWithComplexity)
+      .map(_._2)
 
-      accountComplexity <- blockchain
-        .accountScript(tx.sender.toAddress)
-        .traverse(verifierComplexity(_, blockchain.estimator))
+    val accountComplexity = blockchain
+      .accountScriptWithComplexity(tx.sender.toAddress)
+      .map(_._2)
 
-    } yield assetsComplexity.sum + accountComplexity.getOrElse(0L)
+    assetsComplexity.sum + accountComplexity.getOrElse(0L)
+  }
+
+  def countScriptComplexity(
+    script: Option[Script],
+    blockchain: Blockchain
+  ): Either[ValidationError, Option[(Script, Long)]] =
+    script
+      .traverse(s => Script.verifierComplexity(s, blockchain.estimator).map((s, _)))
+      .leftMap(GenericError(_))
 }

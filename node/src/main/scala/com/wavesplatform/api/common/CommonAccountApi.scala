@@ -49,12 +49,12 @@ private[api] class CommonAccountApi(blockchain: Blockchain, ae: ApiExtensions) {
     ae.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
-    val script: Option[Script] = blockchain.accountScript(address)
+    val script: Option[(Script, Long)] = blockchain.accountScriptWithComplexity(address)
 
     AddressScriptInfo(
-      script = script.map(_.bytes()),
-      scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
-      complexity = script.map(Script.estimate(_, blockchain.estimator).explicitGet()).getOrElse(0L),
+      script = script.map(_._1.bytes()),
+      scriptText = script.map(_._1.expr.toString), // [WAIT] script.map(Script.decompile),
+      complexity = script.map(_._2).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }

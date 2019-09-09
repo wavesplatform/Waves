@@ -34,8 +34,8 @@ trait CompositeBlockchain extends Blockchain {
     cats.Monoid.combine(stableBlockchain.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[Script] =
-    maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(stableBlockchain.assetScript(asset))
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] =
+    maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(stableBlockchain.assetScriptWithComplexity(asset))
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
@@ -162,9 +162,9 @@ trait CompositeBlockchain extends Blockchain {
     }
   }
 
-  override def accountScript(address: Address): Option[Script] = {
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
     diff.scripts.get(address) match {
-      case None            => stableBlockchain.accountScript(address)
+      case None            => stableBlockchain.accountScriptWithComplexity(address)
       case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }

@@ -483,7 +483,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
   }
 
-  // Locks\
+  // Locks
   @inline
   private[this] def inLock[R](l: => Lock, f: => R) = {
     val lockInstance = l
