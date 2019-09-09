@@ -129,8 +129,8 @@ class LevelDBWriter(
     loadBlock(height, db)
   }
 
-  override protected def loadScript(address: Address): Option[(Script, Long)] = readOnly { db =>
-    addressId(address).fold(Option.empty[(Script, Long)]) { addressId =>
+  override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
+    addressId(address).fold(Option.empty[Script]) { addressId =>
       db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
     }
   }
@@ -141,7 +141,7 @@ class LevelDBWriter(
     }
   }
 
-  override protected def loadAssetScript(asset: IssuedAsset): Option[(Script, Long)] = readOnly { db =>
+  override protected def loadAssetScript(asset: IssuedAsset): Option[Script] = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
   }
 
@@ -207,7 +207,7 @@ class LevelDBWriter(
         val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
         val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script.map(_._1), sponsorship))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
       case _ => None
     }
   }
@@ -378,12 +378,12 @@ class LevelDBWriter(
 
     for ((addressId, script) <- scripts) {
       expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
-      script.foreach(s => rw.put(Keys.addressScript(addressId)(height), Some(s)))
+      script.foreach { case (s, _) => rw.put(Keys.addressScript(addressId)(height), Some(s)) }
     }
 
     for ((asset, script) <- assetScripts) {
       expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-      script.foreach(s => rw.put(Keys.assetScript(asset)(height), Some(s)))
+      script.foreach { case (s, _) => rw.put(Keys.assetScript(asset)(height), Some(s)) }
     }
 
     for ((addressId, addressData) <- data) {
