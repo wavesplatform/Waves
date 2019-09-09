@@ -6,6 +6,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -246,6 +247,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
   }
 
   private[this] implicit class JsonObjectOps(json: JsObject) {
+    import com.wavesplatform.features.FeatureProvider._
+
     def addBlockFields(blockId: ByteStr): JsObject =
       json ++ blockchain
         .heightOf(blockId)
@@ -255,10 +258,12 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     def addBlockFields(height: Int): JsObject =
       json ++ createFields(height)
 
-    private[this] def createFields(height: Int) = Json.obj(
-      "height"       -> height,
-      "totalFee"     -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)),
-      "actualReward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))
-    )
+    private[this] def createFields(height: Int) =
+      Json.obj(
+        "height"   -> height,
+        "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))
+      ) ++ (if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward, height))
+              Json.obj("actualReward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_)))
+            else Json.obj())
   }
 }
