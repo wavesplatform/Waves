@@ -11,6 +11,7 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.contract.meta.Dic
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -69,8 +70,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   )
   def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
     complete(
-      Address
-        .fromString(address)
+      Address.fromString(address)
         .flatMap(scriptMetaJson)
         .map(ToResponseMarshallable(_))
     )
@@ -427,7 +427,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .script
       .map(_.base64)
       .traverse(Global.scriptMeta)
-      .map(meta => AccountScriptMeta(account.stringRepr, meta.map(metaConverter.foldRoot)))
+      .map(AccountScriptMeta(account.stringRepr, _))
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
@@ -547,7 +547,7 @@ object AddressApiRoute {
 
   implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
 
-  case class AccountScriptMeta(address: String, meta: Option[JsValue])
-
-  implicit val accountScriptMetaFormat: Format[AccountScriptMeta] = Json.format
+  case class AccountScriptMeta(address: String, meta: Option[Dic])
+  implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
+  implicit lazy val dicFormat: Writes[Dic] = metaConverter.foldRoot
 }
