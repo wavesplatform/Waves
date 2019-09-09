@@ -17,6 +17,7 @@ import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
+import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -26,6 +27,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -157,4 +159,11 @@ package object http extends ApiMarshallers with ScorexLogging {
         case thr: Throwable => uncaughtExceptionHandler.andThen(_(ctx)).applyOrElse[Throwable, Future[RouteResult]](thr, throw _)
       }
     }
+
+  lazy val metaConverter: RecKeyValueFolder[JsValueWrapper, JsObject] =
+    RecKeyValueFolder(
+      Json.toJsFieldJsValueWrapper(_),
+      l => Json.arr(l: _*),
+      m => Json.obj(m: _*)
+    )
 }
