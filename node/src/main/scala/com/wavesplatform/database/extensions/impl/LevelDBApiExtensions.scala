@@ -216,8 +216,8 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
         (txType, txNum)  <- txNums
       } yield (height, txNum, txType)
 
-      takeAfter(takeTypes(heightNumStream, types.map(_.typeId)))(_._1, _._3)
-        .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
+      takeAfter(takeTypes(heightNumStream, types.map(_.typeId)))(_._1, _._2)
+        .flatMap { case (height, txNum, _) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) }
     }
 
     db.get(Keys.addressId(address)).map(AddressId @@ _) match {
