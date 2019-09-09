@@ -64,7 +64,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
       settings.votingInterval,
       votingThreshold,
       RewardVotes(votes.count(_ > reward), votes.count(_ < reward))
-    )).fold[JsValue](Json.obj("status" -> "error", "details" -> s"No information about rewards at height = $height"))(r => Json.toJson(r))
+    )).fold[JsValue](Json.obj("status" -> "error", "details" -> s"Block reward feature is not activated yet"))(r => Json.toJson(r))
 }
 
 object RewardApiRoute {
