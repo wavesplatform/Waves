@@ -7,11 +7,12 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import cats.implicits._
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.v1.repl.http.{NodeConnectionSettings, WebEnvironment}
 
 package object repl {
-  val Global: BaseGlobal = com.wavesplatform.lang.Global
-  val failFastBlockchainEnv = new Environment {
+  val global: BaseGlobal = com.wavesplatform.lang.Global
+  val errorMsgEnvironment: Environment = new Environment {
     lazy val unavailable = throw new RuntimeException(s"Blockchain state is unavailable from REPL")
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 0
@@ -28,8 +29,10 @@ package object repl {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
   }
 
-  def buildInitialCtx(version: StdLibVersion) =
-    CryptoContext.build(Global, version) |+|
-    PureContext.build(Global, version)   |+|
-    WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
+  def buildInitialCtx(settings: Option[NodeConnectionSettings]): CTX = {
+    val environment = settings.fold(errorMsgEnvironment)(WebEnvironment)
+    CryptoContext.build(global, V3) |+|
+    PureContext.build(global, V3)   |+|
+    WavesContext.build(contractDirectiveSet, environment)
+  }
 }

@@ -1,8 +1,8 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.lang.Global.blake2b256
-import scorex.crypto.authds.{LeafData, Side}
+import com.wavesplatform.lang.v1.BaseGlobal
 import scorex.crypto.authds.merkle.MerkleProof
+import scorex.crypto.authds.{LeafData, Side}
 import scorex.crypto.hash.{CryptographicHash, CryptographicHash32, Digest, Digest32}
 
 import scala.util.Try
@@ -59,8 +59,9 @@ object Merkle {
       .getOrElse(Left("Can't parse proof bytes"))
   }
 
+  private val global: BaseGlobal = com.wavesplatform.lang.Global
   private val blakeCH: CryptographicHash[Digest32] =
     new CryptographicHash32 {
-      override def hash(input: Message): Digest32 = Digest32 @@ blake2b256(input)
+      override def hash(input: Message): Digest32 = Digest32 @@ global.blake2b256(input)
     }
 }

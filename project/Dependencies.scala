@@ -100,8 +100,9 @@ object Dependencies {
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
-      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
-    ) ++ protobuf.value
+      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
+      "com.softwaremill.sttp" %%% "core" % "1.6.4"
+    ) ++ protobuf.value ++ circe.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -166,4 +167,17 @@ object Dependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )
+
+  lazy val circe = Def.setting {
+    val circeVersion = "0.12.0-RC4"
+    Seq(
+      "io.circe" %%% "circe-core",
+      "io.circe" %%% "circe-generic",
+      "io.circe" %%% "circe-parser"
+    ).map(_ % circeVersion)
+  }
+
+  lazy val circeJsInterop = Def.setting {
+    "io.circe" %%% "not-java-time" % "0.2.0"
+  }
 }
