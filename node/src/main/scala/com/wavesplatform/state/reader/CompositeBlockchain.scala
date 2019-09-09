@@ -37,7 +37,10 @@ final case class CompositeBlockchain(
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(inner.assetScript(asset))
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] =
+    maybeDiff
+      .flatMap(_.assetScripts.get(asset))
+      .getOrElse(inner.assetScriptWithComplexity(asset))
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
@@ -151,9 +154,9 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScript(address: Address): Option[Script] = {
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
     diff.scripts.get(address) match {
-      case None            => inner.accountScript(address)
+      case None            => inner.accountScriptWithComplexity(address)
       case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }

@@ -3,7 +3,9 @@ package com.wavesplatform.lang.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError.ScriptParseError
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
@@ -46,7 +48,7 @@ object Script {
     val ctx = defaultDecompilerContext
     val (scriptText, directives) = s match {
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
-      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DApp))
+      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
     }
     val directivesText = directives
       .map(_.unparsed)
@@ -66,4 +68,19 @@ object Script {
       case ContractScriptImpl(version, contract) =>
         ContractScript.estimateComplexity(version, contract, estimator)
     }
+
+  def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
+    Script.complexityInfo(script, estimator)
+      .map(calcVerifierComplexity(script, _))
+
+  private def calcVerifierComplexity(
+    script:     Script,
+    complexity: (Long, Map[String, Long])
+  ): Long = {
+    val (totalComplexity, cm) = complexity
+    script match {
+      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
+      case _ => totalComplexity
+    }
+  }
 }

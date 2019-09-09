@@ -87,9 +87,7 @@ object Verifier extends ScorexLogging {
     val isAsset       = assetIdOpt.nonEmpty
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
-    val txE = for {
-      _      <- Script.estimate(script, blockchain.estimator).leftMap(GenericError(_))
-      result <- Try {
+    val txE = Try {
         val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
         val eval = ScriptRunner(height, Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
         val scriptResult = eval match {
@@ -105,8 +103,7 @@ object Verifier extends ScorexLogging {
         case Failure(e) =>
           Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
         case Success(s) => s
-      }
-    } yield result
+    }
 
     val error2Trace: Option[ValidationError] => List[TraceStep] =
       e => {
