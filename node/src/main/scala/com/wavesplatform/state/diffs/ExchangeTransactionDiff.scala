@@ -4,7 +4,6 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset
@@ -68,7 +67,8 @@ object ExchangeTransactionDiff {
           ordersScripted
       }
 
-      assetsComplexity = assetIds
+      assetsComplexity =
+        assetIds.toList
           .flatMap(blockchain.assetScriptWithComplexity)
           .map(_._2)
 
