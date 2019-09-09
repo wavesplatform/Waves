@@ -3,10 +3,12 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import play.api.libs.json.{Format, JsValue, Json}
+import play.api.libs.json.{Format, Json}
 
 @Path("/blockchain/rewards")
 @Api(value = "rewards")
@@ -33,7 +35,8 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "height", value = "Target block height", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json reward status")
@@ -43,10 +46,14 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
     complete(getRewards(height))
   }
 
-  def getRewards(height: Int): JsValue =
-    (for {
-      reward      <- blockchain.blockReward(height)
-      activatedAt <- blockchain.featureActivationHeight(BlockchainFeatures.BlockReward.id)
+  def getRewards(height: Int): Either[ValidationError, RewardStatus] =
+    for {
+      _ <- Either.cond(height <= blockchain.height, (), GenericError(s"Invalid height: $height"))
+      activatedAt <- blockchain
+        .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+        .filter(_ <= height)
+        .toRight(GenericError("Block reward feature is not activated yet"))
+      reward <- blockchain.blockReward(height).toRight(GenericError(s"No information about rewards at height = $height"))
       amount              = blockchain.wavesAmount(height)
       settings            = blockchain.settings.rewardsSettings
       nextCheck           = settings.nearestTermEnd(activatedAt, height)
@@ -64,7 +71,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
       settings.votingInterval,
       votingThreshold,
       RewardVotes(votes.count(_ > reward), votes.count(_ < reward))
-    )).fold[JsValue](Json.obj("status" -> "error", "details" -> s"Block reward feature is not activated yet"))(r => Json.toJson(r))
+    )
 }
 
 object RewardApiRoute {
