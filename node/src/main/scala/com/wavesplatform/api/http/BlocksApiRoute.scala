@@ -263,7 +263,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
         "height"   -> height,
         "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))
       ) ++ (if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward, height))
-              Json.obj("actualReward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_)))
+              Json.obj("reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_)))
             else Json.obj())
   }
 }
