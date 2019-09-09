@@ -74,20 +74,16 @@ object TransactionDiffer extends ScorexLogging {
         case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockHeight)(ci)
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
         case otherTx: ProvenTransaction  =>
-          complexityDiff(currentBlockHeight, blockchain, otherTx) |+|
           unverifiedWithEstimate(currentBlockTimestamp, currentBlockHeight)(blockchain, otherTx)
+            .map(complexityDiff(currentBlockHeight, blockchain, otherTx) |+| _)
         case _  => Left(UnsupportedTransactionType)
       }
     }
 
-  private def complexityDiff(
-    height:     Int,
-    blockchain: Blockchain,
-    tx:         ProvenTransaction
-  ): TracedResult[ValidationError, Diff] =
-    TracedResult(DiffsCommon.countScriptsComplexity(blockchain, tx))
-      .map(c => Diff(height, tx, scriptsComplexity = c))
-      .leftMap(GenericError(_))
+  private def complexityDiff(height: Int, blockchain: Blockchain, tx: ProvenTransaction): Diff = {
+    val complexity = DiffsCommon.getScriptsComplexity(blockchain, tx)
+    Diff(height, tx, scriptsComplexity = complexity)
+  }
 
   private def unverifiedWithEstimate(
     currentBlockTimestamp: Long,
