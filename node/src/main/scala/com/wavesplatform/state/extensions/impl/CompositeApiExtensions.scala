@@ -50,7 +50,7 @@ final class CompositeApiExtensions(blockchain: Blockchain, baseProvider: ApiExte
         balance   <- portfolio.assets.get(asset)
       } yield balance
 
-      balanceFromDiff.forall(_ > 0)
+      balanceFromDiff.forall(_ >= 0)
     }
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
