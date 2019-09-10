@@ -428,9 +428,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       .orElse(blockchain.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def carryFee: Long = readLock {
-    ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
-  }
+  override def maybeCarryFee: Option[Long] = ngState.map(_.carryFee)
 
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = readLock {
     (for {

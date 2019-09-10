@@ -21,11 +21,14 @@ trait CompositeBlockchain extends Blockchain {
   def stableBlockchain: Blockchain
   def newBlock: Option[Block]
   def maybeDiff: Option[Diff]
+  def maybeCarryFee: Option[Long]
   def reward: Option[Long]
 
   final def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
   override val settings: BlockchainSettings = stableBlockchain.settings
+
+  override def carryFee: Long = maybeCarryFee.getOrElse(stableBlockchain.carryFee)
 
   override def balance(address: Address, assetId: Asset): Long =
     stableBlockchain.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
@@ -242,7 +245,7 @@ object CompositeBlockchain {
       val stableBlockchain: Blockchain,
       val maybeDiff: Option[Diff] = None,
       val newBlock: Option[Block] = None,
-      val carryFee: Long = 0,
+      val maybeCarryFee: Option[Long] = None,
       val reward: Option[Long] = None
   ) extends CompositeBlockchain
 
@@ -252,12 +255,5 @@ object CompositeBlockchain {
       newBlock: Option[Block] = None,
       carryFee: Option[Long] = None,
       reward: Option[Long] = None
-  ): CompositeBlockchain = stableBlockchain match {
-    case cb: CompositeBlockchain if cb.newBlock.isEmpty || cb.newBlock == newBlock =>
-      val diff = cb.maybeDiff |+| maybeDiff
-      new CompositeBlockchainImpl(cb.stableBlockchain, diff, newBlock, carryFee.getOrElse(cb.carryFee), reward)
-
-    case _ =>
-      new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee.getOrElse(0L), reward)
-  }
+  ): CompositeBlockchain = new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee, reward)
 }
