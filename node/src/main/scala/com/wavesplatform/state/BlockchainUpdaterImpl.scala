@@ -19,6 +19,7 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
@@ -232,7 +233,7 @@ class BlockchainUpdaterImpl(
                       val reward = rewardForBlock(block)
                       val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                      valdiff = BlockDiffer
+                      val diff = BlockDiffer
                         .fromBlock(
                           CompositeBlockchain(blockchain, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), Some(carry), reward),
                           Some(referencedForgedBlock),
@@ -512,7 +513,7 @@ class BlockchainUpdaterImpl(
         Portfolio(balance, lease, Map.empty).combine(diffPf)
       }
 
-      val bs = BalanceSnapshot(height, lposPortfolioFromNG(address, to))
+      val bs = BalanceSnapshot(height, portfolioAt(address, to))
       if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }

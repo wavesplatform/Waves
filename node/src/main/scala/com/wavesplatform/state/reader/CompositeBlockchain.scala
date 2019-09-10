@@ -121,8 +121,20 @@ trait CompositeBlockchain extends Blockchain {
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
-    CompositeBlockchain.collectActiveLeases(inner, maybeDiff, height, from, to)(filter)
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+    val innerActiveLeases = stableBlockchain.collectActiveLeases(from, to)(filter)
+    maybeDiff match {
+      case Some(ng) if to == height =>
+        val cancelledInLiquidBlock = ng.leaseState.collect {
+          case (id, false) => id
+        }.toSet
+        val addedInLiquidBlock = ng.transactions.collect {
+          case (id, (_, lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
+        }
+        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
+      case _ => innerActiveLeases
+    }
+  }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
     val b = Map.newBuilder[Address, A]
@@ -247,19 +259,4 @@ object CompositeBlockchain {
       carryFee: Option[Long] = None,
       reward: Option[Long] = None
   ): CompositeBlockchain = new CompositeBlockchainImpl(stableBlockchain, maybeDiff, newBlock, carryFee, reward)
-
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
-    val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
-    maybeDiff match {
-      case Some(ng) if to == height =>
-        val cancelledInLiquidBlock = ng.leaseState.collect {
-          case (id, false) => id
-        }.toSet
-        val addedInLiquidBlock = ng.transactions.collect {
-          case (id, (_, lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
-        }
-        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
-      case _ => innerActiveLeases
-    }
-  }
 }
