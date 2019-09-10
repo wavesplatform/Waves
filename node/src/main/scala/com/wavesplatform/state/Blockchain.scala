@@ -85,9 +85,7 @@ trait Blockchain {
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
-  // the following methods are used exclusively by patches
-  def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T]
-  final def allActiveLeases: Seq[LeaseTransaction] = collectActiveLeases { case lt => lt }
+  def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
