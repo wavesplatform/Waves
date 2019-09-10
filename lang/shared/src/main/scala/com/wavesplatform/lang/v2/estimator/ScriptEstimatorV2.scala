@@ -44,11 +44,13 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
-    for {
-      _ <- checkFuncCtx(func)
-      _ <- modify[EstimatorContext, ExecutionError](userFuncs.modify(_)(_ + (FunctionHeader.User(func.name) -> func)))
-      r <- local(evalExpr(inner))
-    } yield r + 5
+    local {
+      for {
+        _ <- checkFuncCtx(func)
+        _ <- modify[EstimatorContext, ExecutionError](userFuncs.modify(_)(_ + (FunctionHeader.User(func.name) -> func)))
+        r <- evalExpr(inner)
+      } yield r + 5
+    }
 
   private def checkFuncCtx(func: FUNC): EvalM[Unit] =
     local {
