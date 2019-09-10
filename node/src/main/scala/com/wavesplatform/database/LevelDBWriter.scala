@@ -14,7 +14,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
+import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -84,10 +84,6 @@ class LevelDBWriter(
     val dbSettings: DBSettings
 ) extends Caches(spendableBalanceChanged)
     with ScorexLogging {
-
-  // Only for tests
-  def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
-    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
