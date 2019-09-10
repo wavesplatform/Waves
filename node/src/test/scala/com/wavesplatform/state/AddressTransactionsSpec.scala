@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
@@ -21,7 +20,7 @@ import org.scalatest.{FreeSpec, Matchers}
 class AddressTransactionsSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
     val settings      = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {

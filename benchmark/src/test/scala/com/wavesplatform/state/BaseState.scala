@@ -11,6 +11,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
@@ -32,7 +33,7 @@ trait BaseState {
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
+  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount

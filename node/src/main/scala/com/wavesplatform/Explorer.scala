@@ -116,7 +116,7 @@ object Explorer extends ScorexLogging {
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
     val db               = openDB(settings.dbSettings.directory)
-    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings, settings.dbSettings)
     val ae = new LevelDBApiExtensions(reader)
 
     val blockchainHeight = reader.height
