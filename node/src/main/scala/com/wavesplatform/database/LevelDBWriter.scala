@@ -212,12 +212,12 @@ class LevelDBWriter(
 
   override def blockReward(height: Int): Option[Long] =
     readOnly(_.db.get(Keys.blockReward(height))).orElse {
-    activatedFeatures.get(BlockchainFeatures.BlockReward.id)
+      activatedFeatures
+        .get(BlockchainFeatures.BlockReward.id)
         .collect {
           case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
         }
     }
-
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
@@ -746,19 +746,35 @@ class LevelDBWriter(
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = readOnly { db =>
-    val results = collection.mutable.Map.empty[TransactionId, Height]
-    db.iterateOver(Keys.LeaseStatusPrefix) { kv =>
-      val height = Height(Ints.fromByteArray(kv.getKey.slice(2, 6)))
-      val txId   = TransactionId(ByteStr(kv.getKey.drop(2 + 4)))
-      if (kv.getValue.head == 1) results += txId -> height
-      else results -= txId
-    }
+  @inline
+  private def heightMatches(key: Array[Byte], maxHeight: Int): Boolean =
+    key.startsWith(Shorts.toByteArray(Keys.LeaseStatusPrefix)) && Ints.fromByteArray(key.slice(2, 6)) <= maxHeight
 
-    for {
-      (txId, _)                 <- results.toVector
-      (_, tx: LeaseTransaction) <- transactionInfo(txId, db) if pf.isDefinedAt(tx)
-    } yield pf(tx)
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
+    val iterator = db.iterator
+    iterator.seek(Shorts.toByteArray(Keys.LeaseStatusPrefix) ++ Ints.toByteArray(from))
+    val probablyActiveLeases = mutable.Set.empty[ByteStr]
+
+    try while (iterator.hasNext && heightMatches(iterator.peekNext().getKey, to)) {
+      val entry   = iterator.next()
+      val leaseId = ByteStr(entry.getKey.drop(6))
+      if (entry.getValue.headOption.contains(1.toByte)) {
+        probablyActiveLeases += leaseId
+      } else {
+        probablyActiveLeases -= leaseId
+      }
+    } finally iterator.close()
+
+    val activeLeaseTransactions = for {
+      leaseId <- probablyActiveLeases
+      if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
+      (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
+      tx     <- db.get(Keys.transactionAt(h, n))
+    } yield tx
+
+    activeLeaseTransactions.collect {
+      case lt: LeaseTransaction if filter(lt) => lt
+    }.toSeq
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
@@ -912,7 +928,8 @@ class LevelDBWriter(
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
-        settings.rewardsSettings.votingWindow(activatedAt, height)
+        settings.rewardsSettings
+          .votingWindow(activatedAt, height)
           .flatMap { h =>
             db.get(Keys.blockHeaderAndSizeAt(Height(h)))
               .map(_._1.rewardVote)

@@ -185,8 +185,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val setScriptId = sender.signedBroadcast(sc1SetTx.json()).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    nodes.waitForHeightArise()
-    val height = sender.height
+    val height = nodes.waitForHeightArise()
 
     nodes.waitForHeightArise()
     val entry1 = StringDataEntry("oracle", "yes")

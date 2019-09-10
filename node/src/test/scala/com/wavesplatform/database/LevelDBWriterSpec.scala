@@ -23,10 +23,15 @@ import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-import scala.util.Random
-
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen with ScalaCheckDrivenPropertyChecks {
+class LevelDBWriterSpec
+    extends FreeSpec
+    with Matchers
+    with TransactionGen
+    with WithDB
+    with DBCacheSettings
+    with RequestGen
+    with ScalaCheckDrivenPropertyChecks {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -235,101 +240,93 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     }
   }
 
-  "allActiveLeases" - {
-    "should return correct set of leases" in {
-      def precs: Gen[(KeyPair, Seq[LeaseTransaction], Seq[Block])] = {
+  "addressTransactions" - {
 
-        val ts = ntpTime.correctedTime()
-
-        for {
-          leaser <- accountGen
-          genesisBlock = TestBlock
-            .create(ts, Seq(GenesisTransaction.create(leaser, ENOUGH_AMT, ts).explicitGet()))
-          leases <- Gen.listOfN(
-            100,
-            for {
-              rec   <- accountGen
-              lease <- createLease(leaser, ENOUGH_AMT / 1000, 1 * 10 ^ 8, ts, rec.toAddress)
-            } yield lease
-          )
-          zero = (Seq.empty[LeaseTransaction], Seq[Block](genesisBlock))
-          (leaseTxs, blocks) = leases.distinct
-            .sliding(10, 10)
-            .foldLeft(zero) {
-              case ((ls, b :: bs), txs) =>
-                val nextBlock = TestBlock
-                  .create(
-                    ts + 10 + (b :: bs).length,
-                    b.uniqueId,
-                    txs
-                  )
-
-                (ls ++ txs, nextBlock :: b :: bs)
-            }
-        } yield (leaser, leaseTxs, blocks.reverse)
-      }
-
-      val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-      val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-      val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-      val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
-      try {
-
-        val (leaser, leases, blocks) = precs.sample.get
-
-        blocks.foreach { block =>
-          bcu.processBlock(block).explicitGet()
-        }
-
-        bcu.allActiveLeases.toSet shouldBe leases.toSet
-
-        val emptyBlock = TestBlock
-          .create(
-            blocks.last.timestamp + 2,
-            blocks.last.uniqueId,
-            Seq.empty
-          )
-
-        // some leases in liquid state, we should add one block over to store them in db
-        bcu.processBlock(emptyBlock)
-
-        defaultWriter.allActiveLeases.toSet shouldBe leases.toSet
-
-        val l = leases(Random.nextInt(leases.length - 1))
-
-        val lc = LeaseCancelTransactionV1
-          .selfSigned(
-            leaser,
-            l.id(),
-            1 * 10 ^ 8,
-            ntpTime.correctedTime() + 1000
-          )
+    "return txs in correct ordering without fromId" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
           .explicitGet()
 
-        val b = TestBlock
-          .create(
-            emptyBlock.timestamp + 2,
-            emptyBlock.uniqueId,
-            Seq(lc)
-          )
+        val ordering = Ordering
+          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
 
-        val b2 = TestBlock
-          .create(
-            b.timestamp + 3,
-            b.uniqueId,
-            Seq.empty
-          )
+        txs.length shouldBe 2
 
-        bcu.processBlock(b)
-        bcu.processBlock(b2)
+        txs.sorted(ordering) shouldBe txs
+      }
+    }
 
-        bcu.allActiveLeases.toSet shouldBe (leases.toSet - l)
-        defaultWriter.allActiveLeases.toSet shouldBe (leases.toSet - l)
+    "correctly applies transaction type filter" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
+          .explicitGet()
 
-        bcu.shutdown()
-      } finally {
-        bcu.shutdown()
-        db.close()
+        txs.length shouldBe 1
+      }
+    }
+
+    "return Left if fromId argument is a non-existent transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
+
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
+
+        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
+      }
+    }
+
+    "return txs in correct ordering starting from a given id" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        // using pagination
+        val firstTx = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
+          .explicitGet()
+          .head
+
+        val secondTx = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
+          .explicitGet()
+          .head
+
+        // without pagination
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .explicitGet()
+
+        txs shouldBe Seq(firstTx, secondTx)
+      }
+    }
+
+    "return an empty Seq when paginating from the last transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .explicitGet()
+
+        val txsFromLast = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
+          .explicitGet()
+
+        txs.length shouldBe 2
+        txsFromLast shouldBe Seq.empty
+      }
+    }
+
+    "don't parse irrelevant transactions in transferById" in {
+      val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+
+      forAll(randomTransactionGen) { tx =>
+        val transactionId = tx.id()
+        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
+        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+
+        writer.transferById(transactionId) shouldBe None
+
+        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
       }
     }
   }

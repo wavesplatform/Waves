@@ -24,8 +24,9 @@ import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time)
-    extends BlockchainUpdater
+class BlockchainUpdaterImpl(
+    blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time
+) extends BlockchainUpdater
     with NG
     with ScorexLogging
     with CompositeBlockchain {
@@ -229,9 +230,11 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                       }
 
                       val reward = rewardForBlock(block)
-                      val diff = BlockDiffer
+                      val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
+
+                      valdiff = BlockDiffer
                         .fromBlock(
-                          CompositeBlockchain(blockchain, Some(referencedLiquidDiff), Some(referencedForgedBlock), Some(carry), reward),
+                          CompositeBlockchain(blockchain, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), Some(carry), reward),
                           Some(referencedForgedBlock),
                           block,
                           constraint,
@@ -239,7 +242,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                         )
 
                       diff.map { hardenedDiff =>
-                        blockchain.append(referencedLiquidDiff, carry, totalFee, reward, referencedForgedBlock)
+                        blockchain.append(liquidDiffWithCancelledLeases, carry, totalFee, reward, referencedForgedBlock)
                         TxsInBlockchainStats.record(ng.transactions.size)
                         Some((hardenedDiff, discarded.flatMap(_.transactionData), reward))
                       }
@@ -252,22 +255,55 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
           }).map {
             _ map {
               case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint), discarded, reward) =>
-                val height = blockchain.height + 1
-                restTotalConstraint = updatedTotalConstraint
+                val newHeight = blockchain.height + 1
+
                 val prevNgState = ngState
-                ngState = Some(new NgState(block, newBlockDiff, carry, totalFee, featuresApprovedWithBlock(block), reward))
+  restTotalConstraint = updatedTotalConstraint
+                ngState = Some(
+                  new NgState(
+                    block,
+                    newBlockDiff,
+                    carry,
+                    totalFee,
+                    featuresApprovedWithBlock(block),
+                    reward,
+                    cancelLeases(collectLeasesToCancel(newHeight))
+                  ))
                 notifyChangedSpendable(prevNgState, ngState)
                 publishLastBlockInfo()
 
                 if ((block.timestamp > time
-                      .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
-                  log.info(s"New height: $height")
+                      .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)) {
+                  log.info(s"New height: $newHeight")
                 }
                 discarded
             }
           }
       )
   }
+
+  private def collectLeasesToCancel(newHeight: Int): Seq[LeaseTransaction] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.LeasingExpiry, newHeight)) {
+      val toHeight = newHeight - blockchain.settings.functionalitySettings.leaseTerm
+      val fromHeight = blockchain.featureActivationHeight(BlockchainFeatures.LeasingExpiry.id) match {
+        case Some(activationHeight) if activationHeight == newHeight => 1
+        case _                                                       => toHeight
+      }
+      log.trace(s"Collecting leases created within [$fromHeight, $toHeight]")
+      blockchain.collectActiveLeases(fromHeight, toHeight)(_ => true)
+    } else Seq.empty
+
+  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction]): Map[ByteStr, Diff] =
+    (for {
+      lt        <- leaseTransactions
+      recipient <- blockchain.resolveAlias(lt.recipient).toSeq
+    } yield lt.id() -> Diff.empty.copy(
+      portfolios = Map(
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
+      ),
+      leaseState = Map(lt.id() -> false)
+    )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = writeLock {
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
@@ -476,7 +512,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
         Portfolio(balance, lease, Map.empty).combine(diffPf)
       }
 
-      val bs = BalanceSnapshot(height, portfolioAt(address, to))
+      val bs = BalanceSnapshot(height, lposPortfolioFromNG(address, to))
       if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceSnapshots(address, from, to) else Seq(bs)
     }
   }
