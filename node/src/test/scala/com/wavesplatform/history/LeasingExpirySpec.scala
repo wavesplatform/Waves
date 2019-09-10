@@ -193,27 +193,22 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
           case Domain(blockchainUpdater) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
-            activeLeaseIds(blockchainUpdater).size shouldBe 0
             ensureEffectiveBalance(blockchainUpdater, alias, 0L)
 
             // block at activation height with lease
             blockchainUpdater.processBlock(blocks(3)).explicitGet()
-            activeLeaseIds(blockchainUpdater).size shouldBe 1
             ensureEffectiveBalance(blockchainUpdater, alias, amount)
 
             // block after activation and before cancellation, including new lease
             blockchainUpdater.processBlock(blocks(4))
-            activeLeaseIds(blockchainUpdater).size shouldBe 2
             ensureEffectiveBalance(blockchainUpdater, alias, amount + halfAmount)
 
             // block at height of first lease cancellation, effective balance reflects it
             blockchainUpdater.processBlock(blocks(5))
-            // activeLeaseIds(blockchainUpdater).size shouldBe 1
             ensureEffectiveBalance(blockchainUpdater, alias, halfAmount)
 
             // block at height of second lease cancellation, effective balance reflects it
             blockchainUpdater.processBlock(blocks(6))
-            // activeLeaseIds(blockchainUpdater).size shouldBe 0
             ensureEffectiveBalance(blockchainUpdater, alias, 0L)
         }
     }
