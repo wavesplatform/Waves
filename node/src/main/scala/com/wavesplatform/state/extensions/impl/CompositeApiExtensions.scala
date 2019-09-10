@@ -50,43 +50,37 @@ final class CompositeApiExtensions(blockchain: Blockchain, baseProvider: ApiExte
         balance   <- portfolio.assets.get(asset)
       } yield balance
 
-      !balanceFromDiff.exists(_ < 0)
-    }
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
-      diff.transactions.get(id).map(_._2)
-    }
-
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
-      diff.portfolios
-        .get(address)
-        .toIterable
-        .flatMap(_.assets.keys)
+      balanceFromDiff.forall(_ > 0)
     }
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
-      maybeAfter
+      def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
+        diff.portfolios
+          .get(address)
+          .toIterable
+          .flatMap(_.assets.keys)
+
+      val assets = maybeAfter
         .fold(assetStreamFromDiff(diff)) { after =>
           assetStreamFromDiff(diff)
             .dropWhile(_ != after)
             .drop(1)
         }
+
+      assets
         .filter(nonZeroBalance)
-        .map { asset =>
-          transactionFromDiff(diff, asset.id)
-            .orElse(blockchain.transactionInfo(asset.id).map(_._2))
+        .map {
+          case IssuedAsset(assetId) =>
+            val txFromDiff = diff.transactions.get(assetId).map(_._2)
+            txFromDiff.orElse(blockchain.transactionInfo(assetId).map(_._2))
         }
-        .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT => itx
-        }
+        .collect { case itx: IssueTransaction if itx.isNFT => itx }
     }
 
     def nftFromBlockchain: Observable[IssueTransaction] =
       baseProvider
         .nftObservable(address, from)
-        .filter { itx =>
-          val asset = IssuedAsset(itx.assetId)
-          nonZeroBalance(asset)
-        }
+        .filter(itx => nonZeroBalance(IssuedAsset(itx.assetId)))
 
     maybeDiff.fold(nftFromBlockchain) { diff =>
       from match {

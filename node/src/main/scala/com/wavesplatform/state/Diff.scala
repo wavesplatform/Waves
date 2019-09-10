@@ -59,7 +59,7 @@ case class AssetDescription(
     script: Option[Script],
     sponsorship: Long
 ) {
-  override def equals(obj: scala.Any) = obj match {
+  override def equals(obj: Any): Boolean = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
         java.util.Arrays.equals(o.name, name) &&
@@ -75,7 +75,7 @@ case class AssetDescription(
 
 object AssetDescription {
   implicit class AssetDescriptionExt(private val ad: AssetDescription) extends AnyVal {
-    def isNFT: Boolean = ad.quantity == 1 && ad.decimals == 0 && !ad.reissuable
+    def isNFT: Boolean = ad.totalVolume == 1 && ad.decimals == 0 && !ad.reissuable
   }
 }
 

@@ -105,7 +105,7 @@ package object state {
     def isNFT(asset: IssuedAsset): Boolean = {
       import com.wavesplatform.features.FeatureProvider._
       val isActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
-      isActivated && blockchain.assetDescription(issuedAsset).exists(_.isNFT)
+      isActivated && blockchain.assetDescription(asset).exists(_.isNFT)
     }
   }
 

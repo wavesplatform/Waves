@@ -84,6 +84,6 @@ object IssueTransaction {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()
-    def isNFT: Boolean   = quantity == 1 && decimals == 0 && !reissuable
+    def isNFT: Boolean   = tx.quantity == 1 && tx.decimals == 0 && !tx.reissuable
   }
 }

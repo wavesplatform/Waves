@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.{Transaction, TransactionParser, Transactio
 import com.wavesplatform.utils.Paged
 import monix.eval.Task
 import monix.reactive.Observable
+import org.iq80.leveldb.Snapshot
 
 import scala.util.Success
 import scala.util.control.NonFatal
@@ -28,14 +29,14 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
 
   def portfolio(a: Address): Portfolio =
     readOnly { db =>
-      def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
+      def loadPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
         assets = (for {
-          asset   <- db.get(Keys.assetList(addressId)) if !ldb.isNFT(issuedAsset)
+          asset   <- db.get(Keys.assetList(addressId)) if !ldb.isNFT(asset)
           balance <- db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset))
         } yield asset -> balance).toMap
       )
 
-      addressId(a).fold(Portfolio.empty)(addressId => loadFullPortfolio(db, addressId))
+      addressId(a).fold(Portfolio.empty)(addressId => loadPortfolio(db, addressId))
     }
 
   override def accountDataKeys(address: Address): Set[String] = readOnly { db =>
@@ -48,8 +49,8 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
   }
 
   def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
-    def openIterator() = readOnlyNoClose { (snapshot, db) =>
-      def issueTxIterator = {
+    def openIterator(): (Iterator[IssueTransaction], Snapshot) = readOnlyNoClose { (snapshot, db) =>
+      def issueTxIterator: Iterator[IssueTransaction] = {
         val assetIds = db
           .get(Keys.addressId(address))
           .fold(Seq.empty[IssuedAsset]) { id =>
@@ -57,11 +58,10 @@ final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
             db.get(Keys.assetList(addressId))
           }
 
-        assetIds.iterator
-          .flatMap(ia => transactionInfo(ia.id).map(_._2))
-          .collect {
-            case itx: IssueTransaction if itx.isNFT => itx
-          }
+        for {
+          IssuedAsset(assetId)       <- assetIds.iterator
+          (_, itx: IssueTransaction) <- transactionInfo(assetId) if itx.isNFT
+        } yield itx
       }
 
       val result = from
