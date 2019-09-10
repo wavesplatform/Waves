@@ -6,7 +6,9 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -99,6 +101,12 @@ package object state {
 
     def allActiveLeases: Seq[LeaseTransaction] =
       blockchain.collectActiveLeases { case lt => lt }
+
+    def isNFT(asset: IssuedAsset): Boolean = {
+      import com.wavesplatform.features.FeatureProvider._
+      val isActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+      isActivated && blockchain.assetDescription(issuedAsset).exists(_.isNFT)
+    }
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]

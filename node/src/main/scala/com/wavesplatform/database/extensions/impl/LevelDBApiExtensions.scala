@@ -7,7 +7,6 @@ import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{Keys, LevelDBWriter, ReadOnlyDB}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.ApiExtensions
 import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionPage, Height, Portfolio, TransactionId, TxNum}
@@ -25,32 +24,18 @@ import scala.util.control.NonFatal
 
 final class LevelDBApiExtensions(ldb: LevelDBWriter) extends ApiExtensions {
   import LevelDBWriter._
-  import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
   import ldb._
 
   def portfolio(a: Address): Portfolio =
     readOnly { db =>
       def loadFullPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
         assets = (for {
-          asset <- db.get(Keys.assetList(addressId))
-        } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
+          asset   <- db.get(Keys.assetList(addressId)) if !ldb.isNFT(issuedAsset)
+          balance <- db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset))
+        } yield asset -> balance).toMap
       )
 
-      def loadPortfolioWithoutNFT(db: ReadOnlyDB, addressId: AddressId) = loadLposPortfolio(db, addressId).copy(
-        assets = (for {
-          issuedAsset <- db.get(Keys.assetList(addressId))
-          asset <- transactionInfo(issuedAsset.id).collect {
-            case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
-          }
-        } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
-      )
-
-      val excludeNFT = ldb.isFeatureActivated(BlockchainFeatures.ReduceNFTFee, height)
-
-      addressId(a).fold(Portfolio.empty) { addressId =>
-        if (excludeNFT) loadPortfolioWithoutNFT(db, AddressId @@ addressId)
-        else loadFullPortfolio(db, addressId)
-      }
+      addressId(a).fold(Portfolio.empty)(addressId => loadFullPortfolio(db, addressId))
     }
 
   override def accountDataKeys(address: Address): Set[String] = readOnly { db =>

@@ -25,8 +25,6 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
 
   override final val assetFee: (Asset, Long) = (Waves, fee)
 
-  val isNFT: Boolean = quantity == 1 && decimals == 0 && !reissuable
-
   val issueJson: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"     -> version,
@@ -35,8 +33,9 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
-      "description" -> new String(description, StandardCharsets.UTF_8),
-    ))
+      "description" -> new String(description, StandardCharsets.UTF_8)
+    )
+  )
 
   final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
@@ -48,7 +47,8 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeBoolean(reissuable),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
-    ))
+    )
+  )
 }
 object IssueTransaction {
 
@@ -63,12 +63,14 @@ object IssueTransaction {
     validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
   }
 
-  def validateIssueParams(name: Array[Byte],
-                          description: Array[Byte],
-                          quantity: Long,
-                          decimals: Byte,
-                          reissuable: Boolean,
-                          fee: Long): Either[ValidationError, Unit] = {
+  def validateIssueParams(
+      name: Array[Byte],
+      description: Array[Byte],
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      fee: Long
+  ): Either[ValidationError, Unit] = {
     (
       validateAmount(quantity, "assets"),
       validateName(name),
@@ -82,5 +84,6 @@ object IssueTransaction {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()
+    def isNFT: Boolean   = quantity == 1 && decimals == 0 && !reissuable
   }
 }

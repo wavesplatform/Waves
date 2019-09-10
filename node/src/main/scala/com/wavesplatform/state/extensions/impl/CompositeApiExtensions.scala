@@ -134,12 +134,9 @@ final class CompositeApiExtensions(blockchain: Blockchain, baseProvider: ApiExte
 
   override def portfolio(a: Address): Portfolio = {
     val diffPf = {
-      val full = getDiff().flatMap(_.portfolios.get(a)).getOrElse(Portfolio.empty)
-      val nonNft = for {
-        (IssuedAsset(id), balance) <- full.assets
-        (_, tx: IssueTransaction)  <- blockchain.transactionInfo(id) if !tx.isNFT
-      } yield (IssuedAsset(id), balance)
-      full.copy(assets = nonNft)
+      val full         = getDiff().flatMap(_.portfolios.get(a)).getOrElse(Portfolio.empty)
+      val nonNftAssets = full.assets.filterNot { case (asset, _) => blockchain.isNFT(asset) }
+      full.copy(assets = nonNftAssets)
     }
 
     Monoid.combine(baseProvider.portfolio(a), diffPf)
