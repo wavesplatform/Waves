@@ -44,25 +44,19 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
+    for {
+      _ <- checkFuncCtx(func)
+      _ <- modify[EstimatorContext, ExecutionError](userFuncs.modify(_)(_ + (FunctionHeader.User(func.name) -> func)))
+      r <- local(evalExpr(inner))
+    } yield r + 5
+
+  private def checkFuncCtx(func: FUNC): EvalM[Unit] =
     local {
       for {
-        ctx <- get
-        _ <- modify[EstimatorContext, ExecutionError]((userFuncs ~ callChain).modify(_) {
-          case (funcs, calls) => (storeFuncArgsCtx(funcs, func, ctx), calls - func.name)
-        })
-        r <- evalExpr(inner)
-      } yield r + 5
+        _ <- modify[EstimatorContext, ExecutionError](lets.modify(_)(_ ++ func.args.map((_, (true, const(0)))).toMap))
+        _ <- evalExpr(func.body)
+      } yield ()
     }
-
-  private def storeFuncArgsCtx(
-    funcDef: Map[FunctionHeader, (FUNC, EstimatorContext)],
-    func:    FUNC,
-    ctx:     EstimatorContext
-  ): Map[FunctionHeader, (FUNC, EstimatorContext)] =
-      funcDef.updated(
-        FunctionHeader.User(func.name),
-        (func, lets.set(ctx)(func.args.map((_, (false, const(1)))).toMap))
-      )
 
   private def evalRef(key: String): EvalM[Long] =
     for {
@@ -92,29 +86,19 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     for {
       ctx <- get
       bodyComplexity <- predefFuncs.get(ctx).get(header).map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
-        .orElse(userFuncs.get(ctx).get(header)
-          .map { case (func, funcCtx) =>
-            if (ctx.callChain.contains(func.name))
-              raiseError[EstimatorContext, ExecutionError, Long](s"Recursive call ${func.name}()")
-            else
-              evalUserFuncCall(func, funcCtx, args)
-          })
+        .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, args)))
         .getOrElse(raiseError(s"function '$header' not found"))
     } yield bodyComplexity
 
-  private def evalUserFuncCall(
-    func:    FUNC,
-    funcCtx: EstimatorContext,
-    args:    List[EXPR]
-  ): EvalM[Long] =
+  private def evalUserFuncCall(func: FUNC, args: List[EXPR]): EvalM[Long] = {
+    val complexityByArg = args.map(evalExpr)
+    val ctxArgs = (func.args zip complexityByArg.map((false, _))).toMap
     for {
-      argsComplexity <- evalFuncArgs(args)
-      _              <- modify[EstimatorContext, ExecutionError]((lets ~ callChain).modify(_) {
-        case (l, c) => (l ++ funcCtx.letDefs, c + func.name)
-      })
+      argsComplexity <- complexityByArg.sequence.map(_.sum)
+      _              <- modify[EstimatorContext, ExecutionError](lets.modify(_)(_ ++ ctxArgs))
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
-      _              <- modify[EstimatorContext, ExecutionError](callChain.modify(_)(_ - func.name))
     } yield bodyComplexity + argsComplexity
+  }
 
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =
     args.traverse(evalExpr).map(_.sum)
