@@ -506,16 +506,16 @@ class BlockchainUpdaterImpl(
     if (blockchainBlock.nonEmpty || ngState.isEmpty) {
       blockchain.balanceSnapshots(address, from, to)
     } else {
-      def portfolioAt(a: Address, mb: ByteStr): Portfolio = readLock {
-        val diffPf  = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
-        val lease   = blockchain.leaseBalance(a)
-        val balance = blockchain.balance(a)
-        Portfolio(balance, lease, Map.empty).combine(diffPf)
-      }
-
-      val bs = BalanceSnapshot(height, portfolioAt(address, to))
+      val bs = BalanceSnapshot(height, lposPortfolioFromNG(address, to))
       if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceSnapshots(address, from, to) else Seq(bs)
     }
+  }
+
+  private[this] def lposPortfolioFromNG(a: Address, mb: ByteStr): Portfolio = readLock {
+    val diffPf  = ngState.fold(Portfolio.empty)(_.balanceDiffAt(a, mb))
+    val lease   = blockchain.leaseBalance(a)
+    val balance = blockchain.balance(a)
+    Portfolio(balance, lease, Map.empty).combine(diffPf)
   }
 
   // Locks
