@@ -299,9 +299,9 @@ class BlockchainUpdaterImpl(
   }
 
   private def collectLeasesToCancel(newHeight: Int): Seq[LeaseTransaction] =
-    if (blockchain.isFeatureActivated(BlockchainFeatures.LeasingExpiry, newHeight)) {
-      val toHeight = newHeight - blockchain.settings.functionalitySettings.leaseTerm
-      val fromHeight = blockchain.featureActivationHeight(BlockchainFeatures.LeasingExpiry.id) match {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.LeaseExpired, newHeight)) {
+      val toHeight = newHeight - blockchain.settings.functionalitySettings.leaseExpired
+      val fromHeight = blockchain.featureActivationHeight(BlockchainFeatures.LeaseExpired.id) match {
         case Some(activationHeight) if activationHeight == newHeight => 1
         case _                                                       => toHeight
       }

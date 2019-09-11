@@ -28,10 +28,10 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
         featureCheckBlocksPeriod = 100,
         blocksForFeatureActivation = 80,
         doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        leaseTerm = LeasingValidity,
+        leaseExpired = LeasingValidity,
         preActivatedFeatures = Map(
           BlockchainFeatures.SmartAccounts.id -> 0,
-          BlockchainFeatures.LeasingExpiry.id -> LeasingExpiryActivationHeight
+          BlockchainFeatures.LeaseExpired.id -> LeasingExpiryActivationHeight
         )
       )
     )
