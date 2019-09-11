@@ -231,6 +231,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     if (settings.restAPISettings.enable) {
+      if (settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
+        log.error("Usage of default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited")
+        forceStopApplication(InvalidApiKey)
+      }
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
@@ -384,11 +389,6 @@ object Application {
     if (config.getBoolean("kamon.enable")) {
       Kamon.addReporter(new InfluxDBReporter())
       SystemMetrics.startCollecting()
-    }
-
-    if (settings.restAPISettings.enable && settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
-      log.error("Usage of default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited")
-      forceStopApplication(InvalidApiKey)
     }
 
     settings
