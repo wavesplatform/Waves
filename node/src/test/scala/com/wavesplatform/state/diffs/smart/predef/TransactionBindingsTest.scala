@@ -292,13 +292,13 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |   }
            |   let dappAddress = dAppAddressBytes == base58'${t.dAppAddressOrAlias.bytes.toString}'
            |
-            |   let paymentAmount = if(${t.payment.nonEmpty})
-           |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
+            |   let paymentAmount = if(${t.payments.nonEmpty})
+           |     then extract(t.payment).amount == ${t.payments.headOption.map(_.amount).getOrElse(-1)}
            |     else isDefined(t.payment) == false
            |
-            |   let paymentAssetId = if(${t.payment.nonEmpty})
-           |     then if (${t.payment.headOption.exists(_.assetId != Waves)})
-           |             then extract(t.payment).assetId == base58'${t.payment.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
+            |   let paymentAssetId = if(${t.payments.nonEmpty})
+           |     then if (${t.payments.headOption.exists(_.assetId != Waves)})
+           |             then extract(t.payment).assetId == base58'${t.payments.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
            |             else isDefined(extract(t.payment).assetId) == false
            |     else isDefined(t.payment) == false
            |
@@ -604,7 +604,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         WavesContext
           .build(
             DirectiveSet(V2, Asset, Expression).explicitGet(),
-            new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null))
+            new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null), V3)
           )
 
     for {
@@ -626,7 +626,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         WavesContext
           .build(
             DirectiveSet(V2, Account, Expression).explicitGet(),
-            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
+            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null), V3)
           )
 
     for {

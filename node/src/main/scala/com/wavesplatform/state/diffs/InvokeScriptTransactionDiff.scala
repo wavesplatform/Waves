@@ -7,6 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -58,23 +59,24 @@ object InvokeScriptTransactionDiff {
               Coeval(tx.asInstanceOf[In]),
               Coeval(blockchain.height),
               blockchain,
-              Coeval(tx.dAppAddressOrAlias.bytes)
+              Coeval(tx.dAppAddressOrAlias.bytes),
+              contract.version
             )
-            val invoker                                       = tx.sender.toAddress.bytes
-            val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-            val invocation = ContractEvaluator.Invocation(
-              functioncall,
-              Recipient.Address(invoker),
-              tx.sender,
-              maybePayment,
-              tx.dAppAddressOrAlias.bytes,
-              tx.id.value,
-              tx.fee,
-              tx.feeAssetId.compatId
-            )
+            val invoker = tx.sender.toAddress.bytes
             val result = for {
               invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
               directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              payments <- InvokeScriptTransaction.extractPayments(tx, blockchain.multiPaymentAllowed, contract.version >= V4).leftMap((_, List.empty[LogItem]))
+              invocation = ContractEvaluator.Invocation(
+                functioncall,
+                Recipient.Address(invoker),
+                tx.sender,
+                payments,
+                tx.dAppAddressOrAlias.bytes,
+                tx.id.value,
+                tx.fee,
+                tx.feeAssetId.compatId
+              )
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(
@@ -229,7 +231,7 @@ object InvokeScriptTransactionDiff {
     } else {
       val totalDataBytes = dataEntries.map(_.toBytes.length).sum
 
-      val payablePart: Map[Address, Portfolio] = tx.payment
+      val payablePart: Map[Address, Portfolio] = tx.payments
         .map {
           case InvokeScriptTransaction.Payment(amt, assetId) =>
             assetId match {

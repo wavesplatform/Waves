@@ -22,7 +22,7 @@ private[diffs] object DiffsCommon {
   ): Long = {
     val (totalComplexity, cm) = complexity
     script match {
-      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
+      case ContractScriptImpl(_, DApp(_, _, _, Some(vf), _)) if cm.contains(vf.u.name) => cm(vf.u.name)
       case _ => totalComplexity
     }
   }
@@ -47,7 +47,7 @@ private[diffs] object DiffsCommon {
 
       case None =>
         script.expr match {
-          case DApp(_, _, callables, _) =>
+          case DApp(_, _, callables, _, _) =>
             callables
               .find(f => (f.u.name == DEFAULT_FUNC_NAME) && f.u.args.isEmpty)
               .flatMap(f => cm.get(f.u.name))

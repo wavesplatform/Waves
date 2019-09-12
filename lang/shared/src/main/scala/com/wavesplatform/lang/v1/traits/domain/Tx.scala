@@ -32,7 +32,7 @@ object Tx {
   case class CI(
       p: Proven,
       dAppAddressOrAlias: Recipient,
-      maybePayment: Option[Pmt],
+      payments: Payments,
       feeAssetId: Option[ByteStr],
       funcName: Option[String],
       funcArgs: List[EVALUATED]

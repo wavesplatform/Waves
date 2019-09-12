@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.testing
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -59,7 +60,7 @@ trait TypedScriptGen {
       callables   <- Gen.listOfN(nCallables, callableGen)
       defaultFunc <- Gen.option(defaultFuncGen)
       verifier    <- Gen.option(verifierGen)
-      c = DApp(DAppMeta(), lets ++ funcs, callables ++ defaultFunc, verifier)
+      c = DApp(DAppMeta(), lets ++ funcs, callables ++ defaultFunc, verifier, V3)
       if ContractSerDe.serialize(c).explicitGet().size < Short.MaxValue - 3 - 4
     } yield c
 

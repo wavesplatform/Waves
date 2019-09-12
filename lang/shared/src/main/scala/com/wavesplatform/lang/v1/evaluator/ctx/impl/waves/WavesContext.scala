@@ -440,7 +440,7 @@ object WavesContext {
       if (isTokenContext)
         UNION(buildAssetSupportedTransactions(proofsEnabled, version))
       else
-        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)))
+        UNION(buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version))
 
     val commonVars = Map(
       ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
@@ -532,7 +532,6 @@ object WavesContext {
       scriptTransfer,
       scriptTransferSetType,
       scriptResultType,
-      invocationType,
       assetType,
       blockInfo
     )
@@ -541,8 +540,8 @@ object WavesContext {
     val types = Map[StdLibVersion, List[CASETYPEREF]](
       V1 -> List.empty,
       V2 -> List.empty,
-      V3 -> v3types,
-      V4 -> (v3types ++ v4types),
+      V3 -> (invocationType(V3) :: v3types),
+      V4 -> (invocationType(V4) :: v3types ::: v4types),
     )
 
     CTX(
@@ -552,6 +551,7 @@ object WavesContext {
     )
   }
 
-  val verifierInput = UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true, V3)), Some("VerifierInput"))
+  //todo!
+  val verifierInput = UNION.create(buildOrderType(true) :: buildActiveTransactionTypes(true, V3), Some("VerifierInput"))
 
 }

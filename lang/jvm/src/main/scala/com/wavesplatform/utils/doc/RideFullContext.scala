@@ -26,6 +26,7 @@ object RideFullContext {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
+    override def multiPaymentAllowed: Boolean                                                                    = ???
   }
 
   def build(

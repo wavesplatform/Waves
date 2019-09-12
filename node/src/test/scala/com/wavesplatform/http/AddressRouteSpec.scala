@@ -187,7 +187,8 @@ class AddressRouteSpec
       ),
       decs = List(),
       callableFuncs = List(),
-      verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
+      verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))),
+      version = V3
     )
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)

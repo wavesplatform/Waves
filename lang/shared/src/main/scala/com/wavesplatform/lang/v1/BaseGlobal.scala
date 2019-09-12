@@ -130,7 +130,7 @@ trait BaseGlobal {
     estimator:     ScriptEstimator
   ): Either[String, ContractInfo] =
     for {
-      dapp       <- ContractCompiler.compile(input, ctx)
+      dapp       <- ContractCompiler.compile(input, ctx, stdLibVersion)
       complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, estimator)
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)

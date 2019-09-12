@@ -23,4 +23,5 @@ trait Environment {
   def resolveAlias(name: String): Either[String, Recipient.Address]
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long]
   def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]
+  def multiPaymentAllowed: Boolean
 }

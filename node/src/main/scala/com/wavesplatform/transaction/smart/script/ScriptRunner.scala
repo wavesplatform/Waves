@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -36,7 +37,7 @@ object ScriptRunner {
           Coeval(scriptContainerAddress)
         )
         EvaluatorV1.applyWithLogging[EVALUATED](ctx, s.expr)
-      case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf), version)) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,
@@ -48,12 +49,12 @@ object ScriptRunner {
           Coeval(scriptContainerAddress)
         )
         val evalContract = in.eliminate(
-          t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.apply(t)),
+          t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper(t, blockchain.multiPaymentAllowed, version)),
           _.eliminate(t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)), _ => ???)
         )
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
-      case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None, _)) =>
         val t: Proven with Authorized =
           in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], _ => ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {

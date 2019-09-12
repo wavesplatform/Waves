@@ -9,8 +9,8 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
-import com.wavesplatform.lang.v1.traits.domain.Tx.{Pmt, ScriptTransfer}
-import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
+import com.wavesplatform.lang.v1.traits.domain.{Ord, Payments, Recipient, Tx}
 
 object ContractEvaluator {
 
@@ -19,7 +19,7 @@ object ContractEvaluator {
   case class Invocation(funcCall: FUNCTION_CALL,
                         caller: Recipient.Address,
                         callerPk: ByteStr,
-                        payment: Option[(Long, Option[ByteStr])],
+                        payments: Payments,
                         dappAddress: ByteStr,
                         transactionId: ByteStr,
                         fee: Long,
@@ -46,18 +46,7 @@ object ContractEvaluator {
           withDecls(
             c.decs,
             BLOCK(
-              LET(
-                f.annotation.invocationArgName,
-                Bindings.buildInvocation(
-                  i.caller,
-                  i.callerPk,
-                  i.payment.map { case (a, t) => Pmt(t, a) },
-                  Recipient.Address(i.dappAddress),
-                  i.transactionId,
-                  i.fee,
-                  i.feeAssetId
-                )
-              ),
+              LET(f.annotation.invocationArgName, Bindings.buildInvocation(i, c.version)),
               BLOCK(f.u, fc)
             )
           )

@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Payments, Recipient, Tx}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -139,7 +139,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
     val parsed = Parser.parseContract(src).get.value
 
-    ContractCompiler(ctx.compilerContext, parsed) should produce("no more than 22 arguments")
+    ContractCompiler(ctx.compilerContext, parsed, V3) should produce("no more than 22 arguments")
   }
 
   def parseCompileAndEvaluate(script: String,
@@ -147,7 +147,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
                               args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
                              ): Either[(ExecutionError, Log), ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
 
     ContractEvaluator(
       ctx.evaluationContext,
@@ -156,7 +156,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
         Recipient.Address(callerAddress),
         callerPublicKey,
-        None,
+        Payments.Single(None),
         ByteStr.empty,
         transactionId,
         fee,
@@ -167,7 +167,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
     val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
     EvaluatorV1.evalWithLogging(Right(ctx.evaluationContext), evalm)._2
   }
@@ -220,7 +220,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         proofs = IndexedSeq.empty
       ),
       dAppAddressOrAlias = Recipient.Address(ByteStr.empty),
-      maybePayment = None,
+      payments = Payments.Single(None),
       feeAssetId = None,
       funcName = Some("foo"),
       funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes).explicitGet(), CONST_STRING("ok").explicitGet())

@@ -5,6 +5,8 @@ import java.nio.ByteBuffer
 
 import cats.implicits._
 import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.Serde.desAux
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
@@ -29,7 +31,7 @@ object ContractSerDe {
         val out = new ByteArrayOutputStream()
 
         // version byte
-        out.writeInt(0)
+        out.writeInt(c.version.id)
 
         out.writeInt(metaBytes.length)
         out.write(metaBytes)
@@ -53,12 +55,12 @@ object ContractSerDe {
   def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
     for {
-      _               <- tryEi(bb.getInt())
+      version         <- tryEi(bb.getInt())
       meta            <- deserializeMeta(bb)
       decs            <- deserializeList[DECLARATION](bb, deserializeDeclaration)
       callableFuncs   <- deserializeList(bb, deserializeCallableFunction)
       verifierFuncOpt <- deserializeOption(bb, deserializeVerifierFunction)
-    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
+    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt, DirectiveDictionary[StdLibVersion].idMap(version))
   }
 
   private def checkMetaSize(metaSize: Int): Either[String, Unit] = {

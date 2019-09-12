@@ -107,7 +107,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None
+      None,
+      V3
     )
   }
 
@@ -148,7 +149,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None
+      None,
+      V3
     )
   }
 
@@ -188,7 +190,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None
+      None,
+      V3
     )
   }
 
@@ -223,12 +226,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
             )
           ))
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr)
+    compiler.ContractCompiler(ctx.compilerContext, expr, V3)
   }
 
   def writeSet(funcName: String, count: Int): DApp = {
@@ -291,12 +294,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, DAppType).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
             )
           ))
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr).right.get
+    compiler.ContractCompiler(ctx.compilerContext, expr, V3).right.get
   }
 
   def simplePreconditionsAndSetContract(invokerGen: Gen[KeyPair] = accountGen,

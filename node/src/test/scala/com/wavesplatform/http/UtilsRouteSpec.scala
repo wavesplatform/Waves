@@ -45,7 +45,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     callableFuncs = List.empty,
     verifierFuncOpt = Some(
       VerifierFunction(VerifierAnnotation("tx"), FUNC("verify", List(), TRUE))
-    )
+    ),
+    version = V3
   )
 
   routePath("/script/decompile") in {
@@ -140,7 +141,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
           VerifierAnnotation("hmmm"),
           FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
         )
-      )
+      ),
+      version = V3
     )
     val dappBase64 = ContractScript(V3, dApp).explicitGet().bytes().base64
     Post(routePath("/script/meta"), dappBase64) ~> route ~> check {

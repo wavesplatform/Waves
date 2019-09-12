@@ -28,7 +28,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       deser.sender shouldEqual transaction.sender
       deser.dAppAddressOrAlias shouldEqual transaction.dAppAddressOrAlias
       deser.funcCallOpt shouldEqual transaction.funcCallOpt
-      deser.payment shouldEqual transaction.payment
+      deser.payments shouldEqual transaction.payments
       deser.fee shouldEqual transaction.fee
       deser.timestamp shouldEqual transaction.timestamp
       deser.proofs shouldEqual transaction.proofs

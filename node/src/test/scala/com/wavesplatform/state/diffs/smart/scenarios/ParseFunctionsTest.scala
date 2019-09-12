@@ -8,7 +8,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Expression, V4}
+import com.wavesplatform.lang.directives.values.{Account, Expression, V3, V4}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -95,7 +95,8 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       Coeval(???),
       Coeval(???),
       EmptyBlockchain,
-      Coeval(???)
+      Coeval(???),
+      V3
     )
 
     val untyped  = Parser.parseExpr(code).get.value

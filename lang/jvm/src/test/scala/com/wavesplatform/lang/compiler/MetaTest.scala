@@ -7,7 +7,7 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, RecKeyValue, Single}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Single}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V3, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
@@ -69,13 +69,13 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](5))),
       )
     )
-    compiler.ContractCompiler(ctx, expr).map(_.meta) shouldBe Right(meta)
+    compiler.ContractCompiler(ctx, expr, V3).map(_.meta) shouldBe Right(meta)
 
     val callables = List(
       CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
       CallableFunction(CallableAnnotation("invocation"), FUNC("bar", List("a"), REF("")))
     )
-    val dApp = DApp(meta, Nil, callables, None)
+    val dApp = DApp(meta, Nil, callables, None, V3)
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
         "callableFuncTypes" -> Chain(List(

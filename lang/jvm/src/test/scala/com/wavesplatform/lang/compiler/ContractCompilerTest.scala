@@ -117,9 +117,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           VerifierFunction(
             VerifierAnnotation("t"),
             FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty).explicitGet())))
-          ))
+          )),
+        V3
       ))
-    compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe expectedResult
   }
 
   property("contract with default func compiles") {
@@ -175,9 +176,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             )
           )
         ),
-        None
+        None,
+        V3
       ))
-    compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe expectedResult
   }
 
   private val cmpCtx: CompilerContext =
@@ -209,7 +211,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'foo'")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Can't find a function 'foo'")
   }
 
   property("contract can access declarations") {
@@ -234,7 +236,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("contract compiles fails when incorrect return type") {
@@ -252,7 +254,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(FieldNames.Error)
+    compiler.ContractCompiler(ctx, expr, V3) should produce(FieldNames.Error)
   }
 
   property("annotation binding can have the same name as annotated function") {
@@ -270,7 +272,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("contract compiles fails if has more than one verifier function") {
@@ -293,7 +295,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("more than 1 verifier function")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("more than 1 verifier function")
   }
 
   property("contract compiles fails if has unknown annotation") {
@@ -308,7 +310,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Annotation not recognized")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Annotation not recognized")
   }
 
   property("verifier function must have 0 arguments") {
@@ -323,7 +325,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("must have 0 arguments")
   }
 
   property("hodlContract") {
@@ -381,7 +383,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("contract functions could return parent type values") {
@@ -409,7 +411,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("contract compilation fails if functions has the same name") {
@@ -436,7 +438,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("is already defined")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("is already defined")
   }
 
   property("contract compilation fails if declaration and annotation bindings has the same name") {
@@ -455,7 +457,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("already defined")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("already defined")
   }
 
   property("contract compilation fails if annotation bindings and func args has the same name") {
@@ -475,7 +477,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("override annotation bindings")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("override annotation bindings")
   }
 
   property("contract compiles if annotation bindings and another func args has the same name") {
@@ -497,7 +499,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("contract compiles if declaration vars and func args has the same name") {
@@ -516,7 +518,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("contract compiles if it use invoke script fields: payment, feeAssetId") {
@@ -541,7 +543,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("matching case with non-existing type should produce error message with suitable types") {
@@ -561,7 +563,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
-    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
+    compiler.ContractCompiler(ctx, expr, V3) should produce(verifierTypes.mkString(", "))
   }
 
   property("expression matching case with non-existing type should produce error message with suitable types") {
@@ -584,7 +586,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
+    compiler.ContractCompiler(ctx, expr, V3) should produce(verifierTypes.mkString(", "))
   }
 
   property("matching case with union type containing non-existing type should produce error message with suitable types") {
@@ -605,7 +607,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
+    compiler.ContractCompiler(ctx, expr, V3) should produce(verifierTypes.mkString(", "))
   }
 
   property("locally call @Callable func should produce informative error") {
@@ -626,7 +628,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'f1'(ByteVector) or it is @Callable")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Can't find a function 'f1'(ByteVector) or it is @Callable")
   }
 
   property("contract compiles if script uses InvokeScriptTransaction function and args field") {
@@ -646,7 +648,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("compiler error if user function defined below usage") {
@@ -664,7 +666,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Can't find a function")
   }
 
   property("compiler error if variable defined below usage") {
@@ -682,7 +684,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("A definition of 'a' is not found")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("A definition of 'a' is not found")
   }
 
   property("contract compilation fails if function name length is longer than 255 bytes") {
@@ -700,7 +702,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("must be less than")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("must be less than")
   }
 
   property("contract compiles if function name length is equal to 255 bytes") {
@@ -718,7 +720,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("compiler error if annotated func has argument of not native type") {
@@ -736,7 +738,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Unexpected argument type in function")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Unexpected argument type in function")
   }
 
   property("contract compiles if annotated func has argument of native type") {
@@ -754,7 +756,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("list as @Callable argument") {
@@ -772,6 +774,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Annotated function should not have generic parameter types")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Annotated function should not have generic parameter types")
   }
 }

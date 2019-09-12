@@ -6,10 +6,12 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
+import com.wavesplatform.lang.v1.traits.domain.Payments
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
@@ -26,7 +28,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
                                             sender: PublicKey,
                                             dAppAddressOrAlias: AddressOrAlias,
                                             funcCallOpt: Option[Terms.FUNCTION_CALL],
-                                            payment: Seq[Payment],
+                                            payments: Seq[Payment],
                                             fee: Long,
                                             feeAssetId: Asset,
                                             timestamp: Long,
@@ -49,7 +51,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
         sender,
         dAppAddressOrAlias.bytes.arr,
         Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
-        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
+        Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
         Longs.toByteArray(fee),
         feeAssetId.byteRepr,
         Longs.toByteArray(timestamp)
@@ -63,7 +65,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
         ++ Json.obj(
           "version" -> version,
           "dApp"    -> dAppAddressOrAlias.stringRepr,
-          "payment" -> payment
+          "payment" -> payments
         )
         ++ (funcCallOpt match {
           case Some(fc) => Json.obj("call" -> InvokeScriptTransaction.functionCallToJson(fc))
@@ -71,7 +73,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
         })
     )
 
-  override def checkedAssets(): Seq[IssuedAsset] = payment.toSeq collect { case Payment(_, assetId: IssuedAsset) => assetId }
+  override def checkedAssets(): Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
@@ -100,6 +102,24 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       )
     )
   }
+
+  def extractPayments(
+    tx: InvokeScriptTransaction,
+    multiPaymentAllowedByNode:   Boolean,
+    multiPaymentAllowedByScript: Boolean
+  ): Either[ExecutionError, Payments] =
+    if (multiPaymentAllowedByNode)
+      Either.cond(
+        multiPaymentAllowedByScript,
+        Payments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))),
+        "Script doesn't support multiple payments"
+      )
+    else
+      Either.cond(
+        tx.payments.length <= 1,
+        Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))),
+        "Multiple payments isn't allowed now"
+      )
 
   override val typeId: Byte                 = 16
   override val supportedVersions: Set[Byte] = Set(1)
@@ -166,7 +186,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   def validate(tx: InvokeScriptTransaction): Either[ValidationError, Unit] = {
     for {
       _ <- Either.cond(tx.chainId == currentChainId, (), WrongChain(currentChainId, tx.chainId))
-      _ <- validate(tx.funcCallOpt, tx.payment, tx.fee)
+      _ <- validate(tx.funcCallOpt, tx.payments, tx.fee)
       _ <- Either.cond(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
     } yield ()
   }
@@ -189,7 +209,6 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
       )
       _ <- checkAmounts(p)
-      _ <- Either.cond(p.length <= 1, (), GenericError("Multiple payment isn't allowed now"))
       _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), GenericError("duplicate payments"))
       _ <- Either.cond(
         fc.isEmpty || fc.get.args.forall(x => x.isInstanceOf[EVALUATED] && !x.isInstanceOf[CaseObj] && !x.isInstanceOf[ARR]),

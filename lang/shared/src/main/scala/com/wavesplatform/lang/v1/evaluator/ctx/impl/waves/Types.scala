@@ -60,19 +60,24 @@ object Types {
   val paymentType   = CASETYPEREF("AttachedPayment", List("assetId" -> optionByteVector, "amount" -> LONG))
 
   val optionPayment = UNION(paymentType, UNIT)
+  val listPayment   = LIST(paymentType)
 
-  val invocationType =
+  def invocationType(v: StdLibVersion) =
     CASETYPEREF(
       "Invocation",
+      payments(multiPaymentAllowed(v)) ::
       List(
         "caller"          -> addressType,
         "callerPublicKey" -> BYTESTR,
-        "payment"         -> optionPayment,
         "transactionId"   -> BYTESTR,
         "fee"             -> LONG,
         "feeAssetId"      -> optionByteVector
       )
     )
+
+  private def payments(multiPaymentAllowed: Boolean) =
+    if (multiPaymentAllowed) "payments" -> listPayment
+    else "payment" -> optionPayment
 
   private val header = List(
     "id"        -> BYTESTR,
@@ -129,19 +134,19 @@ object Types {
     )
   )
 
-  def buildInvokeScriptTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
-    "InvokeScriptTransaction",
-    addProofsIfNeeded(
-      List(
-        "dApp"       -> addressOrAliasType,
-        "payment"    -> optionPayment,
-        "feeAssetId" -> optionByteVector,
-        "function"   -> STRING,
-        "args"       -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
-      ) ++ header ++ proven,
-      proofsEnabled
+  def buildInvokeScriptTransactionType(proofsEnabled: Boolean, version: StdLibVersion) =
+    CASETYPEREF(
+      "InvokeScriptTransaction",
+      addProofsIfNeeded(
+        List(
+          "dApp"       -> addressOrAliasType,
+          "feeAssetId" -> optionByteVector,
+          "function"   -> STRING,
+          "args"       -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
+        ) ++ header ++ proven :+ payments(version >= V4),
+        proofsEnabled
+      )
     )
-  )
 
   def buildReissueTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "ReissueTransaction",
@@ -319,7 +324,9 @@ object Types {
       buildExchangeTransactionType(proofsEnabled),
       buildTransferTransactionType(proofsEnabled),
       buildSetAssetScriptTransactionType(proofsEnabled)
-    ) ++ (if (v == V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
+    ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty)
+
+  private def multiPaymentAllowed(v: StdLibVersion) = v >= V4
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++

@@ -2,6 +2,8 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -58,7 +60,12 @@ object RealTransactionWrapper {
     case a: Alias   => Recipient.Alias(a.name)
   }
 
-  def apply(tx: Transaction, txIdOpt: Option[ByteStr] = None): Tx = {
+  def apply(
+    tx: Transaction,
+    multiPaymentAllowed: Boolean,
+    version: StdLibVersion,
+    txIdOpt: Option[ByteStr] = None
+  ): Tx = {
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient)
       case t: TransferTransaction => mapTransferTx(t)
@@ -97,7 +104,7 @@ object RealTransactionWrapper {
         Tx.CI(
           proven(ci),
           ci.dAppAddressOrAlias,
-          ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)),
+          InvokeScriptTransaction.extractPayments(ci, multiPaymentAllowed, version >= V4).explicitGet(),
           ci.feeAssetId.compatId,
           ci.funcCallOpt.map(_.function.funcName),
           ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)

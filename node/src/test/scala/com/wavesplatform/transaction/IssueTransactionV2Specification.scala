@@ -109,12 +109,12 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
             )
           ))
     }
 
-    val script = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, contract).explicitGet())
+    val script = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, contract, V3).explicitGet())
 
     val tx = IssueTransactionV2
       .create(
