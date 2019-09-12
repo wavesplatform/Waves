@@ -1172,4 +1172,45 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         }
     }
   }
+
+  def multiPaymentPreconditions(
+    verifier: DApp,
+    invokerGen: Gen[KeyPair] = accountGen,
+    masterGen: Gen[KeyPair] = accountGen,
+    payment: Seq[Payment],
+    feeGen: Gen[Long] = ciFee(1)
+  ): Gen[(
+    List[GenesisTransaction],
+    SetScriptTransaction,
+    SetScriptTransaction,
+    InvokeScriptTransaction,
+    KeyPair
+  )] =
+    for {
+      master  <- masterGen
+      invoker <- invokerGen
+      ts      <- timestampGen
+      fee     <- feeGen
+    } yield {
+      val genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      val genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      val script      = ContractScript(V3, contract)
+      val setVerifier = SetScriptTransaction.selfSigned(invoker, ContractScript(V3, verifier).toOption, fee, ts + 2).explicitGet()
+      val setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
+      val ci = InvokeScriptTransaction.selfSigned(invoker, master, None, payment, fee, Waves, ts + 3)
+        .explicitGet()
+      (List(genesis, genesis2), setVerifier, setContract, ci, master)
+  }
+
+  property("multi payment") {
+    forAll(for {
+      r <- simplePreconditionsAndSetContract()
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
+        }
+    }
+  }
+
 }
