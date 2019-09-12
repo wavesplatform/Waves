@@ -46,8 +46,14 @@ package object predef {
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
     runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
 
-  def runScriptWithCustomContext[T <: EVALUATED](script: String, t: In, chainId: Byte, ctxV: StdLibVersion = V1): Either[String, T] =
-    runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
+  def runScriptWithCustomContext[T <: EVALUATED](
+    script: String,
+    t: In,
+    chainId: Byte,
+    ctxV: StdLibVersion = V1,
+    blockchain: Blockchain = EmptyBlockchain
+  ): Either[String, T] =
+    runScript[T](script, ctxV, t, blockchain, chainId)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 
