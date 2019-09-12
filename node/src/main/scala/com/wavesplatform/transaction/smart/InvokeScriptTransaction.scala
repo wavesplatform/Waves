@@ -6,7 +6,6 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED, FUNCTION_CALL}
@@ -109,17 +108,16 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     multiPaymentAllowedByScript: Boolean
   ): Either[ExecutionError, Payments] =
     if (multiPaymentAllowedByNode)
-      Either.cond(
-        multiPaymentAllowedByScript,
-        Payments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))),
-        "Script doesn't support multiple payments"
-      )
+      if (!multiPaymentAllowedByScript)
+        Left("Script doesn't support multiple payments")
+      else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
+        Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
+      else
+        Right(Payments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
+    else if (tx.payments.size > 1)
+      Left("Multiple payments isn't allowed now")
     else
-      Either.cond(
-        tx.payments.length <= 1,
-        Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))),
-        "Multiple payments isn't allowed now"
-      )
+      Right(Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
 
   override val typeId: Byte                 = 16
   override val supportedVersions: Set[Byte] = Set(1)

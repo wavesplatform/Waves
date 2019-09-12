@@ -260,7 +260,7 @@ object InvokeScriptTransactionDiff {
   private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
       ps: List[(Recipient.Address, Long, Option[ByteStr])],
       dataDiff: Diff): TracedResult[ValidationError, Diff] = {
-    if (ps.length <= ContractLimits.MaxPaymentAmount) {
+    if (ps.length <= ContractLimits.MaxTransferPaymentAmount) {
       val foldResult = ps.foldLeft(TracedResult(dataDiff.asRight[ValidationError])) { (tracedDiffAcc, payment) =>
         val (addressRepr, amount, asset) = payment
         val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
@@ -298,7 +298,7 @@ object InvokeScriptTransactionDiff {
       }
       TracedResult(foldResult.resultE.map(_ => Diff.stateOps()), foldResult.trace)
     } else {
-      Left(GenericError(s"Too many ScriptTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
+      Left(GenericError(s"Too many ScriptTransfers: max: ${ContractLimits.MaxTransferPaymentAmount}, actual: ${ps.length}"))
     }
   }
 

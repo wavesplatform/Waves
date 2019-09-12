@@ -23,5 +23,6 @@ object ContractLimits {
   val MaxKeySizeInBytes          = 100
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
-  val MaxPaymentAmount = 10
+  val MaxTransferPaymentAmount = 10
+  val MaxAttachedPaymentAmount = 5
 }
