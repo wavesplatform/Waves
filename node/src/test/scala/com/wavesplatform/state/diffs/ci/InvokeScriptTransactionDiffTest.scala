@@ -112,12 +112,15 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     )
   }
 
-  def paymentContract(senderBinding: String,
+  def paymentContract(
+                      senderBinding: String,
                       argName: String,
                       funcName: String,
                       recipientAddress: Address,
                       recipientAmount: Long,
-                      assets: List[Asset] = List(Waves)): DApp = {
+                      assets: List[Asset] = List(Waves),
+                      version: StdLibVersion = V3
+                     ): DApp = {
 
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(
       a =>
@@ -150,7 +153,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           )
         )),
       None,
-      V3
+      version
     )
   }
 
@@ -158,7 +161,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                              argName: String,
                              recipientAddress: Address,
                              recipientAmount: Long,
-                             assets: List[Asset] = List(Waves)): DApp = {
+                             assets: List[Asset] = List(Waves),
+                             version: StdLibVersion = V3): DApp = {
 
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(
       a =>
@@ -191,7 +195,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           )
         )),
       None,
-      V3
+      version
     )
   }
 
@@ -284,22 +288,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compileContractFromExpr(expr)
   }
 
-  def compileContractFromExpr(expr: Expressions.DAPP): DApp = {
+  def compileContractFromExpr(expr: Expressions.DAPP, version: StdLibVersion = V3): DApp = {
     val ctx = {
-      utils.functionCosts(V3)
+      utils.functionCosts(version)
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3),
-            CryptoContext.build(Global, V3),
+            PureContext.build(Global, version),
+            CryptoContext.build(Global, version),
             WavesContext.build(
-              DirectiveSet(V3, Account, DAppType).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
+              DirectiveSet(version, Account, DAppType).explicitGet(),
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), version)
             )
           ))
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, V3).right.get
+    compiler.ContractCompiler(ctx.compilerContext, expr, version).right.get
   }
 
   def simplePreconditionsAndSetContract(invokerGen: Gen[KeyPair] = accountGen,
@@ -1172,45 +1176,4 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         }
     }
   }
-
-  def multiPaymentPreconditions(
-    verifier: DApp,
-    invokerGen: Gen[KeyPair] = accountGen,
-    masterGen: Gen[KeyPair] = accountGen,
-    payment: Seq[Payment],
-    feeGen: Gen[Long] = ciFee(1)
-  ): Gen[(
-    List[GenesisTransaction],
-    SetScriptTransaction,
-    SetScriptTransaction,
-    InvokeScriptTransaction,
-    KeyPair
-  )] =
-    for {
-      master  <- masterGen
-      invoker <- invokerGen
-      ts      <- timestampGen
-      fee     <- feeGen
-    } yield {
-      val genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      val genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
-      val script      = ContractScript(V3, contract)
-      val setVerifier = SetScriptTransaction.selfSigned(invoker, ContractScript(V3, verifier).toOption, fee, ts + 2).explicitGet()
-      val setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
-      val ci = InvokeScriptTransaction.selfSigned(invoker, master, None, payment, fee, Waves, ts + 3)
-        .explicitGet()
-      (List(genesis, genesis2), setVerifier, setContract, ci, master)
-  }
-
-  property("multi payment") {
-    forAll(for {
-      r <- simplePreconditionsAndSetContract()
-    } yield (r._1, r._2, r._3)) {
-      case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
-        }
-    }
-  }
-
 }
