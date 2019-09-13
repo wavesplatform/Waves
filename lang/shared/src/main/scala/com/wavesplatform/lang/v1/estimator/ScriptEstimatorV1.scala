@@ -55,7 +55,7 @@ object ScriptEstimatorV1 extends ScriptEstimator {
 
       case t: FUNCTION_CALL =>
         for {
-          callCost <- EitherT.fromOption[Coeval]((functionCosts ++ funcs).get(t.function), s"ScriptValidator: Unknown function '${t.function}'")
+          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function).orElse(funcs.get(t.function)), s"ScriptValidator: Unknown function '${t.function}'")
           args <- t.args.foldLeft(EitherT.pure[Coeval, String]((0L, syms))) {
             case (accEi, arg) =>
               for {

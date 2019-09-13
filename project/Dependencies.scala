@@ -23,7 +23,7 @@ object Dependencies {
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect", "1.2.0")
@@ -31,6 +31,8 @@ object Dependencies {
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
+
+  val kafka = "org.apache.kafka" %% "kafka" % "2.1.0"
 
   val enforcedVersions = Def.setting(
     Seq(
@@ -65,7 +67,8 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros").value,
-      shapeless.value
+      shapeless.value,
+      kafka
     ))
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
@@ -151,7 +154,7 @@ object Dependencies {
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.0.0-SNAPSHOT" classifier "proto"
+    "com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto"
   lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(

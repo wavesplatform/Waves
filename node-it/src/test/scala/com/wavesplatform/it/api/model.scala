@@ -206,7 +206,8 @@ case class Block(signature: String,
                  generator: String,
                  transactions: Seq[Transaction],
                  fee: Long,
-                 features: Option[Seq[Short]])
+                 features: Option[Seq[Short]],
+                 reward: Option[Long])
 object Block {
   implicit val blockFormat: Format[Block] = Json.format
 }
@@ -218,6 +219,7 @@ case class BlockHeaders(signature: String,
                         transactionCount: Int,
                         blocksize: Int,
                         features: Option[Set[Short]],
+                        reward: Option[Long],
                         totalFee: Long)
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
@@ -295,7 +297,7 @@ object OrderbookHistory {
 
       case _ => JsError("Can't read ByteStr")
     },
-    Writes(x => JsString(x.base58))
+    Writes(x => JsString(x.toString))
   )
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]

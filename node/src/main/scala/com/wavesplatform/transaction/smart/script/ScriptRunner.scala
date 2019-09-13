@@ -18,8 +18,7 @@ import monix.eval.Coeval
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
 
-  def apply(height: Int,
-            in: TxOrd,
+  def apply(in: TxOrd,
             blockchain: Blockchain,
             script: Script,
             isAssetScript: Boolean,
@@ -30,7 +29,7 @@ object ScriptRunner {
           script.stdLibVersion,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
-          Coeval.evalOnce(height),
+          Coeval.evalOnce(blockchain.height),
           blockchain,
           isAssetScript,
           false,
@@ -42,7 +41,7 @@ object ScriptRunner {
           script.stdLibVersion,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
-          Coeval.evalOnce(height),
+          Coeval.evalOnce(blockchain.height),
           blockchain,
           isAssetScript,
           true,

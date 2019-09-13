@@ -28,6 +28,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -47,8 +48,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   def ciFee(sc: Int = 0): Gen[Long] =
     Gen.choose(
-      FeeValidation.FeeUnit * FeeValidation.OldFeeUnits(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
-      FeeValidation.FeeUnit * FeeValidation.OldFeeUnits(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
+      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
+      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
     )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -512,10 +513,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
-                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args(0).asInstanceOf[CONST_BYTESTR].bs)
+                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
               ))
 
-            blockDiff.transactions(ci.id())._3.contains(setScript.sender) shouldBe true
+            blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
           }
         }
     }
@@ -666,7 +667,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   }
 
   val chainId   = AddressScheme.current.chainId
-  val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.OldFeeUnits(IssueTransactionV2.typeId) * FeeValidation.FeeUnit
+  val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransactionV2.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {
     forAll(for {

@@ -1,14 +1,14 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.directives.values.{Account, ContentType, DApp, Expression, StdLibVersion}
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import cats.implicits._
 import com.wavesplatform.DocSource
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion, _}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.utils.doc.RideFullContext
+import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DocExportTest extends PropSpec with PropertyChecks with Matchers {
   property("declared ride funcs and vars have doc for all contexts") {
@@ -23,7 +23,7 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
 
   lazy val directives: Seq[DirectiveSet] =
     DirectiveSet.contractDirectiveSet +:
-      DirectiveDictionary[StdLibVersion].all
+      Set(V1, V2, V3)
         .map(DirectiveSet(_, Account, Expression).explicitGet())
         .toSeq
 

@@ -6,4 +6,13 @@ package object block {
 
   type VanillaBlock = com.wavesplatform.block.Block
   val VanillaBlock = com.wavesplatform.block.Block
+
+  type PBSignedMicroBlock = com.wavesplatform.protobuf.block.SignedMicroBlock
+  val PBSignedMicroBlock = com.wavesplatform.protobuf.block.SignedMicroBlock
+
+  type PBMicroBlock = com.wavesplatform.protobuf.block.MicroBlock
+  val PBMicroBlock = com.wavesplatform.protobuf.block.MicroBlock
+
+  type VanillaMicroBlock = com.wavesplatform.block.MicroBlock
+  val VanillaMicroBlock = com.wavesplatform.block.MicroBlock
 }

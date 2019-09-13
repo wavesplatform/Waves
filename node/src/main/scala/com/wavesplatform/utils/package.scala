@@ -66,7 +66,7 @@ package object utils extends ScorexLogging {
   }
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
-    override def writes(o: ByteStr): JsValue = JsString(o.base58)
+    override def writes(o: ByteStr): JsValue = JsString(o.toString)
 
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
       case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))

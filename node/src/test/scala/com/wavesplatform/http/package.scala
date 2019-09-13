@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.{PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.transfer._
@@ -44,7 +44,7 @@ package object http {
 
       case _ => JsError("Can't read PublicKey")
     },
-    Writes(x => JsString(x.base58))
+    Writes(x => JsString(x.toString))
   )
 
   implicit val PublicKeyFormat: Format[PublicKey] = byteStrFormat.inmap[PublicKey](
@@ -83,7 +83,7 @@ package object http {
 
       case _ => JsError("Can't read PublicKey")
     },
-    Writes(x => JsString(x.bytes.base58))
+    Writes(x => JsString(x.bytes.toString))
   )
 
   implicit val transferTransactionFormat: Format[TransferTransactionV1] = (

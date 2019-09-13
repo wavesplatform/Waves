@@ -24,9 +24,7 @@ import scala.util.{Left, Right, Try}
 
 object CommonValidation {
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
-                                                          blockTime: Long,
-                                                          tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
@@ -75,20 +73,18 @@ object CommonValidation {
       }
     } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
-                                             height: Int,
-                                             tx: T): Either[ValidationError, T] = tx match {
+  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
+  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
 
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
-        blockchain.isFeatureActivated(b, height),
+        blockchain.isFeatureActivated(b, blockchain.height),
         tx,
         TxValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )
@@ -101,6 +97,7 @@ object CommonValidation {
         case V1 | V2 if sc.containsBlockV2.value => ab
         case V1 | V2                             => Right(tx)
         case V3                                  => ab
+        case V4                                  => activationBarrier(BlockchainFeatures.Dummy)
       }
 
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {

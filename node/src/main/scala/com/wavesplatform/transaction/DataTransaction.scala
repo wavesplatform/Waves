@@ -74,9 +74,9 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
       Left(TxValidationError.TooBigArray)
     } else if (tx.data.exists(_.key.isEmpty)) {
-      Left(TxValidationError.GenericError("Empty key found"))
+      Left(TxValidationError.EmptyDataKey)
     } else if (tx.data.map(_.key).distinct.lengthCompare(tx.data.size) < 0) {
-      Left(TxValidationError.GenericError("Duplicate keys found"))
+      Left(TxValidationError.DuplicatedDataKeys)
     } else if (tx.fee <= 0) {
       Left(TxValidationError.InsufficientFee())
     } else {

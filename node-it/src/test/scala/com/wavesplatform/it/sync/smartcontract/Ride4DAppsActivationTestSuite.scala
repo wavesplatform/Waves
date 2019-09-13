@@ -98,7 +98,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   test("can't set script with user function to asset before Ride4DApps activation") {
     assertBadRequestAndMessage(
       sender.setAssetScript(
-        Asset.IssuedAsset("Test".getBytes("UTF-8")).id.base58,
+        Asset.IssuedAsset("Test".getBytes("UTF-8")).id.toString,
         smartAcc.stringRepr,
         issueFee,
         Some(scriptV2),

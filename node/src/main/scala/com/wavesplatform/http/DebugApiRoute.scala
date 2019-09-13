@@ -368,12 +368,11 @@ case class DebugApiRoute(
   )
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val h  = blockchain.height
-      val t0 = System.nanoTime
-      val tracedDiff = for {
-        tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-        _  <- Verifier(blockchain, h)(tx)
-        ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
+        val t0 = System.nanoTime
+        val tracedDiff = for {
+          tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
+          _  <- Verifier(blockchain)(tx)
+        ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield ei
       val timeSpent = (System.nanoTime - t0) * 1e-6
       val response = Json.obj(
@@ -475,7 +474,7 @@ object DebugApiRoute {
         }
       case _ => JsError("The map is expected")
     },
-    m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
+    m => Json.toJson(m.map { case (assetId, count) => assetId.toString -> count })
   )
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
 

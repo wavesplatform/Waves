@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Types._
 
 object Types {
@@ -8,6 +8,22 @@ object Types {
   val addressType        = CASETYPEREF("Address", List("bytes" -> BYTESTR))
   val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
   val addressOrAliasType = UNION(addressType, aliasType)
+
+  val blockHeader = CASETYPEREF(
+    "BlockHeader",
+    List(
+      "timestamp"                      -> LONG,
+      "version"                        -> LONG,
+      "reference"                      -> BYTESTR,
+      "generator"                      -> BYTESTR,
+      "generatorPublicKey"             -> BYTESTR,
+      "signature"                      -> BYTESTR,
+      "baseTarget"                     -> LONG,
+      "generationSignature"            -> BYTESTR,
+      "transactionCount"               -> LONG,
+      "featureVotes"                   -> LIST(LONG)
+    )
+  )
 
   val assetType = CASETYPEREF(
     "Asset",
@@ -333,6 +349,8 @@ object Types {
       dataEntryType,
       buildOrderType(proofsEnabled),
       transactionsCommonType
-    ) ++ transactionTypes
+    ) ++
+      transactionTypes ++
+      (if (v == V4) List(blockHeader) else Nil)
   }
 }

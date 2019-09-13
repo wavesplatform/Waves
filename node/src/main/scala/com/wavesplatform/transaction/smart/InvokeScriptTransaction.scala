@@ -165,7 +165,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
   def validate(tx: InvokeScriptTransaction): Either[ValidationError, Unit] = {
     for {
-      _ <- Either.cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
+      _ <- Either.cond(tx.chainId == currentChainId, (), WrongChain(currentChainId, tx.chainId))
       _ <- validate(tx.funcCallOpt, tx.payment, tx.fee)
       _ <- Either.cond(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
     } yield ()

@@ -37,7 +37,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
     miner.signedBroadcast(transferToAccount.json())
 
-    nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().base58)
+    nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
 
     val firstTransfer = TransferTransactionV1
       .selfSigned(Waves, account, miner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)

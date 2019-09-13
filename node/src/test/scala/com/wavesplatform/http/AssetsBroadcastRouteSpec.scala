@@ -54,7 +54,7 @@ class AssetsBroadcastRouteSpec
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { t: Transaction =>
-          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(CustomValidationError("foo"), t))
         }
       }
     }
@@ -219,7 +219,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.base58
+      signature.toString
     )
   }
 
@@ -234,7 +234,7 @@ class AssetsBroadcastRouteSpec
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.proofs.map(_.base58)
+      proofs.proofs.map(_.toString)
     )
   }
 

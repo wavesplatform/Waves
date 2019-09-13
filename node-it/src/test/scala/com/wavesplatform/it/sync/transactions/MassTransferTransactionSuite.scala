@@ -135,7 +135,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     for (((req, idOpt), diag) <- invalidTransfers) {
       assertBadRequestAndResponse(sender.broadcastRequest(req), diag)
-      idOpt.foreach(id => nodes.foreach(_.ensureTxDoesntExist(id.base58)))
+      idOpt.foreach(id => nodes.foreach(_.ensureTxDoesntExist(id.toString)))
     }
 
     nodes.waitForHeightArise()

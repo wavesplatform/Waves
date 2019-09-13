@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   def create(sender: com.wavesplatform.account.PublicKey = PublicKey.empty,
              chainId: Byte = 0,
@@ -238,7 +238,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), _)) =>
+      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
         version match {
           case 1 =>
             vt.assets.exchange.ExchangeTransactionV1.create(
@@ -482,7 +482,7 @@ object PBTransactions {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder), _)) =>
+      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
         version match {
           case 1 =>
             vt.assets.exchange.ExchangeTransactionV1(

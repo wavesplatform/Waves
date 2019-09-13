@@ -263,11 +263,15 @@ object Bindings {
 
         CaseObj(
           buildDataTransactionType(proofsEnabled),
-          combine(Map("data" -> data.map(e => CaseObj(
-            dataEntryType,
-            Map("key" -> CONST_STRING(e.key).explicitGet(), "value" -> mapValue(e.value))
-          ))),
-                  provenTxPart(p, proofsEnabled)
+          combine(
+            Map(
+              "data" -> data.map(
+                e =>
+                  CaseObj(
+                    dataEntryType,
+                    Map("key" -> CONST_STRING(e.key).explicitGet(), "value" -> mapValue(e.value))
+                ))),
+            provenTxPart(p, proofsEnabled)
           )
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
@@ -286,6 +290,23 @@ object Bindings {
           )
         )
     }
+
+  def blockHeaderObject(header: BlockHeader): CaseObj =
+    CaseObj(
+      blockHeader,
+      Map[String, EVALUATED](
+        "timestamp"           -> header.timestamp,
+        "version"             -> header.version,
+        "reference"           -> header.reference,
+        "generator"           -> header.generator,
+        "generatorPublicKey"  -> header.generatorPublicKey,
+        "signature"           -> header.signature,
+        "baseTarget"          -> header.baseTarget,
+        "generationSignature" -> header.generationSignature,
+        "transactionCount"    -> header.transactionCount,
+        "featureVotes"        -> header.featureVotes.map(CONST_LONG)
+      )
+    )
 
   def buildAssetInfo(sAInfo: ScriptAssetInfo) =
     CaseObj(
@@ -314,4 +335,5 @@ object Bindings {
         "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
     )
+
 }

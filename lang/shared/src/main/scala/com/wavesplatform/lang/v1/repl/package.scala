@@ -1,18 +1,18 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.traits.Environment.InputEntity
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import cats.implicits._
+import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.traits.Environment.InputEntity
+import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 package object repl {
   val Global: BaseGlobal = com.wavesplatform.lang.Global
   val failFastBlockchainEnv = new Environment {
-    lazy val unavailable = throw new RuntimeException(s"Blockchain state is unavailable from REPL")
+    lazy val unavailable                                                                                         = throw new RuntimeException(s"Blockchain state is unavailable from REPL")
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 0
     override def inputEntity: InputEntity                                                                        = unavailable
@@ -26,10 +26,11 @@ package object repl {
     override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = unavailable
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = unavailable
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = unavailable
   }
 
   def buildInitialCtx(version: StdLibVersion) =
     CryptoContext.build(Global, version) |+|
-    PureContext.build(Global, version)   |+|
-    WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
+      PureContext.build(Global, version) |+|
+      WavesContext.build(contractDirectiveSet, failFastBlockchainEnv)
 }

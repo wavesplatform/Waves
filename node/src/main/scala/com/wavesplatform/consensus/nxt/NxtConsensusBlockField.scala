@@ -1,8 +1,8 @@
 package com.wavesplatform.consensus.nxt
 
 import com.google.common.primitives.{Bytes, Longs}
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.block.BlockField
+import play.api.libs.json.{JsObject, Json}
 
 case class NxtConsensusBlockField(override val value: NxtLikeConsensusBlockData) extends BlockField[NxtLikeConsensusBlockData] {
 
@@ -16,6 +16,6 @@ case class NxtConsensusBlockField(override val value: NxtLikeConsensusBlockData)
     Json.obj(
       name -> Json.obj(
         "base-target"          -> value.baseTarget,
-        "generation-signature" -> value.generationSignature.base58
+        "generation-signature" -> value.generationSignature.toString
       ))
 }

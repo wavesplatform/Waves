@@ -54,7 +54,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val bigAssetFee      = eff1 + 1.waves
 
     assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee),
-                               "negative waves balance")
+                               "Accounts balance errors")
   }
 
   test("Try to put incorrect script") {

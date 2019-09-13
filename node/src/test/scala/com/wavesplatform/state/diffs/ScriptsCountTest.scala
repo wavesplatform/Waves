@@ -9,7 +9,6 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
@@ -206,7 +205,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         case (_, state) =>
           txs.foldLeft(Diff.empty) { (diff, tx) =>
             val newState = CompositeBlockchain(state, Some(diff))
-            val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp, state.height)(newState, tx).resultE.explicitGet()
+            val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
             val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
             if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
             Monoid.combine(diff, newDiff)

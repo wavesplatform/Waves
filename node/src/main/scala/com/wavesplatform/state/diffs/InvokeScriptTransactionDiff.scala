@@ -43,7 +43,7 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
@@ -56,7 +56,7 @@ object InvokeScriptTransactionDiff {
             val environment = new WavesEnvironment(
               AddressScheme.current.chainId,
               Coeval(tx.asInstanceOf[In]),
-              Coeval(height),
+              Coeval(blockchain.height),
               blockchain,
               Coeval(tx.dAppAddressOrAlias.bytes)
             )
@@ -147,7 +147,7 @@ object InvokeScriptTransactionDiff {
           })
           dAppAddress <- TracedResult(dAppAddressEi)
           wavesFee = feeInfo._1
-          dataAndPaymentDiff <- TracedResult(payableAndDataPart(height, tx, dAppAddress, dataEntries, feeInfo._2))
+          dataAndPaymentDiff <- TracedResult(payableAndDataPart(blockchain.height, tx, dAppAddress, dataEntries, feeInfo._2))
           _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _                  <- TracedResult(validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
           _ <- TracedResult(
@@ -160,23 +160,35 @@ object InvokeScriptTransactionDiff {
               (),
               GenericError(s"Unissued assets are not allowed")
             ))
-          scriptsInvoked = {
-            tx.checkedAssets()
-              .collect { case asset@IssuedAsset(_) => asset }
-              .count(blockchain.hasAssetScript) +
-              ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-              (if (blockchain.hasScript(tx.sender)) 1 else 0)
-          }
           _ <- TracedResult {
-            val minWaves = scriptsInvoked * ScriptExtraFee + FeeValidation.feeUnits(blockchain)(InvokeScriptTransaction.typeId) * FeeUnit
+            val totalScriptsInvoked =
+              tx.checkedAssets()
+                .collect { case asset @ IssuedAsset(_) => asset }
+                .count(blockchain.hasAssetScript) +
+                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+                (if (blockchain.hasScript(tx.sender)) 1 else 0)
+            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             Either.cond(
               minWaves <= wavesFee,
               (),
-              GenericError(s"Fee in ${
-                tx.assetFee._1
-                  .fold("WAVES")(_.toString)
-              } for $txName with $scriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in ${tx.assetFee._1
+                .fold("WAVES")(_.toString)} for $txName with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+            )
+          }
+          scriptsInvoked <- TracedResult {
+            val totalScriptsInvoked =
+              tx.checkedAssets()
+                .collect { case asset @ IssuedAsset(_) => asset }
+                .count(blockchain.hasAssetScript) +
+                ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+                (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
+            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            Either.cond(
+              minWaves <= wavesFee,
+              totalScriptsInvoked,
+              GenericError(s"Fee in ${tx.assetFee._1
+                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
             )
           }
 
@@ -192,7 +204,7 @@ object InvokeScriptTransactionDiff {
             case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
           })
           val dataAndPaymentDiffTx              = dataAndPaymentDiff.transactions(tx.id())
-          val dataAndPaymentDiffTxWithTransfers = dataAndPaymentDiffTx.copy(_3 = dataAndPaymentDiffTx._3 ++ transfers.keys)
+          val dataAndPaymentDiffTxWithTransfers = dataAndPaymentDiffTx.copy(_2 = dataAndPaymentDiffTx._2 ++ transfers.keys)
           val transferSetDiff                   = Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
           dataAndPaymentDiff.copy(
             transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
@@ -234,8 +246,7 @@ object InvokeScriptTransactionDiff {
 
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
         Right(
-          Diff(height = height,
-               tx = tx,
+          Diff(tx = tx,
                portfolios = feePart combine payablePart,
                accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap)))
         )
@@ -298,7 +309,6 @@ object InvokeScriptTransactionDiff {
       script: Script): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
-        blockchain.height,
         Coproduct[TxOrd](
           ScriptTransfer(
             asset,

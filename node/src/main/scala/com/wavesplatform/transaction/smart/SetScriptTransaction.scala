@@ -53,7 +53,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
-        .cond(tx.chainId == chainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
+        .cond(tx.chainId == chainId, (), WrongChain(chainId, tx.chainId))
         .flatMap(_ => Either.cond(tx.fee > 0, (), InsufficientFee(s"insufficient fee: ${tx.fee}")))
         .map(_ => tx)
         .foldToTry

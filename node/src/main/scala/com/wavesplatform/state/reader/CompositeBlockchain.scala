@@ -19,8 +19,13 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] = None, newBlock: Option[Block] = None, carry: Long = 0)
-    extends Blockchain {
+final case class CompositeBlockchain(
+    inner: Blockchain,
+    maybeDiff: Option[Diff] = None,
+    newBlock: Option[Block] = None,
+    carry: Long = 0,
+    reward: Option[Long] = None
+) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
@@ -67,7 +72,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
         diff.transactions
           .get(asset.id)
           .collectFirst {
-            case (_, it: IssueTransaction, _) =>
+            case (it: IssueTransaction, _) =>
               AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
@@ -77,8 +82,8 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (h, lt: LeaseTransaction, _) =>
-          LeaseDetails(lt.sender, lt.recipient, h, lt.amount, diff.leaseState(lt.id()))
+        case (lt: LeaseTransaction, _) =>
+          LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
@@ -86,7 +91,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
     diff.transactions
       .get(id)
       .collect {
-        case (h, tx: TransferTransaction, _) => (h, tx)
+        case (tx: TransferTransaction, _) => (height, tx)
       }
       .orElse(inner.transferById(id))
   }
@@ -94,16 +99,16 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
     diff.transactions
       .get(id)
-      .map(_._1)
+      .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
+  override def height: Int = inner.height + newBlock.fold(0)(_ => 1)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -114,7 +119,7 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keys
-      .map(id => diff.transactions(id)._2)
+      .map(id => diff.transactions(id)._1)
       .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
 
     val fromInner = inner.collectActiveLeases {
@@ -230,6 +235,15 @@ final case class CompositeBlockchain(inner: Blockchain, maybeDiff: Option[Diff] 
   override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
+
+  /** Block reward related */
+  override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse inner.blockReward(height)
+
+  override def lastBlockReward: Option[Long] = reward.orElse(inner.lastBlockReward)
+
+  override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
+
+  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
