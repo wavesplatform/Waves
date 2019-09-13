@@ -1,0 +1,138 @@
+waves.network.traffic-logger {
+  ignore-tx-messages = []
+}
+
+generator {
+  chain-id = ${chain_id}
+  accounts = [
+      ${accounts}
+  ]
+
+  send-to = [
+      ${network_servers}
+  ]
+   
+  worker {
+    iterations = 20 // Deprecated
+    delay = ${worker_delay}
+    utx-limit = ${worker_utx_limit}
+    working-time = ${worker_working_time}
+
+    auto-reconnect = true
+    reconnect-delay = 3s
+  }
+
+  mode = "NARROW"
+  narrow {
+    transactions = 10
+    probabilities {
+      issue-transaction-v2 =${issue_transaction_v2}
+      transfer-transaction-v2 = ${transfer_transaction_v2}
+      reissue-transaction-v2 = ${reissue_transaction_v2}
+      burn-transaction-v2 = ${burn_transaction_v2}
+      exchange-transaction-v2 = ${exchange_transaction_v2}
+      lease-transaction-v2 = ${lease_transaction_v2}
+      lease-cancel-transaction-v2 = ${lease_cancel_transaction_v2}
+      create-alias-transaction-v2 = ${create_alias_transaction_v2}
+      mass-transfer-transaction = ${mass_transfer_transaction}
+      data-transaction = ${data_transaction}
+      sponsor-fee-transaction = ${sponsor_fee_transaction}
+      invoke-script-transaction = ${invoke_script_transaction}
+    }
+
+    scripts = [
+      {
+        dapp-account = "EWu1tVUxKBt9UJAxtyXmS8"
+        payment-assets = [ "Asset#1" ]
+        functions = [
+          {
+            name = "dosReturnPayment"
+            args = [
+              {
+                type = "string",
+                value = "str123"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+
+  wide {
+    transactions = 10
+    limit-dest-accounts = 10000
+    min-fee = 100000
+    max-fee = 150000
+  }
+
+  dyn-wide {
+    limit-dest-accounts = 10000
+    start = 1
+    grow-adder = 0.0408
+    min-fee = 100000
+    max-fee = 150000
+  }
+
+  multisig {
+    transactions = 3
+    first-run = false
+  }
+
+  swarm {
+    scripts = 0
+    complexity = false
+    transfers = 0
+    exchange = 10
+    assets = [
+      "ArhKA4Z8LJpbthtcvC9puVESDniXKScdPgpuUkkw358G",
+      "afzcrnmMJLwdUpZKYk48PFcKYBwTqjc2aJmV2NdQmyS",
+      "AFVC315qWRqzPzbTxD5Zs9j7TZzWMg85Lr8aWSZHLegW"
+    ]
+  }
+
+  oracle {
+    transactions = 300
+    required-data = [
+      {
+        type = "boolean"
+        key = "enabled#1"
+        value = true
+      },{
+        type = "boolean"
+        key = "enabled#2"
+        value = true
+      },{
+        type = "boolean"
+        key = "enabled#3"
+        value = true
+      },{
+        type = "integer"
+        key = "integer#1"
+        value = 1
+      },{
+        type = "integer"
+        key = "integer#2"
+        value = 2
+      },{
+        type = "integer"
+        key = "integer#3"
+        value = 3
+      },{
+        type = "string"
+        key = "String#1"
+        value = "foo"
+      },{
+        type = "string"
+        key = "String#2"
+        value = "bar"
+      },{
+        type = "string"
+        key = "String#3"
+        value = "buz"
+      }
+    ]
+  }
+}
+
+include "local.conf"
