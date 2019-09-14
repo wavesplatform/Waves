@@ -190,7 +190,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     "should be applied only for expired leases" in forAll(manyLeases) {
       case (alias, blocks) =>
         withDomain(leasingSettings) {
-          case Domain(blockchainUpdater) =>
+          case Domain(blockchainUpdater, _) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, alias, 0L)
@@ -233,7 +233,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     "has correct balance when lease transaction is accepted in a block where previous leases are cancelled" in forAll(leaseInTheCancelBlock) {
       case (miner, lessor, blocks) =>
         withDomain(leasingSettings) {
-          case Domain(blockchainUpdater) =>
+          case Domain(blockchainUpdater, _) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)
@@ -270,7 +270,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     "can generate block where lease is cancelled" in forAll(blockWhereLeaseCancelled) {
       case (miner, blocks) =>
         withDomain(leasingSettings) {
-          case Domain(blockchainUpdater) =>
+          case Domain(blockchainUpdater, _) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)

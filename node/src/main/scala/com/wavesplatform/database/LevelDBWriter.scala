@@ -86,8 +86,13 @@ class LevelDBWriter(
     with ScorexLogging {
 
   // Only for tests
-  def this(writableDB: DB, spendableBalanceChanged: Observer[(Address, Asset)], fs: FunctionalitySettings, dbSettings: DBSettings) =
-    this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET), dbSettings)
+  def this(
+      writableDB: DB,
+      spendableBalanceChanged: Observer[(Address, Asset)],
+      fs: FunctionalitySettings,
+      dbSettings: DBSettings,
+      rewardSettings: RewardsSettings = RewardsSettings.TESTNET
+  ) = this(writableDB, spendableBalanceChanged, BlockchainSettings('T', fs, GenesisSettings.TESTNET, rewardSettings), dbSettings)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
@@ -233,13 +238,7 @@ class LevelDBWriter(
   }
 
   override def blockReward(height: Int): Option[Long] =
-    readOnly(_.db.get(Keys.blockReward(height))).orElse {
-      activatedFeatures
-        .get(BlockchainFeatures.BlockReward.id)
-        .collect {
-          case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
-        }
-    }
+    readOnly(_.db.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)

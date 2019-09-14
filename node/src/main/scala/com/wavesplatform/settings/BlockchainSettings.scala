@@ -23,10 +23,9 @@ case class RewardsSettings(
 
   def nearestTermEnd(activatedAt: Int, height: Int): Int = {
     require(height >= activatedAt)
-    val diff = height - activatedAt
+    val diff = height - activatedAt + 1
     val mul  = math.ceil(diff.toDouble / term).toInt
-    val next = activatedAt + mul * term
-    if (next == height) next + term else next
+    activatedAt + mul * term - 1
   }
 
   def votingWindow(activatedAt: Int, height: Int): Range = {
