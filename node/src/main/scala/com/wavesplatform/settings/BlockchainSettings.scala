@@ -70,7 +70,7 @@ case class FunctionalitySettings(
     maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,
-    leaseTerm: Int = 1000000
+    leaseExpiration: Int = 1000000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
