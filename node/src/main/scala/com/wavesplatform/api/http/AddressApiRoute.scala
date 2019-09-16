@@ -11,6 +11,8 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.contract.meta.Dic
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
@@ -40,7 +42,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
   @Path("/scriptInfo/{address}")
@@ -58,6 +60,22 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         .map(ToResponseMarshallable(_))
     )
   }
+
+  @Path("/scriptInfo/{address}/meta")
+  @ApiOperation(value = "Meta by address", notes = "Account's script meta", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
+    complete(
+      Address.fromString(address)
+        .flatMap(scriptMetaJson)
+        .map(ToResponseMarshallable(_))
+    )
+  }
+
   @Path("/{address}")
   @ApiOperation(value = "Delete", notes = "Remove the account with address {address} from the wallet", httpMethod = "DELETE")
   @ApiImplicitParams(
@@ -403,6 +421,15 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     AddressScriptInfo(account.stringRepr, script.map(_.base64), scriptText, complexity, extraFee)
   }
 
+  private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
+    import cats.implicits._
+    commonAccountApi.script(account)
+      .script
+      .map(_.base64)
+      .traverse(Global.scriptMeta)
+      .map(AccountScriptMeta(account.stringRepr, _))
+  }
+
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address
       .fromString(address)
@@ -519,4 +546,8 @@ object AddressApiRoute {
   case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String], complexity: Long, extraFee: Long)
 
   implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
+
+  case class AccountScriptMeta(address: String, meta: Option[Dic])
+  implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
+  implicit lazy val dicFormat: Writes[Dic] = metaConverter.foldRoot
 }
