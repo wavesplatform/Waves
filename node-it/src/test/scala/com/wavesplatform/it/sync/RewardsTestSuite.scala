@@ -117,7 +117,7 @@ object RewardsTestSuite {
        |    min-increment = $minIncrement
        |    voting-interval = $votingInterval
        |  }
-       |  rewards.target = $target
+       |  rewards.desired = $target
        |  miner.quorum = 1
        |}""".stripMargin
   )
