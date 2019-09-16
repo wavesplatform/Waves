@@ -1,9 +1,10 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType}
+import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -12,8 +13,6 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
-
-import cats.implicits._
 
 object TransactionDiffer extends ScorexLogging {
 
