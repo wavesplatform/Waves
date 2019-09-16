@@ -25,9 +25,10 @@ object ReplEngine {
       )
       (newCompileCtx, compiled, exprType) <- tryEi(ExpressionCompiler.applyWithCtx(compileCtx, parsed))
       (newEvalCtx, eval)                  <- tryEi(EvaluatorV1.applyWithCtx(evalCtx, compiled))
-      resultO = assignedResult(exprType, eval, newCompileCtx)
-      output = mkOutput(resultO, compileCtx, newCompileCtx)
-      newCtx = resultO.fold((newCompileCtx, newEvalCtx))(addResultToCtx(_, newCompileCtx, newEvalCtx))
+      filteredCompileCtx = excludeInternalDecls(newCompileCtx)
+      resultO = assignedResult(exprType, eval, filteredCompileCtx)
+      output = mkOutput(resultO, compileCtx, filteredCompileCtx)
+      newCtx = resultO.fold((filteredCompileCtx, newEvalCtx))(addResultToCtx(_, filteredCompileCtx, newEvalCtx))
     } yield (output, newCtx)
 
   private def tryEi[R](r: => Either[String, R]): Either[String, R] =
@@ -35,6 +36,9 @@ object ReplEngine {
       .toEither
       .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
       .flatten
+
+  private def excludeInternalDecls(compileCtx: CompilerContext) =
+    compileCtx.copy(varDefs = compileCtx.varDefs.filterNot(v => internalVarPrefixes.contains(v._1.head)))
 
   private val assignPrefix = "res"
   private val assignedR = s"^$assignPrefix([1-9][0-9]*)".r

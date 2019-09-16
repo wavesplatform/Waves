@@ -20,7 +20,7 @@ object DeclPrinter {
   def funcStr(name: String, f: FunctionTypeSignature): String = {
     val FunctionTypeSignature(result, params, _) = f
     val paramsStr = params
-      .map { case (name, t) => s"${name.filterNot(Set('@', '$') contains)}: $t" }
+      .map { case (name, t) => s"${name.filterNot(internalVarPrefixes.contains)}: $t" }
       .mkString(", ")
     s"func $name($paramsStr): $result"
   }
