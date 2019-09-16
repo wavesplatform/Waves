@@ -95,7 +95,7 @@ class MicroBlockMinerImpl(debugState: Ref[Task, MinerDebugInfo.State],
             for {
               blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
                 .leftWiden[Throwable]
-                .raiseOrPure[Task]
+                .liftTo[Task]
               (signedBlock, microBlock) = blocks
               _ <- appendMicroBlock(microBlock)
               _ <- broadcastMicroBlock(account, microBlock)
