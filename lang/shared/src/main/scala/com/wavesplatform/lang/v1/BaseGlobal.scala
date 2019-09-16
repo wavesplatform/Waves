@@ -5,7 +5,7 @@ import java.math.RoundingMode
 import cats.implicits._
 import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -160,10 +160,17 @@ trait BaseGlobal {
   def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
     script match {
       case ContractScriptImpl(_, dApp) =>
-        val funcsName = dApp.callableFuncs.map(_.u.name)
         MetaMapper.dicFromProto(dApp)
-          .mapWithIndex { case (value, i) => Dic(Map(funcsName(i) -> value)) }
+          .map(_.m.headOption)
+          .map {
+            case Some((name, Chain(paramTypes))) =>
+              val funcsName      = dApp.callableFuncs.map(_.u.name)
+              val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
+              Dic(Map(name -> paramsWithFunc))
+            case _ => Dic(Map())
+          }
           .leftMap(ScriptParseError)
+
       case _  => Right(Dic(Map()))
     }
 
