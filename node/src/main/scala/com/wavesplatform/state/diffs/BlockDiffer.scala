@@ -40,9 +40,7 @@ object BlockDiffer extends ScorexLogging {
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     val minerRewardDistr: Portfolio =
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward))
         blockchain.lastBlockReward.map(Portfolio.build(Asset.Waves, _)).getOrElse(Portfolio.empty)
-      else Portfolio.empty
 
     val prevBlockFeeDistr: Portfolio =
       if (stateHeight >= sponsorshipHeight)

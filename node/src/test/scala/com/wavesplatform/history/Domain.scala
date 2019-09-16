@@ -4,6 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
@@ -12,7 +13,7 @@ import monix.execution.Scheduler.Implicits.global
 import scala.concurrent.duration.Duration
 
 //noinspection ScalaStyle
-case class Domain(blockchainUpdater: BlockchainUpdater with NG) {
+case class Domain(blockchainUpdater: BlockchainUpdater with NG, levelDBWriter: LevelDBWriter) {
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block) = blockchainUpdater.processBlock(b).explicitGet()

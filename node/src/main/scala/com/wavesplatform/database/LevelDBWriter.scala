@@ -229,13 +229,7 @@ class LevelDBWriter(
   }
 
   override def blockReward(height: Int): Option[Long] =
-    readOnly(_.db.get(Keys.blockReward(height))).orElse {
-      activatedFeatures
-        .get(BlockchainFeatures.BlockReward.id)
-        .collect {
-          case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
-        }
-    }
+    readOnly(_.db.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
