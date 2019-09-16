@@ -7,12 +7,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{TransactionGen, WithDB}
@@ -203,7 +203,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: Env => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
