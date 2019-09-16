@@ -281,13 +281,6 @@ case class UtilsApiRoute(
     }
   }
 
-  lazy val metaConverter: RecKeyValueFolder[JsValueWrapper, JsObject] =
-    RecKeyValueFolder(
-      Json.toJsFieldJsValueWrapper(_),
-      l => Json.arr(l: _*),
-      m => Json.obj(m: _*)
-    )
-
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")
   @ApiResponses(
