@@ -28,7 +28,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        double-features-periods-after-height = 21
         |        max-transaction-time-back-offset = 55s
         |        max-transaction-time-forward-offset = 12d
-        |        lease-term = 1000000
+        |        lease-expiration = 1000000
         |      }
         |      rewards {
         |        term = 100000
