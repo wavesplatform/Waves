@@ -173,7 +173,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def blockRewardVote(version: Byte): Long =
     if (version < RewardBlockVersion) -1L
-    else settings.rewardsSettings.target.getOrElse(-1L)
+    else settings.rewardsSettings.desired.getOrElse(-1L)
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
