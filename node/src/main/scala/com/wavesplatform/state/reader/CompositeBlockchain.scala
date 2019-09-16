@@ -37,7 +37,10 @@ final case class CompositeBlockchain(
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(inner.assetScript(asset))
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] =
+    maybeDiff
+      .flatMap(_.assetScripts.get(asset))
+      .getOrElse(inner.assetScriptWithComplexity(asset))
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
@@ -116,17 +119,8 @@ final case class CompositeBlockchain(
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = {
-    val (active, canceled) = diff.leaseState.partition(_._2)
-    val fromDiff = active.keys
-      .map(id => diff.transactions(id)._2)
-      .collect { case lt: LeaseTransaction if pf.isDefinedAt(lt) => pf(lt) }
-
-    val fromInner = inner.collectActiveLeases {
-      case lt if !canceled.keySet.contains(lt.id()) && pf.isDefinedAt(lt) => pf(lt)
-    }
-    fromDiff.toVector ++ fromInner
-  }
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
+    CompositeBlockchain.collectActiveLeases(inner, maybeDiff, height, from, to)(filter)
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
     val b = Map.newBuilder[Address, A]
@@ -160,9 +154,9 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScript(address: Address): Option[Script] = {
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
     diff.scripts.get(address) match {
-      case None            => inner.accountScript(address)
+      case None            => inner.accountScriptWithComplexity(address)
       case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }
@@ -252,4 +246,19 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
 
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
+
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+    val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
+    maybeDiff match {
+      case Some(ng) if to == height =>
+        val cancelledInLiquidBlock = ng.leaseState.collect {
+          case (id, false) => id
+        }.toSet
+        val addedInLiquidBlock = ng.transactions.collect {
+          case (id, (_, lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
+        }
+        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
+      case _ => innerActiveLeases
+    }
+  }
 }

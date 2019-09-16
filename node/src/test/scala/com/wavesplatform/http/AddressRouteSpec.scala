@@ -9,6 +9,7 @@ import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -158,7 +159,10 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: AddressOrAlias) => Some(ExprScript(TRUE).explicitGet()))
+    (blockchain.accountScriptWithComplexity _)
+      .when(allAccounts(1).toAddress)
+      .onCall((_: AddressOrAlias) => Some((ExprScript(TRUE).explicitGet(), 1L)))
+
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
@@ -168,7 +172,10 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: AddressOrAlias) => None)
+    (blockchain.accountScriptWithComplexity _)
+      .when(allAccounts(2).toAddress)
+      .onCall((_: AddressOrAlias) => None)
+
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(2)
@@ -186,23 +193,28 @@ class AddressRouteSpec
         )
       ),
       decs = List(),
-      callableFuncs = List(),
+      callableFuncs = List(
+        CallableFunction(
+          CallableAnnotation("i"),
+          FUNC("call", List("a", "b", "c"), CONST_BOOLEAN(true))
+        )
+      ),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    (blockchain.accountScript _)
+    (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))
+      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAkIARIFCgMBAgMAAAAAAAAAAAAAAAEAAAABdAEAAAAGdmVyaWZ5AAAAAAYSVyVy"
+      (response \ "script").as[String] should fullyMatch regex "base64:.+".r
       (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
         "DAppMeta\\(" +
         "1," +
         "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
         "List\\(\\)," +
-        "List\\(\\)," +
+        "List\\(CallableFunction\\(CallableAnnotation\\(i\\),FUNC\\(call,List\\(a, b, c\\),true\\)\\)\\)," +
         "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
         "\\)").r
       // [WAIT]                                           Decompiler(
@@ -210,6 +222,13 @@ class AddressRouteSpec
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+    Get(routePath(s"/scriptInfo/${allAddresses(3)}/meta")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "address").as[String] shouldBe allAddresses(3)
+      (response \ "meta" \ "callableFuncTypes" \ 0 \ "a").as[String] shouldBe "Int"
+      (response \ "meta" \ "callableFuncTypes" \ 0 \ "b").as[String] shouldBe "ByteVector"
+      (response \ "meta" \ "callableFuncTypes" \ 0 \ "c").as[String] shouldBe "ByteVector|Int"
     }
   }
 

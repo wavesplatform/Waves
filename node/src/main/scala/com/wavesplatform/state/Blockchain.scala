@@ -69,10 +69,12 @@ trait Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
 
-  def accountScript(address: Address): Option[Script]
+  def accountScriptWithComplexity(address: Address): Option[(Script, Long)]
+  def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_._1)
   def hasScript(address: Address): Boolean
 
-  def assetScript(id: IssuedAsset): Option[Script]
+  def assetScriptWithComplexity(id: IssuedAsset): Option[(Script, Long)]
+  def assetScript(id: IssuedAsset): Option[Script] = assetScriptWithComplexity(id).map(_._1)
   def hasAssetScript(id: IssuedAsset): Boolean
 
   def accountDataKeys(address: Address): Set[String]
@@ -83,9 +85,7 @@ trait Blockchain {
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
-  // the following methods are used exclusively by patches
-  def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T]
-  final def allActiveLeases: Seq[LeaseTransaction] = collectActiveLeases { case lt => lt }
+  def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
