@@ -226,9 +226,9 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      (response \ "meta" \ "callableFuncTypes" \ 0 \ "a").as[String] shouldBe "Int"
-      (response \ "meta" \ "callableFuncTypes" \ 0 \ "b").as[String] shouldBe "ByteVector"
-      (response \ "meta" \ "callableFuncTypes" \ 0 \ "c").as[String] shouldBe "ByteVector|Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call" \ "a").as[String] shouldBe "Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call" \ "b").as[String] shouldBe "ByteVector"
+      (response \ "meta" \ "callableFuncTypes" \ "call" \ "c").as[String] shouldBe "ByteVector|Int"
     }
   }
 

@@ -9,6 +9,7 @@ import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -154,6 +155,16 @@ trait BaseGlobal {
     script match {
       case ContractScriptImpl(_, dApp) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
       case _                           => Right(Dic(Map()))
+    }
+
+  def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
+    script match {
+      case ContractScriptImpl(_, dApp) =>
+        val funcsName = dApp.callableFuncs.map(_.u.name)
+        MetaMapper.dicFromProto(dApp)
+          .mapWithIndex { case (value, i) => Dic(Map(funcsName(i) -> value)) }
+          .leftMap(ScriptParseError)
+      case _  => Right(Dic(Map()))
     }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
