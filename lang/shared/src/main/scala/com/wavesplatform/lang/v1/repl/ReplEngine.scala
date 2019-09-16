@@ -27,7 +27,7 @@ object ReplEngine {
       (newEvalCtx, eval)                  <- tryEi(EvaluatorV1.applyWithCtx(evalCtx, compiled))
       resultO = assignedResult(exprType, eval, newCompileCtx)
       output = mkOutput(resultO, compileCtx, newCompileCtx)
-      newCtx = resultO.fold((newCompileCtx, newEvalCtx))(r => addResultToCtx(r, newCompileCtx, newEvalCtx))
+      newCtx = resultO.fold((newCompileCtx, newEvalCtx))(addResultToCtx(_, newCompileCtx, newEvalCtx))
     } yield (output, newCtx)
 
   private def tryEi[R](r: => Either[String, R]): Either[String, R] =
@@ -58,8 +58,6 @@ object ReplEngine {
       Some((name, exprType, value))
     }
 
-  private val declPrefix = "defined "
-
   private def mkOutput(
     resultO:       Option[(String, FINAL, EVALUATED)],
     compileCtx:    CompilerContext,
@@ -71,10 +69,10 @@ object ReplEngine {
       for {
         (name, overloads) <- funcs
         signature         <- overloads
-      } yield declPrefix + DeclPrinter.funcStr(name, signature)
+      } yield DeclPrinter.declaredFuncStr(name, signature)
 
     val mappedLets =
-      lets.map { case (name, t) => declPrefix + DeclPrinter.letStr(name, t) }
+      lets.map { case (name, t) => DeclPrinter.declaredLetStr(name, t) }
 
     val evalStr =
       resultO.fold("") { case (name, t, result) => s"$name: $t = $result" }

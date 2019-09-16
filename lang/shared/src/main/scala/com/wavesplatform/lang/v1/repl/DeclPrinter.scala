@@ -9,6 +9,14 @@ object DeclPrinter {
       .map(funcStr(name, _))
       .mkString("\n")
 
+  private val definedStr = "defined "
+
+  def declaredFuncStr(name: String, f: FunctionTypeSignature): String =
+    definedStr + funcStr(name, f)
+
+  def declaredLetStr(name: String, t: FINAL): String =
+    definedStr + letStr(name, t)
+
   def funcStr(name: String, f: FunctionTypeSignature): String = {
     val FunctionTypeSignature(result, params, _) = f
     val paramsStr = params
