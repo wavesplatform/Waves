@@ -139,7 +139,7 @@ class BlockchainUpdaterImpl(
         mayBeReward match {
           case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
             Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
-          case None if mayBeTimeToVote == 0 =>
+          case None if mayBeTimeToVote >= 0 =>
             Some((Seq(), settings.initial))
           case _ => None
         }
