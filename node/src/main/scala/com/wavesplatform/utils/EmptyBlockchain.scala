@@ -82,11 +82,11 @@ case object EmptyBlockchain extends Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
-  override def accountScript(address: Address): Option[Script] = None
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = None
 
   override def hasScript(address: Address): Boolean = false
 
-  override def assetScript(asset: IssuedAsset): Option[Script] = None
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = None
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
@@ -100,7 +100,7 @@ case object EmptyBlockchain extends Blockchain {
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T] = Nil
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

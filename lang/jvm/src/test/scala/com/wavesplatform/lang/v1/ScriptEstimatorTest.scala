@@ -253,4 +253,44 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
 
     estimate(functionCosts(V3), expr) shouldBe 'left
   }
+
+  property("multiple func calls") {
+    val script =
+      """
+        | func f(a: Int) = a + 1
+        | func g(a: Int) = f(1) + f(a)
+        | func h(a: Int) = f(1) + g(a) + g(a)
+        |
+        | let a = 1
+        | let b = 1
+        | if (h(a) == f(a) + g(a))
+        |   then h(a) + f(a) + g(a)
+        |   else h(b) + f(b) + g(b)
+        |
+        |""".stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(290)
+  }
+
+  property("type constructor") {
+    val script =
+      """
+        | let a = Address(base58'')
+        | let b = Unit()
+        | if (true) then a else b
+        |""".stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(16)
+  }
+
+  property("func forward reference") {
+    val expr = BLOCK(
+      FUNC("f", Nil, FUNCTION_CALL(User("g"), Nil)),
+      BLOCK(
+        FUNC("g", Nil, CONST_LONG(1)),
+        CONST_LONG(1)
+      )
+    )
+    estimate(functionCosts(V3), expr) shouldBe 'left
+  }
 }

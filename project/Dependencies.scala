@@ -13,8 +13,8 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0-RC4")
+  private def catsModule(module: String) = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
+  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
@@ -26,7 +26,7 @@ object Dependencies {
   val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
-  private val catsEffect = catsModule("effect", "1.2.0")
+  private val catsEffect = catsModule("effect")
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
@@ -103,8 +103,9 @@ object Dependencies {
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
-      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
-    ) ++ protobuf.value
+      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
+      "com.softwaremill.sttp" %%% "core" % "1.6.4"
+    ) ++ protobuf.value ++ circe.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -169,4 +170,17 @@ object Dependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )
+
+  lazy val circe = Def.setting {
+    val circeVersion = "0.12.0-RC4"
+    Seq(
+      "io.circe" %%% "circe-core",
+      "io.circe" %%% "circe-generic",
+      "io.circe" %%% "circe-parser"
+    ).map(_ % circeVersion)
+  }
+
+  lazy val circeJsInterop = Def.setting {
+    "io.circe" %%% "not-java-time" % "0.2.0"
+  }
 }

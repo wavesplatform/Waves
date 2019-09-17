@@ -16,32 +16,36 @@ object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
-    Right(
-      Diff(
-        tx = tx,
+    DiffsCommon.countScriptComplexity(tx.script, blockchain)
+      .map(script =>
+        Diff(
+          tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
-        assetScripts = Map(asset -> tx.script).filter(_._2.isDefined),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-      ))
+        assetScripts = Map(asset -> script),
+          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+        )
+      )
   }
 
   def setAssetScript(blockchain: Blockchain, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
-        Right(
-          Diff(
-            tx = tx,
+        DiffsCommon.countScriptComplexity(tx.script, blockchain)
+          .map(script =>
+            Diff(
+              tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-            assetScripts = Map(tx.asset          -> tx.script),
-            scriptsRun =
-              // Asset script doesn't count before Ride4DApps activation
-              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-                DiffsCommon.countScriptRuns(blockchain, tx)
-              } else {
-                Some(tx.sender.toAddress).count(blockchain.hasScript)
-              }
-          ))
+            assetScripts = Map(tx.asset          -> script),
+              scriptsRun =
+                // Asset script doesn't count before Ride4DApps activation
+                if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+                  DiffsCommon.countScriptRuns(blockchain, tx)
+                } else {
+                  Some(tx.sender.toAddress).count(blockchain.hasScript)
+                }
+            )
+          )
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
       }

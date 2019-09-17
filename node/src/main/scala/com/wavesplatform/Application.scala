@@ -23,8 +23,8 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
@@ -38,7 +38,7 @@ import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
-import com.wavesplatform.utils.{LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp}
+import com.wavesplatform.utils.{InvalidApiKey, LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp, forceStopApplication}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -247,6 +247,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
+      if (settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
+        log.error("Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf")
+        forceStopApplication(InvalidApiKey)
+      }
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater),

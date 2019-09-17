@@ -99,19 +99,12 @@ object InvokeScriptTransactionDiff {
           )
           (ScriptResult(ds, ps), invocationComplexity) = scriptResult
 
-          verifierComplexity <- TracedResult {
-            blockchain
-              .accountScript(tx.sender)
-              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
-              .leftMap(GenericError(_))
-          }
-          assetsComplexity <- TracedResult {
+          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
+
+          assetsComplexity =
             (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
-              .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
-              .toList
-              .traverse(DiffsCommon.verifierComplexity(_, blockchain.estimator))
-              .leftMap(GenericError(_))
-          }
+              .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
+              .map(_._2)
 
           dataEntries = ds.map {
             case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
