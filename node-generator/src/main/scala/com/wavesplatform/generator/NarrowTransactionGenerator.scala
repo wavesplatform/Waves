@@ -83,7 +83,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val generated = (0 until (n * 1.2).toInt).foldLeft(
       (
         Seq.empty[Transaction],
-        Seq.empty[IssueTransactionV2],
+        Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
         Seq.empty[IssueTransactionV2],
         Seq.empty[LeaseTransactionV2],
         Seq.empty[CreateAliasTransaction]
@@ -303,7 +303,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 transfers = for (_ <- 0 to transferCount) yield {
                   val useAlias  = random.nextBoolean()
                   val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
-                  val amount    = random.nextLong(500000)
+                  val amount    = 1000 / (transferCount + 1)
                   ParsedTransfer(recipient, amount)
                 }
                 tx <- logOption(
@@ -313,7 +313,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                       sender,
                       transfers.toList,
                       ts,
-                      200000 + 50000 * transferCount,
+                      200000 + 50000 * transferCount + 400000,
                       Array.fill(random.nextInt(100))(random.nextInt().toByte)
                     )
                 )
