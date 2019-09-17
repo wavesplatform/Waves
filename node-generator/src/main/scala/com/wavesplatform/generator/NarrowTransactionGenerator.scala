@@ -35,53 +35,54 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
   override def next(): Iterator[Transaction] =
     generate(settings.transactions).toIterator
 
-  def generate(n: Int): Seq[Transaction] = {
-    //noinspection ScalaStyle,TypeAnnotation
-    object preconditions {
-      val issueTransactionSender = randomFrom(accounts).get
+  //noinspection ScalaStyle,TypeAnnotation
+  private[this] object preconditions {
+    val issueTransactionSender = randomFrom(accounts).get
 
-      val tradeAssetIssue = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          issueTransactionSender,
-          "TRADE".getBytes("UTF-8"),
-          "Waves DEX is the best exchange ever".getBytes("UTF-8"),
-          100000000,
-          2,
-          reissuable = false,
-          fee = 100400000L,
-          timestamp = System.currentTimeMillis(),
-          script = None
-        )
-        .right
-        .get
+    val tradeAssetIssue = IssueTransactionV2
+      .selfSigned(
+        AddressScheme.current.chainId,
+        issueTransactionSender,
+        "TRADE".getBytes("UTF-8"),
+        "Waves DEX is the best exchange ever".getBytes("UTF-8"),
+        100000000,
+        2,
+        reissuable = false,
+        fee = 100400000L,
+        timestamp = System.currentTimeMillis(),
+        script = None
+      )
+      .right
+      .get
 
-      val tradeAssetDistribution = {
-        tradeAssetIssue +: accounts.map(acc => {
-          TransferTransactionV2
-            .selfSigned(
-              IssuedAsset(tradeAssetIssue.id()),
-              issueTransactionSender,
-              acc,
-              5,
-              System.currentTimeMillis(),
-              Waves,
-              900000,
-              Array.fill(random.nextInt(100))(random.nextInt().toByte)
-            )
-            .right
-            .get
-        })
-      }
+    val tradeAssetDistribution = {
+      (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
+        TransferTransactionV2
+          .selfSigned(
+            IssuedAsset(tradeAssetIssue.id()),
+            issueTransactionSender,
+            acc,
+            5,
+            System.currentTimeMillis(),
+            Waves,
+            900000,
+            Array.fill(random.nextInt(100))(random.nextInt().toByte)
+          )
+          .right
+          .get
+      })
     }
+  }
 
-    val initialTransactions: Seq[Transaction] = preconditions.tradeAssetIssue +: preconditions.tradeAssetDistribution
+  override def initial: Seq[Transaction] = preconditions.tradeAssetIssue +: preconditions.tradeAssetDistribution
+
+  private[this] def generate(n: Int): Seq[Transaction] = {
 
     val now = System.currentTimeMillis()
 
     val generated = (0 until (n * 1.2).toInt).foldLeft(
       (
-        initialTransactions,
+        Seq.empty[Transaction],
         Seq.empty[IssueTransactionV2],
         Seq.empty[IssueTransactionV2],
         Seq.empty[LeaseTransactionV2],
@@ -194,17 +195,19 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
             } yield tx
 
           case ExchangeTransactionV2 =>
-            for {
-              matcher <- randomFrom(accounts)
-              seller  <- randomFrom(accounts)
-              buyer   <- randomFrom(accounts)
-              pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
-              sellOrder = OrderV2.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThanStandardFee * 3)
-              buyOrder  = OrderV2.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThanStandardFee * 3)
-              tx <- logOption(
-                ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThanStandardFee * 3, ts)
-              )
-            } yield tx
+            (
+              for {
+                matcher <- randomFrom(accounts)
+                seller  <- randomFrom(accounts)
+                buyer   <- randomFrom(accounts)
+                pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
+                sellOrder = OrderV2.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThanStandardFee * 3)
+                buyOrder  = OrderV2.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThanStandardFee * 3)
+                tx <- logOption(
+                  ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThanStandardFee * 3, ts)
+                )
+              } yield tx
+            ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
 
           case LeaseTransactionV2 =>
             (

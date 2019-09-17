@@ -1,5 +1,6 @@
 package com.wavesplatform.generator
 
+import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
@@ -18,7 +19,8 @@ import com.wavesplatform.utils.{LoggerFacade, NTP}
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
+import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper, ValueReader}
+import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.asyncHttpClient
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
@@ -30,9 +32,9 @@ import scala.util.{Failure, Random, Success}
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
   // IDEA bugs
-  implicit val inetSocketAddressReader        = com.wavesplatform.settings.inetSocketAddressReader
-  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  implicit val httpClient                     = asyncHttpClient()
+  implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = com.wavesplatform.settings.inetSocketAddressReader
+  implicit val readConfigInHyphen: NameMapper                          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val httpClient: AsyncHttpClient                             = asyncHttpClient()
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
@@ -105,7 +107,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         },
         opt[Boolean]("first-run").abbr("first").optional().text("generate set multisig script transaction").action { (x, c) =>
           c.copy(multisig = c.multisig.copy(firstRun = x))
-        },
+        }
       )
 
     cmd("oracle")
@@ -119,7 +121,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         },
         opt[Boolean]("enabled").abbr("e").optional().text("DataEnty value").action { (x, c) =>
           c.copy(multisig = c.multisig.copy(firstRun = x))
-        },
+        }
       )
 
     cmd("swarm")
@@ -168,7 +170,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       val estimator = wavesSettings.estimator
 
-      val (universe, initialTransactions) = preconditions
+      val (universe, initialUniTransactions) = preconditions
         .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
 
       Universe.Accounts = universe.accounts
@@ -208,7 +210,10 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         }
       }
 
-      log.info(s"Preconditions: $initialTransactions")
+      val initialGenTransactions = generator.initial
+
+      log.info(s"Universe preconditions: $initialUniTransactions")
+      log.info(s"Generator preconditions: $initialGenTransactions")
 
       val workers = finalConfig.sendTo.map {
         case NodeAddress(node, nodeRestUrl) =>
@@ -221,7 +226,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             node,
             nodeRestUrl,
             () => canContinue,
-            initialTransactions
+            initialUniTransactions ++ initialGenTransactions
           )
       }
 
@@ -244,5 +249,4 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             close(1)
         }
   }
-
 }

@@ -2,6 +2,8 @@ package com.wavesplatform.generator
 
 import java.net.{InetSocketAddress, URL}
 
+import cats.syntax.apply._
+import cats.syntax.flatMap._
 import com.wavesplatform.generator.Worker.Settings
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
@@ -15,65 +17,69 @@ import play.api.libs.json.Json
 import scala.compat.java8.FutureConverters
 import scala.concurrent.{ExecutionContext, Future}
 
-class NewWorker(settings: Settings,
-                transactionSource: Iterator[Transaction],
-                networkSender: NetworkSender,
-                node: InetSocketAddress,
-                nodeRestAddress: URL,
-                canContinue: () => Boolean,
-                initial: Seq[Transaction])(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
+class NewWorker(
+    settings: Settings,
+    transactionSource: Iterator[Transaction],
+    networkSender: NetworkSender,
+    node: InetSocketAddress,
+    nodeRestAddress: URL,
+    canContinue: () => Boolean,
+    initial: Seq[Transaction]
+)(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
     extends ScorexLogging {
 
   def run(): Future[Unit] =
-    pullAndWriteTask().map(_ => ()).runAsyncLogErr(Scheduler(ec))
+    (getChannel >>= (c => withReconnect(writeInitial(c))) >>= (c => withReconnect(pullAndWrite(c))) >>= (c => closeChannel(c)))
+      .runAsyncLogErr(Scheduler(ec))
 
-  private[this] def pullAndWriteTask(channel: Option[Channel] = None): Task[Option[Channel]] =
+  private[this] val nodeUTXTransactionsToSendCount: Task[Int] = Task.defer {
+    import org.asynchttpclient.Dsl._
+    val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
+    Task
+      .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+      .map(r => settings.utxLimit - (Json.parse(r.getResponseBody) \ "size").as[Int])
+  }
+
+  private[this] def writeInitial(channel: Channel): Task[Channel] =
     if (!canContinue())
-      Task.now(None)
-    else {
-      val nodeUTXTransactionsCount: Task[Int] = Task.defer {
-        import org.asynchttpclient.Dsl._
-        val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
-        Task
-          .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
-          .map(r => (Json.parse(r.getResponseBody) \ "size").as[Int])
-      }
-
-      def writeTransactions(channel: Channel, txs: Seq[Transaction]): Task[Unit] =
-        for {
-          _ <- Task.fromFuture(networkSender.send(channel, initial: _*))
-          _ <- Task.fromFuture(networkSender.send(channel, txs: _*))
-        } yield ()
-
-      val baseTask = for {
-        validChannel <- Task.defer(if (channel.exists(_.isOpen)) Task.now(channel.get) else Task.fromFuture(networkSender.connect(node)))
-        txCount <- nodeUTXTransactionsCount
-        txToSendCount = settings.utxLimit - txCount
-        _ = log.info(s"Sending $txToSendCount to $validChannel")
-        _       <- writeTransactions(validChannel, transactionSource.take(txToSendCount).toStream)
-      } yield Option(validChannel)
-
-      val withReconnect = baseTask.onErrorRecoverWith {
-        case error =>
-          channel.foreach(_.close())
-
-          if (settings.autoReconnect) {
-            log.error(s"[$node] An error during sending transactions, reconnect", error)
-            for {
-              _       <- Task.sleep(settings.reconnectDelay)
-              channel <- pullAndWriteTask()
-            } yield channel
-          } else {
-            log.error("Stopping because autoReconnect is disabled", error)
-            Task.raiseError(error)
-          }
-      }
-
+      Task.now(channel)
+    else
       for {
-        channel <- withReconnect
-        _ <- Task(log.info(s"Sleeping for ${settings.delay}"))
-        _ <- Task.sleep(settings.delay)
-        newChannel <- pullAndWriteTask(channel)
-      } yield newChannel
+        validChannel <- validateChannel(channel)
+        _            <- logInfo("Sending initial")
+        _            <- Task.deferFuture(networkSender.send(validChannel, initial: _*))
+        _            <- sleep
+      } yield validChannel
+
+  private[this] def pullAndWrite(channel: Channel): Task[Channel] =
+    if (!canContinue())
+      Task.now(channel)
+    else
+      for {
+        validChannel  <- validateChannel(channel)
+        txToSendCount <- nodeUTXTransactionsToSendCount
+        _             <- Task.deferFuture(networkSender.send(validChannel, transactionSource.take(txToSendCount).toStream: _*))
+        _             <- sleep
+        r             <- pullAndWrite(validChannel)
+      } yield r
+
+  private[this] def withReconnect(baseTask: Task[Channel]): Task[Channel] =
+    baseTask.onErrorHandleWith {
+      case error if settings.autoReconnect && canContinue() =>
+        logError(s"[$node] An error during sending transactions, reconnect", error) *>
+          Task.sleep(settings.reconnectDelay) *>
+          Task.defer(withReconnect(baseTask))
+      case error =>
+        logError("Stopping because autoReconnect is disabled", error) *>
+          Task.raiseError(error)
     }
+
+  private[this] def getChannel: Task[Channel]                        = Task.deferFuture(networkSender.connect(node))
+  private[this] def closeChannel(channel: Channel): Task[Unit]       = Task(channel.close())
+  private[this] def validateChannel(channel: Channel): Task[Channel] = if (channel.isOpen) Task.now(channel) else getChannel
+
+  private[this] def logError(msg: => String, err: Throwable): Task[Unit] = Task(log.error(msg, err))
+  private[this] def logInfo(msg: => String): Task[Unit]                  = Task(log.info(msg))
+
+  private[this] val sleep: Task[Unit] = logInfo(s"Sleeping for ${settings.delay}") *> Task.sleep(settings.delay)
 }
