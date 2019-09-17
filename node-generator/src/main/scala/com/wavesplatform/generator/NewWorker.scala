@@ -46,7 +46,7 @@ class NewWorker(
     else
       for {
         validChannel <- validateChannel(channel)
-        _            <- logInfo("Sending initial")
+        _            <- logInfo(s"Sending ${initial.size} initial transactions to $validChannel")
         _            <- Task.deferFuture(networkSender.send(validChannel, initial: _*))
         _            <- sleep
       } yield validChannel
@@ -58,6 +58,7 @@ class NewWorker(
       for {
         validChannel  <- validateChannel(channel)
         txToSendCount <- nodeUTXTransactionsToSendCount
+        _             <- logInfo(s"Sending $txToSendCount transactions to $validChannel")
         _             <- Task.deferFuture(networkSender.send(validChannel, transactionSource.take(txToSendCount).toStream: _*))
         _             <- sleep
         r             <- pullAndWrite(validChannel)

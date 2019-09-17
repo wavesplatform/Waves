@@ -182,17 +182,48 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
           case ExchangeTransactionV1 =>
-            for {
-              matcher <- randomFrom(accounts)
-              seller  <- randomFrom(accounts)
-              buyer   <- randomFrom(accounts)
-              pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
-              sellOrder = OrderV1.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThanStandardFee * 3)
-              buyOrder  = OrderV1.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThanStandardFee * 3)
-              tx <- logOption(
-                ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThanStandardFee * 3, ts)
-              )
-            } yield tx
+            (
+              for {
+                matcher <- randomFrom(accounts)
+                seller  <- randomFrom(accounts)
+                buyer   <- randomFrom(accounts)
+                pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
+                delta = random.nextLong(10000)
+                sellOrder = OrderV1.sell(
+                  seller,
+                  matcher,
+                  pair,
+                  100000000 + delta,
+                  1 + random.nextLong(10),
+                  ts,
+                  ts + 30.days.toMillis,
+                  moreThanStandardFee * 3
+                )
+                buyOrder = OrderV1.buy(
+                  buyer,
+                  matcher,
+                  pair,
+                  100000000 + delta,
+                  1,
+                  ts,
+                  ts + 1.day.toMillis,
+                  moreThanStandardFee * 3
+                )
+                tx <- logOption(
+                  ExchangeTransactionV1.create(
+                    matcher,
+                    buyOrder,
+                    sellOrder,
+                    100000000 + delta,
+                    1,
+                    300000,
+                    300000,
+                    moreThanStandardFee * 3,
+                    ts
+                  )
+                )
+              } yield tx
+            ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
 
           case ExchangeTransactionV2 =>
             (
@@ -200,11 +231,41 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 matcher <- randomFrom(accounts)
                 seller  <- randomFrom(accounts)
                 buyer   <- randomFrom(accounts)
-                pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
-                sellOrder = OrderV2.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThanStandardFee * 3)
-                buyOrder  = OrderV2.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThanStandardFee * 3)
+                pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
+                delta = random.nextLong(10000)
+                sellOrder = OrderV2.sell(
+                  seller,
+                  matcher,
+                  pair,
+                  100000000 + delta,
+                  1,
+                  ts,
+                  ts + 30.days.toMillis,
+                  moreThanStandardFee * 3
+                )
+                buyOrder = OrderV2.buy(
+                  buyer,
+                  matcher,
+                  pair,
+                  100000000 + delta,
+                  1,
+                  ts,
+                  ts + 1.day.toMillis,
+                  moreThanStandardFee * 3
+                )
                 tx <- logOption(
-                  ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThanStandardFee * 3, ts)
+                  ExchangeTransactionV2
+                    .create(
+                      matcher,
+                      buyOrder,
+                      sellOrder,
+                      100000000 + delta,
+                      1,
+                      300000,
+                      300000,
+                      moreThanStandardFee * 3,
+                      ts
+                    )
                 )
               } yield tx
             ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
@@ -407,7 +468,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     def logNone(msg: => String): Option[A] =
       opt match {
         case None =>
-          log.trace(msg)
+          log.warn(msg)
           None
         case Some(_) => opt
       }
