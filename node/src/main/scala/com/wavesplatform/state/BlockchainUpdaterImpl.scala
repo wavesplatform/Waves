@@ -26,7 +26,10 @@ import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
-    blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], wavesSettings: WavesSettings, time: Time
+    blockchain: LevelDBWriter,
+    spendableBalanceChanged: Observer[(Address, Asset)],
+    wavesSettings: WavesSettings,
+    time: Time
 ) extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -172,7 +175,7 @@ class BlockchainUpdaterImpl(
 
                   BlockDiffer
                     .fromBlock(
-                      CompositeBlockchain(blockchain, carry = blockchain.carryFee, reward = reward),
+                      CompositeBlockchain(blockchain, reward = reward),
                       blockchain.lastBlock,
                       block,
                       miningConstraints.total,
@@ -188,7 +191,7 @@ class BlockchainUpdaterImpl(
 
                   BlockDiffer
                     .fromBlock(
-                      CompositeBlockchain(blockchain, carry = blockchain.carryFee, reward = ng.reward),
+                      CompositeBlockchain(blockchain, reward = ng.reward),
                       blockchain.lastBlock,
                       block,
                       miningConstraints.total,
@@ -211,7 +214,7 @@ class BlockchainUpdaterImpl(
 
                     BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain(blockchain, carry = blockchain.carryFee, reward = ng.reward),
+                        CompositeBlockchain(blockchain, reward = ng.reward),
                         blockchain.lastBlock,
                         block,
                         miningConstraints.total,
@@ -242,8 +245,8 @@ class BlockchainUpdaterImpl(
                         miningConstraints.total
                       }
 
-                      val prevReward = ng.reward
-                      val reward     = rewardForBlock(block)
+                      val prevReward                    = ng.reward
+                      val reward                        = rewardForBlock(block)
                       val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
                       val diff = BlockDiffer
@@ -272,7 +275,7 @@ class BlockchainUpdaterImpl(
                 val newHeight = blockchain.height + 1
 
                 val prevNgState = ngState
-  restTotalConstraint = updatedTotalConstraint
+                restTotalConstraint = updatedTotalConstraint
                 ngState = Some(
                   new NgState(
                     block,
@@ -282,7 +285,8 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     cancelLeases(collectLeasesToCancel(newHeight))
-                  ))
+                  )
+                )
                 notifyChangedSpendable(prevNgState, ngState)
                 publishLastBlockInfo()
 
