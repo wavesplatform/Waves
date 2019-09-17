@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTransactionType}
+import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -63,14 +63,13 @@ object TransactionDiffer {
   private def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
       tx match {
-        case gtx: GenesisTransaction => GenesisTransactionDiff(blockchain.height)(gtx)
-        case ptx: PaymentTransaction =>
-          PaymentTransactionDiff(blockchain)(ptx)
+        case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx)
+        case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx)
         case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain)(ci)
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx)
         case otherTx: ProvenTransaction =>
-          complexityDiff(blockchain, otherTx) |+|
-            unverifiedWithEstimate(currentBlockTimestamp)(blockchain, otherTx)
+          unverifiedWithEstimate(currentBlockTimestamp)(blockchain, otherTx)
+            .map(complexityDiff(blockchain, otherTx) |+| _)
         case _ => Left(UnsupportedTransactionType)
       }
     }
@@ -78,10 +77,10 @@ object TransactionDiffer {
   private def complexityDiff(
       blockchain: Blockchain,
       tx: ProvenTransaction
-  ): TracedResult[ValidationError, Diff] =
-    TracedResult(DiffsCommon.countScriptsComplexity(blockchain, tx))
-      .map(c => Diff(tx, scriptsComplexity = c))
-      .leftMap(GenericError(_))
+  ): Diff = {
+    val complexity = DiffsCommon.getScriptsComplexity(blockchain, tx)
+    Diff(tx, scriptsComplexity = complexity)
+  }
 
   private def unverifiedWithEstimate(
       currentBlockTimestamp: Long

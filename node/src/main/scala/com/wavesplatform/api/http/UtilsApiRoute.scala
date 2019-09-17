@@ -10,7 +10,6 @@ import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllo
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
@@ -19,7 +18,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
@@ -280,13 +278,6 @@ case class UtilsApiRoute(
       complete(result)
     }
   }
-
-  lazy val metaConverter: RecKeyValueFolder[JsValueWrapper, JsObject] =
-    RecKeyValueFolder(
-      Json.toJsFieldJsValueWrapper(_),
-      l => Json.arr(l: _*),
-      m => Json.obj(m: _*)
-    )
 
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")

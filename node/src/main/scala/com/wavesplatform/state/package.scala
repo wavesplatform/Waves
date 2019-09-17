@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Paged
 import monix.reactive.Observable
 import play.api.libs.json._
@@ -192,6 +193,8 @@ package object state {
 
     def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
+
+    def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]

@@ -4,10 +4,10 @@ import java.io.FileWriter
 import java.nio.file.{Files, Paths}
 
 import com.github.mustachejava.DefaultMustacheFactory
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, DApp, Expression, V3}
+import com.wavesplatform.lang.directives.values.{Account, Expression, V3}
 
 import scala.collection.JavaConverters._
 

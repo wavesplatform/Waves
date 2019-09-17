@@ -52,7 +52,10 @@ lazy val lang =
       // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
-lazy val langJS  = lang.js.settings(versionSourceSetting("com.wavesplatform.lang"))
+lazy val langJS  = lang.js.settings(
+  libraryDependencies += Dependencies.circeJsInterop.value,
+  versionSourceSetting("com.wavesplatform.lang")
+)
 lazy val langJVM = lang.jvm
 
 lazy val node = project

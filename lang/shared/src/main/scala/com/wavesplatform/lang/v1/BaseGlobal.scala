@@ -2,8 +2,10 @@ package com.wavesplatform.lang.v1
 
 import java.math.RoundingMode
 
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import cats.implicits._
+import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -11,9 +13,10 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import cats.implicits._
-import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+
+import scala.concurrent.Future
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -153,6 +156,23 @@ trait BaseGlobal {
       case _                           => Right(Dic(Map()))
     }
 
+  def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
+    script match {
+      case ContractScriptImpl(_, dApp) =>
+        MetaMapper.dicFromProto(dApp)
+          .map(_.m.headOption)
+          .map {
+            case Some((name, Chain(paramTypes))) =>
+              val funcsName      = dApp.callableFuncs.map(_.u.name)
+              val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
+              Dic(Map(name -> paramsWithFunc))
+            case _ => Dic(Map())
+          }
+          .leftMap(ScriptParseError)
+
+      case _  => Right(Dic(Map()))
+    }
+
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
 
   // Math functions
@@ -172,6 +192,8 @@ trait BaseGlobal {
       case BaseGlobal.RoundCeiling()  => CEILING
       case BaseGlobal.RoundFloor()    => FLOOR
     }
+
+  implicit val sttpBackend: SttpBackend[Future, Nothing]
 }
 
 object BaseGlobal {
