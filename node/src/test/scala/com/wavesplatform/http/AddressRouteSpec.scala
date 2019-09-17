@@ -143,7 +143,6 @@ class AddressRouteSpec
         }
     }
   }
-
   routePath("/verifyText/{address}") in testVerify("verifyText", false)
   routePath("/verify/{address}") in testVerify("verify", true)
 
@@ -191,34 +190,42 @@ class AddressRouteSpec
       meta = DAppMeta(
         version = 1,
         List(
-          CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 3)))
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 3))),
+          CallableFuncSignature(ByteString.copyFrom(Array[Byte](8))),
+          CallableFuncSignature(ByteString.EMPTY),
         )
       ),
       decs = List(),
       callableFuncs = List(
         CallableFunction(
           CallableAnnotation("i"),
-          FUNC("call", List("a", "b", "c"), CONST_BOOLEAN(true))
+          FUNC("call1", List("a", "b", "c"), CONST_BOOLEAN(true))
+        ),
+        CallableFunction(
+          CallableAnnotation("i"),
+          FUNC("call2", List("d"), CONST_BOOLEAN(true))
+        ),
+        CallableFunction(
+          CallableAnnotation("i"),
+          FUNC("call3", Nil, CONST_BOOLEAN(true))
         )
       ),
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
+
     (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(3).toAddress)
       .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
+    (blockchain.accountScript _)
+      .when(allAccounts(3).toAddress)
+      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))
+
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAA[QBAgMEAAAAAAAAAAAAAAABAAAAAXQBAAAABnZlcmlmeQAAAAAG65AUYw=="
       (response \ "script").as[String] should fullyMatch regex "base64:.+".r
-      (response \ "scriptText").as[String] should fullyMatch regex ("DApp\\(" +
-        "DAppMeta\\(" +
-        "1," +
-        "List\\(CallableFuncSignature\\(<ByteString@(.*) size=3>\\)\\)\\)," +
-        "List\\(\\)," +
-        "List\\(CallableFunction\\(CallableAnnotation\\(i\\),FUNC\\(call,List\\(a, b, c\\),true\\)\\)\\)," +
-        "Some\\(VerifierFunction\\(VerifierAnnotation\\(t\\),FUNC\\(verify,List\\(\\),true\\)\\)\\)" +
-        "\\)").r
+      (response \ "scriptText").as[String] should fullyMatch regex "DApp\\(.+\\)".r
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
@@ -228,9 +235,11 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      (response \ "meta" \ "callableFuncTypes" \ 0 \ "a").as[String] shouldBe "Int"
-      (response \ "meta" \ "callableFuncTypes" \ 0 \ "b").as[String] shouldBe "ByteVector"
-      (response \ "meta" \ "callableFuncTypes" \ 0 \ "c").as[String] shouldBe "ByteVector|Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ "a").as[String] shouldBe "Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ "b").as[String] shouldBe "ByteVector"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ "c").as[String] shouldBe "ByteVector|Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call2" \ "d").as[String] shouldBe "String"
+      (response \ "meta" \ "callableFuncTypes" \ "call3").as[JsObject] shouldBe JsObject(Seq())
     }
   }
 

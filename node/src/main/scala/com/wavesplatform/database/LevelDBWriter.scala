@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
+import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -207,13 +208,7 @@ class LevelDBWriter(
   }
 
   override def blockReward(height: Int): Option[Long] =
-    readOnly(_.db.get(Keys.blockReward(height))).orElse {
-      activatedFeatures
-        .get(BlockchainFeatures.BlockReward.id)
-        .collect {
-          case activatedAt if height >= activatedAt && height < activatedAt + settings.rewardsSettings.term => settings.rewardsSettings.initial
-        }
-    }
+    readOnly(_.db.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)

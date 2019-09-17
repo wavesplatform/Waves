@@ -35,27 +35,27 @@ class RewardsTestSuite
       }
     }
 
-    nodes.waitForHeight(activationHeight + 1)
+    nodes.waitForHeight(activationHeight)
     nodes.map(_.rewardStatus(activationHeight)).foreach { ri => // 4
       ri.currentReward should be(initial)
       ri.minIncrement should be(minIncrement)
       ri.term should be(term)
-      ri.nextCheck should be(activationHeight + term)
-      ri.votingIntervalStart should be(activationHeight + term - votingInterval + 1)
+      ri.nextCheck should be(activationHeight + term - 1)
+      ri.votingIntervalStart should be(activationHeight + term - votingInterval)
       ri.votingThreshold should be(votingInterval / 2 + 1)
       ri.votes.increase should be(0)
       ri.votes.decrease should be(0)
       ri.totalWavesAmount should be(initialAmount + initial)
     }
 
-    val votingStartHeight = activationHeight + term - votingInterval + 1
-    nodes.waitForHeight(votingStartHeight + 1)
-    nodes.map(_.rewardStatus(votingStartHeight)).foreach { ri => // 9
+    val votingStartHeight = activationHeight + term - votingInterval
+    nodes.waitForHeight(votingStartHeight)
+    nodes.map(_.rewardStatus(votingStartHeight)).foreach { ri => // 8
       ri.currentReward should be(initial)
       ri.minIncrement should be(minIncrement)
       ri.term should be(term)
-      ri.nextCheck should be(activationHeight + term)
-      ri.votingIntervalStart should be(activationHeight + term - votingInterval + 1)
+      ri.nextCheck should be(activationHeight + term - 1)
+      ri.votingIntervalStart should be(activationHeight + term - votingInterval)
       ri.votingThreshold should be(votingInterval / 2 + 1)
       ri.votes.increase should be(1)
       ri.votes.decrease should be(0)
@@ -66,32 +66,32 @@ class RewardsTestSuite
     val newReward       = initial + minIncrement
     val amountAfterTerm = initialAmount + BigInt(initial) * BigInt(term) + newReward
 
-    nodes.waitForHeight(termEndHeight + 1)
+    nodes.waitForHeight(termEndHeight)
     nodes.map(_.rewardStatus(termEndHeight)).foreach { ri => // 12
       ri.currentReward should be(newReward)
       ri.minIncrement should be(minIncrement)
       ri.term should be(term)
-      ri.nextCheck should be(termEndHeight + term)
-      ri.votingIntervalStart should be(termEndHeight + term - votingInterval + 1)
+      ri.nextCheck should be(termEndHeight + term - 1)
+      ri.votingIntervalStart should be(termEndHeight + term - votingInterval)
       ri.votingThreshold should be(votingInterval / 2 + 1)
       ri.votes.increase should be(0)
       ri.votes.decrease should be(0)
       ri.totalWavesAmount should be(amountAfterTerm)
     }
 
-    val secondVotingStartHeight = termEndHeight + term - votingInterval + 1
+    val secondVotingStartHeightPlusTwo = termEndHeight + term - votingInterval + 2
 
-    nodes.waitForHeight(secondVotingStartHeight + 1)
-    nodes.map(_.rewardStatus(secondVotingStartHeight)).foreach { ri => // 17
+    nodes.waitForHeight(secondVotingStartHeightPlusTwo)
+    nodes.map(_.rewardStatus(secondVotingStartHeightPlusTwo)).foreach { ri => // 18
       ri.currentReward should be(newReward)
       ri.minIncrement should be(minIncrement)
       ri.term should be(term)
-      ri.nextCheck should be(termEndHeight + term)
-      ri.votingIntervalStart should be(termEndHeight + term - votingInterval + 1)
+      ri.nextCheck should be(termEndHeight + term - 1)
+      ri.votingIntervalStart should be(termEndHeight + term - votingInterval)
       ri.votingThreshold should be(votingInterval / 2 + 1)
-      ri.votes.increase should be(1)
+      ri.votes.increase should be(3)
       ri.votes.decrease should be(0)
-      ri.totalWavesAmount should be(amountAfterTerm + newReward * BigInt(secondVotingStartHeight - termEndHeight))
+      ri.totalWavesAmount should be(amountAfterTerm + newReward * BigInt(secondVotingStartHeightPlusTwo - termEndHeight))
     }
   }
 }
@@ -117,7 +117,7 @@ object RewardsTestSuite {
        |    min-increment = $minIncrement
        |    voting-interval = $votingInterval
        |  }
-       |  rewards.target = $target
+       |  rewards.desired = $target
        |  miner.quorum = 1
        |}""".stripMargin
   )

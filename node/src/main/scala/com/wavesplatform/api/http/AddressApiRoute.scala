@@ -424,10 +424,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
     import cats.implicits._
-    commonAccountApi.script(account)
-      .script
-      .map(_.base64)
-      .traverse(Global.scriptMeta)
+    blockchain.accountScript(account)
+      .traverse(Global.dAppFuncTypes)
       .map(AccountScriptMeta(account.stringRepr, _))
   }
 
