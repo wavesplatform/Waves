@@ -1,14 +1,10 @@
 package com.wavesplatform.events.protobuf
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
+import com.wavesplatform.events.protobuf.StateUpdate.{BalanceUpdate => PBBalanceUpdate, DataEntryUpdate => PBDataEntryUpdate, LeasingUpdate => PBLeasingUpdate}
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.events.protobuf.StateUpdate.{
-  BalanceUpdate => PBBalanceUpdate,
-  DataEntryUpdate => PBDataEntryUpdate,
-  LeasingUpdate => PBLeasingUpdate
-}
-import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
 import com.wavesplatform.state.{BlockAppended, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
 
 object PBEvents {

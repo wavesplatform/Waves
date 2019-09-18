@@ -66,7 +66,7 @@ lazy val node = project
   .settings(versionSourceSetting("com.wavesplatform"))
 
 lazy val `grpc-server` = project
-  .dependsOn(node % "compile;test->test;runtime->provided")
+  .dependsOn(node % "compile;test->test;runtime->provided", `blockchain-updates-model`)
 
 lazy val `node-it` = project.dependsOn(node)
 
@@ -78,7 +78,11 @@ lazy val benchmark = project
     langJVM % "compile;test->test"
   )
 
-lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val `blockchain-updates-model` = (project in file("blockchain-updates") / "model")
+  .dependsOn(node % "compile;test->test;runtime->provided")
+
+lazy val `blockchain-updates` = project
+  .dependsOn(node % "compile;test->test;runtime->provided", `blockchain-updates-model`)
 
 lazy val it = project
   .settings(
