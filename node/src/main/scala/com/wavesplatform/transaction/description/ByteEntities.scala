@@ -302,9 +302,9 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
         if (transferCount == 0) {
           Nil
         } else if (transferCount < 0 || transferCount > buf.length - offset - 2) {
-          throw new Exception(s"Brocken array size ($transferCount entries while ${buf.length - offset - 2} bytes avaliable)")
+          throw new IllegalArgumentException(s"Invalid array size ($transferCount entries while ${buf.length - offset - 2} bytes available)")
         } else {
-          List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offst) => readTransfer(buf, offst) }
+          List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offset) => readTransfer(buf, offset) }
         }
 
       val resultOffset = transfersList.lastOption.map(_._2).getOrElse(offset + 2)
