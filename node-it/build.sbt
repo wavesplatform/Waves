@@ -12,10 +12,11 @@ inTask(docker)(
   Seq(
     imageNames := Seq(ImageName("com.wavesplatform/node-it")),
     exposedPorts := Set(6863, 6869, 6870), // NetworkApi, RestApi, gRPC
-    additionalFiles ++= stageFiles(LocalProject("node")).value +: Seq(
+    additionalFiles ++= Seq(
+      stageFiles(LocalProject("node")).value,
+      stageFiles(LocalProject("grpc-server")).value,
       (Test / resourceDirectory).value / "template.conf",
-      (Test / sourceDirectory).value / "container" / "start-waves.sh",
-      stageFiles(LocalProject("grpc-server")).value
+      (Test / sourceDirectory).value / "container" / "start-waves.sh"
     )
   )
 )
