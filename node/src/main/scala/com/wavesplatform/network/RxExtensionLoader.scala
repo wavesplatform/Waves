@@ -67,10 +67,15 @@ object RxExtensionLoader extends ScorexLogging {
                   val ch = best.channel
                   log.debug(
                     s"${id(ch)} Requesting signatures${if (optimistic) " optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsyncLogErr
                   ch.writeAndFlush(GetSignatures(knownSigs)).addListener { f: ChannelFuture =>
-                    if (!f.isSuccess) log.error(s"Error requesting signatures: $ch", f.cause())
+                    if (!f.isSuccess) {
+                      log.error(s"Error requesting signatures: $ch", f.cause())
+                      peerDatabase.suspendAndClose(ch)
+                    }
                   }
+
                   state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))
                 case None =>
                   log.trace(s"Holding on requesting next sigs, $state")
