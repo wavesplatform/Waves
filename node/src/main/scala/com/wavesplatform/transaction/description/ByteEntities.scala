@@ -299,8 +299,10 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
       val transferCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
 
       val transfersList: List[(Validation[ParsedTransfer], Int)] =
-        if (transferCount < 0 || transferCount > buf.size - offset - 2) {
-          throw new Exception(s"Brocken array size ($transferCount entries while ${buf.size - offset - 2} bytes avaliable)")
+        if (transferCount == 0) {
+          Nil
+        } else if (transferCount < 0 || transferCount > buf.length - offset - 2) {
+          throw new Exception(s"Brocken array size ($transferCount entries while ${buf.length - offset - 2} bytes avaliable)")
         } else {
           List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offst) => readTransfer(buf, offst) }
         }
@@ -356,18 +358,22 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
     Seq(
       ByteEntityDescription(index, "Data entries count", UnimportantType, "2", subIndex = 1),
       ByteEntityDescription(index, "Key 1 length (K1)", UnimportantType, "2", subIndex = 2),
-      ByteEntityDescription(index,
-                            "Key 1 bytes",
-                            "UTF-8 encoded",
-                            s"K1 <= ${DataEntry.MaxKeySize} * 4 (max number of bytes per char) = ${DataEntry.MaxKeySize * 4}",
-                            subIndex = 3),
+      ByteEntityDescription(
+        index,
+        "Key 1 bytes",
+        "UTF-8 encoded",
+        s"K1 <= ${DataEntry.MaxKeySize} * 4 (max number of bytes per char) = ${DataEntry.MaxKeySize * 4}",
+        subIndex = 3
+      ),
       ByteEntityDescription(index, "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", UnimportantType, "1", subIndex = 4),
-      ByteEntityDescription(index,
-                            "Value 1 bytes",
-                            "Value 1 type",
-                            s"Depends on the value type, max ${DataEntry.MaxValueSize}",
-                            subIndex = 5,
-                            additionalInfo = "\n...")
+      ByteEntityDescription(
+        index,
+        "Value 1 bytes",
+        "Value 1 type",
+        s"Depends on the value type, max ${DataEntry.MaxValueSize}",
+        subIndex = 5,
+        additionalInfo = "\n..."
+      )
     )
   }
 
@@ -469,11 +475,11 @@ class OptionBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[
   def generateDoc: Seq[ByteEntityDescription] = {
     ByteEntityDescription(index, s"$name $firstByteInterpretation", UnimportantType, "1", subIndex = 1) +:
       nestedByteEntity.generateDoc.map { desc =>
-      desc.copy(
-        length = desc.length + s" or 0 (depends on the byte in $index.1)",
-        subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
-      )
-    }
+        desc.copy(
+          length = desc.length + s" or 0 (depends on the byte in $index.1)",
+          subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
+        )
+      }
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Option[U], Int)] = {
@@ -483,10 +489,12 @@ class OptionBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[
 }
 
 object OptionBytes {
-  def apply[U](index: Int,
-               name: String,
-               nestedByteEntity: ByteEntity[U],
-               firstByteInterpretation: String = "existence flag (1/0)"): ByteEntity[Option[U]] =
+  def apply[U](
+      index: Int,
+      name: String,
+      nestedByteEntity: ByteEntity[U],
+      firstByteInterpretation: String = "existence flag (1/0)"
+  ): ByteEntity[Option[U]] =
     new OptionBytes(index, name, nestedByteEntity, firstByteInterpretation)
 }
 
@@ -496,11 +504,11 @@ class SeqBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U])
     val seq =
       ByteEntityDescription(index, s"$name size", UnimportantType, "2", subIndex = 1) +:
         nestedByteEntity.generateDoc.map { desc =>
-        desc.copy(
-          length = desc.length + s" or 0 (depends on the short in $index.1)",
-          subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
-        )
-      }
+          desc.copy(
+            length = desc.length + s" or 0 (depends on the short in $index.1)",
+            subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
+          )
+        }
 
     seq.init :+ seq.last.copy(additionalInfo = "\n...")
   }

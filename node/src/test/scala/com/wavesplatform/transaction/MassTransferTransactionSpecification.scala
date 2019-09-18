@@ -75,7 +75,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
     }
   }
 
-  property(testName = "JSON format validation") {
+  property("JSON format validation") {
     val js = Json.parse("""{
                        "type": 11,
                        "id": "H36CTJc7ztGRZPCrvpNYeagCN1HV1gXqUthsXKdBT3UD",
@@ -106,7 +106,8 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
     val transfers = MassTransferTransaction
       .parseTransfersList(
-        List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L)))
+        List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L))
+      )
       .right
       .get
 
@@ -124,5 +125,18 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       .get
 
     js shouldEqual tx.json()
+  }
+
+  property("empty transfers validation") {
+    import play.api.libs.json._
+    val transaction = TransactionFactory
+      .fromSignedRequest(
+        Json.parse(
+          """{"senderPublicKey":"CkvZ3sY9o8zV1akquJk6Y5d9Ke4G68zGzfSTep1KZBhi","fee":51449505,"type":11,"transferCount":0,"version":1,"totalAmount":0,"attachment":"SQqypFfuVh4j4H6zaZaAXPT8fbuNQSo6cvv6jiQuYeFXDJjtjwvu7QE6bAzQJ7VSCpX8km6rTYbug7mi3i","sender":"3MrFBnLCGKibu1jrEcRiHqGBwYCeQgyUQHc","feeAssetId":null,"proofs":["uYVrE8fKzR2dcx1EXU2WLWPwgWfdgAizRuwDJd2eU19rgoSpPuUF9eQCQzmKxg1pA3Tcp31W9MnZiK3LEbQeBwe"],"assetId":"5TBkQTEnyN8qYvfnDMnVQss3DuRVLmXSnyFFLS5AnzvE","transfers":[],"id":"CwJMbjdXchdqupzCkoALGBzg5Zp72duzhGfURLR5iwK1","timestamp":215734165446088575}"""
+        )
+      )
+      .explicitGet()
+
+    TransactionParsers.parseBytes(transaction.bytes()) shouldBe 'right
   }
 }
