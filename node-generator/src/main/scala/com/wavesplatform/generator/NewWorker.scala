@@ -3,7 +3,6 @@ package com.wavesplatform.generator
 import java.net.{InetSocketAddress, URL}
 
 import cats.syntax.apply._
-import cats.syntax.flatMap._
 import com.wavesplatform.generator.Worker.Settings
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
@@ -24,21 +23,52 @@ class NewWorker(
     node: InetSocketAddress,
     nodeRestAddress: URL,
     canContinue: () => Boolean,
-    initial: Seq[Transaction]
+    initial: Seq[Transaction],
+    richAccountAddresses: Seq[String]
 )(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
     extends ScorexLogging {
 
   def run(): Future[Unit] =
-    (getChannel >>= (c => withReconnect(writeInitial(c))) >>= (c => withReconnect(pullAndWrite(c))) >>= (c => closeChannel(c)))
-      .runAsyncLogErr(Scheduler(ec))
+    task.runAsyncLogErr(Scheduler(ec))
+
+  private[this] val task =
+    for {
+      channel <- getChannel
+      channel <- withReconnect(writeInitial(channel))
+      channel <- withReconnect(pullAndWrite(channel))
+      _       <- closeChannel(channel)
+    } yield ()
 
   private[this] val nodeUTXTransactionsToSendCount: Task[Int] = Task.defer {
     import org.asynchttpclient.Dsl._
     val request = get(s"$nodeRestAddress/transactions/unconfirmed/size").build()
     Task
       .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
-      .map(r => settings.utxLimit - (Json.parse(r.getResponseBody) \ "size").as[Int])
+      .map(r => math.max(settings.utxLimit - (Json.parse(r.getResponseBody) \ "size").as[Int], 0))
   }
+
+  private[this] val balanceOfRichAccount: Task[Map[String, Long]] =
+    Task
+      .defer {
+        import org.asynchttpclient.Dsl._
+        val results = richAccountAddresses.map { address =>
+          val request = get(s"$nodeRestAddress/addresses/balance/$address").build()
+          Task
+            .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
+            .map(r => address -> (Json.parse(r.getResponseBody) \ "balance").as[Long])
+        }
+        Task.gather(results).map(_.toMap)
+      }
+      .onErrorFallbackTo(Task.now(Map()))
+
+  private[this] val retrieveBalances: Task[Unit] =
+    if (!canContinue())
+      Task.unit
+    else
+      for {
+        balances <- balanceOfRichAccount
+        _        <- if (balances.nonEmpty) logInfo(s"Balances: ${balances.mkString("(", ", ", ")")}") else Task.unit
+      } yield ()
 
   private[this] def writeInitial(channel: Channel): Task[Channel] =
     if (!canContinue())
@@ -51,20 +81,21 @@ class NewWorker(
         _            <- sleep
       } yield validChannel
 
-  private[this] def pullAndWrite(channel: Channel): Task[Channel] =
+  private[this] def pullAndWrite(channel: Channel, cnt: Int = 0): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
     else
       for {
+        _             <- if (cnt % 10 == 0) retrieveBalances.executeAsync else Task.unit
         validChannel  <- validateChannel(channel)
         txToSendCount <- nodeUTXTransactionsToSendCount
         _             <- logInfo(s"Sending $txToSendCount transactions to $validChannel")
         _             <- Task.deferFuture(networkSender.send(validChannel, transactionSource.take(txToSendCount).toStream: _*))
         _             <- sleep
-        r             <- pullAndWrite(validChannel)
+        r             <- Task.defer(pullAndWrite(validChannel, (cnt + 1) % 10))
       } yield r
 
-  private[this] def withReconnect(baseTask: Task[Channel]): Task[Channel] =
+  private[this] def withReconnect[A](baseTask: Task[A]): Task[A] =
     baseTask.onErrorHandleWith {
       case error if settings.autoReconnect && canContinue() =>
         logError(s"[$node] An error during sending transactions, reconnect", error) *>

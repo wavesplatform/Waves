@@ -212,8 +212,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       val initialGenTransactions = generator.initial
 
-      log.info(s"Universe preconditions: $initialUniTransactions")
-      log.info(s"Generator preconditions: $initialGenTransactions")
+      log.info(s"Universe preconditions transactions size: ${initialUniTransactions.size}")
+      log.info(s"Generator preconditions transactions size: ${initialGenTransactions.size}")
 
       val workers = finalConfig.sendTo.map {
         case NodeAddress(node, nodeRestUrl) =>
@@ -226,7 +226,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             node,
             nodeRestUrl,
             () => canContinue,
-            initialUniTransactions ++ initialGenTransactions
+            initialUniTransactions ++ initialGenTransactions,
+            finalConfig.privateKeyAccounts.map(_.toAddress.stringRepr)
           )
       }
 

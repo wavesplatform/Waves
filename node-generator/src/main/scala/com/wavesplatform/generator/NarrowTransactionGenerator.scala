@@ -47,7 +47,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
         "Waves DEX is the best exchange ever".getBytes("UTF-8"),
         100000000,
         2,
-        reissuable = false,
+        reissuable = true,
         fee = 100400000L,
         timestamp = System.currentTimeMillis(),
         script = None
@@ -72,6 +72,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           .get
       })
     }
+
+    val leaseRecipient = GeneratorSettings.toKeyPair("lease recipient")
   }
 
   override def initial: Seq[Transaction] = preconditions.tradeAssetIssue +: preconditions.tradeAssetDistribution
@@ -84,7 +86,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
       (
         Seq.empty[Transaction],
         Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
-        Seq.empty[IssueTransactionV2],
+        Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
         Seq.empty[LeaseTransactionV2],
         Seq.empty[CreateAliasTransaction]
       )
@@ -144,10 +146,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case ReissueTransactionV2 =>
             (
               for {
-                (assetTx, reissuable) <- randomFrom(reissuableIssueTxs).map((_, random.nextBoolean())) orElse
-                  randomFrom(Universe.IssuedAssets.filter(_.reissuable)).map(asset => (asset, asset.reissuable))
-                sender <- accountByAddress(assetTx.sender.stringRepr)
-                fee = assetTx.script.fold(100040000L)(_ => 100840000L)
+                assetTx <- randomFrom(reissuableIssueTxs) orElse randomFrom(Universe.IssuedAssets.filter(_.reissuable))
+                sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx <- logOption(
                   ReissueTransactionV2
                     .selfSigned(
@@ -155,8 +155,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                       sender,
                       IssuedAsset(assetTx.id()),
                       Random.nextInt(Int.MaxValue),
-                      reissuable,
-                      fee,
+                      true,
+                      100400000L,
                       ts
                     )
                 )
@@ -275,9 +275,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               for {
                 sender <- randomFrom(accounts)
                 useAlias = random.nextBoolean()
-                recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
-                else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
-                tx <- logOption(LeaseTransactionV2.selfSigned(sender, 1, moreThanStandardFee * 3, ts, recipient))
+                recipient <- (if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
+                              else randomFrom(accounts.filter(_ != sender).map(_.toAddress))) orElse Some(preconditions.leaseRecipient.toAddress)
+                tx <- logOption(LeaseTransactionV2.selfSigned(sender, random.nextLong(1, 100), moreThanStandardFee * 3, ts, recipient))
               } yield tx
             ).logNone("Can't define recipient of transaction, check your configuration")
 
