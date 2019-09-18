@@ -12,6 +12,8 @@ import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
+import scala.util.Success
+
 class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("serialization roundtrip") {
@@ -137,6 +139,9 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       )
       .explicitGet()
 
-    TransactionParsers.parseBytes(transaction.bytes()) shouldBe 'right
+    val parsed = TransactionParsers.parseBytes(transaction.bytes())
+    parsed should matchPattern {
+      case Success(mtt: MassTransferTransaction) if mtt.transfers.isEmpty => // Success
+    }
   }
 }
