@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.prop.TableDrivenPropertyChecks
-import com.wavesplatform.it.sync._
 
 import scala.util.Random
 
@@ -13,7 +13,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val alias            = randomAlias()
     val (balance1, eff1) = miner.accountBalances(firstAddress)
 
-    val aliasFee = calcAliasFee(firstAddress, alias)
+    val aliasFee = createAlias(firstAddress, alias)
     miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
 
     val aliasFull = fullAliasByAddress(firstAddress, alias)
@@ -26,7 +26,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   test("Not able to create same aliases to same address") {
     val alias            = randomAlias()
     val (balance1, eff1) = miner.accountBalances(firstAddress)
-    val aliasFee         = calcAliasFee(firstAddress, alias)
+    val aliasFee         = createAlias(firstAddress, alias)
     miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
 
     assertBadRequest(sender.createAlias(firstAddress, alias, minFee))
@@ -37,7 +37,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val alias = randomAlias()
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)
-    val aliasFee         = calcAliasFee(firstAddress, alias)
+    val aliasFee         = createAlias(firstAddress, alias)
     assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, minFee), "Alias already claimed")
     miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
@@ -48,10 +48,10 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val (balance1, eff1) = miner.accountBalances(secondAddress)
 
-    val aliasFeeFirstAlias = calcAliasFee(secondAddress, firstAlias)
+    val aliasFeeFirstAlias = createAlias(secondAddress, firstAlias)
     miner.assertBalances(secondAddress, balance1 - aliasFeeFirstAlias, eff1 - aliasFeeFirstAlias)
 
-    val aliasFeeSecondAlias = calcAliasFee(secondAddress, secondAlias)
+    val aliasFeeSecondAlias = createAlias(secondAddress, secondAlias)
     miner.assertBalances(secondAddress, balance1 - aliasFeeFirstAlias - aliasFeeSecondAlias, eff1 - aliasFeeFirstAlias - aliasFeeSecondAlias)
 
     val aliasesList = sender.aliasByAddress(secondAddress)
@@ -65,7 +65,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
       val (balance1, eff1) = miner.accountBalances(secondAddress)
-      val aliasFee         = calcAliasFee(secondAddress, alias)
+      val aliasFee         = createAlias(secondAddress, alias)
       miner.assertBalances(secondAddress, balance1 - aliasFee, eff1 - aliasFee)
     }
   }
@@ -94,7 +94,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val (balance1, eff1) = miner.accountBalances(firstAddress)
     val (balance3, eff3) = miner.accountBalances(thirdAddress)
 
-    val aliasFee  = calcAliasFee(thirdAddress, thirdAddressAlias)
+    val aliasFee  = createAlias(thirdAddress, thirdAddressAlias)
     val aliasFull = fullAliasByAddress(thirdAddress, thirdAddressAlias)
     //lease maximum value, to pass next thirdAddress
     val leasingAmount = balance1 - minFee - 0.5.waves
@@ -114,7 +114,15 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, balance + minFee), "State check failed. Reason: negative waves balance")
   }
 
-  private def calcAliasFee(address: String, alias: String): Long = {
+  test("Able to resolve alias via gRPC method") {
+    val alias            = randomAlias()
+    createAlias(firstAddress, alias)
+
+    val addr = miner.grpc.resolveAlias(alias)
+    addr.stringRepr shouldBe firstAddress
+  }
+
+  private def createAlias(address: String, alias: String): Long = {
     if (!sender.aliasByAddress(address).exists(_.endsWith(alias))) {
       val aliasId = sender.createAlias(address, alias, minFee).id
       nodes.waitForHeightAriseAndTxPresent(aliasId)
