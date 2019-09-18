@@ -5,7 +5,7 @@ import com.wavesplatform.block.{Block, BlockField}
 import play.api.libs.json.{JsNumber, JsObject, Json}
 
 case class RewardBlockField(version: Byte, override val value: Long) extends BlockField[Long] {
-  override val name: String = "reward"
+  override val name: String = "desiredReward"
 
   override protected def j: JsObject =
     if (version < Block.RewardBlockVersion) JsObject.empty

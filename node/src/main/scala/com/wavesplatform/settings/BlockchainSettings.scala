@@ -23,10 +23,9 @@ case class RewardsSettings(
 
   def nearestTermEnd(activatedAt: Int, height: Int): Int = {
     require(height >= activatedAt)
-    val diff = height - activatedAt
+    val diff = height - activatedAt + 1
     val mul  = math.ceil(diff.toDouble / term).toInt
-    val next = activatedAt + mul * term
-    if (next == height) next + term else next
+    activatedAt + mul * term - 1
   }
 
   def votingWindow(activatedAt: Int, height: Int): Range = {
@@ -70,7 +69,8 @@ case class FunctionalitySettings(
     doubleFeaturesPeriodsAfterHeight: Int,
     maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
-    lastTimeBasedForkParameter: Long = 0L
+    lastTimeBasedForkParameter: Long = 0L,
+    leaseExpiration: Int = 1000000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter

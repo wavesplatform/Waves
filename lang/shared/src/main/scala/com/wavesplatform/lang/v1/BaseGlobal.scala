@@ -5,10 +5,11 @@ import java.math.RoundingMode
 import cats.implicits._
 import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -154,6 +155,23 @@ trait BaseGlobal {
     script match {
       case ContractScriptImpl(_, dApp) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
       case _                           => Right(Dic(Map()))
+    }
+
+  def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
+    script match {
+      case ContractScriptImpl(_, dApp) =>
+        MetaMapper.dicFromProto(dApp)
+          .map(_.m.headOption)
+          .map {
+            case Some((name, Chain(paramTypes))) =>
+              val funcsName      = dApp.callableFuncs.map(_.u.name)
+              val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
+              Dic(Map(name -> paramsWithFunc))
+            case _ => Dic(Map())
+          }
+          .leftMap(ScriptParseError)
+
+      case _  => Right(Dic(Map()))
     }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
