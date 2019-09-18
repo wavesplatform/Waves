@@ -22,9 +22,20 @@ class RewardsTestSuite
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
+  private val firstMiner = nodes.head
+  private val secondMiner = nodes.last
+
   "reward changes accordingly node's votes" in {
 
     val initialAmount = BigInt(Constants.TotalWaves) * BigInt(Constants.UnitsInWave)
+
+    val initFirstMinerBalance = firstMiner.balanceDetails(firstMiner.address).available
+    val initSecondMinerBalance = firstMiner.balanceDetails(secondMiner.address).available
+
+    assertBadRequestAndMessage(firstMiner.rewardStatus(1),"Block reward feature is not activated yet",400)
+    nodes.waitForHeight(activationHeight - 1)
+    firstMiner.balanceDetails(firstMiner.address).available shouldBe initFirstMinerBalance
+    firstMiner.balanceDetails(secondMiner.address).available shouldBe initSecondMinerBalance
 
     nodes.waitForHeight(activationHeight)
     val featureInfo = nodes.map(_.featureActivationStatus(BlockchainFeatures.BlockReward.id))
@@ -92,6 +103,13 @@ class RewardsTestSuite
       ri.votes.increase should be(3)
       ri.votes.decrease should be(0)
       ri.totalWavesAmount should be(amountAfterTerm + newReward * BigInt(secondVotingStartHeightPlusTwo - termEndHeight))
+    }
+    "miner's balance increases as he generates block" in {
+      secondMiner.close()
+      val minerBalanceBefore = firstMiner.balanceDetails(firstMiner.address).available
+      val currentHeight = firstMiner.height
+      firstMiner.waitForHeight(currentHeight + 1)
+      firstMiner.balanceDetails(firstMiner.address).available shouldBe minerBalanceBefore + firstMiner.rewardStatus(firstMiner.height).currentReward
     }
   }
 }
