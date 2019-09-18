@@ -1,0 +1,200 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonOutput
+import devops.waves.*
+@Library('jenkins-shared-lib')
+
+ut = new utils()
+scripts = new scripts()
+def useNodeSbtCache = false
+def repoUrl = "https://github.com/wavesplatform/Waves"
+def dockerImageName = "node/test"
+def testTasks=[:]
+def dockerRegistryCreds = 'dockerhub-wavesnode-creds'
+
+properties([
+
+    ut.buildDiscarderPropertyObject('14', '30'),
+
+    parameters([
+        ut.choiceParameterObject('branch', scripts.getBranches(repoUrl), Boolean.TRUE),
+        ut.extendedChoiceParameterDefinitionObject('useNodeSbtCache', "yes", "yes", 0, "")
+    ])
+])
+
+stage('Build information'){
+    if (! params.branch || params.branch.contains('No values in a list') )
+    {
+        echo "Aborting this build. Please run it again with the required parameters specified"
+        currentBuild.result = Constants.PIPELINE_ABORTED
+        return
+    }
+    else
+    {
+        echo "Parameters are specified:" + params
+        if (params.useNodeSbtCache == "yes"){
+            useNodeSbtCache = true
+        }
+    }
+}
+
+if (currentBuild.result == Constants.PIPELINE_ABORTED){
+    return
+}
+
+timeout(time:20, unit:'MINUTES') {
+    node('vostok'){
+        currentBuild.result = Constants.PIPELINE_SUCCESS
+
+        timestamps {
+            wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
+                try {
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} - ${branch}"
+
+                    stage('Checkout') {
+                        sh 'env'
+                        step([$class: 'WsCleanup'])
+                        ut.checkout(branch, repoUrl)
+                        dir ('docker'){
+                            stash includes: '**', name: 'dockerFiles', useDefaultExcludes: false
+                        }
+                    }
+                    testTasks["Mainnet"] = {
+                        stage("Mainnet, basic image, local.conf"){
+                            dir ('mainnet'){
+                                unstash 'dockerFiles'
+                                def wavesLatestVersion=ut.shWithOutput("curl -fsSL https://api.github.com/repos/wavesplatform/Waves/releases/latest | tac | grep -m 1 'tag_name.:' | tr -cd '[0-9\\.]'")
+                                dockerImageBasic = ut.buildDockerImage('', dockerRegistryCreds, dockerImageName, 'basic', "--no-cache", true)
+                                sh """
+                                mkdir -p data config
+                                chmod -R 777 data config
+                                echo waves.rest-api.enable=yes > ./config/local.conf
+                                echo waves.rest-api.bind-address=0.0.0.0 >> ./config/local.conf
+                                echo waves.rest-api.api-key-hash=superApiKeyHash >> ./config/local.conf
+                                echo waves.network.declared-address=\\\"0.0.0.0:6868\\\" >> ./config/local.conf
+                                docker run -d --rm --name node_mainnet \
+                                -v "${env.WORKSPACE}/mainnet/data":/var/lib/waves \
+                                -v "${env.WORKSPACE}/mainnet/config":/etc/waves \
+                                -e WAVES_WALLET_PASSWORD=myNewWalletSuperPassword \
+                                -e WAVES_WALLET_SEED=599RbZ7JZPF3dYRtBNyBtyXzeiU7LhFMtQ1EwFCWYXec1pVNWM8nQrz516arCUko6RvPpEryHFK4Ew7La3sjGdoN \
+                                -p 6869:6869 -p 6868:6868 \
+                                ${dockerImageName}:basic
+                                while true ; do
+                                    grep "Custom '/etc/waves/waves.conf' not found. Using a default one for 'mainnet' network." ./data/log/waves.log &&
+                                    grep "Waves v${wavesLatestVersion} Blockchain Id: W" ./data/log/waves.log &&
+                                    grep "WAVES_VERSION='${wavesLatestVersion}'" ./data/log/waves.log &&
+                                    grep "WAVES_NETWORK='mainnet'" ./data/log/waves.log &&
+                                    grep "WAVES_WALLET_SEED='599RbZ7JZPF3dYRtBNyBtyXzeiU7LhFMtQ1EwFCWYXec1pVNWM8nQrz516arCUko6RvPpEryHFK4Ew7La3sjGdoN'" ./data/log/waves.log &&
+                                    grep "WAVES_WALLET_PASSWORD='myNewWalletSuperPassword'" ./data/log/waves.log &&
+                                    grep "Added account" ./data/log/waves.log &&
+                                    grep "REST API was bound on 0.0.0.0:6869" ./data/log/waves.log && 
+                                    curl -fsSL 127.0.0.1:6869 | grep swagger &&
+                                    curl 127.0.0.1:6868 || true &&
+                                    grep "Blacklisting.*172.17.*Timeout expired while waiting for handshake" data/log/waves.log && break ||
+                                    sleep 10
+                                done
+                                """
+                            }
+                        }
+                    }
+                    testTasks["Testnet"] = {
+                        stage("Testnet, version image, default envs"){
+                            dir ('testnet'){
+                                unstash 'dockerFiles'
+                                def wavesVersion=ut.shWithOutput("curl -fsSL https://api.github.com/repos/wavesplatform/Waves/releases | tac | grep  'tag_name.:' | tail -n 3 | cut -dv -f2 | cut -d\\\" -f1 | shuf -n 1")
+                                println "random version: ${wavesVersion}"
+                                def dockerImageVersion = ut.buildDockerImage('', dockerRegistryCreds, dockerImageName, 'version', "--build-arg WAVES_VERSION=${wavesVersion} --no-cache", true)
+                                sh """
+                                mkdir -p data config
+                                chmod -R 777 data config
+                                docker run -d --rm --name node_testnet \
+                                    -v "${env.WORKSPACE}/testnet/data":/var/lib/waves \
+                                    -v "${env.WORKSPACE}/testnet/config":/etc/waves \
+                                    -e WAVES_WALLET_PASSWORD=myWalletSuperPassword  \
+                                    -e WAVES_NETWORK=testnet \
+                                    ${dockerImageName}:version
+                                while true ; do
+                                    grep "Custom '/etc/waves/waves.conf' not found. Using a default one for 'testnet' network" ./data/log/waves.log &&
+                                    grep "Waves v${wavesVersion} Blockchain Id: T" ./data/log/waves.log &&
+                                    grep "WAVES_HEAP_SIZE='2g'" ./data/log/waves.log &&
+                                    grep "WAVES_LOG_LEVEL='DEBUG'" ./data/log/waves.log &&
+                                    grep "WAVES_VERSION='${wavesVersion}'" ./data/log/waves.log &&
+                                    grep "WAVES_NETWORK='testnet'" ./data/log/waves.log &&
+                                    grep "WAVES_WALLET_SEED=''" ./data/log/waves.log &&
+                                    grep "WAVES_WALLET_PASSWORD='myWalletSuperPassword'" ./data/log/waves.log &&
+                                    grep "Added account" ./data/log/waves.log && break ||
+                                    sleep 10
+                                done
+                                """
+                            }
+                        }
+                        
+                    }
+                    testTasks["Stagenet"] = {
+                        stage("Stagenet, compile image,custom envs"){
+                            dir ('stagenet'){
+                                unstash 'dockerFiles'
+                                if (useNodeSbtCache){
+                                    def text = readFile "Dockerfile"
+                                    sh """
+                                        cp -R  ${env.HOME}/.ivy2 ./.ivy2
+                                        cp -R  ${env.HOME}/.sbt ./.sbt
+                                        mkdir -p ./.ivy2 ./.sbt
+                                    """
+                                    replacement="as builder\nCOPY ./.ivy2 /root/.ivy2\nCOPY ./.sbt /root/.sbt"
+                                    writeFile file: "Dockerfile", text: text.replace('as builder', replacement)
+                                }
+                                def dockerImageCompile = ut.buildDockerImage('', dockerRegistryCreds, dockerImageName, 'compile', "--build-arg WAVES_VERSION=99.99.99 --build-arg 'DEB_PACKCAGE_NETWORKS=mainnet testnet stagenet' --build-arg BRANCH=${branch} --no-cache", true)
+                                sh """
+                                mkdir -p data config
+                                chmod -R 777 data config
+                                docker run -d --rm --name node_stagenet \
+                                -v "${env.WORKSPACE}/stagenet/data":/var/lib/waves \
+                                -v "${env.WORKSPACE}/stagenet/config":/etc/waves \
+                                -e WAVES_WALLET_PASSWORD=myNewWalletSuperPassword \
+                                -e WAVES_WALLET_SEED=599RbZ7JZPF3dYRtBNyBtyXzeiU7LhFMtQ1EwFCWYXec1pVNWM8nQrz516arCUko6RvPpEryHFK4Ew7La3sjGdoN \
+                                -e WAVES_NETWORK=stagenet \
+                                -e WAVES_LOG_LEVEL=INFO \
+                                -e WAVES_HEAP_SIZE=3g \
+                                -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.rest-api.port=6870 -Dwaves.rest-api.bind-address=0.0.0.0" \
+                                -p 6870:6870 \
+                                ${dockerImageName}:compile
+                                while true ; do
+                                    grep "Custom '/etc/waves/waves.conf' not found. Using a default one for 'stagenet' network." ./data/log/waves.log &&
+                                    grep "Waves v99.99.99 Blockchain Id: S" ./data/log/waves.log &&
+                                    grep "WAVES_HEAP_SIZE='3g'" ./data/log/waves.log &&
+                                    grep "WAVES_LOG_LEVEL='INFO'" ./data/log/waves.log &&
+                                    grep "WAVES_VERSION='99.99.99'" ./data/log/waves.log &&
+                                    grep "WAVES_NETWORK='stagenet'" ./data/log/waves.log &&
+                                    grep "'\\-Dwaves.rest-api.enable=yes \\-Dwaves.rest-api.port=6870 \\-Dwaves.rest-api.bind-address=0.0.0.0" ./data/log/waves.log &&
+                                    grep "WAVES_WALLET_SEED='599RbZ7JZPF3dYRtBNyBtyXzeiU7LhFMtQ1EwFCWYXec1pVNWM8nQrz516arCUko6RvPpEryHFK4Ew7La3sjGdoN'" ./data/log/waves.log &&
+                                    grep "WAVES_WALLET_PASSWORD='myNewWalletSuperPassword'" ./data/log/waves.log &&
+                                    grep "Added account" ./data/log/waves.log &&
+                                    grep "REST API was bound on 0.0.0.0:6870" ./data/log/waves.log && 
+                                    curl -fsSL 127.0.0.1:6870 | grep swagger && break ||
+                                    sleep 10
+                                done
+                                """
+                            }
+                        }
+                    }
+                    parallel testTasks
+                }
+                catch (err) {
+                    currentBuild.result = Constants.PIPELINE_FAILURE
+                    println("ERROR caught")
+                    println(err)
+                    println(err.getMessage())
+                    println(err.getStackTrace())
+                    println(err.getCause())
+                    println(err.getLocalizedMessage())
+                    println(err.toString())
+                }
+                finally{
+                    sh "docker stop node_mainnet node_stagenet node_testnet || true"
+                    sh "docker rmi ${dockerImageName}:basic ${dockerImageName}:version ${dockerImageName}:compile || true"
+                    ut.notifySlack("jenkins-notifications", currentBuild.result)
+                }
+            }
+        }
+    }
+}
