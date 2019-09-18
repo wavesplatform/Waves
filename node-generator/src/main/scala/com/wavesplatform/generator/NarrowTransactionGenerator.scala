@@ -390,7 +390,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 SetScriptTransaction.selfSigned(
                   sender,
                   Some(script),
-                  1800000L,
+                  1800000L + random.nextLong(100),
                   ts
                 )
               )
@@ -399,7 +399,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case SetAssetScriptTransaction =>
             (
               for {
-                assetTx <- randomFrom(validIssueTxs ++ Universe.IssuedAssets).filter(_.script.isDefined)
+                assetTx <- randomFrom((validIssueTxs ++ Universe.IssuedAssets).filter(_.script.isDefined))
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
                 script = Gen.script(complexity = false, estimator)
                 tx <- logOption(
