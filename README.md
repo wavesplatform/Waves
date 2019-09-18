@@ -131,7 +131,6 @@ java -jar node/target/waves-all*.jar path/to/config/file
 ```
 sbt "extension-module/run /path/to/configuration"
 
-
 ```
 
 ### IntelliJ IDEA
@@ -173,4 +172,12 @@ Keep up with the latest news and articles, and find out all about events happeni
 - [Waves Blog](https://blog.wavesplatform.com/)
 - [Support](https://support.wavesplatform.com/)
 
-- https://support.wavesplatform.com/)
+
+
+# Acknowledgement
+
+![img](https://camo.githubusercontent.com/97fa03cac759a772255b93c64ab1c9f76a103681/68747470733a2f2f7777772e796f75726b69742e636f6d2f696d616765732f796b6c6f676f2e706e67)
+
+We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.
+
+Take a look at YourKit's leading software products: YourKit Java Profiler and YourKit .NET Profiler.
