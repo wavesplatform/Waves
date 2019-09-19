@@ -107,7 +107,7 @@ object RxScoreObserver extends ScorexLogging {
 
     val observable = Observable(ls, rs, cc).merge
       .map { maybeClosedChannel =>
-        val sw: SyncWith = calcSyncWith(currentBestChannel, localScore, scores.asMap().asScala)
+        val sw: SyncWith = calcSyncWith(currentBestChannel.filterNot(maybeClosedChannel.contains), localScore, scores.asMap().asScala)
         currentBestChannel = sw.map(_.channel)
         ChannelClosedAndSyncWith(maybeClosedChannel, sw)
       }
