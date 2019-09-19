@@ -98,7 +98,7 @@ object RxScoreObserver extends ScorexLogging {
         .observeOn(scheduler)
         .map { ch =>
           scores.invalidate(ch)
-          if (currentBestChannel.contains(ch)) {
+          if (currentBestChannel.exists(_.id() == ch.id())) {
             log.debug(s"${id(ch)} Best channel has been closed")
             currentBestChannel = None
           }
