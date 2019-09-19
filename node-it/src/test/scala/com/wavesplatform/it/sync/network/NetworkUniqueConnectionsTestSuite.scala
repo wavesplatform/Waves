@@ -13,7 +13,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
   import NetworkUniqueConnectionsTestSuite._
 
   "nodes should up and connect with each other" in {
-    val firstNode = docker.startNode(FirstNodeConfig, autoConnect = false)
+    val firstNode = docker.startNode(FirstNodeConfig)
 
     val status = firstNode.status()
     log.trace(s"#### $status")
@@ -34,8 +34,9 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
     // Outgoing connection: first -> second (2)
     firstNode.connect(secondNode.containerNetworkAddress)
 
-    withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
-      intercept[TimeoutException] { firstNode.waitForPeers(2, 30.seconds) }
+    withClue("Nodes should drop second connection") {
+      firstNode.waitForPeers(2, 30 seconds)
+      firstNode.waitForPeers(1, 30 seconds)
     }
   }
 
