@@ -207,9 +207,19 @@ case class Block(signature: String,
                  transactions: Seq[Transaction],
                  fee: Long,
                  features: Option[Seq[Short]],
-                 reward: Option[Long])
+                 reward: Option[Long],
+                 `nxt-consensus`: Block.NxtConsensus) {
+  def nxtConsensus: Block.NxtConsensus = `nxt-consensus`
+}
 object Block {
   implicit val blockFormat: Format[Block] = Json.format
+  case class NxtConsensus(`base-target`: Long, `generation-signature`: String) {
+    def baseTarget: Long = `base-target`
+    def generationSignature: String = `generation-signature`
+  }
+  object NxtConsensus {
+    implicit val nxtConsensusFormat: Format[NxtConsensus] = Json.format
+  }
 }
 
 case class BlockHeaders(signature: String,

@@ -48,7 +48,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       alice.stringRepr, s"alias:$chainId:nickname", 100, minFee, Some(assetId)).id
     nodes.waitForHeightAriseAndTxPresent(transferTxId)
   }
-//TODO Alias
+
   test("this") {
     repl.execute("this.toString()").right.value should endWith(alice.stringRepr)
   }
@@ -104,8 +104,15 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
   test("blockInfoByHeight()") {
     val h = miner.height - 1
-    repl.execute(s"blockInfoByHeight($h).value().height")
-      .right.value should endWith(s" $h")
+    val bi = miner.blockAt(h)
+    repl.execute(s"let bi = blockInfoByHeight($h).value()")
+    println(repl.execute(s"bi"))
+    repl.execute(s"bi.height").right.value should endWith(s" ${bi.height}")
+    repl.execute(s"bi.timestamp").right.value should endWith(s" ${bi.timestamp}")
+    repl.execute(s"bi.baseTarget").right.value should endWith(s" ${bi.nxtConsensus.baseTarget}")
+    repl.execute(s"bi.generationSignature").right.value should endWith(s" ${bi.nxtConsensus.generationSignature}")
+    repl.execute(s"bi.generatorPublicKey").right.value should endWith(s" ${miner.publicKey.stringRepr}")
+    repl.execute(s"bi.generator.toString()").right.value should endWith(s" ${bi.generator}")
   }
 
   test("transactionHeightById()") {
@@ -115,6 +122,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   test("transferTransactionById()") {
     repl.execute(s"let transferTx = transferTransactionById(base58'$transferTxId').value()")
     repl.execute(s"transferTx.sender.toString()").right.value should endWith(alice.stringRepr)
+    //TODO all fields
   }
 
   test("addressFromPublicKey()") {
