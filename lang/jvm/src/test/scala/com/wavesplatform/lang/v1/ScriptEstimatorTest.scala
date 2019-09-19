@@ -293,4 +293,28 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
     )
     estimate(functionCosts(V3), expr) shouldBe 'left
   }
+
+  property("function call with differing param referencing") {
+    val script = s"""
+                    | func inc(a: Int, b: Int, c: Int) = a + a + b
+                    | inc(1 + 1, 1, 1)
+                  """.stripMargin
+
+    val expr = compile(script)
+    val cost = estimate(functionCosts(V3), expr).explicitGet()
+
+    cost shouldBe
+        5     /* func decl              */ +
+        5 * 3 /* func call args count   */ +
+        1     /* first call a at inc()  */ +
+        2     /* call a at inc()        */ +
+        1     /* call + at inc()        */ +
+        2     /* call a at inc()        */ +
+        1     /* call + at inc()        */ +
+        1     /* first call b at inc()  */ +
+        2     /* call b at inc()        */ +
+        3     /* 1 + 1 param            */ +
+        1     /* 1 param                */ +
+        1     /* 1 param                */
+  }
 }
