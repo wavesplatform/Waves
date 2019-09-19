@@ -114,7 +114,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def rewardForBlock(block: Block): Option[Long] = {
+  private def nextReward(): Option[Long] = {
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
@@ -139,9 +139,9 @@ class BlockchainUpdaterImpl(
           val gt        = votes.count(_ > currentReward)
           val threshold = settings.votingInterval / 2 + 1
 
-          if (lt > threshold)
+          if (lt >= threshold)
             Some(math.max(currentReward - settings.minIncrement, 0))
-          else if (gt > threshold)
+          else if (gt >= threshold)
             Some(currentReward + settings.minIncrement)
           else
             Some(currentReward)
@@ -171,8 +171,7 @@ class BlockchainUpdaterImpl(
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(blockchain, height)
-                  val reward            = rewardForBlock(block)
-
+                  val reward            = nextReward()
                   BlockDiffer
                     .fromBlock(
                       CompositeBlockchain(blockchain, reward = reward),
@@ -246,7 +245,7 @@ class BlockchainUpdaterImpl(
                       }
 
                       val prevReward                    = ng.reward
-                      val reward                        = rewardForBlock(block)
+                      val reward                        = nextReward()
                       val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
                       val diff = BlockDiffer
@@ -435,19 +434,17 @@ class BlockchainUpdaterImpl(
   override def reward: Option[Long] = ngState.flatMap(_.reward)
 
   override def blockRewardVotes(height: Int): Seq[Long] = readLock {
-    val mayBeVote =
-      for {
-        activatedAt <- activatedFeatures.get(BlockchainFeatures.BlockReward.id).filter(_ <= height)
-        vote <- ngState.collect {
-          case ng if settings.rewardsSettings.votingWindow(activatedAt, height).contains(height) => ng.base.rewardVote
+    activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
+      case Some(activatedAt) if activatedAt <= height =>
+        ngState match {
+          case None => blockchain.blockRewardVotes(height)
+          case Some(ng) =>
+            val innerVotes = blockchain.blockRewardVotes(height)
+            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height).contains(height))
+              innerVotes :+ ng.base.rewardVote
+            else innerVotes
         }
-      } yield vote
-
-    val innerVotes = blockchain.blockRewardVotes(height)
-
-    mayBeVote match {
-      case Some(vote) => innerVotes :+ vote
-      case None       => innerVotes
+      case None => Seq()
     }
   }
 

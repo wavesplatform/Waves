@@ -207,7 +207,8 @@ case class Block(signature: String,
                  transactions: Seq[Transaction],
                  fee: Long,
                  features: Option[Seq[Short]],
-                 reward: Option[Long])
+                 reward: Option[Long],
+                 desiredReward: Option[Long])
 object Block {
   implicit val blockFormat: Format[Block] = Json.format
 }
@@ -220,6 +221,7 @@ case class BlockHeaders(signature: String,
                         blocksize: Int,
                         features: Option[Set[Short]],
                         reward: Option[Long],
+                        desiredReward: Option[Long],
                         totalFee: Long)
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
