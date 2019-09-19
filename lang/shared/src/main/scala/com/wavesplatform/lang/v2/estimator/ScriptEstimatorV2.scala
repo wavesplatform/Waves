@@ -97,12 +97,12 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       argsComplexity <- evalFuncArgs(args)
       ctx <- get
       _   <- update(lets.modify(_)(_ ++ ctx.overlappedRefs))
-      overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map(arg -> _)).toMap
-      ctxArgs    = func.args.map(_ -> (false, const(1))).toMap
+      overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map((arg, _))).toMap
+      ctxArgs    = func.args.map((_, (false, const(1)))).toMap
       _              <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l ++ ctxArgs, or ++ overlapped)})
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
       evaluatedCtx   <- get
-      overlappedChanges = overlapped.map { case ref@(name, _) => evaluatedCtx.letDefs.get(name).map(name -> _).getOrElse(ref) }
+      overlappedChanges = overlapped.map { case ref@(name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
       _              <- update((lets ~ overlappedRefs).modify(_){ case (l, or) => (l -- ctxArgs.keys ++ overlapped, or ++ overlappedChanges)})
     } yield bodyComplexity + argsComplexity
 
