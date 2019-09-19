@@ -10,22 +10,24 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Properties, List => JList, Map => JMap}
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
-import com.google.common.primitives.Ints._
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.settings._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import org.apache.commons.compress.archivers.ArchiveStreamFactory
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
 import scala.collection.JavaConverters._
