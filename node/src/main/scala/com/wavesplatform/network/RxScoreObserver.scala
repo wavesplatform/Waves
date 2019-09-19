@@ -86,8 +86,8 @@ object RxScoreObserver extends ScorexLogging {
         .map(_.distinctUntilChanged
           .debounce(remoteScoreDebounce))
         .merge
-        .map {
-          case ((ch, score)) =>
+        .collect {
+          case (ch, score) if ch.isOpen =>
             scores.put(ch, score)
             log.trace(s"${id(ch)} New remote score $score")
             None
@@ -98,7 +98,7 @@ object RxScoreObserver extends ScorexLogging {
         .observeOn(scheduler)
         .map { ch =>
           scores.invalidate(ch)
-          if (currentBestChannel.exists(_.id() == ch.id())) {
+          if (currentBestChannel.contains(ch)) {
             log.debug(s"${id(ch)} Best channel has been closed")
             currentBestChannel = None
           }
