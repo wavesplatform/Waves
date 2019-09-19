@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import java.io.FileOutputStream
+import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
@@ -10,11 +10,14 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Properties, List => JList, Map => JMap}
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
+import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
-import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -34,12 +37,14 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
-import scala.util.Random
 import scala.util.control.NonFatal
+import scala.util.{Random, Try}
 
 class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boolean = false, imageName: String = Docker.NodeImageName)
     extends AutoCloseable
     with ScorexLogging {
+
+  import Docker._
 
   private val http = asyncHttpClient(
     config()
