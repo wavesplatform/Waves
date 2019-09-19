@@ -143,6 +143,15 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     repl.execute("a") shouldBe Right("res2: Int = 5")
   }
 
+  property("internal decls") {
+    val repl = Repl()
+    repl.execute("func filterStep(acc: List[Int], v: Int) = if (v % 2 == 0) then v :: acc else acc")
+    repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)")
+    repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)") shouldBe Right("res2: List[Int] = [4, 2]")
+
+    repl.info("_isInstanceOf") shouldBe "_isInstanceOf not found in context"
+  }
+
   ignore("waves context") {
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
     val repl = Repl(Some(settings))

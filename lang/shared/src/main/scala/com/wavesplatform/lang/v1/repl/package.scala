@@ -36,4 +36,7 @@ package object repl {
       PureContext.build(global, V3) |+|
       WavesContext.build(contractDirectiveSet, environment)
   }
+
+  val internalVarPrefixes: Set[Char] = Set('@', '$')
+  val internalFuncPrefix: String = "_"
 }

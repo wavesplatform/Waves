@@ -1,0 +1,82 @@
+
+waves {
+  network {
+    port = 6867
+    known-peers = ${known_peers}
+    declared-address = "${declared_address}"
+    enable-peers-exchange = no
+    enable-blacklisting = no
+    node-name = ${host_id}
+    max-inbound-connections = 70
+    max-outbound-connections = 70
+    traffic-logger {
+      # Codes of transmitted messages to ignore. See MessageSpec.messageCode
+      ignore-tx-messages = [] # BlockMessageSpec, TransactionMessageSpec
+
+      # Codes of received messages to ignore. See MessageSpec.messageCode
+      ignore-rx-messages = [] # TransactionMessageSpec
+    }
+  }
+
+  rest-api {
+    port = 6869
+  }
+
+  miner {
+    enable = ${node_miner}
+    micro-block-interval = ${micro_block_interval}
+    max-transactions-in-key-block = 0
+    max-transactions-in-micro-block = ${max_transactions_in_micro_block}
+    min-micro-block-age = ${min_micro_block_age}
+  }
+
+  wallet.seed = "${devnet_wallet_seed}"
+  
+  blockchain {
+    type = ${blockchain_type}
+    custom {
+      address-scheme-character = ${custom_address_scheme_character}
+      functionality {
+    #   NG features(to disable set [])
+        pre-activated-features =  ${pre_activated_features}
+        feature-check-blocks-period = 30
+        blocks-for-feature-activation = 25
+      }
+    }
+  }
+  features {
+    supported = ${features_supported}
+  }
+}
+
+kamon {
+  enable = yes
+  environment.host = ${host_id}
+  influxdb {
+    hostname = 127.0.0.1
+    port = 8086
+    database = "devnet"
+
+    authentication {
+      user = "${influex_db_user}"
+      password = "${influex_db_password}"
+    }
+
+    time-units = "ms"
+  }
+
+  metric.tick-interval = 1 second
+}
+
+metrics {
+  enable = yes
+  node-id = ${host_id}
+
+  influx-db {
+    username = "${influex_db_user}"
+    password = "${influex_db_password}"
+
+    batch-actions = 100
+    batch-flash-duration = 5s
+  }
+}

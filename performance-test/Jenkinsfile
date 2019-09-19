@@ -1,0 +1,321 @@
+#!/usr/bin/env groovy
+import devops.waves.*
+@Library('jenkins-shared-lib')
+
+ut = new utils()
+scripts = new scripts()
+def json_parameters = [:]
+def updateNodeTasks = [:]
+def restartNodeTasks = [:]
+def localCongTemplateMap = [:]
+def applicationTemplateMap = [:]
+def preconditionsConfMap = [:]
+def remote = [:]
+def deploy_new_version, data_drop, wallet_drop, matcher_data_drop, run_generator, update_config
+def servers = []
+def parentDir = { path -> path[0..<path.lastIndexOf('/')] }
+
+def artifactsDir = 'performance-test/out'
+def repo_url = 'https://github.com/wavesplatform/Waves.git'
+def localConfLocation = 'performance-test/local.conf'
+def localConfTemplateLocation = 'performance-test/local.conf.template'
+def localConfLocationOnNode = '/usr/share/waves-devnet/conf/local.conf'
+
+def applicationConfLocation = 'node-generator/src/main/resources/application.conf'
+def applicationConfTemplateLocation = 'performance-test/application.conf.template'
+
+def preconditionsConfLocation = 'node-generator/src/main/resources/preconditions.conf'
+def preconditionsConfTemplateLocation = 'performance-test/preconditions.conf.template'
+
+def debFileLocationOnNode = '/tmp/waves_deb'
+def debFileLocation = ''
+def node_service_name = 'waves-devnet'
+
+properties([
+    parameters([
+        ut.choiceParameterObject('branch', scripts.getBranches(repo_url), Boolean.TRUE),
+        ut.choiceParameterObject('deploymentGroup', scripts.getDeploymentGroups()),
+        ut.cascadeChoiceParameterObject('deploymentServers', scripts.getDeploymentServers(), 'deploymentGroup','PARAMETER_TYPE_CHECK_BOX'),
+        extendedChoice(bindings: '', description: '', groovyClasspath: '', groovyScript: scripts.getPerformanceTestParams(), multiSelectDelimiter: ',', name: 'parameters', quoteValue: false, saveJSONParameterToFile: false, type: 'PT_JSON', visibleItemCount: 5)])])
+
+@NonCPS
+def get_json_objects(){
+    return new groovy.json.JsonSlurperClassic().parseText(parameters)
+}
+
+@NonCPS
+def get_formated_acc_or_server_string(def acc_or_server_string, def identifier){
+    def formated_acc_or_server_string = ''
+    if (identifier == 'account'){
+        acc_or_server_string.replaceAll('[\\[\\]\\s]','').split(',').each { formated_acc_or_server_string += "\n    \"${it}\"," }
+    } else if (identifier == 'server'){
+        acc_or_server_string.replaceAll('[\\[\\]\\s]','').split(',').each { formated_acc_or_server_string += "\n    {\n      network-address = \"${it}\"\n      api-address = \"http://${it}:6869\"\n    }," }
+    }
+    return formated_acc_or_server_string.replaceAll(",\$", "");
+}
+
+@NonCPS
+def get_formated_preconditions_string(def preconditions_string, def identifier){
+    def formated_preconditions_string=''
+    def map = [:]
+    List <String> mapList = []
+
+    if (preconditions_string.contains('],'))
+        mapList = preconditions_string.split('\\],')
+    else mapList.add(preconditions_string)
+
+    mapList.each {
+        it.replaceAll('[\\[\\]\\s]','').split(',').each {
+            it.split(':').with {
+                map[it[0].trim()] = it[1].trim()
+            }
+        }
+        if (identifier == 'leases'){
+            formated_preconditions_string = "${formated_preconditions_string}\n    { from = \"${map.from}\", to = \"${map.to}\", amount = \"${map.amount}\" },"
+        } else if (identifier == 'accounts'){
+            formated_preconditions_string = "${formated_preconditions_string}\n    { seed = \"${map.seed}\", balance = \"${map.balance}\", script-file = \"${map.script_file}\" },"
+        } else if (identifier == 'assets'){
+            formated_preconditions_string = "${formated_preconditions_string}\n    { issuer = \"${map.issuer}\", name = \"${map.name}\", description = \"${map.description}\", amount = \"${map.amount}\", decimals = \"${map.decimals}\", reissuable = \"${map.reissuable}\" }, script-file = \"${map.script_file}\" },"
+        }
+    }
+    return formated_preconditions_string.replaceAll(",\$", "");
+}
+
+stage('Build information'){
+    if (! params.branch || ! params.parameters )
+    {
+        echo "Aborting this build. Please run it again with the required parameters specified"
+        currentBuild.result = Constants.PIPELINE_ABORTED
+        return
+    }
+    else
+    {
+        servers = deploymentServers.split(',').collect{it.toLowerCase()}
+        println "Parameters are specified:\n" +
+        "branch: ${branch}\n" +
+        "deploymentGroup: ${deploymentGroup}\n" +
+        "servers: ${servers}\n"
+
+        json_parameters = get_json_objects()
+
+        deploy_new_version = json_parameters.actions.deploy_new_version.toBoolean()
+        data_drop = json_parameters.actions.data_drop.toBoolean()
+        wallet_drop = json_parameters.actions.wallet_drop.toBoolean()
+        matcher_data_drop = json_parameters.actions.matcher_data_drop.toBoolean()
+        run_generator = json_parameters.actions.run_generator.toBoolean()
+        update_config = json_parameters.actions.update_config.toBoolean()
+        localCongTemplateMap = [
+            blockchain_type: json_parameters.configs.blockchain.blockchain_type.join(' '),
+            custom_address_scheme_character: json_parameters.configs.blockchain.custom_address_scheme_character.join(' '),
+            features_supported: json_parameters.configs.blockchain.features_supported.join(' '),
+            pre_activated_features: json_parameters.configs.blockchain.pre_activated_features.join(' '),
+            micro_block_interval: json_parameters.configs.miner.micro_block_interval.join(' '),
+            max_transactions_in_micro_block: json_parameters.configs.miner.max_transactions_in_micro_block.join(' '),
+            min_micro_block_age: json_parameters.configs.miner.min_micro_block_age.join(' '),
+            declared_address: '',
+            known_peers:'',
+            host_id: '',
+            node_miner: '',
+            devnet_wallet_seed: '',
+            influex_db_user: '',
+            influex_db_password: '']
+        println "'local.conf' parameters are specified:\n" + localCongTemplateMap + "\n"
+        localCongTemplateMap.influex_db_user = Constants.INFLUEX_DB_USER
+        localCongTemplateMap.influex_db_password = Constants.INFLUEX_DB_PASSWORD
+
+        applicationTemplateMap = [
+            chain_id: json_parameters.configs.generator.chain_id.join(' '),
+            accounts: get_formated_acc_or_server_string(json_parameters.configs.generator.accounts.account.join(' '), 'account'),
+            network_servers: get_formated_acc_or_server_string(json_parameters.configs.generator.network_servers.network_server.join(' '), 'server'),
+            worker_delay: json_parameters.configs.worker.worker_delay.join(' '),
+            worker_utx_limit: json_parameters.configs.worker.worker_utx_limit.join(' '),
+            worker_working_time: json_parameters.configs.worker.worker_working_time.join(' '),
+            issue_transaction_v2: json_parameters.configs.probabilities.issue_transaction_v2.join(' '),
+            transfer_transaction_v2: json_parameters.configs.probabilities.transfer_transaction_v2.join(' '),
+            reissue_transaction_v2: json_parameters.configs.probabilities.reissue_transaction_v2.join(' '),
+            burn_transaction_v2: json_parameters.configs.probabilities.burn_transaction_v2.join(' '),
+            exchange_transaction_v2: json_parameters.configs.probabilities.exchange_transaction_v2.join(' '),
+            lease_transaction_v2: json_parameters.configs.probabilities.lease_transaction_v2.join(' '),
+            lease_cancel_transaction_v2: json_parameters.configs.probabilities.lease_cancel_transaction_v2.join(' '),
+            create_alias_transaction_v2: json_parameters.configs.probabilities.create_alias_transaction_v2.join(' '),
+            mass_transfer_transaction: json_parameters.configs.probabilities.mass_transfer_transaction.join(' '),
+            data_transaction: json_parameters.configs.probabilities.data_transaction.join(' '),
+            sponsor_fee_transaction: json_parameters.configs.probabilities.sponsor_fee_transaction.join(' '),
+            invoke_script_transaction: json_parameters.configs.probabilities.invoke_script_transaction.join(' ') ]
+        println "'application.conf' parameters are specified:\n" + applicationTemplateMap + "\n"
+
+        preconditionsConfMap = [
+            faucet: json_parameters.configs.preconditions.faucet.join(' '),
+            accounts: get_formated_preconditions_string(json_parameters.configs.preconditions.accounts.join(' '), 'accounts'),
+            leases: get_formated_preconditions_string(json_parameters.configs.preconditions.leases.join(' '), 'leases'),
+            assets: get_formated_preconditions_string(json_parameters.configs.preconditions.assets.join(' '), 'assets')
+        ]
+        println "'preconditions.conf' Parameters are specified:\n" + applicationTemplateMap + "\n"
+    }
+}
+
+if (currentBuild.result == Constants.PIPELINE_ABORTED){
+    return
+}
+
+node('wavesnode'){
+    currentBuild.result = Constants.PIPELINE_SUCCESS
+
+    timestamps {
+        try {
+
+            withEnv(["NTP_SERVER=${json_parameters.environment.ntp_server}", "SBT_OPTS=-Xmx2g -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=128m -Dnetwork=devnet"]) {
+                currentBuild.displayName = "#${env.BUILD_NUMBER} - ${branch}"
+
+                stage('Checkout') {
+                    sh 'env'
+                    step([$class: 'WsCleanup'])
+                    ut.checkout(branch, repo_url)
+                    sh "mkdir ${artifactsDir}"
+                }
+
+                withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
+
+                    servers.each { serverName ->
+                        remote["${serverName}"] = [:]
+                        remote["${serverName}"].host = serverName
+                        remote["${serverName}"].name = serverName
+                        remote["${serverName}"].allowAnyHosts = true
+                        remote["${serverName}"].user = userName
+                        remote["${serverName}"].identityFile = identity
+                        ut.remoteExec(remote["${serverName}"], true, "systemctl stop ${node_service_name}")
+                    }
+
+                    stage('Updating nodes') {
+
+                        if (update_config) {
+                            String localConfFileContent = ''
+                            def all_servers = (deploymentGroup == "dev-core") ? Constants.DEV_CORE_NODES.clone() : Constants.DEVNET3_NODES.clone()
+                            servers.each { serverName ->
+                                echo "Generating local.conf-${serverName}"
+                                localCongTemplateMap.declared_address = Constants.DEVNET_NODES_IP_ADDRESSES_MAP[serverName] + ':6867'
+                                localCongTemplateMap.host_id = Constants.DEVNET_NODES_ID_MAP[serverName]
+                                localCongTemplateMap.node_miner = Constants.DEVNET_NODES_MINER[serverName]
+                                localCongTemplateMap.devnet_wallet_seed = Constants.DEVNET_NODES_WALLET_SEEDS[serverName]
+                                localCongTemplateMap.known_peers = """[ ${all_servers.findAll{!it.contains("${serverName}")}.collect{ "\"${Constants.DEVNET_NODES_IP_ADDRESSES_MAP[it]}:6867\"" }.join(",")} ]"""
+                                localConfFileContent = ut.replaceTemplateVars(localConfTemplateLocation, localCongTemplateMap)
+                                writeFile file: localConfLocation+"-${serverName}", text: localConfFileContent
+                                sh "cp ${localConfLocation}-${serverName} ${artifactsDir}/"
+                            }
+                        }
+
+                        if (deploy_new_version) {
+                            echo "Building package"
+                            ut.sbt 'clean packageAll'
+                            debFileLocation = findFiles(glob: '**/*.deb')
+                            debFileLocation.each {
+                                sh "cp ${it.path} ${artifactsDir}/"
+                            }
+                        }
+
+                        servers.each { serverName ->
+                            updateNodeTasks["Updating node ${serverName}"] = {
+                                if (deploy_new_version) {
+                                    echo "Updating node ${serverName}"
+                                    debFileLocation.each { deb ->
+                                        ut.remoteExec(remote["${serverName}"], true, "bash -c '[[ -d ${debFileLocationOnNode} ]] && rm -rf ${debFileLocationOnNode}/* || mkdir -p ${debFileLocationOnNode} && chmod -R 777 ${debFileLocationOnNode}'")
+                                        ut.remotePut(remote["${serverName}"], deb.path, "${debFileLocationOnNode}/" + deb.name)
+                                        ut.remoteExec(remote["${serverName}"], true, "dpkg --force-confnew -i ${debFileLocationOnNode}/${deb.name}")
+                                    }
+                                }
+                                if (update_config) {
+                                    echo "Updating node ${serverName} config"
+                                    ut.remoteExec(remote["${serverName}"], true, "setfacl -R -m u:${userName}:rwx ${parentDir localConfLocationOnNode}")
+                                    ut.remoteExec(remote["${serverName}"], true, "rm -f ${localConfLocationOnNode} || true")
+                                    ut.remotePut(remote["${serverName}"], localConfLocation+"-${serverName}", localConfLocationOnNode)
+                                    ut.remoteExec(remote["${serverName}"], true, "chown ${node_service_name}:${node_service_name} ${localConfLocationOnNode}")
+                                }
+                            }
+                        }
+                        parallel updateNodeTasks
+                        if (! deploy_new_version) {
+                            org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Updating nodes')
+                        }
+                    }
+                    stage('Data drop') {
+                        servers.each { serverName ->
+                            restartNodeTasks["Restarting node ${serverName}"] = {
+
+                                if (data_drop) {
+                                    echo "Removing node state"
+                                    ut.remoteExec(remote["${serverName}"], true, "rm -rf /var/lib/${node_service_name}/{data,peers.dat}")
+                                }
+                                if (wallet_drop) {
+                                    echo "Removing wallet data"
+                                    ut.remoteExec(remote["${serverName}"], true, "rm -rf /var/lib/${node_service_name}/wallet")
+                                }
+                                if (matcher_data_drop) {
+                                    echo "Removing matcher data"
+                                    ut.remoteExec(remote["${serverName}"], true, "rm -rf /var/lib/${node_service_name}/matcher/data")
+                                }
+                                ut.remoteExec(remote["${serverName}"], true, "systemctl restart ${node_service_name}")
+                            }
+                            parallel restartNodeTasks
+                        }
+                        if (!(data_drop || wallet_drop || matcher_data_drop)) {
+                            org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Data drop')
+                        }
+                    }
+                }
+            }
+
+            stage('Run generator') {
+                if (run_generator){
+                    println "Generate generator configs"
+                    String applicationConfFileContent = ut.replaceTemplateVars(applicationConfTemplateLocation, applicationTemplateMap)
+                    writeFile file: applicationConfLocation, text: applicationConfFileContent
+                    sh "cp ${applicationConfLocation} ${artifactsDir}/"
+                    String preconditionsConfFileContent = ut.replaceTemplateVars(preconditionsConfTemplateLocation, preconditionsConfMap)
+                    writeFile file: preconditionsConfLocation, text: preconditionsConfFileContent
+                    sh "cp ${preconditionsConfLocation} ${artifactsDir}/"
+
+                    def nodesHeight = [:]
+                    def height = ""
+                    while (true){
+                        sleep(5)
+                        servers.each { serverName ->
+                            height = ut.shWithOutput "curl -sX 'GET' http://${serverName}:6869/node/status | grep -m 1 'blockchainHeight\":' | cut -d, -f 1 | tr -cd '[0-9]='"
+                            nodesHeight[serverName] = height
+                            println "server '${serverName}': height '${nodesHeight[serverName]}'"
+                        }
+
+                        servers.each { serverName ->
+                            if (nodesHeight[serverName] == height){
+                                nodesHeight.remove(serverName)
+                            }
+                        }
+
+                        if (nodesHeight.values().size() == 0){
+                            break
+                        }
+                    }
+                    println "Launch generator!"
+                    ut.sbt "node-generator/run"
+                }
+                else{
+                org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Run generator')
+                }
+            }
+        }
+        catch (err) {
+            currentBuild.result = Constants.PIPELINE_FAILURE
+            println("ERROR caught")
+            println(err)
+            println(err.getMessage())
+            println(err.getStackTrace())
+            println(err.getCause())
+            println(err.getLocalizedMessage())
+            println(err.toString())
+        }
+        finally{
+            sh "tar -czvf artifacts.tar.gz -C ${artifactsDir} ."
+            archiveArtifacts artifacts: 'artifacts.tar.gz'
+            ut.notifySlack("jenkins-notifications", currentBuild.result)
+        }
+    }
+}
