@@ -73,7 +73,6 @@ object RxExtensionLoader extends ScorexLogging {
                   )
 
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsyncLogErr
-                  ch.close()
                   ch.writeAndFlush(GetSignatures(knownSigs)).addListener { f: ChannelFuture =>
                     if (!f.isSuccess) log.error(s"Error requesting signatures: $ch", f.cause())
                   }
