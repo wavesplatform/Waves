@@ -14,6 +14,7 @@ import org.asynchttpclient.AsyncHttpClient
 import play.api.libs.json.Json
 
 import scala.compat.java8.FutureConverters
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 class NewWorker(
@@ -78,7 +79,7 @@ class NewWorker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending ${initial.size} initial transactions to $validChannel")
         _            <- Task.deferFuture(networkSender.send(validChannel, initial: _*))
-        _            <- sleep
+        _            <- sleep(settings.initialDelay.getOrElse(settings.delay))
       } yield validChannel
 
   private[this] def pullAndWrite(channel: Channel, cnt: Int = 0): Task[Channel] =
@@ -91,7 +92,7 @@ class NewWorker(
         txToSendCount <- nodeUTXTransactionsToSendCount
         _             <- logInfo(s"Sending $txToSendCount transactions to $validChannel")
         _             <- Task.deferFuture(networkSender.send(validChannel, transactionSource.take(txToSendCount).toStream: _*))
-        _             <- sleep
+        _             <- sleep(settings.delay)
         r             <- Task.defer(pullAndWrite(validChannel, (cnt + 1) % 10))
       } yield r
 
@@ -99,7 +100,7 @@ class NewWorker(
     baseTask.onErrorHandleWith {
       case error if settings.autoReconnect && canContinue() =>
         logError(s"[$node] An error during sending transactions, reconnect", error) *>
-          Task.sleep(settings.reconnectDelay) *>
+          sleep(settings.reconnectDelay) *>
           Task.defer(withReconnect(baseTask))
       case error =>
         logError("Stopping because autoReconnect is disabled", error) *>
@@ -113,5 +114,5 @@ class NewWorker(
   private[this] def logError(msg: => String, err: Throwable): Task[Unit] = Task(log.error(msg, err))
   private[this] def logInfo(msg: => String): Task[Unit]                  = Task(log.info(msg))
 
-  private[this] val sleep: Task[Unit] = logInfo(s"Sleeping for ${settings.delay}") *> Task.sleep(settings.delay)
+  private[this] def sleep(delay: FiniteDuration): Task[Unit] = logInfo(s"Sleeping for $delay") *> Task.sleep(delay)
 }

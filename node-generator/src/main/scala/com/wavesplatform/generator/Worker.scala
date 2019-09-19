@@ -17,8 +17,8 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.control.NonFatal
 
 class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator, initial: List[Transaction])(
-    implicit ec: ExecutionContext)
-    extends ScorexLogging {
+    implicit ec: ExecutionContext
+) extends ScorexLogging {
 
   private type Result[T] = EitherT[Future, (Int, Throwable), T]
 
@@ -105,13 +105,22 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
 }
 
 object Worker {
-  case class Settings(autoReconnect: Boolean, iterations: Int, workingTime: FiniteDuration, utxLimit: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
+  case class Settings(
+      autoReconnect: Boolean,
+      iterations: Int,
+      workingTime: FiniteDuration,
+      utxLimit: Int,
+      delay: FiniteDuration,
+      reconnectDelay: FiniteDuration,
+      initialDelay: Option[FiniteDuration]
+  )
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
       import x._
 
       s"""number of iterations: $iterations
+         |initial delay: ${initialDelay.getOrElse(delay)}
          |delay between iterations: $delay
          |auto reconnect: ${if (autoReconnect) "enabled" else "disabled"}
          |reconnect delay: $reconnectDelay""".stripMargin

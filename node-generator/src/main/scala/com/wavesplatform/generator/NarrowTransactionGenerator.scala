@@ -87,7 +87,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
         Seq.empty[Transaction],
         Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
         Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
-        Seq.empty[LeaseTransactionV2],
+        Universe.Leases,
         Seq.empty[CreateAliasTransaction]
       )
     ) {
@@ -284,7 +284,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case LeaseCancelTransactionV2 =>
             (
               for {
-                lease  <- randomFrom(activeLeaseTransactions)
+                lease  <- activeLeaseTransactions.headOption
                 sender <- accountByAddress(lease.sender.stringRepr)
                 tx     <- logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThanStandardFee * 3, ts))
               } yield tx
@@ -432,6 +432,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case _                                => aliases
         })
     }
+
+    Universe.Leases = generated._4
 
     log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).mapValues(_.size).mkString("\t", "\n\t", "")}")
 
