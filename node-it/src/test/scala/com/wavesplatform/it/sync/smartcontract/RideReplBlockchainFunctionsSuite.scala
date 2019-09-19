@@ -63,6 +63,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("assetBalance()") {
+    //TODO always returns waves balance instead of asset
     repl.execute(s"this.assetBalance(base58'$assetId')").right.value should endWith (" 900")
   }
   test("wavesBalance()") {
@@ -106,13 +107,18 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
     val h = miner.height - 1
     val bi = miner.blockAt(h)
     repl.execute(s"let bi = blockInfoByHeight($h).value()")
-    println(repl.execute(s"bi"))
-    repl.execute(s"bi.height").right.value should endWith(s" ${bi.height}")
-    repl.execute(s"bi.timestamp").right.value should endWith(s" ${bi.timestamp}")
-    repl.execute(s"bi.baseTarget").right.value should endWith(s" ${bi.nxtConsensus.baseTarget}")
-    repl.execute(s"bi.generationSignature").right.value should endWith(s" ${bi.nxtConsensus.generationSignature}")
-    repl.execute(s"bi.generatorPublicKey").right.value should endWith(s" ${miner.publicKey.stringRepr}")
-    repl.execute(s"bi.generator.toString()").right.value should endWith(s" ${bi.generator}")
+    //TODO possibly using wrong chain Id for generator address
+    repl.execute(s"bi").right.value should endWith(
+      s"""BlockInfo(
+        |	baseTarget = ${bi.nxtConsensus.baseTarget}
+        |	generator = Address(
+        |		bytes = base58'${bi.generator}'
+        |	)
+        |	timestamp = ${bi.timestamp}
+        |	height = ${bi.height}
+        |	generationSignature = base58'${bi.nxtConsensus.generationSignature}'
+        |	generatorPublicKey = base58'${miner.publicKey.stringRepr}'
+        |""".stripMargin)
   }
 
   test("transactionHeightById()") {
@@ -121,15 +127,32 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("transferTransactionById()") {
     repl.execute(s"let transferTx = transferTransactionById(base58'$transferTxId').value()")
-    repl.execute(s"transferTx.sender.toString()").right.value should endWith(alice.stringRepr)
-    //TODO all fields
+    //TODO Left because recipient alias can't be parsed
+    repl.execute(s"transferTx").right.value should endWith(
+      """TransferTransaction(
+        |	feeAssetId = ""
+        |	amount = ""
+        |	assetId = ""
+        |	recipient = ""
+        |	attachment = ""
+        |	id = ""
+        |	fee = ""
+        |	timestamp = ""
+        |	version = ""
+        |	sender = ""
+        |	senderPublicKey = ""
+        |	bodyBytes = ""
+        |	proofs = ""
+        |""".stripMargin)
   }
 
   test("addressFromPublicKey()") {
+    //TODO possibly using wrong chain Id
     repl.execute(s"addressFromPublicKey(base58'${alice.publicKey.stringRepr}').value().toString()")
       .right.value should endWith(alice.stringRepr)
   }
   test("addressFromRecipient() with alias") {
+    //TODO Left because recipient alias can't be parsed
     repl.execute(s"addressFromRecipient(transferTx.recipient).toString()")
       .right.value should endWith(bob.stringRepr)
   }
