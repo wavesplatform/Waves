@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V3}
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -317,37 +317,5 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |
         |""".stripMargin
     Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
-  }
-
-  import com.wavesplatform.common.utils.EitherExt2
-  property("parser2 test") {
-    val code =
-      """
-        | let answersCount = "test"
-        | let answersCount3 = "om nom nom"
-        | true
-        |""".stripMargin
-    val res = Parser2.parseExpression(code)
-    val resDAPP = Parser2.parseDAPP(code)
-
-    val ctx: CTX =
-      Monoid
-        .combineAll(
-          Seq(
-            PureContext.build(Global, V3),
-            CryptoContext.build(Global, V3),
-            WavesContext
-              .build(
-                DirectiveSet(V3, Account, Expression).explicitGet(),
-                Common.emptyBlockchainEnvironment()
-              )
-          ))
-
-    val compiled = ExpressionCompiler(ctx.compilerContext, res.get)
-
-
-    res shouldBe true
-    resDAPP shouldBe true
-    compiled shouldBe true
   }
 }

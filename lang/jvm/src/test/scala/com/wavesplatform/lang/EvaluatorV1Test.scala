@@ -755,6 +755,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       .applyWithLogging[EVALUATED](context.evaluationContext,
                                    ExpressionCompiler
                                      .compile(script, context.compilerContext)
+                                     .map(_._1)
                                      .explicitGet())
     (r._1, r._2.map {
       case CONST_BOOLEAN(b) => b

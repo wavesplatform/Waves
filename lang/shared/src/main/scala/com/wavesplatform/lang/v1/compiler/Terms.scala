@@ -14,6 +14,11 @@ object Terms {
   sealed abstract class DECLARATION {
     def toStr: Coeval[String]
     override def toString: String = toStr()
+    def isItFailed: Boolean = false
+  }
+  case class FAILED_DEC(error: CompilationError) extends DECLARATION {
+    def toStr: Coeval[String] = Coeval.now(error.message)
+    override def isItFailed: Boolean = true
   }
   case class LET(name: String, value: EXPR)                     extends DECLARATION {
     def toStr: Coeval[String] = for {
@@ -30,6 +35,11 @@ object Terms {
     def toStr: Coeval[String]
     override def toString: String = toStr()
   }
+
+  case class FAILED_EXPR(error: CompilationError) extends EXPR {
+    def toStr: Coeval[String] = Coeval.now(error.message)
+  }
+
   case class GETTER(expr: EXPR, field: String)                         extends EXPR {
     def toStr: Coeval[String] = for {
       e <- expr.toStr

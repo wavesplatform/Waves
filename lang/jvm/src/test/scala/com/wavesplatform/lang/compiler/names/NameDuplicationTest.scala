@@ -224,7 +224,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
 
   def compileOf(script: String): Either[String, DApp] = {
     val expr = Parser.parseContract(script.stripMargin).get.value
-    compiler.ContractCompiler(ctx, expr)
+    compiler.ContractCompiler(ctx, expr).map(_._1)
   }
 
 }

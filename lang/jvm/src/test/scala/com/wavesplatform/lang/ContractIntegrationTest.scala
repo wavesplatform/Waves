@@ -147,7 +147,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
                               args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
                              ): Either[(ExecutionError, Log), ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()._1
 
     ContractEvaluator(
       ctx.evaluationContext,
@@ -167,7 +167,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()._1
     val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
     EvaluatorV1.evalWithLogging(Right(ctx.evaluationContext), evalm)._2
   }

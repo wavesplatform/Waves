@@ -18,7 +18,7 @@ import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 object ContractCompiler {
 
-  def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[(AnnotatedFunction, List[(String, Types.FINAL)])] = {
+  def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[(AnnotatedFunction, List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC)] = {
     val annotationsM: CompileM[List[Annotation]] = af.anns.toList.traverse[CompileM, Annotation] { ann =>
       for {
         n    <- handlePart(ann.name)
@@ -38,7 +38,7 @@ object ContractCompiler {
     } yield (annotations, compiledBody)
 
     r flatMap {
-      case (List(c: CallableAnnotation), (func, tpe, typedParams)) =>
+      case (List(c: CallableAnnotation), (func, tpe, typedParams, parseNodeExpr)) =>
         for {
           _ <- Either
             .cond(
@@ -51,9 +51,9 @@ object ContractCompiler {
               Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
             )
             .toCompileM
-        } yield (CallableFunction(c, func), typedParams)
+        } yield (CallableFunction(c, func), typedParams, af.copy(f = parseNodeExpr))
 
-      case (List(c: VerifierAnnotation), (func, tpe, typedParams)) =>
+      case (List(c: VerifierAnnotation), (func, tpe, typedParams, parseNodeExpr)) =>
         for {
           _ <- Either
             .cond(tpe match {
@@ -61,34 +61,36 @@ object ContractCompiler {
               case _                   => false
             }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '$tpe'"))
             .toCompileM
-        } yield (VerifierFunction(c, func), typedParams)
+        } yield (VerifierFunction(c, func), typedParams, af.copy(f = parseNodeExpr))
     }
   }
 
-  def compileDeclaration(dec: Expressions.Declaration): CompileM[DECLARATION] = {
+  def compileDeclaration(dec: Expressions.Declaration): CompileM[(DECLARATION, Expressions.Declaration)] = {
     dec match {
       case l: Expressions.LET =>
         for {
           compiledLet <- compileLet(dec.position, l)
-          (letName, letType, letExpr) = compiledLet
+          (letName, letType, letExpr, parseNodeDecl) = compiledLet
           _ <- updateCtx(letName, letType, dec.position)
-        } yield Terms.LET(letName, letExpr)
+        } yield (Terms.LET(letName, letExpr), parseNodeDecl)
       case f: FUNC =>
         for {
           cf <- compileFunc(dec.position, f)
-          (func, compiledFuncBodyType, argTypes) = cf
+          (func, compiledFuncBodyType, argTypes, parseNodeDecl) = cf
           typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
           _ <- updateCtx(func.name, typeSig)
-        } yield func
+        } yield (func, parseNodeDecl)
     }
   }
 
-  private def compileContract(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[DApp] = {
+  private def compileContract(ctx: CompilerContext, parsedDapp: Expressions.DAPP): CompileM[(DApp, Expressions.DAPP)] = {
     for {
-      decs <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
-      _    <- validateDuplicateVarsInContract(contract)
-      _    <- validateAnnotatedFuncsArgTypes(ctx, contract)
-      funcNameWithWrongSize = contract.fs
+      decsCompileResult <- parsedDapp.decs.traverse[CompileM, (DECLARATION, Expressions.Declaration)](compileDeclaration)
+      decs = decsCompileResult.map(_._1)
+      parsedNodeDecs = decsCompileResult.map(_._2)
+      _    <- validateDuplicateVarsInContract(parsedDapp)
+      _    <- validateAnnotatedFuncsArgTypes(ctx, parsedDapp)
+      funcNameWithWrongSize = parsedDapp.fs
         .map(af => Expressions.PART.toOption[String](af.name))
         .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes("UTF-8").size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
         .map(_.get)
@@ -97,22 +99,23 @@ object ContractCompiler {
           funcNameWithWrongSize.isEmpty,
           (),
           Generic(
-            contract.position.start,
-            contract.position.end,
+            parsedDapp.position.start,
+            parsedDapp.position.end,
             s"Annotated function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} for functions with name: ${funcNameWithWrongSize
               .mkString(", ")}"
           )
         )
         .toCompileM
-      l <- contract.fs.traverse[CompileM, (AnnotatedFunction, List[(String, Types.FINAL)])](af => local(compileAnnotatedFunc(af)))
+      l <- parsedDapp.fs.traverse[CompileM, (AnnotatedFunction, List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC)](af => local(compileAnnotatedFunc(af)))
       annotatedFuncs = l.map(_._1)
+      parsedNodeAFuncs = l.map(_._3)
 
       duplicatedFuncNames = annotatedFuncs.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
       _ <- Either
         .cond(
           duplicatedFuncNames.isEmpty,
           (),
-          AlreadyDefined(contract.position.start, contract.position.start, duplicatedFuncNames.mkString(", "), isFunction = true)
+          AlreadyDefined(parsedDapp.position.start, parsedDapp.position.start, duplicatedFuncNames.mkString(", "), isFunction = true)
         )
         .toCompileM
 
@@ -120,8 +123,8 @@ object ContractCompiler {
         .cond(
           annotatedFuncs.forall(_.u.args.size <= ContractLimits.MaxInvokeScriptArgs),
           (),
-          Generic(contract.position.start,
-                  contract.position.end,
+          Generic(parsedDapp.position.start,
+                  parsedDapp.position.end,
                   s"Script functions can have no more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
         )
         .toCompileM
@@ -129,10 +132,10 @@ object ContractCompiler {
       callableFuncsWithParams = l.filter(_._1.isInstanceOf[CallableFunction])
       callableFuncs = callableFuncsWithParams.map(_._1.asInstanceOf[CallableFunction])
       callableFuncsTypeInfo = callableFuncsWithParams.map {
-        case (f, typedParams) => typedParams.map(_._2)
+        case (f, typedParams, _) => typedParams.map(_._2)
       }
       meta <- MetaMapper.toProto(V1)(callableFuncsTypeInfo)
-        .leftMap(Generic(contract.position.start, contract.position.start, _))
+        .leftMap(Generic(parsedDapp.position.start, parsedDapp.position.start, _))
         .toCompileM
 
       verifierFunctions = annotatedFuncs.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
@@ -143,12 +146,12 @@ object ContractCompiler {
             Option.apply(vf).pure[CompileM]
           else
             raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
-              Generic(contract.position.start, contract.position.start, "Verifier function must have 0 arguments"))
+              Generic(parsedDapp.position.start, parsedDapp.position.start, "Verifier function must have 0 arguments"))
         case _ =>
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
-            Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
+            Generic(parsedDapp.position.start, parsedDapp.position.start, "Can't have more than 1 verifier function defined"))
       }
-    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
+    } yield (DApp(meta, decs, callableFuncs, verifierFuncOpt), parsedDapp.copy(decs = parsedNodeDecs, fs = parsedNodeAFuncs))
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
@@ -208,7 +211,7 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] = {
+  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, (DApp, Expressions.DAPP)] = {
     compileContract(c, contract)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
@@ -220,7 +223,7 @@ object ContractCompiler {
       case fastparse.core.Parsed.Success(xs, _) =>
         ContractCompiler(ctx, xs) match {
           case Left(err) => Left(err.toString)
-          case Right(c)  => Right(c)
+          case Right(c)  => Right(c._1)
         }
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
     }

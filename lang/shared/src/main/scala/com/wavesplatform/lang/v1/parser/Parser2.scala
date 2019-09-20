@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.parser
 
-import org.parboiled2._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
-import org.parboiled2.support.Lifter
-import shapeless.{::, HNil}
+import com.wavesplatform.lang.v1.parser.UnaryOperation._
+import org.parboiled2._
 
 
 abstract class Accessor extends Positioned
@@ -12,40 +12,7 @@ case class MethodAcc(position: Pos, name: PART[String], args: Seq[EXPR]) extends
 case class GetterAcc(position: Pos, name: PART[String])                  extends Accessor
 case class ListIndexAcc(position: Pos, index: EXPR)                      extends Accessor
 
-
-
-sealed trait UnaryOp {
-  def name: String
-}
-case class POSITIVEOP() extends UnaryOp {
-  def name = "+"
-}
-case class NEGATIVEOP() extends UnaryOp {
-  def name = "-"
-}
-case class NOTOP() extends UnaryOp {
-  def name = "!"
-}
-
-// TODO fix type
-trait BinaryOp
-case class OROP() extends BinaryOp
-case class ANDOP() extends BinaryOp
-case class EQOP() extends BinaryOp
-case class NEOP() extends BinaryOp
-case class GEOP() extends BinaryOp
-case class GTOP() extends BinaryOp
-case class SUMOP() extends BinaryOp
-case class SUBOP() extends BinaryOp
-case class MULOP() extends BinaryOp
-case class DIVOP() extends BinaryOp
-case class MODOP() extends BinaryOp
-case class LEOP() extends BinaryOp
-case class LTOP() extends BinaryOp
-case class CONSOP() extends BinaryOp
-
-
-case class BinaryOpWithExpr(op: BinaryOp, expr: EXPR)
+case class BinaryOpWithExpr(op: BinaryOperation, expr: EXPR)
 case class IdAndTypes(id: PART[String], types: Seq[PART[String]])
 
 class Parser2(val input: ParserInput) extends Parser {
@@ -72,11 +39,11 @@ class Parser2(val input: ParserInput) extends Parser {
 
   def Expr: Rule1[EXPR] = rule{OrOpAtom}
 
-  def OrOpAtom: Rule1[EXPR] = rule{push(cursor) ~ AndOpAtom ~ zeroOrMore(WS ~ OR_OP ~ WS ~ AndOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
-  def AndOpAtom: Rule1[EXPR] = rule{push(cursor) ~ CompareGroupOpAtom ~ zeroOrMore(WS ~ AND_OP ~ WS ~ CompareGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
+  def OrOpAtom: Rule1[EXPR] = rule{push(cursor) ~ AndOpAtom ~ zeroOrMore(WS ~ OROP ~ WS ~ AndOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
+  def AndOpAtom: Rule1[EXPR] = rule{push(cursor) ~ CompareGroupOpAtom ~ zeroOrMore(WS ~ ANDOP ~ WS ~ CompareGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def CompareGroupOpAtom: Rule1[EXPR] = rule{push(cursor) ~ EqualityGroupOpAtom ~ zeroOrMore(WS ~ COMPARE_GROUP_OP ~ WS ~ EqualityGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def EqualityGroupOpAtom: Rule1[EXPR] = rule{push(cursor) ~ ConsOpAtom ~ zeroOrMore(WS ~ EQUALITY_GROUP_OP ~ WS ~ ConsOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
-  def ConsOpAtom: Rule1[EXPR] = rule{push(cursor) ~ SumGroupOpAtom ~ zeroOrMore(WS ~ CONS_OP ~ WS ~ SumGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
+  def ConsOpAtom: Rule1[EXPR] = rule{push(cursor) ~ SumGroupOpAtom ~ zeroOrMore(WS ~ CONSOP ~ WS ~ SumGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def SumGroupOpAtom: Rule1[EXPR] = rule{push(cursor) ~ MultGroupOpAtom ~ zeroOrMore(WS ~ SUM_GROUP_OP ~ WS ~ MultGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def MultGroupOpAtom: Rule1[EXPR] = rule{push(cursor) ~ AtomExpr ~ zeroOrMore(WS ~ MULT_GROUP_OP ~ WS ~ AtomExpr ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def AtomExpr: Rule1[EXPR] = rule{push(cursor) ~ optional(UNARY_OP) ~ WS ~ (GettableExpr | If | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _}
@@ -92,49 +59,40 @@ class Parser2(val input: ParserInput) extends Parser {
 
   def ListAtom: Rule1[EXPR] = rule{push(cursor) ~ "[" ~ WS ~ zeroOrMore(Expr).separatedBy(WS ~ "," ~ WS) ~ WS ~ "]" ~ push(cursor) ~> parseListAtom _}                //~ optional(WS ~ ListAccess)
 
-
-  //TODO remove
-  implicit def forRule1Custom[M[_], T]: Lifter[M, HNil, T :: HNil] {
-    type In          = HNil
-    type StrictOut   = M[T] :: HNil
-    type OptionalOut = M[T] :: HNil
-  } = throw new IllegalStateException("Untranslated compile-time only call")
-
-
   def If: Rule1[EXPR] = rule{push(cursor) ~ "if" ~ WS ~ Expr ~ WS ~ "then" ~ WS ~ Expr ~ WS ~ "else" ~ WS ~ Expr ~ push(cursor) ~> parseIf _}
 
   def Match: Rule1[EXPR] = rule{push(cursor) ~ "match" ~ WS ~ Expr ~ WS ~ "{" ~ oneOrMore(WS ~ MatchCase) ~ WS ~ "}" ~ push(cursor) ~> parseMatch _}
   def MatchCase: Rule1[MATCH_CASE] = rule{push(cursor) ~ "case" ~ WS ~ ((IdentifierAtom ~ WS ~ ":" ~ WS ~ TypesAtom) | DefaultMatchCase) ~ WS ~ "=>" ~ WS ~ Expr ~ push(cursor) ~> parseMatchCase _}
   def DefaultMatchCase: Rule2[PART[String], Seq[PART[String]]] = rule{"_" ~ push(PART.VALID(Pos(0, 0), "_")) ~ push(Seq.empty[PART[String]])}
 
-  def OR_OP: Rule1[BinaryOp] = rule{"||" ~ push(OROP())}
-  def AND_OP: Rule1[BinaryOp] = rule{"&&"  ~ push(ANDOP())}
+  def OROP: Rule1[BinaryOperation] = rule{"||" ~ push(OR_OP)}
+  def ANDOP: Rule1[BinaryOperation] = rule{"&&"  ~ push(AND_OP)}
 
-  def COMPARE_GROUP_OP: Rule1[BinaryOp] = rule{GT_OP | GE_OP | LT_OP | LE_OP}
-  def GT_OP: Rule1[BinaryOp] = rule{">" ~ push(GTOP())}
-  def GE_OP: Rule1[BinaryOp] = rule{">=" ~ push(GEOP())}
-  def LT_OP: Rule1[BinaryOp] = rule{"<" ~ push(LTOP())}
-  def LE_OP: Rule1[BinaryOp] = rule{"<=" ~ push(LEOP())}
+  def COMPARE_GROUP_OP: Rule1[BinaryOperation] = rule{GTOP | GEOP | LTOP | LEOP}
+  def GTOP: Rule1[BinaryOperation] = rule{">" ~ push(GT_OP)}
+  def GEOP: Rule1[BinaryOperation] = rule{">=" ~ push(GE_OP)}
+  def LTOP: Rule1[BinaryOperation] = rule{"<" ~ push(LT_OP)}
+  def LEOP: Rule1[BinaryOperation] = rule{"<=" ~ push(LE_OP)}
 
-  def EQUALITY_GROUP_OP: Rule1[BinaryOp] = rule{EQ_OP | NE_OP}
-  def EQ_OP: Rule1[BinaryOp] = rule{"==" ~ push(EQOP())}
-  def NE_OP: Rule1[BinaryOp] = rule{"!=" ~ push(NEOP())}
+  def EQUALITY_GROUP_OP: Rule1[BinaryOperation] = rule{EQOP | NEOP}
+  def EQOP: Rule1[BinaryOperation] = rule{"==" ~ push(EQ_OP)}
+  def NEOP: Rule1[BinaryOperation] = rule{"!=" ~ push(NE_OP)}
 
-  def CONS_OP: Rule1[BinaryOp] = rule{"::" ~ push(CONSOP())}
+  def CONSOP: Rule1[BinaryOperation] = rule{"::" ~ push(CONS_OP)}
 
-  def SUM_GROUP_OP: Rule1[BinaryOp] = rule{SUM_OP | SUB_OP}
-  def SUM_OP: Rule1[BinaryOp] = rule{"+" ~ push(SUMOP())}
-  def SUB_OP: Rule1[BinaryOp] = rule{"-" ~ push(SUBOP())}
+  def SUM_GROUP_OP: Rule1[BinaryOperation] = rule{SUMOP | SUBOP}
+  def SUMOP: Rule1[BinaryOperation] = rule{"+" ~ push(SUM_OP)}
+  def SUBOP: Rule1[BinaryOperation] = rule{"-" ~ push(SUB_OP)}
 
-  def MULT_GROUP_OP: Rule1[BinaryOp] = rule{MUL_OP | DIV_OP | MOD_OP}
-  def MUL_OP: Rule1[BinaryOp] = rule{"*" ~ push(MULOP())}
-  def DIV_OP: Rule1[BinaryOp] = rule{"/" ~ push(DIVOP())}
-  def MOD_OP: Rule1[BinaryOp] = rule{"%" ~ push(MODOP())}
+  def MULT_GROUP_OP: Rule1[BinaryOperation] = rule{MULOP | DIVOP | MODOP}
+  def MULOP: Rule1[BinaryOperation] = rule{"*" ~ push(MUL_OP)}
+  def DIVOP: Rule1[BinaryOperation] = rule{"/" ~ push(DIV_OP)}
+  def MODOP: Rule1[BinaryOperation] = rule{"%" ~ push(MOD_OP)}
 
-  def UNARY_OP: Rule1[UnaryOp] = rule{POSITIVE_OP | NEGATIVE_OP | NOT_OP}
-  def POSITIVE_OP: Rule1[UnaryOp] = rule{"+" ~ push(POSITIVEOP())}
-  def NEGATIVE_OP: Rule1[UnaryOp] = rule{"-" ~ push(NEGATIVEOP())}
-  def NOT_OP: Rule1[UnaryOp] = rule{"!" ~ push(NOTOP())}
+  def UNARY_OP: Rule1[UnaryOperation] = rule{POSITIVEOP | NEGATIVEOP | NOTOP}
+  def POSITIVEOP: Rule1[UnaryOperation] = rule{"+" ~ push(POSITIVE_OP)}
+  def NEGATIVEOP: Rule1[UnaryOperation] = rule{"-" ~ push(NEGATIVE_OP)}
+  def NOTOP: Rule1[UnaryOperation] = rule{"!" ~ push(NOT_OP)}
 
   def ConstAtom: Rule1[EXPR] = rule{IntegerAtom | StringAtom | ByteVectorAtom | BooleanAtom | ListAtom}
 
@@ -149,7 +107,7 @@ class Parser2(val input: ParserInput) extends Parser {
 
   def BooleanAtom: Rule1[EXPR] = rule{"true" ~ push(parseTrueAtom(cursor - 4)) | "false" ~ push(parseFalseAtom(cursor - 5))}
 
-  def StringAtom: Rule1[EXPR] = rule {"\"" ~ push(cursor) ~ capture(zeroOrMore(noneOf("\"\\") ~ ANY)) ~ push(cursor) ~> parseStringAtom _ ~ "\""}
+  def StringAtom: Rule1[EXPR] = rule {"\"" ~ push(cursor) ~ capture(zeroOrMore(noneOf("\"\\"))) ~ push(cursor) ~> parseStringAtom _ ~ "\""}
   def Char: Rule0 = rule{LowerChar | UpperChar}
   def UpperChar: Rule0 = rule{CharPredicate.UpperAlpha}
   def LowerChar: Rule0 = rule{CharPredicate.LowerAlpha}
@@ -275,20 +233,20 @@ class Parser2(val input: ParserInput) extends Parser {
       (exprLeft: EXPR, opAndExprRight: BinaryOpWithExpr) => {
         val pos = Pos(exprLeft.position.start, opAndExprRight.expr.position.end)
         opAndExprRight.op match {
-          case LTOP() => BINARY_OP(pos, opAndExprRight.expr, GTOP(), exprLeft)
-          case LEOP() => BINARY_OP(pos, opAndExprRight.expr, GEOP(), exprLeft)
-          case CONSOP() => FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(exprLeft, opAndExprRight.expr))
+          case LT_OP => BINARY_OP(pos, opAndExprRight.expr, GT_OP, exprLeft)
+          case LE_OP => BINARY_OP(pos, opAndExprRight.expr, GE_OP, exprLeft)
+          case CONS_OP => FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(exprLeft, opAndExprRight.expr))
           case _ => BINARY_OP(pos, exprLeft, opAndExprRight.op, opAndExprRight.expr)
         }
       }
     }
   }
 
-  def parseAtomExpr(startPos: Int, unOperationOpt: Option[UnaryOp], expr: EXPR, endPos: Int): EXPR = {
-    unOperationOpt.map{
-      op =>
-        FUNCTION_CALL(Pos(startPos, endPos),PART.VALID(Pos(0, 0), op.name), List(expr))
-    }.getOrElse(expr)
+  def parseAtomExpr(startPos: Int, unOperationOpt: Option[UnaryOperation], expr: EXPR, endPos: Int): EXPR = {
+    unOperationOpt match {
+      case Some(POSITIVE_OP) | None => expr
+      case Some(op) => FUNCTION_CALL(Pos(startPos, endPos),PART.VALID(Pos(0, 0), op.func), List(expr))
+    }
   }
 
   def parseIdentifierAtom(startPos: Int, typeName: String, endPos: Int): PART[String] = {
@@ -345,6 +303,7 @@ object Parser2 {
   }
 
   def parseDAPP(scriptStr: String) = {
-    new Parser2(scriptStr).DAppRoot.run().get
+    val result = new Parser2(scriptStr).DAppRoot.run()
+    result
   }
 }

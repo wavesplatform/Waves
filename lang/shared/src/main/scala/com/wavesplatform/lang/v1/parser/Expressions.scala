@@ -86,7 +86,7 @@ object Expressions {
   case class GETTER(position: Pos, ref: EXPR, field: PART[String], resultType: Option[FINAL] = None)              extends EXPR
   case class CONST_BYTESTR(position: Pos, value: PART[ByteStr], resultType: Option[FINAL] = Some(BYTESTR))        extends EXPR
   case class CONST_STRING(position: Pos, value: PART[String], resultType: Option[FINAL] = Some(STRING))           extends EXPR
-  case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOp, b: EXPR, resultType: Option[FINAL] = None)         extends EXPR
+  case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOperation, b: EXPR, resultType: Option[FINAL] = None)  extends EXPR
   case class BLOCK(position: Pos, let: Declaration, body: EXPR, resultType: Option[FINAL] = None)                 extends EXPR
   case class IF(position: Pos, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, resultType: Option[FINAL] = None)         extends EXPR
   case class REF(position: Pos, key: PART[String], resultType: Option[FINAL] = None)                              extends EXPR
