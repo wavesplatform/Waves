@@ -87,7 +87,7 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
         ),
         fee = 1300000
       ),
-      "State check failed. Reason: Fee in WAVES for InvokeScriptTransaction with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES: 1300000"
+      "State check failed. Reason: Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
     )
   }
 }
