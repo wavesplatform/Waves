@@ -174,7 +174,6 @@ node('wavesnode'){
                     sh "mkdir ${artifactsDir}"
                 }
 
-
                 withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
 
                     servers.each { serverName ->
