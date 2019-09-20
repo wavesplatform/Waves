@@ -4,8 +4,7 @@ import com.typesafe.sbt.packager.Keys.executableScriptName
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
 
-enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning)
-
+enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
@@ -135,6 +134,8 @@ inConfig(Debian)(
         |}
         |""".stripMargin
   ) ++ nameFix)
+
+V.scalaPackage := "com.wavesplatform"
 
 // Hack for https://youtrack.jetbrains.com/issue/SCL-15210
 
