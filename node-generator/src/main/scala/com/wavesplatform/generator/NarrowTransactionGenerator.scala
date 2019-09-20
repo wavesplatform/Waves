@@ -136,7 +136,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                       500,
                       ts,
                       Waves,
-                      moreThanStandardFee,
+                      500000L,
                       Array.fill(random.nextInt(100))(random.nextInt().toByte)
                     )
                 )
@@ -174,7 +174,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                     sender,
                     IssuedAsset(assetTx.id()),
                     Random.nextInt(1000),
-                    900000L,
+                    500000L,
                     ts
                   )
                 )
@@ -207,7 +207,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   1,
                   ts,
                   ts + 1.day.toMillis,
-                  moreThanStandardFee * 3
+                  300000L
                 )
                 tx <- logOption(
                   ExchangeTransactionV1.create(
@@ -241,7 +241,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   1,
                   ts,
                   ts + 30.days.toMillis,
-                  moreThanStandardFee * 3
+                  300000L
                 )
                 buyOrder = OrderV2.buy(
                   buyer,
@@ -251,7 +251,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   1,
                   ts,
                   ts + 1.day.toMillis,
-                  moreThanStandardFee * 3
+                  300000L
                 )
                 tx <- logOption(
                   ExchangeTransactionV2
@@ -261,9 +261,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                       sellOrder,
                       100000000 + delta,
                       1,
-                      300000,
-                      300000,
-                      moreThanStandardFee * 3,
+                      300000L,
+                      300000L,
+                      700000L,
                       ts
                     )
                 )
@@ -277,7 +277,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 useAlias = random.nextBoolean()
                 recipient <- (if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
                               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))) orElse Some(preconditions.leaseRecipient.toAddress)
-                tx <- logOption(LeaseTransactionV2.selfSigned(sender, random.nextLong(1, 100), moreThanStandardFee * 3, ts, recipient))
+                tx <- logOption(LeaseTransactionV2.selfSigned(sender, random.nextLong(1, 100), 500000L, ts, recipient))
               } yield tx
             ).logNone("Can't define recipient of transaction, check your configuration")
 
@@ -286,21 +286,21 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               for {
                 lease  <- activeLeaseTransactions.headOption
                 sender <- accountByAddress(lease.sender.stringRepr)
-                tx     <- logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), moreThanStandardFee * 3, ts))
+                tx     <- logOption(LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, sender, lease.id(), 500000L, ts))
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
           case CreateAliasTransactionV2 =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 500000, ts))
+            logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
 
           case MassTransferTransaction =>
             (
               for {
                 (sender, asset) <- randomSenderAndAsset(validIssueTxs)
                 transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
-                transfers = for (_ <- 0 to transferCount) yield {
+                transfers = for (_ <- 0 until transferCount) yield {
                   val useAlias  = random.nextBoolean()
                   val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
                   val amount    = 1000 / (transferCount + 1)
@@ -313,7 +313,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                       sender,
                       transfers.toList,
                       ts,
-                      200000 + 50000 * transferCount + 400000,
+                      100000L + 50000L * transferCount + 400000L,
                       Array.fill(random.nextInt(100))(random.nextInt().toByte)
                     )
                 )
@@ -338,7 +338,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 BinaryDataEntry(Random.nextString(10), ByteStr(b))
             }
             val size = 128 + data.map(_.toBytes.length).sum
-            val fee  = 500000 * (size / 1024 + 1)
+            val fee  = 500000L * (size / 1024 + 1)
             logOption(DataTransaction.selfSigned(sender, data.toList, fee, ts))
 
           case SponsorFeeTransaction =>
@@ -390,7 +390,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 SetScriptTransaction.selfSigned(
                   sender,
                   Some(script),
-                  1800000L + random.nextLong(100),
+                  1400000L + random.nextLong(100),
                   ts
                 )
               )

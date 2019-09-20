@@ -27,7 +27,7 @@ object Preconditions {
 
   sealed abstract class PAction(val priority: Int)
   final case class LeaseP(from: KeyPair, to: Address, amount: Long, repeat: Option[Int]) extends PAction(3)
-  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissueable: Boolean, scriptFile: String)
+  final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissuable: Boolean, scriptFile: String)
       extends PAction(2)
   final case class CreateAccountP(seed: String, balance: Long, scriptFile: Option[String]) extends PAction(1)
 
@@ -52,7 +52,8 @@ object Preconditions {
                   .explicitGet()
               }.toList
               (uni.copy(leases = newTxs ::: uni.leases), newTxs ::: txs)
-            case IssueP(assetName, issuer, assetDescription, amount, decimals, reissueable, scriptFile) =>
+
+            case IssueP(assetName, issuer, assetDescription, amount, decimals, reissuable, scriptFile) =>
               val script = Option(scriptFile)
                 .filter(_.nonEmpty)
                 .map(file => ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(file))), estimator))
@@ -67,7 +68,7 @@ object Preconditions {
                   assetDescription.getBytes("UTF-8"),
                   amount,
                   decimals.toByte,
-                  reissueable,
+                  reissuable,
                   script,
                   100000000 + Fee,
                   time.correctedTime()
