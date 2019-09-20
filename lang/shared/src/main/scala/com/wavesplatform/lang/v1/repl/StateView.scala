@@ -13,6 +13,7 @@ case class StateView(ctx: CompilerContext) {
 
   private lazy val funcs: Map[String, String] =
     ctx.functionDefs
+      .filterNot(_._1.startsWith(internalFuncPrefix))
       .map { case (name, signatures) => (name, DeclPrinter.overloadFuncStr(name, signatures))}
 
   private lazy val values: Map[String, String] =
