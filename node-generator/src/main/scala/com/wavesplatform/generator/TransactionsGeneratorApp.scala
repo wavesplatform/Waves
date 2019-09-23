@@ -40,9 +40,6 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
   val parser = new OptionParser[GeneratorSettings]("generator") {
     head("TransactionsGenerator - Waves load testing transactions generator")
-    opt[Int]('i', "iterations").valueName("<iterations>").text("number of iterations").action { (v, c) =>
-      c.copy(worker = c.worker.copy(iterations = v))
-    }
     opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
       c.copy(worker = c.worker.copy(delay = v))
     }
@@ -145,6 +142,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
+  implicit val _: ValueReader[Worker.Settings] = Worker.settingsReader
+
   val defaultConfig =
     ConfigFactory
       .load()
@@ -219,7 +218,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case NodeAddress(node, nodeRestUrl) =>
           log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
           // new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
-          new NewWorker(
+          new Worker(
             finalConfig.worker,
             Iterator.continually(generator.next()).flatten,
             sender,
