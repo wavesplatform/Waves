@@ -1,8 +1,8 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.protobuf.order.AssetPair
 import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
 import com.wavesplatform.{transaction => vt}
 
@@ -13,7 +13,8 @@ object PBOrders {
     VanillaOrder(
       PublicKey(order.senderPublicKey.toByteArray),
       PublicKey(order.matcherPublicKey.toByteArray),
-      vt.assets.exchange.AssetPair(Asset.fromProtoId(order.getAssetPair.getAmountAssetId), Asset.fromProtoId(order.getAssetPair.getPriceAssetId)),
+      vt.assets.exchange
+        .AssetPair(PBAmounts.toVanillaAssetId(order.getAssetPair.amountAssetId), PBAmounts.toVanillaAssetId(order.getAssetPair.priceAssetId)),
       order.orderSide match {
         case PBOrder.Side.BUY             => vt.assets.exchange.OrderType.BUY
         case PBOrder.Side.SELL            => vt.assets.exchange.OrderType.SELL
@@ -25,7 +26,8 @@ object PBOrders {
       order.expiration,
       order.getMatcherFee.longAmount,
       order.proofs.map(_.toByteArray: ByteStr),
-      if (version == 0) order.version.toByte else version.toByte
+      if (version == 0) order.version.toByte else version.toByte,
+      PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId)
     )
   }
 
@@ -41,10 +43,10 @@ object PBOrders {
 
   def protobuf(order: VanillaOrder): PBOrder = {
     PBOrder(
-      chainId = 0,
+      AddressScheme.current.chainId,
       ByteString.copyFrom(order.senderPublicKey),
       ByteString.copyFrom(order.matcherPublicKey),
-      Some(PBOrder.AssetPair(Some(order.assetPair.amountAsset.protoId), Some(order.assetPair.priceAsset.protoId))),
+      Some(AssetPair(PBAmounts.toPBAssetId(order.assetPair.amountAsset), PBAmounts.toPBAssetId(order.assetPair.priceAsset))),
       order.orderType match {
         case vt.assets.exchange.OrderType.BUY  => PBOrder.Side.BUY
         case vt.assets.exchange.OrderType.SELL => PBOrder.Side.SELL

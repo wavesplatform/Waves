@@ -7,5 +7,4 @@ case class RestAPISettings(enable: Boolean,
                            cors: Boolean,
                            apiKeyDifferentHost: Boolean,
                            transactionsByAddressLimit: Int,
-                           distributionAddressLimit: Int,
-                           allowTxRebroadcasting: Boolean)
+                           distributionAddressLimit: Int)

@@ -6,6 +6,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.{ContractScript, ScriptReader}
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.{NoShrink, crypto}
 import org.scalacheck.{Arbitrary, Gen}
@@ -33,10 +34,13 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
   property("should parse expression with all supported std lib version") {
     val scriptEthList =
       DirectiveDictionary[StdLibVersion].all.map { version =>
-        ScriptCompiler.compile(s"""
-                                  |{-# STDLIB_VERSION ${version.value} #-}
-                                  |  true
-                                  """.stripMargin)
+        ScriptCompiler.compile(
+          s"""
+             |{-# STDLIB_VERSION ${version.value} #-}
+             |  true
+             """.stripMargin,
+          ScriptEstimatorV2
+        )
       }
     scriptEthList.foreach(_ shouldBe 'right)
 

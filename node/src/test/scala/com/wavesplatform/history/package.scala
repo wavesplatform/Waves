@@ -9,7 +9,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{BlockchainSettings, TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings._
 import com.wavesplatform.transaction.Transaction
 
 package object history {
@@ -19,7 +19,8 @@ package object history {
   val DefaultBlockchainSettings = BlockchainSettings(
     addressSchemeCharacter = 'N',
     functionalitySettings = TestFunctionalitySettings.Enabled,
-    genesisSettings = null
+    genesisSettings = GenesisSettings.TESTNET,
+    rewardsSettings = RewardsSettings.TESTNET
   )
 
   val config   = ConfigFactory.load()
@@ -47,7 +48,11 @@ package object history {
   val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
 
-  def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, 0L)
+  def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block =
+    buildBlockOfTxs(refTo, txs, txs.headOption.fold(0L)(_.timestamp))
+
+  def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction], timestamp: Long): Block =
+    customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, timestamp)
 
   def customBuildBlockOfTxs(refTo: ByteStr,
                             txs: Seq[Transaction],
@@ -63,7 +68,8 @@ package object history {
         consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
         transactionData = txs,
         signer = signer,
-        Set.empty
+        Set.empty,
+        -1L
       )
       .explicitGet()
 
@@ -112,7 +118,7 @@ package object history {
   }
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) =
-    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 3, 0L)
+    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 3, base.timestamp)
 
   def chainBaseAndMicro(totalRefTo: ByteStr,
                         base: Seq[Transaction],

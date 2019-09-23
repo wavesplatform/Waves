@@ -2,7 +2,7 @@ package com.wavesplatform.lang.directives
 
 import com.wavesplatform.lang.ExecutionError
 import fastparse.WhitespaceApi
-import fastparse.core.Parsed.Success
+import fastparse.core.Parsed.{Failure, Success}
 import cats.implicits._
 
 object DirectiveParser {
@@ -44,8 +44,16 @@ object DirectiveParser {
 
   def apply(input: String): Either[ExecutionError, List[Directive]] =
     input.split("\n")
+      .filter(_.matches(s"\\s*\\$start.*$end\\s*"))
       .map(parser.parse(_))
-      .collect { case Success(value, _) => value }
-      .toList
-      .sequence
+      .foldLeft(Map[DirectiveKey, Directive]().asRight[ExecutionError]) {
+        case (err: Left[_, _], _)                                      => err
+        case (_, _: Failure[_, _])                                     => Left(s"Directive $input has illegal format")
+        case (_, Success(Left(err), _))                                => Left(err)
+        case (Right(acc), Success(Right(d), _)) if acc.contains(d.key) => Left(s"Directive key ${d.key.text} is used more than once")
+        case (Right(acc), Success(Right(d), _))                        => Right(acc + (d.key -> d))
+      }
+      .map(_.values.toList)
+
+  case class ParseResult(keys: Set[DirectiveKey], directives: List[Directive])
 }

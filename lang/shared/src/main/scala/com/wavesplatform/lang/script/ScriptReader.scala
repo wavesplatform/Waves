@@ -12,11 +12,11 @@ object ScriptReader {
 
   val checksumLength = 4
 
-  def fromBytes(bytes: Array[Byte], checkComplexity: Boolean = true): Either[ScriptParseError, Script] = {
-    val checkSum          = bytes.takeRight(checksumLength)
-    val computedCheckSum  = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
+  def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
+    val checkSum         = bytes.takeRight(checksumLength)
+    val computedCheckSum = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
 
-    (for {
+    for {
       versionByte <- bytes.headOption.toRight(ScriptParseError("Can't parse empty script bytes"))
       a <- {
         val contentTypes   = DirectiveDictionary[ContentType].idMap
@@ -39,25 +39,19 @@ object ScriptReader {
       scriptBytes                         = bytes.drop(offset).dropRight(checksumLength)
 
       _ <- Either.cond(java.util.Arrays.equals(checkSum, computedCheckSum), (), ScriptParseError("Invalid checksum"))
-      s <- scriptType match {
+      s <- (scriptType match {
         case Expression | Library =>
           for {
-            _ <- if (checkComplexity) {
-              ExprScript.validateBytes(scriptBytes)
-            } else {
-              Right(())
-            }
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
-            s     <- ExprScript(stdLibVersion, bytes, checkSize = false, checkComplexity = checkComplexity)
+            s     <- ExprScript(stdLibVersion, bytes, checkSize = false)
           } yield s
         case DApp =>
           for {
             dapp <- ContractSerDe.deserialize(scriptBytes)
             s    <- ContractScript(stdLibVersion, dapp)
           } yield s
-      }
-    } yield s).left
-      .map(m => ScriptParseError(m.toString))
+      }).left
+        .map(ScriptParseError)
+    } yield s
   }
-
 }

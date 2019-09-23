@@ -39,8 +39,9 @@ object Keys {
   def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
     Key("lease-balance", hAddr(13, height, addressId), readLeaseBalance, writeLeaseBalance)
   def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey("lease-status-history", 14, leaseId.arr)
+  val LeaseStatusPrefix: Short = 15
   def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
-    Key("lease-status", hBytes(15, height, leaseId.arr), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
+    Key("lease-status", hBytes(LeaseStatusPrefix, height, leaseId.arr), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
 
   def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]] = historyKey("filled-volume-and-fee-history", 16, orderId.arr)
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
@@ -166,4 +167,11 @@ object Keys {
   val InvokeScriptResultPrefix: Short = 56
   def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
     Key("invoke-script-result", hNum(InvokeScriptResultPrefix, height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
+
+  val BlockRewardPrefix: Short = 57
+  def blockReward(height: Int): Key[Option[Long]] =
+    Key.opt("block-reward", h(BlockRewardPrefix, height), Longs.fromByteArray, Longs.toByteArray)
+
+  val wavesAmountPrefix: Short = 58
+  def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(wavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 }

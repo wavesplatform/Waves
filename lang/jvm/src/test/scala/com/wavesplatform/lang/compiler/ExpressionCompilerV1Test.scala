@@ -450,7 +450,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.FUNC(
         AnyPos,
         Expressions.PART.VALID(AnyPos, "id"),
-        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
         Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
       ),
       Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))

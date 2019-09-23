@@ -13,40 +13,31 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 
-private[api] class CommonTransactionsApi(blockchain: Blockchain, utx: UtxPool, wallet: Wallet, broadcast: (VanillaTransaction, Boolean) => Unit) {
+private[api] class CommonTransactionsApi(
+    blockchain: Blockchain,
+    utx: UtxPool,
+    wallet: Wallet,
+    publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
+) {
+  def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] =
+    blockchain.addressTransactionsObservable(address, Set.empty, fromId)
 
-  def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = {
-    val iterator = blockchain.addressTransactions(address, Set.empty, fromId)
-    Observable.fromIterator(iterator, () => iterator.close())
-  }
-
-  def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] = {
+  def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] =
     blockchain.transactionInfo(transactionId)
-  }
 
-  def unconfirmedTransactions(): Seq[VanillaTransaction] = {
+  def unconfirmedTransactions(): Seq[VanillaTransaction] =
     utx.all
-  }
 
-  def unconfirmedTransactionById(transactionId: ByteStr): Option[VanillaTransaction] = {
+  def unconfirmedTransactionById(transactionId: ByteStr): Option[VanillaTransaction] =
     utx.transactionById(transactionId)
-  }
 
-  def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] = {
+  def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] =
     FeeValidation
       .getMinFee(blockchain, tx)
       .map {
         case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
           (asset, feeInAsset, feeInWaves)
       }
-  }
 
-  def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, VanillaTransaction] = {
-    val result = for {
-      isNew <- utx.putIfNew(tx)
-      _ = broadcast(tx, isNew)
-    } yield tx
-
-    result
-  }
+  def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }

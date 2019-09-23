@@ -1,5 +1,6 @@
 package com.wavesplatform.database
 
+import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
@@ -11,9 +12,9 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
+import com.wavesplatform.state.utils.{BlockchainAddressTransactionsList, _}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
@@ -21,11 +22,17 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
-
-import scala.util.Random
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen {
+class LevelDBWriterSpec
+    extends FreeSpec
+    with Matchers
+    with TransactionGen
+    with WithDB
+    with DBCacheSettings
+    with RequestGen
+    with ScalaCheckDrivenPropertyChecks {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -41,7 +48,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     import TestFunctionalitySettings.Enabled
     "correctly joins height ranges" in {
       val fs     = Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccountTrading.id -> 0))
-      val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
       writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
       writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
       writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
@@ -49,14 +56,14 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   }
   "hasScript" - {
     "returns false if a script was not set" in {
-      val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
       writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
     "returns false if a script was set and then unset" in {
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
-        val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+        val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
         writer.hasScript(account) shouldBe false
       }
     }
@@ -65,7 +72,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       "if there is a script in db" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
-          val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+          val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
           writer.hasScript(account) shouldBe true
         }
       }
@@ -112,7 +119,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   }
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
@@ -132,7 +139,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   }
 
   def testWithBlocks(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, Seq[Block], KeyPair) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
@@ -177,7 +184,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   }
 
   "correctly reassemble block from header and transactions" in {
-    val rw        = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val rw        = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
@@ -231,105 +238,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     } finally {
       bcu.shutdown()
       db.close()
-    }
-  }
-
-  "allActiveLeases" - {
-    "should return correct set of leases" in {
-      def precs: Gen[(KeyPair, Seq[LeaseTransaction], Seq[Block])] = {
-
-        val ts = ntpTime.correctedTime()
-
-        for {
-          leaser <- accountGen
-          genesisBlock = TestBlock
-            .create(ts, Seq(GenesisTransaction.create(leaser, ENOUGH_AMT, ts).explicitGet()))
-          leases <- Gen.listOfN(
-            100,
-            for {
-              rec   <- accountGen
-              lease <- createLease(leaser, ENOUGH_AMT / 1000, 1 * 10 ^ 8, ts, rec.toAddress)
-            } yield lease
-          )
-          zero = (Seq.empty[LeaseTransaction], Seq[Block](genesisBlock))
-          (leaseTxs, blocks) = leases.distinct
-            .sliding(10, 10)
-            .foldLeft(zero) {
-              case ((ls, b :: bs), txs) =>
-                val nextBlock = TestBlock
-                  .create(
-                    ts + 10 + (b :: bs).length,
-                    b.uniqueId,
-                    txs
-                  )
-
-                (ls ++ txs, nextBlock :: b :: bs)
-            }
-        } yield (leaser, leaseTxs, blocks.reverse)
-      }
-
-      val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-      val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-      val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-      val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
-      try {
-
-        val (leaser, leases, blocks) = precs.sample.get
-
-        blocks.foreach { block =>
-          bcu.processBlock(block).explicitGet()
-        }
-
-        bcu.allActiveLeases.toSet shouldBe leases.toSet
-
-        val emptyBlock = TestBlock
-          .create(
-            blocks.last.timestamp + 2,
-            blocks.last.uniqueId,
-            Seq.empty
-          )
-
-        // some leases in liquid state, we should add one block over to store them in db
-        bcu.processBlock(emptyBlock)
-
-        defaultWriter.allActiveLeases.toSet shouldBe leases.toSet
-
-        val l = leases(Random.nextInt(leases.length - 1))
-
-        val lc = LeaseCancelTransactionV1
-          .selfSigned(
-            leaser,
-            l.id(),
-            1 * 10 ^ 8,
-            ntpTime.correctedTime() + 1000
-          )
-          .explicitGet()
-
-        val b = TestBlock
-          .create(
-            emptyBlock.timestamp + 2,
-            emptyBlock.uniqueId,
-            Seq(lc)
-          )
-
-        val b2 = TestBlock
-          .create(
-            b.timestamp + 3,
-            b.uniqueId,
-            Seq.empty
-          )
-
-        bcu.processBlock(b)
-        bcu.processBlock(b2)
-
-        bcu.allActiveLeases.toSet shouldBe (leases.toSet - l)
-        defaultWriter.allActiveLeases.toSet shouldBe (leases.toSet - l)
-
-        bcu.shutdown()
-      } finally {
-        bcu.shutdown()
-        db.close()
-      }
     }
   }
 
@@ -408,5 +316,19 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       }
     }
 
+    "don't parse irrelevant transactions in transferById" in {
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+
+      forAll(randomTransactionGen) { tx =>
+        val transactionId = tx.id()
+        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
+        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+
+        writer.transferById(transactionId) shouldBe None
+
+        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
+      }
+    }
   }
 }

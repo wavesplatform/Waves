@@ -47,9 +47,8 @@ object FeeValidation {
     if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
         feeDetails <- getMinFee(blockchain, tx)
-        minFee = feeDetails.minFeeInAsset
         _ <- Either.cond(
-          minFee <= tx.assetFee._2,
+          feeDetails.minFeeInAsset <= tx.assetFee._2,
           (),
           notEnoughFeeError(tx.builder.typeId, feeDetails, tx.assetFee._2)
         )
@@ -83,8 +82,7 @@ object FeeValidation {
             baseFee + (base.length - 1) / 1024
           case itx: IssueTransaction =>
             lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
-
-            val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+            val multiplier        = if (itx.isNFT && nftActivated) NFTMultiplier else 1
 
             (baseFee * multiplier).toLong
           case _ => baseFee

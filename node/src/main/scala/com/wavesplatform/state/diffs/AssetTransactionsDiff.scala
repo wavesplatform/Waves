@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -16,34 +16,36 @@ object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
-    Right(
-      Diff(
-        tx = tx,
+    DiffsCommon.countScriptComplexity(tx.script, blockchain)
+      .map(script =>
+        Diff(
+          tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
-        assetScripts = Map(asset -> tx.script).filter(_._2.isDefined),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
-      ))
+        assetScripts = Map(asset -> script),
+          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+        )
+      )
   }
 
   def setAssetScript(blockchain: Blockchain, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
-        Right(
-          Diff(
-            tx = tx,
+        DiffsCommon.countScriptComplexity(tx.script, blockchain)
+          .map(script =>
+            Diff(
+              tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-            assetScripts = Map(tx.asset          -> tx.script),
-            scriptsRun =
-              // Asset script doesn't count before Ride4DApps activation
-              if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-                DiffsCommon.countScriptRuns(blockchain, tx)
-              } else {
-                Some(tx.sender.toAddress).count(blockchain.hasScript)
-              },
-            scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
-          ))
+            assetScripts = Map(tx.asset          -> script),
+              scriptsRun =
+                // Asset script doesn't count before Ride4DApps activation
+                if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+                  DiffsCommon.countScriptRuns(blockchain, tx)
+                } else {
+                  Some(tx.sender.toAddress).count(blockchain.hasScript)
+                }
+            )
+          )
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
       }
@@ -53,17 +55,8 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.asset).get
 
-      def wasBurnt: Boolean = {
-        val burns = blockchain
-          .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
-          .getOrElse(Nil)
-
-        val result = burns.collectFirst { case (_, btx: BurnTransaction) if btx.asset == btx.asset => btx }
-        result.isDefined
-      }
-
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
-      if (oldInfo.reissuable || (blockTime <= blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
+      if (oldInfo.reissuable || (blockTime <= blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp)) {
         if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
           Left(GenericError("Asset total value overflow"))
         } else {
@@ -72,8 +65,7 @@ object AssetTransactionsDiff {
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> tx.quantity))),
               assetInfos = Map(tx.asset            -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable)),
-              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-              scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
+              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
             ))
         }
       } else {
@@ -89,8 +81,7 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.asset -> -tx.quantity))),
         assetInfos = Map(tx.asset            -> AssetInfo(isReissuable = true, volume = -tx.quantity)),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
     }
   }
@@ -103,8 +94,7 @@ object AssetTransactionsDiff {
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
           sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
-          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-          scriptsComplexity = DiffsCommon.countScriptsComplexity(blockchain, tx)
+          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         ),
         GenericError("Sponsorship smart assets is disabled.")
       )

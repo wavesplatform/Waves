@@ -16,7 +16,7 @@ object WavesDockerPlugin extends AutoPlugin {
         exposedPorts := Set.empty,
         baseImage := "anapsix/alpine-java:8_server-jre",
         dockerfile := {
-          val yourKitArchive = "YourKit-JavaProfiler-2019.1-docker.zip"
+          val yourKitArchive = "YourKit-JavaProfiler-2019.8-docker.zip"
           val bin            = "/opt/waves/start-waves.sh"
 
           new Dockerfile {

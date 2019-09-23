@@ -243,7 +243,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       FUNC(
         AnyPos,
         PART.VALID(AnyPos, "q"),
-        Seq((PART.VALID(AnyPos, "x"), Seq(PART.VALID(AnyPos, "Int"))), (PART.VALID(AnyPos, "y"), Seq(PART.VALID(AnyPos, "Boolean")))),
+        Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None))), (PART.VALID(AnyPos, "y"), Seq((PART.VALID(AnyPos, "Boolean"), None)))),
         CONST_LONG(AnyPos, 42)
       ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
@@ -258,7 +258,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       AnyPos,
       FUNC(AnyPos,
            PART.VALID(AnyPos, "q"),
-           Seq((PART.VALID(AnyPos, "x"), Seq(PART.VALID(AnyPos, "Int"), PART.VALID(AnyPos, "String")))),
+           Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None), (PART.VALID(AnyPos, "String"), None)))),
            CONST_LONG(AnyPos, 42)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )

@@ -11,8 +11,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.{WithDomain, openDB}
+import com.wavesplatform.database.openDB
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -24,6 +24,8 @@ import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -47,7 +49,7 @@ private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path   = Files.createTempDirectory("leveldb-test")
     val db     = openDB(path.toAbsolutePath.toString)
-    val writer = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
 
     sys.addShutdownHook {
       db.close()
@@ -84,7 +86,8 @@ class UtxPoolSpecification
             BlockchainFeatures.SmartAccounts.id -> 0,
             BlockchainFeatures.Ride4DApps.id    -> 0
           )),
-        genesisSettings
+        genesisSettings,
+        RewardsSettings.TESTNET
       ),
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
@@ -201,7 +204,7 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set(sender.address), Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set(sender.stringRepr), Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
@@ -216,8 +219,8 @@ class UtxPoolSpecification
       UtxSettings(txs.length,
                   PoolDefaultMaxBytes,
                   1000,
-                  Set(sender.address),
-                  Set(recipient.address),
+                  Set(sender.stringRepr),
+                  Set(recipient.stringRepr),
                   allowTransactionsFromSmartAccounts = true,
                   allowSkipChecks = false)
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
@@ -232,12 +235,12 @@ class UtxPoolSpecification
       time = new TestTime()
       txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
     } yield {
-      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
+      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.stringRepr).toSet else Set.empty
       val settings =
         UtxSettings(txs.length,
                     PoolDefaultMaxBytes,
                     1000,
-                    Set(sender.address),
+                    Set(sender.stringRepr),
                     whitelist,
                     allowTransactionsFromSmartAccounts = true,
                     allowSkipChecks = false)
@@ -502,7 +505,7 @@ class UtxPoolSpecification
 
       "takes into account unconfirmed transactions" in forAll(withValidPayments) {
         case (sender, state, utxPool, _, _) =>
-          val basePortfolio = state.portfolio(sender)
+          val basePortfolio = Distributions(state).portfolio(sender)
           val baseAssetIds  = basePortfolio.assetIds
 
           val pessimisticAssetIds = {

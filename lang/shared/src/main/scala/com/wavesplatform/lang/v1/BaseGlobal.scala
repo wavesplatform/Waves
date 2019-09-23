@@ -1,7 +1,11 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import java.math.RoundingMode
+
+import cats.implicits._
+import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -9,9 +13,10 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import cats.implicits._
-import com.wavesplatform.lang.contract.meta.{Dic, MetaMapper}
-import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+
+import scala.concurrent.Future
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -54,7 +59,7 @@ trait BaseGlobal {
     }
   }
 
-  def base16Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]] = {
+  def base16Decode(input: String): Either[String, Array[Byte]] = {
     val size = input.size
     if(size % 2 == 1) {
       Left("Need internal bytes number")
@@ -94,52 +99,78 @@ trait BaseGlobal {
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
 
-  def compileExpression(input: String,
-                        context: CompilerContext,
-                        restrictToLetBlockOnly: Boolean,
-                        stdLibVersion: StdLibVersion,
-                        isDecl: Boolean
-                       ): Either[String, (Array[Byte], (Terms.EXPR, Expressions.EXPR), Long)] = {
-    val compiler =
-      if (isDecl) ExpressionCompiler.compileDecls _
-      else ExpressionCompiler.compile _
+  val compileExpression =
+    compile(_, _, _, _, _, ExpressionCompiler.compile)
+
+  val compileDecls =
+    compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
+
+  private def compile(
+    input:         String,
+    context:       CompilerContext,
+    letBlockOnly:  Boolean,
+    stdLibVersion: StdLibVersion,
+    estimator:     ScriptEstimator,
+    compiler:      (String, CompilerContext) => Either[String, EXPR]
+  ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
     for {
-      compilationRes <- compiler(input, context)
-      illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(compilationRes._1)
+      ex <- compiler(input, context)
+      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      serializedExpr = serializeExpression(compilationRes._1, stdLibVersion)
+      x = serializeExpression(ex, stdLibVersion)
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion)
-      complexity <- ScriptEstimator(vars, costs, compilationRes._1)
-    } yield (serializedExpr, compilationRes, complexity)
-  }
+      complexity <- estimator(vars, costs, ex)
+    } yield (x, ex, complexity)
 
-  type ContractInfo = (Array[Byte], DApp, Long, Vector[(String, Long)])
+  type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
 
-  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, ContractInfo] =
+  def compileContract(
+    input:         String,
+    ctx:           CompilerContext,
+    stdLibVersion: StdLibVersion,
+    estimator:     ScriptEstimator
+  ): Either[String, ContractInfo] =
     for {
       dapp       <- ContractCompiler.compile(input, ctx)
-      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp)
+      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, estimator)
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {
-      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      script <- Script.fromBase64String(compiledCode.trim)
       meta   <- scriptMeta(script)
     } yield (Script.decompile(script)._1, meta)
 
   def scriptMeta(compiledCode: String): Either[ScriptParseError, Dic] =
     for {
-      script <- Script.fromBase64String(compiledCode.trim, checkComplexity = false)
+      script <- Script.fromBase64String(compiledCode.trim)
       meta   <- scriptMeta(script)
     } yield meta
 
   def scriptMeta(script: Script): Either[ScriptParseError, Dic] =
     script match {
-      case ContractScriptImpl(_, dApp, _) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
-      case _                              => Right(Dic(Map()))
+      case ContractScriptImpl(_, dApp) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
+      case _                           => Right(Dic(Map()))
+    }
+
+  def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
+    script match {
+      case ContractScriptImpl(_, dApp) =>
+        MetaMapper.dicFromProto(dApp)
+          .map(_.m.headOption)
+          .map {
+            case Some((name, Chain(paramTypes))) =>
+              val funcsName      = dApp.callableFuncs.map(_.u.name)
+              val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
+              Dic(Map(name -> paramsWithFunc))
+            case _ => Dic(Map())
+          }
+          .leftMap(ScriptParseError)
+
+      case _  => Right(Dic(Map()))
     }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
@@ -148,6 +179,21 @@ trait BaseGlobal {
 
   def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
   def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
+
+  import RoundingMode._
+
+  protected def roundMode(round: BaseGlobal.Rounds) : RoundingMode =
+    round match {
+      case BaseGlobal.RoundUp()       => UP
+      case BaseGlobal.RoundHalfUp()   => HALF_UP
+      case BaseGlobal.RoundHalfDown() => HALF_DOWN
+      case BaseGlobal.RoundDown()     => DOWN
+      case BaseGlobal.RoundHalfEven() => HALF_EVEN
+      case BaseGlobal.RoundCeiling()  => CEILING
+      case BaseGlobal.RoundFloor()    => FLOOR
+    }
+
+  implicit val sttpBackend: SttpBackend[Future, Nothing]
 }
 
 object BaseGlobal {

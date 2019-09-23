@@ -6,12 +6,12 @@ import java.nio.file.Files
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
@@ -32,8 +32,8 @@ trait BaseState {
     LevelDBFactory.factory.open(new File(dir), options)
   }
 
-  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
-  val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
+  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
+  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -76,7 +76,7 @@ trait BaseState {
 
   private def append(prev: Option[Block], next: Block): Unit = {
     val preconditionDiff = BlockDiffer.fromBlock(state, prev, next, MiningConstraint.Unlimited).explicitGet().diff
-    state.append(preconditionDiff, 0, 0, next)
+    state.append(preconditionDiff, 0, 0, None, next)
   }
 
   def applyBlock(b: Block): Unit = {

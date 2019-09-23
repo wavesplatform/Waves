@@ -229,7 +229,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         .calculateDelay(
           hit(genSig.arr),
           lastBlockCData.baseTarget,
-          nodes.head.accountBalances(signerPK.address)._2
+          nodes.head.accountBalances(signerPK.stringRepr)._2
         )
     )
 
@@ -255,7 +255,8 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         consensusData = cData,
         transactionData = Nil,
         signer = signerPK,
-        featureVotes = Set.empty
+        featureVotes = Set.empty,
+        rewardVote = -1L
       )
       .explicitGet()
   }

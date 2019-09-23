@@ -12,10 +12,9 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 case object EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
@@ -55,19 +54,20 @@ case object EmptyBlockchain extends Blockchain {
 
   override def featureVotes(height: Int): Map[Short, Int] = Map.empty
 
-  override def portfolio(a: Address): Portfolio = Portfolio.empty
+  /** Block reward related */
+  override def blockReward(height: Int): Option[Long] = None
+
+  override def lastBlockReward: Option[Long] = None
+
+  override def blockRewardVotes(height: Int): Seq[Long] = Seq.empty
+
+  override def wavesAmount(height: Int): BigInt = 0
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = None
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = None
 
   override def transactionHeight(id: ByteStr): Option[Int] = None
-
-  override def nftList(address: Address, from: Option[IssuedAsset]): CloseableIterator[IssueTransaction] = CloseableIterator.empty
-
-  override def addressTransactions(address: Address,
-                                   types: Set[TransactionParser],
-                                   fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = CloseableIterator.empty
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
@@ -82,15 +82,15 @@ case object EmptyBlockchain extends Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
-  override def accountScript(address: Address): Option[Script] = None
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = None
 
   override def hasScript(address: Address): Boolean = false
 
-  override def assetScript(asset: IssuedAsset): Option[Script] = None
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = None
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
-  override def accountDataKeys(acc: Address): Seq[String] = Seq.empty
+  override def accountDataKeys(acc: Address): Set[String] = Set.empty
 
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
@@ -100,17 +100,7 @@ case object EmptyBlockchain extends Blockchain {
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def assetDistribution(assetId: IssuedAsset): AssetDistribution = Monoid.empty[AssetDistribution]
-
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
-
-  override def allActiveLeases: CloseableIterator[LeaseTransaction] = CloseableIterator.empty
-
-  override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
-    Right(AssetDistributionPage(Paged[Address, AssetDistribution](false, None, Monoid.empty[AssetDistribution])))
+  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

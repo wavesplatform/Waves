@@ -4,10 +4,11 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.state.{BlockchainUpdaterImpl, _}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -30,7 +31,8 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
            |let ind = $ind
            |true
           """.stripMargin,
-        isAssetScript = false
+        isAssetScript = false,
+        ScriptEstimatorV2
       ).explicitGet()
 
       script
@@ -132,7 +134,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
   def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], BlockchainUpdater with NG) => Unit): Unit = {
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, settings0.dbSettings.copy(maxCacheSize = CACHE_SIZE))
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, settings0.dbSettings.copy(maxCacheSize = CACHE_SIZE))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get

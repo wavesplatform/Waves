@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.LeaseTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -19,10 +20,10 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
   private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.address)
+    val (balance1, eff1) = miner.accountBalances(acc0.stringRepr)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee).id
+    val txId = sender.transfer(sender.address, acc0.stringRepr, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
@@ -42,7 +43,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
         }
         """.stripMargin
 
-    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+    val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()

@@ -7,6 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -14,7 +15,7 @@ import com.wavesplatform.transaction.{Proofs, Transaction}
 
 import scala.util.Random
 
-class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settings, val accounts: Seq[KeyPair])
+class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator)
     extends TransactionGenerator {
 
   override def next(): Iterator[Transaction] = {
@@ -29,7 +30,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
     val enoughFee               = 0.005.waves
     val totalAmountOnNewAccount = 1.waves
 
-    val script: Script = Gen.multiSigScript(owners, 3)
+    val script: Script = Gen.multiSigScript(owners, 3, estimator)
 
     val now       = System.currentTimeMillis()
     val setScript = SetScriptTransaction.selfSigned(bank, Some(script), enoughFee, now).explicitGet()

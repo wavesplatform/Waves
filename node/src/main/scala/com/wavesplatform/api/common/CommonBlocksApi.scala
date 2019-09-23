@@ -27,7 +27,7 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
   }
 
   def calcBlocksDelay(blockId: BlockId, blockNum: Int): Either[ApiError, Long] = {
-    getBlockById(blockId).flatMap { block =>
+    getBlockById(blockId).toRight(BlockDoesNotExist).flatMap { block =>
       blockchain
         .parentHeader(block, blockNum)
         .map(parent => (block.timestamp - parent.timestamp) / blockNum)
@@ -70,13 +70,12 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.genesis
   }
 
-  def blockBySignature(blockId: BlockId): Either[ApiError, VanillaBlock] = {
+  def blockBySignature(blockId: BlockId): Option[VanillaBlock] = {
     getBlockById(blockId)
   }
 
-  private[this] def getBlockById(signature: ByteStr): Either[ApiError, VanillaBlock] = {
+  private[this] def getBlockById(signature: ByteStr): Option[VanillaBlock] = {
     blockchain
       .blockById(signature)
-      .toRight(BlockDoesNotExist)
   }
 }

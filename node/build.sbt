@@ -18,6 +18,8 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
+    PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
+    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.endsWith("waves")),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
@@ -86,9 +88,6 @@ inConfig(Universal)(
       "-J-Xms128m",
       "-J-Xmx2g",
       "-J-XX:+ExitOnOutOfMemoryError",
-      // Java 9 support
-      "-J-XX:+IgnoreUnrecognizedVMOptions",
-      "-J--add-modules=java.xml.bind",
       // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
       "-J-XX:+UseG1GC",
       "-J-XX:+UseNUMA",

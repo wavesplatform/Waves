@@ -8,7 +8,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -17,6 +16,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPoolImpl
@@ -96,7 +96,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           })
 
           val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock)
-          Await.result(blockAppendTask.runAsync(scheduler), Duration.Inf)
+          Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
 
           signal.tryAcquire(10, TimeUnit.SECONDS)
 
@@ -108,7 +108,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)

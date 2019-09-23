@@ -126,7 +126,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
           _ <- Task.sleep(1.second)
         } yield ch.isOpen shouldBe false
 
-      test(testTask.runAsync(monix.execution.Scheduler.global))
+      test(testTask.runToFuture(monix.execution.Scheduler.global))
   }
 
   "should process received extension" in {

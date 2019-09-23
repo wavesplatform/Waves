@@ -1,15 +1,15 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
+import com.wavesplatform.api.http.alias.AliasApiRoute
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
+import com.wavesplatform.utils.Time
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
@@ -20,18 +20,13 @@ class AliasBroadcastRouteSpec
     with RequestGen
     with PathMockFactory
     with PropertyChecks
-    with RestAPISettingsHelper {
-  private val utx         = stub[UtxPool]
-  private val allChannels = stub[ChannelGroup]
+    with RestAPISettingsHelper
+    with NoShrink {
+  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
-  (utx.putIfNew _)
-    .when(*, *)
-    .onCall((t: Transaction, _: Boolean) => TracedResult(Left(TransactionValidationError(GenericError("foo"), t))))
-    .anyNumberOfTimes()
-
+  val route = AliasApiRoute(restAPISettings, stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
 
   "returns StateCheckFiled" - {
-    val route = AliasBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
@@ -43,7 +38,6 @@ class AliasBroadcastRouteSpec
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(restAPISettings, utx, allChannels).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat

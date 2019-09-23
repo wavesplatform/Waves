@@ -14,7 +14,7 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
   property("disallows too old transacions") {
     forAll(for {
       prevBlockTs <- timestampGen
-      blockTs     <- timestampGen
+      blockTs     <- Gen.choose(prevBlockTs, prevBlockTs + 7 * 24 * 3600 * 1000)
       master      <- accountGen
       height      <- positiveIntGen
       recipient   <- accountGen
@@ -24,7 +24,7 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
-        withStateAndHistory(Enabled) { blockchain: Blockchain =>
+        withLevelDBWriter(Enabled) { blockchain: Blockchain =>
           val result = TransactionDiffer(Some(prevBlockTs), blockTs)(blockchain, transfer1).resultE
           result should produce("in the past relative to previous block timestamp")
         }
@@ -44,8 +44,8 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
-        val functionalitySettings = Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
-        withStateAndHistory(functionalitySettings) { blockchain: Blockchain =>
+        val functionalitySettings = Enabled.copy(lastTimeBasedForkParameter = blockTs - 1)
+        withLevelDBWriter(functionalitySettings) { blockchain: Blockchain =>
           TransactionDiffer(Some(prevBlockTs), blockTs)(blockchain, transfer1).resultE should
             produce("in the future relative to block timestamp")
         }

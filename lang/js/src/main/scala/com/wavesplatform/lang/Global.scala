@@ -1,10 +1,16 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
-import com.wavesplatform.lang.v1.BaseGlobal
+import java.math.{BigDecimal, BigInteger}
 
+import cats.implicits._
+import com.softwaremill.sttp.{FetchBackend, FetchOptions, SttpBackend}
+import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+
+import scala.concurrent.Future
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
+import scala.util.Try
 
 object Global extends BaseGlobal {
   def base58Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base58Encode(toBuffer(input)))
@@ -52,6 +58,58 @@ object Global extends BaseGlobal {
   override def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean =
     impl.Global.merkleVerify(toBuffer(rootBytes), toBuffer(proofBytes), toBuffer(valueBytes))
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = ???
+  override def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    calcScaled(Math.pow)(b, bp, e, ep, rp, round)
+
+  override def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round)
+
+  private def calcScaled(calc: (Double, Double) => Double)(
+    base:          Long,
+    baseScale:     Long,
+    exponent:      Long,
+    exponentScale: Long,
+    resultScale:   Long,
+    round:         BaseGlobal.Rounds,
+  ): Either[String, Long] =
+    tryEi {
+      val result = calc(
+        base     * Math.pow(10, -baseScale),
+        exponent * Math.pow(10, -exponentScale)
+      )
+      unscaled(result, resultScale, round)
+    }
+
+  private def tryEi[R](r: => Either[String, R]): Either[String, R] =
+    Try(r)
+      .toEither
+      .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
+      .flatten
+
+  private def unscaled(
+    value: Double,
+    scale: Long,
+    round: BaseGlobal.Rounds
+  ): Either[String, Long] = {
+    val decimal =
+      if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BigDecimal.valueOf(value.toLong)
+      else BigDecimal.valueOf(value)
+
+    decimal
+      .setScale(scale.toInt, roundMode(round))
+      .unscaledValue
+      .longExact
+  }
+
+  implicit class BigIntOps(v: BigInteger) {
+    // absent in scala.js BigInteger
+    def longExact: Either[String, Long] =
+      Either.cond(
+        v.bitLength <= 63,
+        v.longValue,
+        "BigInteger out of long range"
+      )
+  }
+
+  override val sttpBackend: SttpBackend[Future, Nothing] = FetchBackend(FetchOptions.Default)
 }

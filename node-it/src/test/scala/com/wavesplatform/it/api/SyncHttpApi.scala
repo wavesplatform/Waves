@@ -7,6 +7,7 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -89,6 +90,9 @@ object SyncHttpApi extends Assertions {
 
     def activationStatus: ActivationStatus =
       sync(async(n).activationStatus)
+
+    def rewardStatus(height: Int): RewardStatus =
+      sync(async(n).rewardStatus(height))
 
     def seed(address: String): String =
       sync(async(n).seed(address))
@@ -191,11 +195,11 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
 
-    def debugStateChanges(transactionId:String): DebugStateChanges ={
+    def debugStateChanges(transactionId: String): DebugStateChanges = {
       sync(async(n).debugStateChanges(transactionId))
     }
 
-    def debugStateChangesByAddress(address:String, limit: Int): Seq[DebugStateChanges] ={
+    def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
       sync(async(n).debugStateChangesByAddress(address, limit))
     }
 
@@ -385,6 +389,8 @@ object SyncHttpApi extends Assertions {
 
     def blockSeq(fromHeight: Int, toHeight: Int): Seq[Block] = sync(async(n).blockSeq(fromHeight, toHeight))
 
+    def blockSeqByAddress(address: String, from: Int, to: Int): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to))
+
     def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
@@ -448,14 +454,18 @@ object SyncHttpApi extends Assertions {
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
+    private[this] def withTxIdMessage[T](transactionId: String)(f: => T): T =
+      try f
+      catch { case NonFatal(cause) => throw new RuntimeException(s"Error awaiting transaction: $transactionId", cause) }
+
     def height(implicit pos: Position): Seq[Int] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
-      sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+      withTxIdMessage(transactionId)(sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime))
 
     def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
-      sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime)
+      withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)

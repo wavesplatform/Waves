@@ -756,4 +756,22 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
+
+  property("list as @Callable argument") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3#-}
+          | {-#CONTENT_TYPE DAPP#-}
+          |
+          | @Callable(i)
+          | func f(a:List[Int]) = WriteSet([])
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Annotated function should not have generic parameter types")
+  }
 }

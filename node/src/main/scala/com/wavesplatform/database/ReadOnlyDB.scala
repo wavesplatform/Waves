@@ -1,9 +1,7 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.Shorts
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
-import com.wavesplatform.utils.CloseableIterator
 import org.iq80.leveldb.{DB, DBIterator, ReadOptions}
 
 import scala.annotation.tailrec
@@ -25,13 +23,7 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit) = db.iterateOver(prefix)(f)
-
-  def iterateOverStream(): CloseableIterator[DBEntry] = db.iterateOverStream()
-
-  def iterateOverStream(prefix: Array[Byte]): CloseableIterator[DBEntry] = db.iterateOverStream(prefix)
-
-  def iterateOverStream(prefix: Short): CloseableIterator[DBEntry] = db.iterateOverStream(Shorts.toByteArray(prefix))
+  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator

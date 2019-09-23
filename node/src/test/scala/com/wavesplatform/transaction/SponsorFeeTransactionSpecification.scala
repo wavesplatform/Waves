@@ -129,7 +129,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
           .right
           .get
         minFee <- smallFeeGen
-        assetId = issue.assetId()
+        assetId = issue.assetId
       } yield SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetId), Some(minFee), fee, timestamp) should produce("insufficient fee")
     }
   }
@@ -144,7 +144,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
           .right
           .get
         minFee  = None
-        assetId = issue.assetId()
+        assetId = issue.assetId
       } yield SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetId), minFee, fee, timestamp) should produce("insufficient fee")
     }
   }

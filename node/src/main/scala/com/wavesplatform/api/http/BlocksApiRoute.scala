@@ -6,20 +6,17 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.execution.Scheduler
 import play.api.libs.json._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler)
-    extends ApiRoute
-    with WithSettings {
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute with CommonApiFunctions {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
   private[this] val commonApi           = new CommonBlocksApi(blockchain)
 
@@ -35,35 +32,38 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
-  def address: Route = (path("address" / Segment / IntNumber / IntNumber) & get) {
-    case (address, start, end) =>
-      if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-        val result = for {
-          address <- Address.fromString(address)
-          jsonBlocks = commonApi.blockHeadersRange(start, end).filter(_._1.signerData.generator.toAddress == address).map {
-            case (_, _, h) =>
-              blockchain.blockAt(h).get.json().addBlockFields(h)
-          }
-          result = jsonBlocks.toListL.map(JsArray(_))
-        } yield result.runAsync
+    )
+  )
+  def address: Route =
+    extractScheduler(
+      implicit sc =>
+        (path("address" / Segment / IntNumber / IntNumber) & get) {
+          case (address, start, end) =>
+            if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+              val result = for {
+                address <- Address.fromString(address)
+                jsonBlocks = commonApi
+                  .blockHeadersRange(start, end)
+                  .filter(_._1.signerData.generator.toAddress == address)
+                  .map {
+                    case (_, _, h) =>
+                      blockchain.blockAt(h).get.json().addBlockFields(h)
+                  }
+                result = jsonBlocks.toListL.map(JsArray(_))
+              } yield result.runToFuture
 
-        complete(result)
-      } else {
-        complete(TooBigArrayAllocation)
-      }
-  }
+              complete(result)
+            } else {
+              complete(TooBigArrayAllocation)
+            }
+        }
+    )
 
-  @Path("/child/{signature}")
-  @ApiOperation(value = "Child block", notes = "Get successor of specified block", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
-    ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
-      val childJson = for ((child, height) <- commonApi.childBlock(block.uniqueId))
-        yield child.json().addBlockFields(height)
+      val childJson =
+        for ((child, height) <- commonApi.childBlock(block.uniqueId))
+          yield child.json().addBlockFields(height)
 
       complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
     }
@@ -79,7 +79,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     Array(
       new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
     withBlock(blockchain, encodedSignature) { block =>
       val result = if (count <= 0) {
@@ -99,7 +100,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def heightEncoded: Route = (path("height" / Segment) & get) { encodedSignature =>
     if (encodedSignature.length > TransactionParsers.SignatureStringLength)
       complete(InvalidSignature)
@@ -128,7 +130,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def at: Route = (path("at" / IntNumber) & get)(at(_, includeTransactions = true))
 
   @Path("/headers/at/{height}")
@@ -136,7 +139,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def atHeaderOnly: Route = (path("headers" / "at" / IntNumber) & get)(at(_, includeTransactions = false))
 
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
@@ -157,7 +161,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     Array(
       new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) =>
     seq(start, end, includeTransactions = true)
   }
@@ -168,12 +173,13 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     Array(
       new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
-    ))
+    )
+  )
   def seqHeaderOnly: Route = (path("headers" / "seq" / IntNumber / IntNumber) & get) { (start, end) =>
     seq(start, end, includeTransactions = false)
   }
 
-  private def seq(start: Int, end: Int, includeTransactions: Boolean): StandardRoute = {
+  private def seq(start: Int, end: Int, includeTransactions: Boolean): Route = {
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
       val blocks = if (includeTransactions) {
         commonApi
@@ -185,7 +191,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
           .map { case (bh, size, height) => BlockHeader.json(bh, size).addBlockFields(height) }
       }
 
-      complete(blocks.toListL.map(JsArray(_)).runAsync)
+      extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
     } else {
       complete(TooBigArrayAllocation)
     }
@@ -221,7 +227,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
     if (encodedSignature.length > TransactionParsers.SignatureStringLength) {
       complete(InvalidSignature)
@@ -232,7 +239,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
           .toOption
           .toRight(InvalidSignature)
 
-        block <- commonApi.blockBySignature(blockId)
+        block <- commonApi.blockBySignature(blockId).toRight(BlockDoesNotExist)
       } yield block.json().addBlockFields(block.uniqueId)
 
       complete(result)
@@ -240,13 +247,23 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   }
 
   private[this] implicit class JsonObjectOps(json: JsObject) {
+    import com.wavesplatform.features.FeatureProvider._
+
     def addBlockFields(blockId: ByteStr): JsObject =
       json ++ blockchain
         .heightOf(blockId)
-        .map(height => Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))))
+        .map(height => createFields(height))
         .getOrElse(JsObject.empty)
 
     def addBlockFields(height: Int): JsObject =
-      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)))
+      json ++ createFields(height)
+
+    private[this] def createFields(height: Int) =
+      Json.obj(
+        "height"   -> height,
+        "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))
+      ) ++ (if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward, height))
+              Json.obj("reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_)))
+            else Json.obj())
   }
 }

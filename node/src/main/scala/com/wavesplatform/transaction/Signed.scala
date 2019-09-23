@@ -22,7 +22,7 @@ trait Signed extends Authorized {
 
   @ApiModelProperty(hidden = true)
   val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =
-    Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
+    Coeval.evalOnce(Await.result(signaturesValidMemoized.runToFuture(Signed.scheduler), Duration.Inf))
 }
 
 object Signed {
@@ -42,7 +42,7 @@ object Signed {
                        case None    => Right(ss)
                      }
                    }
-                   .runAsync,
+                   .runAsyncLogErr,
                  Duration.Inf)
 
   private def validateTask[S <: Signed](signedEntity: S): Task[E[S]] =

@@ -93,6 +93,11 @@ object CompilationError {
       s"Undefined type: `$name`" + varStr + expectedTypesStr
     }
   }
+
+  final case class GenericTypeNotFound(start: Int, end: Int, t: String) extends CompilationError {
+    val message = s"Undefined generic type `$t`"
+  }
+
   final case class FieldNotFound(start: Int, end: Int, name: String, typeName: String) extends CompilationError {
     val message = s"Undefined field `$name` of variable of type `$typeName`"
   }

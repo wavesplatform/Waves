@@ -3,9 +3,8 @@ package com.wavesplatform.utils
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.{RejectedExecutionHandler, ScheduledThreadPoolExecutor, ThreadFactory}
 
-import monix.execution.UncaughtExceptionReporter.LogExceptionsToStandardErr
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
-import monix.execution.{ExecutionModel, UncaughtExceptionReporter}
+import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
 
 /** Helper methods to create schedulers with custom DiscardPolicy
   * We doesn't use [[monix.execution.schedulers.AdaptedThreadPoolExecutorMixin]]
@@ -25,23 +24,23 @@ object Schedulers {
   }
 
   def singleThread(name: String,
-                   reporter: UncaughtExceptionReporter = LogExceptionsToStandardErr,
+                   reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
                    executionModel: ExecutionModel = ExecutionModel.Default,
                    rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy): SchedulerService = {
     val factory  = threadFactory(name, daemonic = true, reporter)
     val executor = new ScheduledThreadPoolExecutor(1, factory, rejectedExecutionHandler)
 
-    ExecutorScheduler(executor, reporter, executionModel)
+    ExecutorScheduler(executor, reporter, executionModel, Features.empty)
   }
 
   def fixedPool(poolSize: Int,
                 name: String,
-                reporter: UncaughtExceptionReporter = LogExceptionsToStandardErr,
+                reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
                 executionModel: ExecutionModel = ExecutionModel.Default,
                 rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy): SchedulerService = {
     val factory  = threadFactory(name, daemonic = true, reporter)
     val executor = new ScheduledThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler)
 
-    ExecutorScheduler(executor, reporter, executionModel)
+    ExecutorScheduler(executor, reporter, executionModel, Features.empty)
   }
 }

@@ -4,25 +4,25 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{NTPTime, RequestGen, WithDB}
+import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
 import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
-import monix.execution.Scheduler.Implicits.global
 
 class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
 
@@ -47,7 +47,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     val (fs, settings) =
       if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
 
-    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, events)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
@@ -277,7 +277,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
         val events = ReplaySubject[BlockchainUpdated]()
         val defaultWriter =
-          new LevelDBWriter(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
+          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
         val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, events)
 
         try {

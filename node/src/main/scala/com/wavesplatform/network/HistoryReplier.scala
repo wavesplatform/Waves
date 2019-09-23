@@ -53,7 +53,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
       }.runAsyncLogErr
 
     case GetBlock(sig) =>
-      Task(knownBlocks.get(sig)).map(bytes => ctx.writeAndFlush(RawBytes(BlockSpec.messageCode, bytes))).logErrDiscardNoSuchElementException.runAsync
+      Task(knownBlocks.get(sig)).map(bytes => ctx.writeAndFlush(RawBytes(BlockSpec.messageCode, bytes))).logErrDiscardNoSuchElementException.runAsyncLogErr
 
     case mbr @ MicroBlockRequest(totalResBlockSig) =>
       Task(knownMicroBlocks.get(totalResBlockSig))
@@ -62,7 +62,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
           log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
         }
         .logErrDiscardNoSuchElementException
-        .runAsync
+        .runAsyncLogErr
 
     case _: Handshake =>
       Task {

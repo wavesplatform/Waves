@@ -18,37 +18,37 @@ package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: Either[ValidationError, Diff] => Unit): Unit = withStateAndHistory(fs) { state =>
+      assertion: Either[ValidationError, Diff] => Unit): Unit = withLevelDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, precondition)
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.diff))
   }
 
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: TracedResult[ValidationError, Diff] => Unit): Unit = withStateAndHistory(fs) { state =>
+      assertion: TracedResult[ValidationError, Diff] => Unit): Unit = withLevelDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, precondition)
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.diff))
   }
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
-      assertion: (Diff, Blockchain) => Unit): Unit = withStateAndHistory(fs) { state =>
+      assertion: (Diff, Blockchain) => Unit): Unit = withLevelDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
-      state.append(diff, fees, totalFee, curBlock)
+      state.append(diff, fees, totalFee, None, curBlock)
       Some(curBlock)
     }
 
@@ -56,7 +56,7 @@ package object diffs extends WithState with Matchers {
     val cb              = CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 
-    state.append(diff, fees, totalFee, block)
+    state.append(diff, fees, totalFee, None, block)
     assertion(diff, state)
   }
 
@@ -69,12 +69,12 @@ package object diffs extends WithState with Matchers {
     assertDiffAndState(preconditions, block, fs, withNg = false)(assertion)
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
-    withStateAndHistory(fs) { state =>
+    withLevelDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
       test(txs => {
         val block = TestBlock.create(txs)
-        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, block))
+        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block))
       })
     }
 

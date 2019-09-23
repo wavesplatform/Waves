@@ -993,4 +993,36 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(script(error = false)) shouldBe Right(CONST_LONG(1))
     eval(script(error = true))  shouldBe Left(message)
   }
+
+  property("list as argument") {
+    val script =
+      """
+        | func head(a: List[Int]) = [a[2], a[0]]
+        | head([1, 2, 3]) == [3, 1]
+      """.stripMargin
+    eval(script) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("illegal generic") {
+    val script =
+      """
+        | func head(a: Generic[Int]) = a
+        | true
+      """.stripMargin
+    eval(script) should produce("Undefined generic type")
+  }
+
+  property("list type inferrer 2") {
+    val script =
+      s"""
+         | let l = if (true)
+         |         then if false
+         |              then nil
+         |              else nil
+         |         else "str"
+         | size(l) == 0
+      """.stripMargin
+
+    eval[EVALUATED](script, None) should produce("Can't find a function overload 'size'")
+  }
 }

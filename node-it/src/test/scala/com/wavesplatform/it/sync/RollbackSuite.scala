@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -56,6 +57,8 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
   test("Just rollback transactions") {
     val startHeight      = sender.height
     val stateBeforeApply = sender.debugStateAt(startHeight)
+
+    nodes.waitForHeightArise()
 
     val requests = generateTransfersToRandomAddresses(190, nodeAddresses)
     Await.result(processRequests(requests), 2.minutes)
@@ -173,7 +176,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     }""".stripMargin
 
     val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).right.get
-    val script    = ScriptCompiler(scriptText, isAssetScript = false).right.get._1
+    val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).right.get._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
       .right
@@ -182,8 +185,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val setScriptId = sender.signedBroadcast(sc1SetTx.json()).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    nodes.waitForHeightArise()
-    val height = sender.height
+    val height = nodes.waitForHeightArise()
 
     nodes.waitForHeightArise()
     val entry1 = StringDataEntry("oracle", "yes")
@@ -191,6 +193,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
     val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, waitForTx = true).id
+    nodes.waitForHeightAriseAndTxPresent(tx)
 
     //as rollback is too fast, we should blacklist nodes from each other before rollback
     sender.blacklist(miner.networkAddress)

@@ -94,8 +94,7 @@ object RxScoreObserver extends ScorexLogging {
         }
 
     def cc: Observable[Option[Channel]] =
-      Observable
-        .merge(channelClosed, channelTimeout)
+      Observable(channelClosed, channelTimeout).merge
         .observeOn(scheduler)
         .map { ch =>
           scores.invalidate(ch)
@@ -106,8 +105,7 @@ object RxScoreObserver extends ScorexLogging {
           Option(ch)
         }
 
-    val observable = Observable
-      .merge(ls, rs, cc)
+    val observable = Observable(ls, rs, cc).merge
       .map { maybeClosedChannel =>
         val sw: SyncWith = calcSyncWith(currentBestChannel, localScore, scores.asMap().asScala)
         currentBestChannel = sw.map(_.channel)

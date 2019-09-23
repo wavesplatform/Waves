@@ -226,7 +226,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
         if (enableProfiling) {
           // https://www.yourkit.com/docs/java/help/startup_options.jsp
-          config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2019.1/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +
+          config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +
             s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot "
         }
 

@@ -65,4 +65,39 @@ class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
             |
       """.stripMargin) shouldBe Left(s"Illegal directive value $wrongValue for key SCRIPT_TYPE")
   }
+
+  property("directive with illegal format") {
+    parse("{-# ILLEGAL #-}") shouldBe Left("Directive {-# ILLEGAL #-} has illegal format")
+    parse("{-# A%@#%$^$ A%#%%$ #-}") shouldBe 'left
+    parse("{-# AAA BBB CCC DDD #-}") shouldBe 'left
+  }
+
+  property("directive duplicate") {
+    parse(
+      s"""
+         | {-# STDLIB_VERSION 1 #-}
+         | {-# CONTENT_TYPE EXPRESSION #-}
+         | {-# CONTENT_TYPE EXPRESSION #-}
+         | {-# SCRIPT_TYPE  ASSET #-}
+      """.stripMargin
+    ) shouldBe Left("Directive key CONTENT_TYPE is used more than once")
+  }
+
+  property("spaces between directives") {
+    parse(
+      s"""
+         | {-# STDLIB_VERSION 3 #-}
+         |
+         |
+         |    {-# CONTENT_TYPE EXPRESSION #-}
+         |
+         |
+         | {-# SCRIPT_TYPE  ASSET #-}
+      """.stripMargin
+    ) shouldBe Right(List(
+      Directive(STDLIB_VERSION, V3),
+      Directive(CONTENT_TYPE, Expression),
+      Directive(SCRIPT_TYPE, Asset)
+    ))
+  }
 }

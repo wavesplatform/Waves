@@ -72,6 +72,9 @@
     "name" : "SHA1",
     "doc" : "SHA1 digest algorithm"
   }, {
+    "name" : "tx",
+    "doc" : "Processing transaction"
+  }, {
     "name" : "Sell",
     "doc" : "Sell OrderType"
   } ]

@@ -9,7 +9,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
@@ -36,11 +36,13 @@ object Importer extends ScorexLogging {
 
   type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
 
-  final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
-                                 blockchainFile: File = new File("blockchain"),
-                                 importHeight: Int = Int.MaxValue,
-                                 format: String = Formats.Binary,
-                                 verify: Boolean = true)
+  final case class ImportOptions(
+      configFile: File = new File("waves-testnet.conf"),
+      blockchainFile: File = new File("blockchain"),
+      importHeight: Int = Int.MaxValue,
+      format: String = Formats.Binary,
+      verify: Boolean = true
+  )
 
   def parseOptions(args: Array[String]): Try[ImportOptions] = {
     lazy val commandParser = {
@@ -94,11 +96,13 @@ object Importer extends ScorexLogging {
       case t => t
     }
 
-  def initBlockchain(scheduler: Scheduler,
-                     time: NTP,
-                     settings: WavesSettings,
-                     importOptions: ImportOptions,
-                     blockchainUpdated: Observer[BlockchainUpdated]): (Blockchain with BlockchainUpdater, AppendBlock, UtxPoolImpl) = {
+  def initBlockchain(
+      scheduler: Scheduler,
+      time: NTP,
+      settings: WavesSettings,
+      importOptions: ImportOptions,
+      blockchainUpdated: Observer[BlockchainUpdated]
+  ): (Blockchain with BlockchainUpdater, AppendBlock, UtxPoolImpl) = {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
       StorageFactory(settings, db, time, Observer.empty, blockchainUpdated)
@@ -111,12 +115,14 @@ object Importer extends ScorexLogging {
     (blockchainUpdater, extAppender, utxPool)
   }
 
-  def initExtensions(wavesSettings: WavesSettings,
-                     blockchainUpdater: Blockchain with BlockchainUpdater,
-                     appenderScheduler: Scheduler,
-                     time: Time,
-                     utxPool: UtxPool,
-                     blockchainUpdatedObservable: Observable[BlockchainUpdated]): Seq[Extension] = {
+  def initExtensions(
+      wavesSettings: WavesSettings,
+      blockchainUpdater: Blockchain with BlockchainUpdater,
+      appenderScheduler: Scheduler,
+      time: Time,
+      utxPool: UtxPool,
+      blockchainUpdatedObservable: Observable[BlockchainUpdated]
+  ): Seq[Extension] = {
     val extensionContext = {
       val t = time
       new Context {
@@ -124,10 +130,11 @@ object Importer extends ScorexLogging {
         override def blockchain: Blockchain  = blockchainUpdater
         override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] =
           Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler)
-        override def time: Time                                            = t
-        override def wallet: Wallet                                        = ???
-        override def utx: UtxPool                                          = utxPool
-        override def broadcastTx(tx: Transaction): Unit                    = ???
+        override def time: Time     = t
+        override def wallet: Wallet = ???
+        override def utx: UtxPool   = utxPool
+
+        override def broadcastTransaction(tx: Transaction) = ???
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
@@ -145,11 +152,13 @@ object Importer extends ScorexLogging {
     extensions
   }
 
-  def startImport(scheduler: Scheduler,
-                  bis: BufferedInputStream,
-                  blockchainUpdater: Blockchain,
-                  appendBlock: AppendBlock,
-                  importOptions: ImportOptions): Unit = {
+  def startImport(
+      scheduler: Scheduler,
+      bis: BufferedInputStream,
+      blockchainUpdater: Blockchain,
+      appendBlock: AppendBlock,
+      importOptions: ImportOptions
+  ): Unit = {
     var quit     = false
     val lenBytes = new Array[Byte](Ints.BYTES)
     val start    = System.currentTimeMillis()
@@ -182,7 +191,7 @@ object Importer extends ScorexLogging {
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
             if (blockchainUpdater.lastBlockId.contains(block.reference)) {
-              Await.result(appendBlock(block).runAsync(scheduler), Duration.Inf) match {
+              Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
                 case Left(ve) =>
                   log.error(s"Error appending block: $ve")
                   quit = true
@@ -223,16 +232,15 @@ object Importer extends ScorexLogging {
       (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdated)
       extensions                                = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
       _                                         = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
-    } yield
-      () => {
-        Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
-        bis.close()
-        fis.close()
-        time.close()
-        utxPool.close()
-        blockchainUpdated.onComplete()
-        blockchainUpdater.shutdown()
-      }
+    } yield () => {
+      Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
+      bis.close()
+      fis.close()
+      time.close()
+      utxPool.close()
+      blockchainUpdated.onComplete()
+      blockchainUpdater.shutdown()
+    }
 
   def main(args: Array[String]): Unit = {
     run(args) match {

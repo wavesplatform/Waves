@@ -5,12 +5,13 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 
 @Sharable
 class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  implicit val scheduler = Schedulers.fixedPool(2, "message-observer")
+  private implicit val scheduler: SchedulerService = Schedulers.fixedPool(2, "message-observer")
 
   private val signatures          = ConcurrentSubject.publish[(Channel, Signatures)]
   private val blocks              = ConcurrentSubject.publish[(Channel, Block)]
@@ -41,12 +42,14 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
 }
 
 object MessageObserver {
-  type Messages = (ChannelObservable[Signatures],
-                   ChannelObservable[Block],
-                   ChannelObservable[BigInt],
-                   ChannelObservable[MicroBlockInv],
-                   ChannelObservable[MicroBlockResponse],
-                   ChannelObservable[Transaction])
+  type Messages = (
+      ChannelObservable[Signatures],
+      ChannelObservable[Block],
+      ChannelObservable[BigInt],
+      ChannelObservable[MicroBlockInv],
+      ChannelObservable[MicroBlockResponse],
+      ChannelObservable[Transaction]
+  )
 
   def apply(): (MessageObserver, Messages) = {
     val mo = new MessageObserver()

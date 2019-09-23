@@ -1,53 +1,36 @@
 package com.wavesplatform.it.sync
 
-import java.io.File
-
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import monix.eval.Coeval
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec}
+import org.scalatest.FreeSpec
 import play.api.libs.json._
 
-import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class NFTBalanceSuite
-    extends FreeSpec
-    with WaitForHeight2
-    with IntegrationSuiteWithThreeAddresses
-    with BeforeAndAfterAll
-    with NodesFromDocker
-    with CancelAfterFailure {
+    extends FreeSpec with BaseTransactionSuiteLike {
 
   import NFTBalanceSuite._
 
-  override protected def nodeConfigs: Seq[Config] = configs
 
-  protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
-    Option(System.getProperty("waves.it.config.file")) match {
-      case None => dockerNodes()
-      case Some(filePath) =>
-        val defaultConfig = ConfigFactory.load()
-        ConfigFactory
-          .parseFile(new File(filePath))
-          .getConfigList("nodes")
-          .asScala
-          .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
-    }
-  }
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 
   override protected def nodes: Seq[Node] = theNodes()
 
@@ -57,15 +40,15 @@ class NFTBalanceSuite
 
   private val (simple, nft) = fillPortfolio(issuer, 100, 100)
 
-  private val randomTokenToTransfer = IssuedAsset(nft(Random.nextInt(nft.length)).assetId())
+  private val randomTokenToTransfer = IssuedAsset(nft(Random.nextInt(nft.length)).assetId)
 
   protected override def beforeAll(): Unit = {
-    theNodes.run()
+    super.beforeAll()
 
     val fundAndIssue =
       for {
         _      <- traverse(nodes)(_.waitForHeight(2))
-        fundTx <- node.transfer(node.address, issuer.address, 1000.waves, 0.001.waves)
+        fundTx <- node.transfer(node.address, issuer.stringRepr, 1000.waves, 0.001.waves)
         _      <- node.waitForTransaction(fundTx.id)
         _ <- Future.sequence((simple ++ nft) map { tx =>
           for {
@@ -76,16 +59,14 @@ class NFTBalanceSuite
       } yield ()
 
     Await.ready(fundAndIssue, 2.minutes)
-
-    super.beforeAll()
   }
 
   "after activation" - {
     "returns only non-nft portfolio on /balance/{address}" in {
-      val expectedIds = simple map (_.assetId().toString)
+      val expectedIds = simple map (_.assetId.toString)
 
       val assertion =
-        getPortfolio(node, issuer.address) map { ids =>
+        getPortfolio(node, issuer.stringRepr) map { ids =>
           ids.toSet shouldBe expectedIds.toSet
         }
 
@@ -93,10 +74,10 @@ class NFTBalanceSuite
     }
 
     "returns issue transactions on /nft/{address}/limit/{limit}" in {
-      val expectedIds = nft.map(_.assetId().toString)
+      val expectedIds = nft.map(_.assetId.toString)
 
       val assertion =
-        getNFTPage(node, issuer.address, 1000, None) map { ids =>
+        getNFTPage(node, issuer.stringRepr, 1000, None) map { ids =>
           ids.toSet shouldBe expectedIds.toSet
         }
 
@@ -122,8 +103,8 @@ class NFTBalanceSuite
       val assertion = for {
         tx         <- node.signedBroadcast(transfer.json())
         _          <- node.waitForTransaction(tx.id)
-        issuerNFTs <- getNFTPage(node, issuer.address, 1000, None)
-        otherNFTs  <- getNFTPage(node, other.address, 1000, None)
+        issuerNFTs <- getNFTPage(node, issuer.stringRepr, 1000, None)
+        otherNFTs  <- getNFTPage(node, other.stringRepr, 1000, None)
       } yield {
         issuerNFTs shouldNot contain(randomTokenToTransfer.id.toString)
         otherNFTs should contain(randomTokenToTransfer.id.toString)
@@ -136,23 +117,25 @@ class NFTBalanceSuite
   "pagination" - {
     "works" in {
       val expectedIds = nft
-        .filter(_.assetId() != randomTokenToTransfer.id)
-        .map(_.assetId().toString)
+        .filter(_.assetId != randomTokenToTransfer.id)
+        .map(_.assetId.toString)
         .toSet
 
       val assertion = for {
-        pagedIds    <- getNFTPaged(node, issuer.address, 10).map(_.toSet)
-        nonPagedIds <- getNFTPage(node, issuer.address, 1000, None).map(_.toSet)
+        pagedIds    <- getNFTPaged(node, issuer.stringRepr, 10).map(_.toSet)
+        nonPagedIds <- getNFTPage(node, issuer.stringRepr, 1000, None).map(_.toSet)
       } yield {
         pagedIds shouldBe expectedIds
         nonPagedIds shouldBe expectedIds
       }
 
-      Await.result(assertion, 1.minute)
+      Await.result(
+        assertion, 1.minute
+      )
     }
 
     "returns error on wrong limit" in {
-      val assertion = getNFTPage(node, issuer.address, 10000000, None)
+      val assertion = getNFTPage(node, issuer.stringRepr, 10000000, None)
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith {
           case ex: Throwable =>
@@ -165,7 +148,7 @@ class NFTBalanceSuite
     }
 
     "returns error on wrong base58 in after" in {
-      val assertion = getNFTPage(node, issuer.address, 100, Some("wr0ngbase58str1ng"))
+      val assertion = getNFTPage(node, issuer.stringRepr, 100, Some("wr0ngbase58str1ng"))
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith {
           case ex: Throwable =>
@@ -181,26 +164,7 @@ class NFTBalanceSuite
 }
 
 object NFTBalanceSuite {
-  val configs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .withDefault(1)
-      .overrideBase(_.raw(s"""
-                          |waves.blockchain.custom.functionality.pre-activated-features = {
-                          |          2 = 0
-                          |          3 = 0
-                          |          4 = 0
-                          |          5 = 0
-                          |          6 = 0
-                          |          7 = 0
-                          |          9 = 0
-                          |          10 = 0
-                          |          11 = 0
-                          |          12 = 0
-                          |          13 = 0
-                          |}
-         """.stripMargin))
-      .buildNonConflicting()
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
@@ -271,18 +235,14 @@ object NFTBalanceSuite {
   // returns issue transactions ids from addresses portfolio
   // obtained via paged api
   def getNFTPaged(node: Node, address: String, limit: Int): Future[List[String]] = {
-    def loop(lastId: String, acc: List[String]): Future[List[String]] = {
-      getNFTPage(node, address, limit, Some(lastId)) flatMap { ids =>
-        if (ids.nonEmpty) loop(ids.last, ids ++ acc)
+    def loop(lastId: Option[String], acc: List[String]): Future[List[String]] = {
+      getNFTPage(node, address, limit, lastId) flatMap { ids =>
+        if (ids.nonEmpty) loop(ids.lastOption, ids ++ acc)
         else Future.successful(acc)
       }
     }
 
-    getNFTPage(node, address, limit, None) flatMap { ids =>
-      if (ids.nonEmpty) loop(ids.last, ids)
-      else Future.successful(ids)
-    }
-
+    loop(None, Nil)
   }
 
   //returns asset ids from addresses portfolio
