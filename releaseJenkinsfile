@@ -4,7 +4,7 @@ import devops.waves.*
 @Library('jenkins-shared-lib')
 
 ut = new utils()
-
+scripts = new scripts()
 def artifactsDir="out"
 def networks
 def artifacts
