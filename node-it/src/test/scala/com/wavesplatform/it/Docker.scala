@@ -145,10 +145,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     log.trace(s"Starting ${nodeConfigs.size} containers")
     val all = nodeConfigs.map(startNodeInternal(_))
     Await.result(
-      for {
-        _ <- Future.traverse(all)(_.waitForStartup())
-        // _ <- Future.traverse(all)(connectToAll)
-      } yield (),
+      Future.traverse(all)(_.waitForStartup()),
       5.minutes
     )
     all
