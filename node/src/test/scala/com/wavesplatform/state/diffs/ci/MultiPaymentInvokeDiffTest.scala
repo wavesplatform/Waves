@@ -39,6 +39,23 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     ContractScript(version, contract).explicitGet()
   }
 
+  def dAppVerifier(version: StdLibVersion): Script = {
+    val script =
+      s"""
+         | {-# STDLIB_VERSION ${version.id} #-}
+         | {-# CONTENT_TYPE   DAPP          #-}
+         | {-# SCRIPT_TYPE    ACCOUNT       #-}
+         |
+         | @Verifier(tx)
+         | func verify() = true
+         |
+       """.stripMargin
+
+    val expr = Parser.parseContract(script).get.value
+    val contract = compileContractFromExpr(expr, version)
+    ContractScript(version, contract).explicitGet()
+  }
+
   def verifier(version: StdLibVersion, scriptType: ScriptType): Script = {
     val script =
       s"""
