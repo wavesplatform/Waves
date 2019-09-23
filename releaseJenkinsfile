@@ -84,7 +84,7 @@ node('vostok'){
                         }
                         
                         def dockerImageBuilder = ut.buildDockerImage('', dockerRegistryCreds, 'wavesbuilder', wavesVersion, "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKCAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch} --target builder --no-cache", true)
-                        dockerImage = ut.buildDockerImage('', dockerRegistryCreds, dockerImageName, wavesVersion, "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKCAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch}", true)
+                        dockerImage = ut.buildDockerImage('', dockerRegistryCreds, dockerImageName, wavesVersion, "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch}", true)
                         sh  """
                                 id=\$(docker create wavesbuilder:${wavesVersion})
                                 docker cp \${id}:/out "${env.WORKSPACE}"
