@@ -25,7 +25,6 @@ class RewardsTestSuite
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private val miner = nodes.head
-  private val nonMiner = nodes.last
 
   "reward changes accordingly node's votes and miner's balance changes by reward amount after block generation" - {
     val initMinerBalance = miner.balanceDetails(miner.address).available
@@ -46,15 +45,15 @@ class RewardsTestSuite
       minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus(miner.height).currentReward
 
       val rewardAtActivation = miner.rewardStatus(activationHeight)
-      rewardAtActivation.currentReward should be(initial)
-      rewardAtActivation.minIncrement should be(minIncrement)
-      rewardAtActivation.term should be(term)
-      rewardAtActivation.nextCheck should be(activationHeight + term - 1)
-      rewardAtActivation.votingIntervalStart should be(activationHeight + term - votingInterval)
-      rewardAtActivation.votingThreshold should be(votingInterval / 2 + 1)
-      rewardAtActivation.votes.increase should be(0)
-      rewardAtActivation.votes.decrease should be(0)
-      rewardAtActivation.totalWavesAmount should be(initialAmount + initial)
+      rewardAtActivation.currentReward shouldBe initial
+      rewardAtActivation.minIncrement shouldBe minIncrement
+      rewardAtActivation.term shouldBe term
+      rewardAtActivation.nextCheck shouldBe activationHeight + term - 1
+      rewardAtActivation.votingIntervalStart shouldBe activationHeight + term - votingInterval
+      rewardAtActivation.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardAtActivation.votes.increase shouldBe 0
+      rewardAtActivation.votes.decrease shouldBe 0
+      rewardAtActivation.totalWavesAmount shouldBe initialAmount + initial
 
       miner.waitForHeight(activationHeight + 1) // 5
       miner.balanceDetails(miner.address).available shouldBe minerBalanceAtActivationHeight + miner.rewardStatus(miner.height).currentReward
@@ -62,15 +61,15 @@ class RewardsTestSuite
       val votingStartHeight = activationHeight + term - votingInterval
       miner.waitForHeight(votingStartHeight, 2.minutes) // 8
       val rewardAfterFirstVote = miner.rewardStatus(votingStartHeight)
-      rewardAfterFirstVote.currentReward should be(initial)
-      rewardAfterFirstVote.minIncrement should be(minIncrement)
-      rewardAfterFirstVote.term should be(term)
-      rewardAfterFirstVote.nextCheck should be(activationHeight + term - 1)
-      rewardAfterFirstVote.votingIntervalStart should be(activationHeight + term - votingInterval)
-      rewardAfterFirstVote.votingThreshold should be(votingInterval / 2 + 1)
-      rewardAfterFirstVote.votes.increase should be(1)
-      rewardAfterFirstVote.votes.decrease should be(0)
-      rewardAfterFirstVote.totalWavesAmount should be(initialAmount + BigInt(initial) * BigInt(votingStartHeight - activationHeight + 1))
+      rewardAfterFirstVote.currentReward shouldBe initial
+      rewardAfterFirstVote.minIncrement shouldBe minIncrement
+      rewardAfterFirstVote.term shouldBe term
+      rewardAfterFirstVote.nextCheck shouldBe activationHeight + term - 1
+      rewardAfterFirstVote.votingIntervalStart shouldBe activationHeight + term - votingInterval
+      rewardAfterFirstVote.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardAfterFirstVote.votes.increase shouldBe 1
+      rewardAfterFirstVote.votes.decrease shouldBe 0
+      rewardAfterFirstVote.totalWavesAmount shouldBe initialAmount + BigInt(initial) * BigInt(votingStartHeight - activationHeight + 1)
 
       val termEndHeight = activationHeight + term
       val newReward = initial + minIncrement
@@ -84,15 +83,15 @@ class RewardsTestSuite
       miner.waitForHeight(termEndHeight) // 12
 
       val rewardAtTermEnd = miner.rewardStatus(termEndHeight)
-      rewardAtTermEnd.currentReward should be(newReward)
-      rewardAtTermEnd.minIncrement should be(minIncrement)
-      rewardAtTermEnd.term should be(term)
-      rewardAtTermEnd.nextCheck should be(termEndHeight + term - 1)
-      rewardAtTermEnd.votingIntervalStart should be(termEndHeight + term - votingInterval)
-      rewardAtTermEnd.votingThreshold should be(votingInterval / 2 + 1)
-      rewardAtTermEnd.votes.increase should be(0)
-      rewardAtTermEnd.votes.decrease should be(0)
-      rewardAtTermEnd.totalWavesAmount should be(amountAfterTerm)
+      rewardAtTermEnd.currentReward shouldBe newReward
+      rewardAtTermEnd.minIncrement shouldBe minIncrement
+      rewardAtTermEnd.term shouldBe term
+      rewardAtTermEnd.nextCheck shouldBe termEndHeight + term - 1
+      rewardAtTermEnd.votingIntervalStart shouldBe termEndHeight + term - votingInterval
+      rewardAtTermEnd.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardAtTermEnd.votes.increase shouldBe 0
+      rewardAtTermEnd.votes.decrease shouldBe 0
+      rewardAtTermEnd.totalWavesAmount shouldBe amountAfterTerm
       val minerBalanceAtTermEndHeight = miner.balanceDetails(miner.address).available
       minerBalanceAtTermEndHeight shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus(miner.height).currentReward
 
@@ -104,15 +103,15 @@ class RewardsTestSuite
 
       miner.waitForHeight(secondVotingStartHeightPlusTwo, 5.minutes) // 18
       val rewardSecVoting = miner.rewardStatus(secondVotingStartHeightPlusTwo)
-      rewardSecVoting.currentReward should be(newReward)
-      rewardSecVoting.minIncrement should be(minIncrement)
-      rewardSecVoting.term should be(term)
-      rewardSecVoting.nextCheck should be(termEndHeight + term - 1)
-      rewardSecVoting.votingIntervalStart should be(termEndHeight + term - votingInterval)
-      rewardSecVoting.votingThreshold should be(votingInterval / 2 + 1)
-      rewardSecVoting.votes.increase should be(3)
-      rewardSecVoting.votes.decrease should be(0)
-      rewardSecVoting.totalWavesAmount should be(amountAfterTerm + newReward * BigInt(secondVotingStartHeightPlusTwo - termEndHeight))
+      rewardSecVoting.currentReward shouldBe newReward
+      rewardSecVoting.minIncrement shouldBe minIncrement
+      rewardSecVoting.term shouldBe term
+      rewardSecVoting.nextCheck shouldBe termEndHeight + term - 1
+      rewardSecVoting.votingIntervalStart shouldBe termEndHeight + term - votingInterval
+      rewardSecVoting.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardSecVoting.votes.increase shouldBe 3
+      rewardSecVoting.votes.decrease shouldBe 0
+      rewardSecVoting.totalWavesAmount shouldBe amountAfterTerm + newReward * BigInt(secondVotingStartHeightPlusTwo - termEndHeight)
     }
     "when miner votes for decrease" in {
       docker.restartNode(dockerNodes().head, configWithDecreasedDesired)
@@ -123,15 +122,15 @@ class RewardsTestSuite
       minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus(miner.height).currentReward
 
       val rewardAtActivation = miner.rewardStatus(activationHeight)
-      rewardAtActivation.currentReward should be(initial)
-      rewardAtActivation.minIncrement should be(minIncrement)
-      rewardAtActivation.term should be(term)
-      rewardAtActivation.nextCheck should be(activationHeight + term - 1)
-      rewardAtActivation.votingIntervalStart should be(activationHeight + term - votingInterval)
-      rewardAtActivation.votingThreshold should be(votingInterval / 2 + 1)
-      rewardAtActivation.votes.increase should be(0)
-      rewardAtActivation.votes.decrease should be(0)
-      rewardAtActivation.totalWavesAmount should be(initialAmount + initial)
+      rewardAtActivation.currentReward shouldBe initial
+      rewardAtActivation.minIncrement shouldBe minIncrement
+      rewardAtActivation.term shouldBe term
+      rewardAtActivation.nextCheck shouldBe activationHeight + term - 1
+      rewardAtActivation.votingIntervalStart shouldBe activationHeight + term - votingInterval
+      rewardAtActivation.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardAtActivation.votes.increase shouldBe 0
+      rewardAtActivation.votes.decrease shouldBe 0
+      rewardAtActivation.totalWavesAmount shouldBe initialAmount + initial
 
       val termEndHeight = activationHeight + term
       val newReward = initial - minIncrement
@@ -143,15 +142,15 @@ class RewardsTestSuite
 
       miner.waitForHeight(termEndHeight)
       val rewardAtTermEnd = miner.rewardStatus(termEndHeight)
-      rewardAtTermEnd.currentReward should be(newReward)
-      rewardAtTermEnd.minIncrement should be(minIncrement)
-      rewardAtTermEnd.term should be(term)
-      rewardAtTermEnd.nextCheck should be(termEndHeight + term - 1)
-      rewardAtTermEnd.votingIntervalStart should be(termEndHeight + term - votingInterval)
-      rewardAtTermEnd.votingThreshold should be(votingInterval / 2 + 1)
-      rewardAtTermEnd.votes.increase should be(0)
-      rewardAtTermEnd.votes.decrease should be(0)
-      rewardAtTermEnd.totalWavesAmount should be(amountAfterTerm)
+      rewardAtTermEnd.currentReward shouldBe newReward
+      rewardAtTermEnd.minIncrement shouldBe minIncrement
+      rewardAtTermEnd.term shouldBe term
+      rewardAtTermEnd.nextCheck shouldBe termEndHeight + term - 1
+      rewardAtTermEnd.votingIntervalStart shouldBe termEndHeight + term - votingInterval
+      rewardAtTermEnd.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardAtTermEnd.votes.increase shouldBe 0
+      rewardAtTermEnd.votes.decrease shouldBe 0
+      rewardAtTermEnd.totalWavesAmount shouldBe amountAfterTerm
       val minerBalanceAtTermEnd = miner.balanceDetails(miner.address).available
       minerBalanceAtTermEnd shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus(miner.height).currentReward
 
@@ -162,15 +161,15 @@ class RewardsTestSuite
       val secondVotingStartHeightPlusTwo = termEndHeight + term - votingInterval + 2
       miner.waitForHeight(secondVotingStartHeightPlusTwo, 5.minutes) // 18
       val rewardSecVoting = miner.rewardStatus(secondVotingStartHeightPlusTwo)
-      rewardSecVoting.currentReward should be(newReward)
-      rewardSecVoting.minIncrement should be(minIncrement)
-      rewardSecVoting.term should be(term)
-      rewardSecVoting.nextCheck should be(termEndHeight + term - 1)
-      rewardSecVoting.votingIntervalStart should be(termEndHeight + term - votingInterval)
-      rewardSecVoting.votingThreshold should be(votingInterval / 2 + 1)
-      rewardSecVoting.votes.increase should be(0)
-      rewardSecVoting.votes.decrease should be(3)
-      rewardSecVoting.totalWavesAmount should be(amountAfterTerm + newReward * BigInt(secondVotingStartHeightPlusTwo - termEndHeight))
+      rewardSecVoting.currentReward shouldBe newReward
+      rewardSecVoting.minIncrement shouldBe minIncrement
+      rewardSecVoting.term shouldBe term
+      rewardSecVoting.nextCheck shouldBe termEndHeight + term - 1
+      rewardSecVoting.votingIntervalStart shouldBe termEndHeight + term - votingInterval
+      rewardSecVoting.votingThreshold shouldBe votingInterval / 2 + 1
+      rewardSecVoting.votes.increase shouldBe 0
+      rewardSecVoting.votes.decrease shouldBe 3
+      rewardSecVoting.totalWavesAmount shouldBe amountAfterTerm + newReward * BigInt(secondVotingStartHeightPlusTwo - termEndHeight)
     }
   }
 }
@@ -198,7 +197,7 @@ object RewardsTestSuite {
        |    voting-interval = $votingInterval
        |  }
        |  rewards.desired = $increasedDesired
-       |  miner.quorum = 1
+       |  miner.quorum = 0
        |}""".stripMargin
   )
 
@@ -216,12 +215,11 @@ object RewardsTestSuite {
        |    voting-interval = $votingInterval
        |  }
        |  rewards.desired = $decreasedDesired
-       |  miner.quorum = 1
+       |  miner.quorum = 0
        |}""".stripMargin
   )
 
   val Configs: Seq[Config] = Seq(
-    configWithIncreasedDesired.withFallback(Default.head),
-    Default.last
+    configWithIncreasedDesired.withFallback(Default.head)
   )
 }
