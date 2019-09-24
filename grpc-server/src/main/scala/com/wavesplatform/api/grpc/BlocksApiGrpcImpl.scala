@@ -76,9 +76,10 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
 
       case Request.Height(height) =>
+        val actualHeight = if (height > 0) height else blockchain.height + height
         commonApi
-          .blockAtHeight(if (height > 0) height else blockchain.height + height)
-          .map(block => BlockWithHeight(Some(block.toPB), height))
+          .blockAtHeight(actualHeight)
+          .map(block => BlockWithHeight(Some(block.toPB), actualHeight))
 
       case Request.Reference(_) =>
         throw new StatusRuntimeException(Status.UNIMPLEMENTED)
