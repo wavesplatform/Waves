@@ -266,17 +266,16 @@ class UtxPoolImpl(
 
   private[this] val scheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
-  private val q = AsyncQueue.unbounded[Seq[Transaction]]()(scheduler)
+  private val queue = AsyncQueue.unbounded[Seq[Transaction]]()(scheduler)
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction]): Unit = q.offer(transactions)
+  def addAndCleanup(transactions: Seq[Transaction]): Unit = queue.offer(transactions)
 
   private def consume(): CancelableFuture[Unit] =
-    q.drain(1, Int.MaxValue)
+    queue
+      .drain(1, Int.MaxValue)
       .flatMap { transactionSeq =>
-        for (ts <- transactionSeq; t <- ts) {
-          addTransaction(t, verify = false)
-        }
+        for (ts <- transactionSeq; transaction <- ts) addTransaction(transaction, verify = false)
         packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
         consume()
       }(scheduler)
