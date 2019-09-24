@@ -162,7 +162,7 @@ object InvokeScriptTransactionDiff {
                 (if (blockchain.hasScript(tx.sender)) 1 else 0)
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            val assetName = s"${tx.assetFee._1.fold("WAVES")(_.id.base58)}"
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               (),
@@ -179,7 +179,7 @@ object InvokeScriptTransactionDiff {
                 (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            val assetName = s"${tx.assetFee._1.fold("WAVES")(_.id.base58)}"
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
