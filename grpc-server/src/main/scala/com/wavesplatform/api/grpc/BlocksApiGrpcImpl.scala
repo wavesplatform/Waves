@@ -4,15 +4,19 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.Blockchain
-import io.grpc.{Status, StatusRuntimeException}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.grpc.stub.StreamObserver
+import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
+import scala.util.Try
 
 class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
   private[this] val commonApi = new CommonBlocksApi(blockchain)
@@ -22,28 +26,46 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   }
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = {
-    val stream = if (request.includeTransactions) {
-      commonApi
-        .blocksRange(request.fromHeight, request.toHeight)
-        .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
-    } else {
-      commonApi
-        .blockHeadersRange(request.fromHeight, request.toHeight)
-        .map { case (header, _, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
+    def validateFilter(): Either[GenericError, Unit] = request.filter match {
+      case Filter.Generator(generator) =>
+        val isValidPK      = Try(PublicKey(generator.toByteStr).toAddress).isSuccess
+        val isValidAddress = PBRecipients.toAddress(generator).isRight
+        Either.cond(isValidPK || isValidAddress, (), GenericError(s"Invalid generator: ${generator.toByteStr}"))
+
+      case Filter.Empty => Right(())
     }
 
-    val filteredStream = stream.filter {
-      case BlockWithHeight(Some(PBBlock(Some(header), _, _)), _) =>
-        request.filter match {
-          case BlockRangeRequest.Filter.Generator(generator) =>
-            header.generator == generator || PublicKey(header.generator.toByteArray).toAddress.bytes == generator.toByteStr
-          case BlockRangeRequest.Filter.Empty => true
+    validateFilter() match {
+      case Left(error) =>
+        responseObserver.onError(GRPCErrors.toStatusException(error))
+
+      case Right(_) =>
+        val stream = if (request.includeTransactions) {
+          commonApi
+            .blocksRange(request.fromHeight, request.toHeight)
+            .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
+        } else {
+          commonApi
+            .blockHeadersRange(request.fromHeight, request.toHeight)
+            .map { case (header, _, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
         }
 
-      case _ => true
-    }
+        val filteredStream = stream.filter {
+          case BlockWithHeight(Some(PBBlock(Some(header), _, _)), _) =>
+            request.filter match {
+              case BlockRangeRequest.Filter.Generator(generator) =>
+                header.generator == generator || PBRecipients
+                  .toAddress(generator)
+                  .toOption
+                  .contains(PublicKey(header.generator.toByteArray).toAddress)
+              case BlockRangeRequest.Filter.Empty => true
+            }
 
-    responseObserver.completeWith(filteredStream)
+          case _ => true
+        }
+
+        responseObserver.completeWith(filteredStream)
+    }
   }
 
   override def getBlock(request: BlockRequest): Future[BlockWithHeight] = Future {
