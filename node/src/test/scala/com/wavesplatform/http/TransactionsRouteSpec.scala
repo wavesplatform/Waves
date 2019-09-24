@@ -41,13 +41,15 @@ class TransactionsRouteSpec
 
   implicit def scheduler = Scheduler.global
 
-  private val wallet = Wallet(WalletSettings(None, Some("qwerty"), None))
-  private val blockchain = mock[Blockchain]
-  private val utx = mock[UtxPool]
-  private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
-  private val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, stub[AddressTransactions], utx, utxPoolSynchronizer, new TestTime).route
+  val wallet     = Wallet(WalletSettings(None, Some("qwerty"), None))
+  val blockchain = mock[Blockchain]
 
-  private val invalidBase58Gen = alphaNumStr.map(_ + "0")
+  val utx                 = mock[UtxPool]
+  val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
+
+  val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, stub[AddressTransactions], utx, utxPoolSynchronizer, new TestTime).route
+
+  val InvalidBase58Gen = alphaNumStr.map(_ + "0")
 
   routePath("/calculateFee") - {
     "transfer with Waves fee" - {
@@ -118,7 +120,7 @@ class TransactionsRouteSpec
 
     "transfer with Asset fee" - {
       "without sponsorship" in {
-        val assetId: ByteStr = issueGen.sample.get.assetId
+        val assetId: ByteStr  = issueGen.sample.get.assetId
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -149,7 +151,7 @@ class TransactionsRouteSpec
 
       "with sponsorship" in {
         val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey = accountGen.sample.get
+        val sender: PublicKey    = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
@@ -169,16 +171,20 @@ class TransactionsRouteSpec
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
         (blockchain.assetDescription _)
           .expects(assetId)
-          .returning(Some(AssetDescription(
-            issuer = accountGen.sample.get,
-            name = "foo".getBytes("UTF-8"),
-            description = "bar".getBytes("UTF-8"),
-            decimals = 8,
-            reissuable = false,
-            totalVolume = Long.MaxValue,
-            script = None,
-            sponsorship = 5
-          )))
+          .returning(
+            Some(
+              AssetDescription(
+                issuer = accountGen.sample.get,
+                name = "foo".getBytes("UTF-8"),
+                description = "bar".getBytes("UTF-8"),
+                decimals = 8,
+                reissuable = false,
+                totalVolume = Long.MaxValue,
+                script = None,
+                sponsorship = 5
+              )
+            )
+          )
           .anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, blockchain, utx, utxPoolSynchronizer, new TestTime).route
@@ -192,7 +198,7 @@ class TransactionsRouteSpec
 
       "with sponsorship, smart token and smart account" in {
         val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey = accountGen.sample.get
+        val sender: PublicKey    = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
@@ -213,16 +219,20 @@ class TransactionsRouteSpec
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
         (blockchain.assetDescription _)
           .expects(assetId)
-          .returning(Some(AssetDescription(
-            issuer = accountGen.sample.get,
-            name = "foo".getBytes("UTF-8"),
-            description = "bar".getBytes("UTF-8"),
-            decimals = 8,
-            reissuable = false,
-            totalVolume = Long.MaxValue,
-            script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
-            sponsorship = 5
-          )))
+          .returning(
+            Some(
+              AssetDescription(
+                issuer = accountGen.sample.get,
+                name = "foo".getBytes("UTF-8"),
+                description = "bar".getBytes("UTF-8"),
+                decimals = 8,
+                reissuable = false,
+                totalVolume = Long.MaxValue,
+                script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
+                sponsorship = 5
+              )
+            )
+          )
           .anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, blockchain, utx, utxPoolSynchronizer, new TestTime).route
@@ -257,7 +267,7 @@ class TransactionsRouteSpec
       }
 
       "invalid after" in {
-        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), invalidBase58Gen) {
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), InvalidBase58Gen) {
           case (address, limit, invalidBase58) =>
             Get(routePath(s"/address/$address/limit/$limit?after=$invalidBase58")) ~> route ~> check {
               status shouldEqual StatusCodes.BadRequest
@@ -296,7 +306,7 @@ class TransactionsRouteSpec
 
   routePath("/info/{signature}") - {
     "handles invalid signature" in {
-      forAll(invalidBase58Gen) { invalidBase58 =>
+      forAll(InvalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidSignature)
       }
 
@@ -329,7 +339,7 @@ class TransactionsRouteSpec
       } yield t
 
       forAll(g) { txs =>
-        (utx.all _).expects().returns(txs).once()
+        (utx.transactions _).expects().returns(txs).once()
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
@@ -363,7 +373,7 @@ class TransactionsRouteSpec
 
   routePath("/unconfirmed/info/{signature}") - {
     "handles invalid signature" in {
-      forAll(invalidBase58Gen) { invalidBase58 =>
+      forAll(InvalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidSignature)
       }
 

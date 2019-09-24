@@ -48,15 +48,15 @@ class UtxPoolImpl(
   private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   // State
-  private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val transactionsMap       = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
   // Init consume loop
   TxQueue.consume()
 
-  override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
-    else putNewTx(tx, verify)
+  override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+    if (transactionsMap.containsKey(tx.id())) TracedResult.wrapValue(false)
+    else this.putNewTx(tx, verify = true)
   }
 
   private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -86,7 +86,7 @@ class UtxPoolImpl(
                   GenericError("transactions from scripted accounts are denied from UTX pool")
                 )
 
-                scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
+                scriptedCount = transactionsMap.values().asScala.count(TxCheck.isScripted)
                 _ <- Either.cond(
                   skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
                   (),
@@ -124,7 +124,7 @@ class UtxPoolImpl(
         }
 
         def checkIsMostProfitable(newTx: Transaction): Boolean = PoolMetrics.checkIsMostProfitable.measure {
-          transactions
+          transactionsMap
             .values()
             .asScala
             .forall(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) < 0)
@@ -132,12 +132,12 @@ class UtxPoolImpl(
       }
 
       lazy val skipSizeCheck = utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx)
-      lazy val transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+      lazy val transactionsBytes = transactionsMap.values.asScala // Bytes size of all transactions in pool
         .map(_.bytes().length)
         .sum
 
       for {
-        _ <- Either.cond(transactions.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
+        _ <- Either.cond(transactionsMap.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
         _ <- Either.cond(
           skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
           (),
@@ -164,19 +164,18 @@ class UtxPoolImpl(
       .map(_.id())
       .foreach(remove)
 
-  private[this] def remove(txId: ByteStr): Unit = for (tx <- Option(transactions.remove(txId))) {
+  private[this] def remove(txId: ByteStr): Unit = for (tx <- Option(transactionsMap.remove(txId))) {
     PoolMetrics.removeTransaction(tx)
     pessimisticPortfolios.remove(tx.id())
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
-      .map { diff =>
-        pessimisticPortfolios.add(tx.id(), diff); true
-      }
+      .map(pessimisticPortfolios.add(tx.id(), _))
+      .map(_ => true)
 
     if (!verify || isNew.resultE.isRight) {
-      transactions.put(tx.id(), tx)
+      transactionsMap.put(tx.id(), tx)
       PoolMetrics.addTransaction(tx)
     }
 
@@ -190,13 +189,17 @@ class UtxPoolImpl(
         .getAggregated(addr)
         .spendableBalanceOf(assetId)
 
-  override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
+  override def pessimisticPortfolio(addr: Address): Portfolio =
+    pessimisticPortfolios.getAggregated(addr)
 
-  override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
+  override def transactions: Seq[Transaction] =
+    transactionsMap.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
-  override def size: Int = transactions.size
+  override def size: Int =
+    transactionsMap.size
 
-  override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
+  override def transactionById(transactionId: ByteStr): Option[Transaction] =
+    Option(transactionsMap.get(transactionId))
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -209,7 +212,7 @@ class UtxPoolImpl(
       type R = (Seq[Transaction], Diff, MultiDimensionalMiningConstraint, Int)
       @inline def bumpIterations(r: R): R = r.copy(_4 = r._4 + 1)
 
-      transactions.values.asScala.toSeq
+      transactionsMap.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
         .foldLeft((Seq.empty[Transaction], Monoid[Diff].empty, initialConstraint, 0)) {

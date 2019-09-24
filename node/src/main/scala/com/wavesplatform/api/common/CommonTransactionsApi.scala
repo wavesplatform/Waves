@@ -14,7 +14,10 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 
-private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTransactions: AddressTransactions, utx: UtxPool,
+private[api] final class CommonTransactionsApi(
+    blockchain: Blockchain,
+    addressTransactions: AddressTransactions,
+    utx: UtxPool,
     wallet: Wallet,
     publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
 ) {
@@ -25,7 +28,7 @@ private[api] final class CommonTransactionsApi(blockchain: Blockchain, addressTr
     blockchain.transactionInfo(transactionId)
 
   def unconfirmedTransactions(): Seq[VanillaTransaction] =
-    utx.all
+    utx.transactions
 
   def unconfirmedTransactionById(transactionId: ByteStr): Option[VanillaTransaction] =
     utx.transactionById(transactionId)
