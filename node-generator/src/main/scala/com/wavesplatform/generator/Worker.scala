@@ -1,13 +1,15 @@
 package com.wavesplatform.generator
 
 import java.net.{InetSocketAddress, URL}
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 import cats.Show
 import cats.effect.concurrent.Ref
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import com.typesafe.config.Config
-import com.wavesplatform.generator.Worker.{Settings, State, WarmUp}
+import com.wavesplatform.generator.Worker.{EmptyState, Settings, State, WarmUp}
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
@@ -39,10 +41,10 @@ class Worker(
 
   private[this] val task =
     for {
-      state <- Ref.of[Task, State](State(settings.warmUp))
+      state <- Ref.of[Task, State](EmptyState(settings.warmUp))
       initState <- settings.initialWarmUp match {
-        case Some(warmUp) => Ref.of[Task, State](State(warmUp))
-        case None         => Ref.of[Task, State](State(WarmUp.constWarmUp(initial.size)))
+        case Some(warmUp) => Ref.of[Task, State](EmptyState(warmUp))
+        case None         => Ref.of[Task, State](EmptyState(WarmUp.constWarmUp(initial.size)))
       }
       channel <- getChannel
       _       <- logInfo("INITIAL PHASE")
@@ -170,32 +172,40 @@ object Worker {
       start: Int,
       end: Int,
       step: Int,
+      duration: Option[FiniteDuration],
       once: Boolean
   )
 
   object WarmUp {
-    def constWarmUp(size: Int) = WarmUp(size, size, 1, true)
+    def constWarmUp(size: Int) = WarmUp(size, size, 1, None, true)
   }
 
-  case class State(
-      cnt: Int,
-      raised: Boolean,
-      private val warmUp: WarmUp
-  ) {
+  sealed trait State {
+    def cnt: Int
     def next(utxCnt: Int): State =
-      if (raised) this.copy(cnt = utxCnt)
-      else {
-        val mayBeNextCnt = if (cnt < 0) warmUp.start else math.min(cnt + warmUp.step, warmUp.end)
-        val nextCnt      = math.min(mayBeNextCnt, utxCnt)
-        val nextRaised   = if (nextCnt == warmUp.end && warmUp.once) true else false
-        State(nextCnt, nextRaised, warmUp)
+      this match {
+        case EmptyState(warmUp) =>
+          WorkState(warmUp.start, false, warmUp.duration.map(d => LocalDateTime.now.plus(d.toMillis, ChronoUnit.MILLIS)), warmUp)
+        case s @ WorkState(cnt, raised, endAfter, warmUp) =>
+          if (raised) s.copy(cnt = utxCnt)
+          else {
+            endAfter match {
+              case Some(ldt) if ldt.isBefore(LocalDateTime.now) => s.copy(cnt = utxCnt, raised = true)
+              case _ =>
+                val mayBeNextCnt = if (cnt < 0) warmUp.start else math.min(cnt + warmUp.step, warmUp.end)
+                val nextCnt      = math.min(mayBeNextCnt, utxCnt)
+                val nextRaised   = if (nextCnt == warmUp.end && warmUp.once) true else false
+                WorkState(nextCnt, nextRaised, endAfter, warmUp)
+            }
+          }
       }
-
-    override def toString: String = if (cnt < 0) "Empty" else s"State(cnt=$cnt, raised=$raised)"
   }
-
-  object State {
-    def apply(warmUp: WarmUp) = new State(-1, false, warmUp)
+  final case class EmptyState(warmUp: WarmUp) extends State {
+    val cnt: Int                  = 0
+    override def toString: String = "EmptyState"
+  }
+  final case class WorkState(cnt: Int, raised: Boolean, endAfter: Option[LocalDateTime], warmUp: WarmUp) extends State {
+    override def toString: String = s"State(cnt=$cnt, raised=$raised, endAfter=$endAfter)"
   }
 
   implicit val settingsReader: ValueReader[Settings] = (config: Config, path: String) => {
@@ -208,11 +218,12 @@ object Worker {
     val reconnectDelay              = config.as[FiniteDuration](s"$path.reconnect-delay")
 
     def readWarmUp(warmUpConfig: Config): WarmUp = {
-      val warmUpStart = warmUpConfig.as[Int](s"start")
-      val warmUpEnd   = warmUpConfig.as[Option[Int]](s"end").getOrElse(utxLimit)
-      val warmUpStep  = warmUpConfig.as[Int](s"step")
-      val warmUpOnce  = warmUpConfig.as[Option[Boolean]](s"once").getOrElse(true)
-      WarmUp(warmUpStart, warmUpEnd, warmUpStep, warmUpOnce)
+      val warmUpStart    = warmUpConfig.as[Int](s"start")
+      val warmUpEnd      = warmUpConfig.as[Option[Int]](s"end").getOrElse(utxLimit)
+      val warmUpStep     = warmUpConfig.as[Int](s"step")
+      val warmUpDuration = warmUpConfig.as[Option[FiniteDuration]](s"duration")
+      val warmUpOnce     = warmUpConfig.as[Option[Boolean]](s"once").getOrElse(true)
+      WarmUp(warmUpStart, warmUpEnd, warmUpStep, warmUpDuration, warmUpOnce)
     }
 
     val warmUp     = readWarmUp(config.getConfig(s"$path.warm-up"))
