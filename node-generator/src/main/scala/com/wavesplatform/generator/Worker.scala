@@ -103,9 +103,7 @@ class Worker(
     else
       for {
         _ <- sleep(settings.initialDelay)
-        _ <- if (settings.waitForEmptyUtxAfterInitial)
-          nodeUTXTransactionsToSendCount >>= (cnt => if (cnt == settings.utxLimit) Task.unit else Task.defer(afterInitial))
-        else Task.unit
+        _ <- nodeUTXTransactionsToSendCount >>= (cnt => if (cnt == settings.utxLimit) Task.unit else Task.defer(afterInitial))
       } yield ()
 
   private[this] def pullAndWrite(channel: Channel, state: Ref[Task, State], cnt: Int = 0): Task[Channel] =
