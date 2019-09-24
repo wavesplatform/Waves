@@ -4,12 +4,13 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 
-import com.google.common.primitives.Shorts
+import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.extensions.impl.LevelDBApiExtensions
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -85,7 +86,8 @@ object Explorer extends ScorexLogging {
     "transaction-height-and-nums-by-id",
     "block-transactions-fee",
     "invoke-script-result",
-    "block-reward"
+    "block-reward",
+    "waves-amount"
   )
 
   def main(argsRaw: Array[String]): Unit = {
@@ -127,6 +129,29 @@ object Explorer extends ScorexLogging {
       val flag                             = argument(0, "command").toUpperCase
 
       flag match {
+        case "WB" =>
+          val balances = mutable.Map[BigInt, Long]()
+          db.iterateOver(6: Short) { e =>
+            val addressId = BigInt(e.getKey.drop(6))
+            val balance = Longs.fromByteArray(e.getValue)
+            balances += (addressId -> balance)
+          }
+
+          var actualTotalReward = 0L
+          db.iterateOver(Keys.BlockRewardPrefix) { e =>
+            actualTotalReward += Longs.fromByteArray(e.getValue)
+          }
+
+          val actualTotalBalance = balances.values.sum + reader.carryFee
+          val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
+          val byKeyTotalBalance = reader.wavesAmount(blockchainHeight)
+
+          if (actualTotalBalance != expectedTotalBalance || expectedTotalBalance != byKeyTotalBalance)
+            log.error(s"Something wrong, actual total waves balance: $actualTotalBalance," +
+              s" expected total waves balance: $expectedTotalBalance, total waves balance by key: $byKeyTotalBalance")
+          else
+            log.info(s"Correct total waves balance: $actualTotalBalance WAVELETS")
+
         case "B" =>
           val maybeBlockId = Base58.tryDecodeWithLimit(argument(1, "block id")).toOption.map(ByteStr.apply)
           if (maybeBlockId.isDefined) {
