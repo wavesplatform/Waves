@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import cats.Eval
 import cats.data.EitherT
+import cats.implicits._
+import cats.{Eval, Monad}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.TrampolinedExecResult
+import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -12,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
 
-sealed trait BaseFunction {
+sealed trait BaseFunction[F[_]] {
   @JSExport def signature: FunctionTypeSignature
   @JSExport def header: FunctionHeader = signature.header
   def costByLibVersion: Map[StdLibVersion, Long]
@@ -22,39 +23,41 @@ sealed trait BaseFunction {
 }
 
 object BaseFunction {
-  implicit def header(bf: BaseFunction): FunctionHeader = bf.header
+  implicit def header[F[_]](bf: BaseFunction[F]): FunctionHeader = bf.header
 }
 
 @JSExportTopLevel("FunctionTypeSignature")
 case class FunctionTypeSignature(result: TYPE, args: Seq[(String, TYPE)], header: FunctionHeader)
 
 @JSExportTopLevel("NativeFunction")
-case class NativeFunction(@(JSExport @field) name: String,
-                          costByLibVersion: Map[StdLibVersion, Long],
-                          @(JSExport @field) signature: FunctionTypeSignature,
-                          ev: List[EVALUATED] => Either[String, EVALUATED],
-                          @(JSExport @field) args: Array[String])
-    extends BaseFunction {
-  def eval(args: List[EVALUATED]): TrampolinedExecResult[EVALUATED] = EitherT.fromEither[Eval](ev(args))
+case class NativeFunction[F[_] : Monad](
+  @(JSExport @field) name: String,
+  costByLibVersion: Map[StdLibVersion, Long],
+  @(JSExport @field) signature: FunctionTypeSignature,
+  ev: List[EVALUATED] => F[Either[String, EVALUATED]],
+  @(JSExport @field) args: Array[String]
+) extends BaseFunction[F] {
+  def eval(args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
+    EitherT.apply[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](ev(args).pure[Eval])
 }
 
 object NativeFunction {
 
-  def apply(name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
-      ev: PartialFunction[List[EVALUATED], Either[String, EVALUATED]]): NativeFunction =
+  def apply[F[_] : Monad](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+      ev: PartialFunction[List[EVALUATED], F[Either[String, EVALUATED]]]): NativeFunction[F] =
     new NativeFunction(
       name = name,
       costByLibVersion = DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
-      ev = ev.orElse{ case _ => Left("Passed argument with wrong type").asInstanceOf[Either[String, EVALUATED]]},
+      ev = ev.orElse { case _ => "Passed argument with wrong type".asLeft[EVALUATED].pure[F] },
       args = args.map(_._1).toArray
     )
 
-  def apply(name: String,
+  def apply[F[_] : Monad](name: String,
             costByLibVersion: Map[StdLibVersion, Long],
             internalName: Short,
             resultType: TYPE,
-            args: (String, TYPE, String)*)(ev: List[EVALUATED] => Either[String, EVALUATED]): NativeFunction =
+            args: (String, TYPE, String)*)(ev: List[EVALUATED] => F[Either[String, EVALUATED]]): NativeFunction[F] =
     new NativeFunction(
       name = name,
       costByLibVersion = costByLibVersion,
@@ -66,35 +69,36 @@ object NativeFunction {
 }
 
 @JSExportTopLevel("UserFunction")
-case class UserFunction(@(JSExport @field) name: String,
-                        @(JSExport @field) internalName: String,
-                        costByLibVersion: Map[StdLibVersion, Long],
-                        @(JSExport @field) signature: FunctionTypeSignature,
-                        ev: EXPR,
-                        @(JSExport @field) args: Array[String])
-    extends BaseFunction
+case class UserFunction[F[_]](
+  @(JSExport@field) name: String,
+  @(JSExport@field) internalName: String,
+  costByLibVersion: Map[StdLibVersion, Long],
+  @(JSExport@field) signature: FunctionTypeSignature,
+  ev: EXPR,
+  @(JSExport@field) args: Array[String]
+) extends BaseFunction[F]
 
 object UserFunction {
 
-  def apply(name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction =
+  def apply[F[_]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[F] =
     UserFunction(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
 
-  def deprecated(name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction =
+  def deprecated[F[_]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[F] =
     UserFunction.deprecated(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
 
-  def apply(name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, args: (String, TYPE)*)(
-      ev: EXPR): UserFunction =
+  def apply[F[_]](name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, args: (String, TYPE)*)(
+      ev: EXPR): UserFunction[F] =
     UserFunction(name, name, costByLibVersion, resultType, args: _*)(ev)
 
-  def apply(name: String, internalName: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(
-      ev: EXPR): UserFunction =
+  def apply[F[_]](name: String, internalName: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(
+      ev: EXPR): UserFunction[F] =
     UserFunction(name, internalName, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
 
-  def apply(name: String,
+  def apply[F[_]](name: String,
             internalName: String,
             costByLibVersion: Map[StdLibVersion, Long],
             resultType: TYPE,
-            args: (String, TYPE)*)(ev: EXPR): UserFunction =
+            args: (String, TYPE)*)(ev: EXPR): UserFunction[F] =
     new UserFunction(
       name = name,
       internalName = internalName,
@@ -104,12 +108,14 @@ object UserFunction {
       args = args.map(_._1).toArray
     )
 
-  def deprecated(name: String,
-                 internalName: String,
-                 costByLibVersion: Map[StdLibVersion, Long],
-                 resultType: TYPE,
-                 args: (String, TYPE)*)(ev: EXPR): UserFunction =
-    new UserFunction(
+  def deprecated[F[_]](
+    name: String,
+    internalName: String,
+    costByLibVersion: Map[StdLibVersion, Long],
+    resultType: TYPE,
+    args: (String, TYPE)*
+  )(ev: EXPR): UserFunction[F] =
+    new UserFunction[F](
       name = name,
       internalName = internalName,
       costByLibVersion = costByLibVersion,

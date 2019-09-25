@@ -1,9 +1,9 @@
 package com.wavesplatform.utils.doc
 
-import com.wavesplatform.common.utils.EitherExt2
+import cats.Id
+import cats.implicits._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -11,10 +11,8 @@ import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
-import cats.implicits._
-
 object RideFullContext {
-  private val dummyEnv = new Environment {
+  private val dummyEnv = new Environment[Id] {
     override def height: Long = ???
     override def chainId: Byte = 66
     override def inputEntity: InputEntity = ???
@@ -32,8 +30,8 @@ object RideFullContext {
 
   def build(
     ds:       DirectiveSet,
-    wavesEnv: Environment = dummyEnv
-  ): CTX = {
+    wavesEnv: Environment[Id] = dummyEnv
+  ): CTX[Id] = {
     val wavesCtx = WavesContext.build(ds, wavesEnv)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion)
     val pureCtx = PureContext.build(Global, ds.stdLibVersion)

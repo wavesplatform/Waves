@@ -1,15 +1,17 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
+import cats.Monad
+import cats.implicits._
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, CONST_BYTESTR, CONST_STRING}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
-class EnvironmentFunctions(environment: Environment) {
+class EnvironmentFunctions[F[_] : Monad](environment: Environment[F]) {
 
-  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, Option[Any]] = {
+  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, F[Option[Any]]] = {
     val objTypeName = addressOrAlias.caseType.name
 
     val recipientEi =
@@ -32,8 +34,8 @@ class EnvironmentFunctions(environment: Environment) {
     recipientEi.map(environment.data(_, key, dataType))
   }
 
-  def addressFromAlias(name: String): Either[ExecutionError, Recipient.Address] = environment.resolveAlias(name)
-
+  def addressFromAlias(name: String): F[Either[ExecutionError, Recipient.Address]] =
+    environment.resolveAlias(name)
 }
 
 object EnvironmentFunctions {

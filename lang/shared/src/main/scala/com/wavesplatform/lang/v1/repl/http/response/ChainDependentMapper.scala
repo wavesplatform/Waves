@@ -1,15 +1,15 @@
-package com.wavesplatform.lang.v1.repl.http
+package com.wavesplatform.lang.v1.repl.http.response
 
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.repl.global
-import com.wavesplatform.lang.v1.repl.http.response._
+import com.wavesplatform.lang.v1.repl.http.response.model.{AssetInfoResponse, BlockInfoResponse, ByteString, TransferTransaction, TransferTransactionV1, TransferTransactionV2}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
 
-private[http] case class ResponseMapper(chainId: Byte) {
+private[http] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
     Transfer(
       proven(tx),

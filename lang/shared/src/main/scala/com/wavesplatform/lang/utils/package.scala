@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
@@ -20,14 +21,14 @@ package object utils {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
-  val lazyContexts: Map[DirectiveSet, Coeval[CTX]] = {
+  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Id]]] = {
     val directives = for {
       version    <- DirectiveDictionary[StdLibVersion].all
       cType      <- DirectiveDictionary[ContentType].all
       scriptType <- DirectiveDictionary[ScriptType].all
     } yield DirectiveSet(version, scriptType, cType)
 
-    val environment = new Environment {
+    val environment = new Environment[Id] {
       override def height: Long                                                                                    = 0
       override def chainId: Byte                                                                                   = 1: Byte
       override def inputEntity: Environment.InputEntity                                                            = null
@@ -66,7 +67,7 @@ package object utils {
 
   def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
 
-  def estimate(version: StdLibVersion, ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
+  def estimate(version: StdLibVersion, ctx: EvaluationContext[Id]): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
       case (typeName, CASETYPEREF(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
     }(collection.breakOut)

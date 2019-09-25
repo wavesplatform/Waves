@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.repl.http.response
+package com.wavesplatform.lang.v1.repl.http.response.model
 
 import io.circe.generic.auto._
 import io.circe.{Decoder, DecodingFailure, HCursor}
