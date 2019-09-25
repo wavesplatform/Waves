@@ -9,7 +9,7 @@ import cats.effect.concurrent.Ref
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import com.typesafe.config.Config
-import com.wavesplatform.generator.Worker.{EmptyState, Settings, State, WarmUp}
+import com.wavesplatform.generator.Worker.{EmptyState, Settings, SkipState, State}
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
@@ -44,7 +44,7 @@ class Worker(
       state <- Ref.of[Task, State](EmptyState(settings.warmUp))
       initState <- settings.initialWarmUp match {
         case Some(warmUp) => Ref.of[Task, State](EmptyState(warmUp))
-        case None         => Ref.of[Task, State](EmptyState(WarmUp.constWarmUp(initial.size)))
+        case None         => Ref.of[Task, State](SkipState(settings.utxLimit))
       }
       channel <- getChannel
       _       <- logInfo("INITIAL PHASE")
@@ -174,36 +174,40 @@ object Worker {
       once: Boolean
   )
 
-  object WarmUp {
-    def constWarmUp(size: Int) = WarmUp(size, size, 1, None, true)
-  }
-
   sealed trait State {
     def cnt: Int
-    def next(utxCnt: Int): State =
+    def next(utxToSendCnt: Int): State =
       this match {
+        case SkipState(_) => SkipState(utxToSendCnt)
         case EmptyState(warmUp) =>
           WorkState(warmUp.start, false, warmUp.duration.map(d => LocalDateTime.now.plus(d.toMillis, ChronoUnit.MILLIS)), warmUp)
         case s @ WorkState(cnt, raised, endAfter, warmUp) =>
-          if (raised) s.copy(cnt = utxCnt)
+          if (raised) s.copy(cnt = utxToSendCnt)
           else {
             endAfter match {
-              case Some(ldt) if ldt.isBefore(LocalDateTime.now) => s.copy(cnt = utxCnt, raised = true)
+              case Some(ldt) if ldt.isBefore(LocalDateTime.now) => s.copy(cnt = utxToSendCnt, raised = true)
               case _ =>
-                val mayBeNextCnt = if (cnt < 0) warmUp.start else math.min(cnt + warmUp.step, warmUp.end)
-                val nextCnt      = math.min(mayBeNextCnt, utxCnt)
+                val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
+                val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
                 val nextRaised   = if (nextCnt == warmUp.end && warmUp.once) true else false
                 WorkState(nextCnt, nextRaised, endAfter, warmUp)
             }
           }
       }
   }
+
   final case class EmptyState(warmUp: WarmUp) extends State {
     val cnt: Int                  = 0
     override def toString: String = "EmptyState"
   }
+
   final case class WorkState(cnt: Int, raised: Boolean, endAfter: Option[LocalDateTime], warmUp: WarmUp) extends State {
+    require(cnt >= 0)
     override def toString: String = s"State(cnt=$cnt, raised=$raised, endAfter=$endAfter)"
+  }
+
+  final case class SkipState(cnt: Int) extends State {
+    override def toString: String = "SkipState"
   }
 
   implicit val settingsReader: ValueReader[Settings] = (config: Config, path: String) => {
