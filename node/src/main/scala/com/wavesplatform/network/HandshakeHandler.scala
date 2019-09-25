@@ -144,7 +144,7 @@ object HandshakeHandler extends ScorexLogging {
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean = {
     val (major, minor, _) = remoteVersion
     major match {
-      case 0 => minor >= 1
+      case 0 => minor >= 13
       case 1 => minor >= 0
       case _ => false
     }
