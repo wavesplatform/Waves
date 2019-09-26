@@ -37,7 +37,17 @@ import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, Micro
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Schedulers._
-import com.wavesplatform.utils.{InvalidApiKey, LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp, forceStopApplication}
+import com.wavesplatform.utils.{
+  InvalidApiKey,
+  LoggerFacade,
+  NTP,
+  Schedulers,
+  ScorexLogging,
+  SystemInformationReporter,
+  Time,
+  UtilApp,
+  forceStopApplication
+}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -47,13 +57,13 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -61,8 +71,7 @@ import scala.util.control.NonFatal
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
-
-  import monix.execution.Scheduler.Implicits.{global => scheduler}
+  import monix.execution.Scheduler.Implicits.{global => globalScheduler}
 
   private val db = openDB(settings.dbSettings.directory)
 
@@ -137,13 +146,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val lastScore = lastBlockInfo
       .map(_.score)
       .distinctUntilChanged
-      .share(scheduler)
+      .share(globalScheduler)
 
     lastScore
       .debounce(LocalScoreBroadcastDebounce)
       .foreach { x =>
         allChannels.broadcast(LocalScoreChanged(x))
-      }(scheduler)
+      }(globalScheduler)
 
     val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
     val network =
@@ -359,7 +368,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       case s                                 => s.shutdown()
     }
     timeout.foreach { to =>
-      val r = Await.result(scheduler.awaitTermination(to, global), 2 * to)
+      val r = Await.result(scheduler.awaitTermination(to, Scheduler.global), 2 * to)
       if (r)
         log.info(s"$name was shutdown successfully")
       else
@@ -398,7 +407,6 @@ object Application {
   }
 
   def main(args: Array[String]): Unit = {
-
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")
@@ -449,7 +457,7 @@ object Application {
               .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
           )
         }
-      }
+      }(Scheduler.global)
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
