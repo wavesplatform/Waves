@@ -5,19 +5,21 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
+import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
-import com.wavesplatform.api.grpc.AccountsApiGrpc
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BlockRangeRequest, BlockRequest, BlocksApiGrpc}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
@@ -524,12 +526,56 @@ object SyncHttpApi extends Assertions {
 
   class NodeExtGrpc(n: Node) {
     import com.wavesplatform.account.{Address => Addr}
+    import com.wavesplatform.block.{Block => Blck, BlockHeader => BlckHeader}
 
     private[this] lazy val accounts = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private[this] lazy val blocks = BlocksApiGrpc.blockingStub(n.grpcChannel)
 
     def resolveAlias(alias: String): Addr = {
       val addr = accounts.resolveAlias(StringValue.of(alias))
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
+    }
+
+    def blockAt(height: Int): Blck = {
+      val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height))).getBlock
+      PBBlocks.vanilla(block).explicitGet()
+    }
+
+    def blockById(blockId: String): Blck = {
+      val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.BlockId.apply(ByteString.copyFrom(Base58.decode(blockId))))).getBlock
+      PBBlocks.vanilla(block).explicitGet()
+    }
+
+    def blockSeq(fromHeight: Int, toHeight: Int): Seq[Blck] = {
+      val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = true, BlockRangeRequest.Filter.Empty))
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).explicitGet()).toSeq
+    }
+
+    def blockSeqByAddress(address: String, fromHeight: Int, toHeight: Int): Seq[Blck] = {
+      val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = true,
+        BlockRangeRequest.Filter.Generator.apply(ByteString.copyFrom(Base58.decode(address)))))
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).explicitGet()).toSeq
+    }
+
+    def blockHeaderAt(height: Int): BlckHeader = {
+      val block = blocks.getBlock(BlockRequest.of(includeTransactions = false, BlockRequest.Request.Height.apply(height))).getBlock
+      PBBlocks.vanilla(block).explicitGet().getHeader()
+    }
+
+    def blockHeaderById(blockId: String): BlckHeader = {
+      val block = blocks.getBlock(BlockRequest.of(includeTransactions = false, BlockRequest.Request.BlockId.apply(ByteString.copyFrom(Base58.decode(blockId))))).getBlock
+      PBBlocks.vanilla(block).explicitGet().getHeader()
+    }
+
+    def blockHeaderSeq(fromHeight: Int, toHeight: Int): Seq[BlckHeader] = {
+      val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = false, BlockRangeRequest.Filter.Empty))
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).explicitGet().getHeader()).toSeq
+    }
+
+    def blockHeaderSeqByAddress(address: String, fromHeight: Int, toHeight: Int): Seq[BlckHeader] = {
+      val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = false,
+        BlockRangeRequest.Filter.Generator.apply(ByteString.copyFrom(Base58.decode(address)))))
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).explicitGet().getHeader()).toSeq
     }
   }
 }
