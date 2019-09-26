@@ -18,7 +18,7 @@ import scala.util.control.NonFatal
 
 class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
-  private type PeerRemoved[T] = RemovalNotification[T, java.lang.Long]
+  private type PeerRemoved[T]         = RemovalNotification[T, java.lang.Long]
   private type PeerRemovalListener[T] = PeerRemoved[T] => Unit
 
   private def cache[T <: AnyRef](timeout: FiniteDuration, removalListener: Option[PeerRemovalListener[T]] = None) =
@@ -76,17 +76,16 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
 
-  override def blacklist(socketAddress: InetSocketAddress, reason: String): Unit = getAddress(socketAddress).foreach { address =>
+  override def blacklist(inetAddress: InetAddress, reason: String): Unit =
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
         unverifiedPeers.removeIf { x =>
-          Option(x.getAddress).contains(address)
+          Option(x.getAddress).contains(inetAddress.getAddress)
         }
-        blacklist.put(address, System.currentTimeMillis())
-        reasons.put(address, reason)
+        blacklist.put(inetAddress, System.currentTimeMillis())
+        reasons.put(inetAddress, reason)
       }
     }
-  }
 
   override def suspend(socketAddress: InetSocketAddress): Unit = getAddress(socketAddress).foreach { address =>
     unverifiedPeers.synchronized {
@@ -152,7 +151,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def blacklistAndClose(channel: Channel, reason: String): Unit = getRemoteAddress(channel).foreach { x =>
     log.debug(s"Blacklisting ${id(channel)}: $reason")
-    blacklist(x, reason)
+    blacklist(x.getAddress, reason)
     channel.close()
   }
 
