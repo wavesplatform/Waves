@@ -35,7 +35,7 @@ case class MassTransferTransaction private (
   override val builder: MassTransferTransaction.type = MassTransferTransaction
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
 
-    val assetIdBytes = assetId.byteRepr
+    val assetIdBytes = assetId.bytesRepr
 
     val transferBytes = transfers
       .map { case ParsedTransfer(recipient, amount) => recipient.bytes.arr ++ Longs.toByteArray(amount) }

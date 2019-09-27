@@ -36,8 +36,8 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
 
   final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes  = Longs.toByteArray(timestamp)
-    val assetIdBytes    = assetId.byteRepr
-    val feeAssetIdBytes = feeAssetId.byteRepr
+    val assetIdBytes    = assetId.bytesRepr
+    val feeAssetIdBytes = feeAssetId.bytesRepr
     val amountBytes     = Longs.toByteArray(amount)
     val feeBytes        = Longs.toByteArray(fee)
 

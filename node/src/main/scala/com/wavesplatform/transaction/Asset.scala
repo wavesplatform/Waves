@@ -13,45 +13,45 @@ object Asset {
   final case class IssuedAsset(id: ByteStr) extends Asset
   case object Waves                         extends Asset
 
-  private[this] val assetJsonFormat: Format[IssuedAsset] = Format(
-    Reads {
-      case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
-      case JsString(str) =>
-        Base58.tryDecodeWithLimit(str) match {
-          case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
-          case Failure(err) => JsError(s"Expected base58-encoded assetId (${Option(err.getMessage).getOrElse("unknown")})")
-        }
-      case _ => JsError("Expected base58-encoded assetId")
-    },
-    Writes(asset => JsString(asset.id.base58))
-  )
+  implicit val jsonFormat: Format[Asset] = {
+    val issuedAssetFormat = Format[IssuedAsset](
+      Reads {
+        case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
+        case JsString(str) =>
+          Base58.tryDecodeWithLimit(str) match {
+            case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
+            case Failure(err) => JsError(s"Expected base58-encoded assetId (${Option(err.getMessage).getOrElse("unknown")})")
+          }
+        case _ => JsError("Expected base58-encoded assetId")
+      },
+      Writes(asset => JsString(asset.id.base58))
+    )
 
-  implicit val assetIdJsonFormat: Format[Asset] = Format(
-    Reads {
-      case assetId: JsString => assetJsonFormat.reads(assetId)
-      case JsNull            => JsSuccess(Waves)
-      case _                 => JsError("Expected base58-encoded assetId or null")
-    },
-    Writes {
-      case Waves               => JsNull
-      case ia @ IssuedAsset(_) => assetJsonFormat.writes(ia)
-    }
-  )
+    Format(
+      Reads {
+        case assetId: JsString => issuedAssetFormat.reads(assetId)
+        case JsNull            => JsSuccess(Waves)
+        case _                 => JsError("Expected base58-encoded assetId or null")
+      },
+      Writes {
+        case Waves               => JsNull
+        case ia @ IssuedAsset(_) => issuedAssetFormat.writes(ia)
+      }
+    )
+  }
 
-  implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
+  implicit val valueReader: ValueReader[Asset] = { (cfg, path) =>
     AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
 
-  def fromString(maybeStr: Option[String]): Asset = {
+  def fromString(maybeStr: Option[String]): Asset =
     maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)
-  }
 
-  def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
+  def fromCompatId(maybeBStr: Option[ByteStr]): Asset =
     maybeBStr.fold[Asset](Waves)(IssuedAsset)
-  }
 
   implicit class AssetIdOps(private val ai: Asset) extends AnyVal {
-    def byteRepr: Array[Byte] = ai match {
+    def bytesRepr: Array[Byte] = ai match {
       case Waves           => Array(0: Byte)
       case IssuedAsset(id) => (1: Byte) +: id.arr
     }

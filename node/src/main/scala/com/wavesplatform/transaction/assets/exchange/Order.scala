@@ -269,7 +269,7 @@ object Order {
   }
 
   def assetIdBytes(assetId: Asset): Array[Byte] = {
-    assetId.byteRepr
+    assetId.bytesRepr
   }
 
   def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
