@@ -1,8 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.{Eval, Id}
-import cats.data.EitherT
-import cats.syntax.either._
+import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
@@ -48,7 +46,7 @@ object CryptoContext {
     }
   }
 
-  private def digestAlgValue(tpe: CASETYPEREF): LazyVal[Id] = LazyVal(EitherT(Eval.always(CaseObj(tpe, Map.empty).asRight[String])))
+  private def digestAlgValue(tpe: CASETYPEREF): LazyVal[Id] = LazyVal.fromEvaluated(CaseObj(tpe, Map.empty))
 
   def build(global: BaseGlobal, version: StdLibVersion): CTX[Id] = {
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction[Id] =

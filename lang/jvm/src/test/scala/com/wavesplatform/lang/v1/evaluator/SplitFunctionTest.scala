@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator
 
+import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.{AorBorC, NoShrink, addCtx, sampleTypes}
@@ -25,12 +26,12 @@ class SplitFunctionTest
 
   private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
-    val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
-    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX =
+    val lazyVal                                                = LazyVal.fromEvaluated[Id](pointInstance.orNull)
+    val stringToTuple: Map[String, (FINAL, LazyVal[Id])] = Map(("p", (pointType, lazyVal)))
+    val ctx: CTX[Id] =
       Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
   }
 
   property("split string containing separators") {

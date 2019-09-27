@@ -1,15 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.data.EitherT
 import cats.implicits._
-import cats.{Eval, Id, Monad}
+import cats.{Id, Monad}
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.ExecutionError
 
 import scala.collection.mutable.ListBuffer
 
@@ -79,7 +78,7 @@ class EvaluatorV1[F[_] : Monad] {
             Monad[EvalM[F, ?]].flatMap(args.traverse(evalExpr)) { args =>
               val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
                 case (r, (argValue, (argName, _))) =>
-                  r + (argName -> LazyVal(argValue, ctx.l(s"$argName")))
+                  r + (argName -> LazyVal.fromEvaluated(argValue, ctx.l(s"$argName")))
               }
               local {
                 val newState: EvalM[F, Unit] = set[F, LoggedEvaluationContext[F], ExecutionError](lets.set(ctx)(letDefsWithArgs)).map(_.pure[F])

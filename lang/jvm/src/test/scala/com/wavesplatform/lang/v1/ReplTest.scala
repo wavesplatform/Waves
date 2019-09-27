@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1
 
+import cats.implicits._
+import cats.{Applicative, Eval, Traverse}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.repl.Repl
@@ -7,70 +9,76 @@ import com.wavesplatform.lang.v1.repl.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.{Matchers, PropSpec}
 
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.{global => g}
+
 class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
+  def await[A](f: Future[A]): A = Await.result(f, 999 seconds)
+
   property("variable memorization") {
     val repl = Repl()
-    repl.execute("let a = 1")     shouldBe Right("defined let a: Int")
-    repl.execute("let b = 2")     shouldBe Right("defined let b: Int")
-    repl.execute("let c = a + b") shouldBe Right("defined let c: Int")
-    repl.execute("c")             shouldBe Right("res1: Int = 3")
-    repl.execute("a + b")         shouldBe Right("res2: Int = 3")
-    repl.execute("res1 + res2")   shouldBe Right("res3: Int = 6")
+    await(repl.execute("let a = 1"))     shouldBe Right("defined let a: Int")
+    await(repl.execute("let b = 2"))     shouldBe Right("defined let b: Int")
+    await(repl.execute("let c = a + b")) shouldBe Right("defined let c: Int")
+    await(repl.execute("c"))             shouldBe Right("res1: Int = 3")
+    await(repl.execute("a + b"))         shouldBe Right("res2: Int = 3")
+    await(repl.execute("res1 + res2"))   shouldBe Right("res3: Int = 6")
   }
 
   property("context funcs") {
     val repl = Repl()
-    repl.execute(""" let s = "aaa|bbb|ccc" """)
-    repl.execute(""" s.split("|") """) shouldBe Right("""res1: List[String] = ["aaa", "bbb", "ccc"]""")
+    await(repl.execute(""" let s = "aaa|bbb|ccc" """))
+    await(repl.execute(""" s.split("|") """)) shouldBe Right("""res1: List[String] = ["aaa", "bbb", "ccc"]""")
 
-    repl.execute(""" let a = blake2b256(base58'') != base58'' """)
-    repl.execute(""" a || false """) shouldBe Right("res2: Boolean = true")
+    await(repl.execute(""" let a = blake2b256(base58'') != base58'' """))
+    await(repl.execute(""" a || false """)) shouldBe Right("res2: Boolean = true")
   }
 
   property("user funcs") {
     val repl = Repl()
-    repl.execute(""" func inc(a: Int) = a + 1 """) shouldBe Right("defined func inc(a: Int): Int")
-    repl.execute(""" inc(5) """) shouldBe Right("res1: Int = 6")
+    await(repl.execute(""" func inc(a: Int) = a + 1 """)) shouldBe Right("defined func inc(a: Int): Int")
+    await(repl.execute(""" inc(5) """)) shouldBe Right("res1: Int = 6")
   }
 
   property("syntax errors") {
     val repl = Repl()
-    repl.execute(""" let a = {{1} """) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
-    repl.execute(""" 1 ++ 2 """)       shouldBe Left("Compilation failed: expected a second operator in 4-4")
+    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
+    await(repl.execute(""" 1 ++ 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
   }
 
   property("logic errors") {
     val repl = Repl()
-    repl.execute(""" let a = base64'12345' """) shouldBe Left("Compilation failed: can't parse Base64 string in 17-21")
-    repl.execute(""" let b = "abc" + 1 """)     shouldBe Left("Compilation failed: Can't find a function overload '+'(String, Int) in 9-18")
+    await(repl.execute(""" let a = base64'12345' """)) shouldBe Left("Compilation failed: can't parse Base64 string in 17-21")
+    await(repl.execute(""" let b = "abc" + 1 """))     shouldBe Left("Compilation failed: Can't find a function overload '+'(String, Int) in 9-18")
   }
 
   property("exceptions") {
     val repl = Repl()
     val msg = "error message"
-    repl.execute(s""" throw("$msg") """) shouldBe Left(msg)
+    await(repl.execute(s""" throw("$msg") """)) shouldBe Left(msg)
   }
 
-  property("waves context funcs") {
+  property("waves context funcs absent") {
     val repl = Repl()
-    repl.execute(s""" transferTransactionById(base58'fdg') """) shouldBe Left("Blockchain state is unavailable from REPL")
-    repl.execute(s""" let a = height """)
-    repl.execute(s""" a """)  shouldBe Right("res1: Int = 0")
+    await(repl.execute(s""" transferTransactionById(base58'fdg') """)) shouldBe Left("Blockchain state is unavailable from REPL")
+    await(repl.execute(s""" let a = height """))
+    await(repl.execute(s""" a """))  shouldBe Right("res1: Int = 0")
   }
 
   property("state reset") {
     val repl = Repl()
-    repl.execute("let a = 1")     shouldBe Right("defined let a: Int")
-    repl.execute("let b = a + 2") shouldBe Right("defined let b: Int")
-    repl.execute("b")             shouldBe Right("res1: Int = 3")
+    await(repl.execute("let a = 1"))     shouldBe Right("defined let a: Int")
+    await(repl.execute("let b = a + 2")) shouldBe Right("defined let b: Int")
+    await(repl.execute("b"))             shouldBe Right("res1: Int = 3")
     repl.clear()
-    repl.execute("a") shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
-    repl.execute("b") shouldBe Left("Compilation failed: A definition of 'b' is not found in 0-1")
+    await(repl.execute("a")) shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
+    await(repl.execute("b")) shouldBe Left("Compilation failed: A definition of 'b' is not found in 0-1")
   }
 
   property("keep state if input contain both expression and declarations") {
     val repl = Repl()
-    repl.execute(
+    await(repl.execute(
       """
         | func my1() = 3
         | let a = 2
@@ -78,7 +86,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
         | func my2(a: String) = a + a
         | my1()
       """.stripMargin
-    ) shouldBe Right(
+    )) shouldBe Right(
       """
         |defined func my1(): Int
         |defined func my2(a: String): String
@@ -91,25 +99,25 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
 
   property("ctx leak") {
     val repl = Repl()
-    repl.execute(
+    await(repl.execute(
       """
          func f() = {
            let a = 3
            a
          }
       """
-    )
-    repl.execute(
+    ))
+    await(repl.execute(
       """
          let b = {
            let a = 3
            a
          }
       """
-    )
-    repl.execute("f()") shouldBe Right("res1: Int = 3")
-    repl.execute("b")   shouldBe Right("res2: Int = 3")
-    repl.execute("a")   shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
+    ))
+    await(repl.execute("f()")) shouldBe Right("res1: Int = 3")
+    await(repl.execute("b"))   shouldBe Right("res2: Int = 3")
+    await(repl.execute("a"))   shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
   }
 
   property("type info") {
@@ -125,29 +133,29 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
       "func getInteger(data: List[DataEntry], key: String): Int|Unit",
       "func getInteger(data: List[DataEntry], index: Int): Int|Unit"
     )
-    repl.execute("func my(a: Int) = toString(a)")
+    await(repl.execute("func my(a: Int) = toString(a)"))
     repl.info("my") shouldBe "func my(a: Int): String"
   }
 
   property("let info") {
     val repl = Repl()
-    repl.execute("let a = 5")
+    await(repl.execute("let a = 5"))
     repl.info("a")    shouldBe "let a: Int"
     repl.info("unit") shouldBe "let unit: Unit"
   }
 
   property("state reassign") {
     val repl = Repl()
-    repl.execute("let a = 5")
-    repl.execute("1")
-    repl.execute("a") shouldBe Right("res2: Int = 5")
+    await(repl.execute("let a = 5"))
+    await(repl.execute("1"))
+    await(repl.execute("a")) shouldBe Right("res2: Int = 5")
   }
 
   property("internal decls") {
     val repl = Repl()
-    repl.execute("func filterStep(acc: List[Int], v: Int) = if (v % 2 == 0) then v :: acc else acc")
-    repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)")
-    repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)") shouldBe Right("res2: List[Int] = [4, 2]")
+    await(repl.execute("func filterStep(acc: List[Int], v: Int) = if (v % 2 == 0) then v :: acc else acc"))
+    await(repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)"))
+    await(repl.execute("FOLD<5>([1,2,3,4,5], nil, filterStep)")) shouldBe Right("res2: List[Int] = [4, 2]")
 
     repl.info("_isInstanceOf") shouldBe "_isInstanceOf not found in context"
   }
@@ -156,14 +164,14 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
     val repl = Repl(Some(settings))
 
-    repl.execute(""" this.getInteger("int") """)  shouldBe Right("res1: Int|Unit = 100500")
-    repl.execute(""" this.getString("str") """)   shouldBe Right("res2: String|Unit = text")
-    repl.execute(""" this.getBinary("bin") """)   shouldBe Right("res3: ByteVector|Unit = r1Mw3j9J")
-    repl.execute(""" this.getBoolean("bool") """) shouldBe Right("res4: Boolean|Unit = true")
+    await(repl.execute(""" this.getInteger("int") """))  shouldBe Right("res1: Int|Unit = 100500")
+    await(repl.execute(""" this.getString("str") """))   shouldBe Right("res2: String|Unit = text")
+    await(repl.execute(""" this.getBinary("bin") """))   shouldBe Right("res3: ByteVector|Unit = r1Mw3j9J")
+    await(repl.execute(""" this.getBoolean("bool") """)) shouldBe Right("res4: Boolean|Unit = true")
 
-    repl.execute(""" height """).explicitGet() should fullyMatch regex "res5: Int = \\d+".r
+    await(repl.execute(""" height """)).explicitGet() should fullyMatch regex "res5: Int = \\d+".r
 
-    repl.execute(""" transferTransactionById(base58'GgjvCxoDP2FtNrKMqsWrUqJZfMGTiWB1tF2RyYHk6u9w') """) shouldBe
+    await(repl.execute(""" transferTransactionById(base58'GgjvCxoDP2FtNrKMqsWrUqJZfMGTiWB1tF2RyYHk6u9w') """)) shouldBe
       Right(
         """
           |res6: TransferTransaction|Unit = TransferTransaction(
@@ -188,10 +196,10 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
         """.trim.stripMargin
       )
 
-    repl.execute(""" transactionHeightById(base58'GgjvCxoDP2FtNrKMqsWrUqJZfMGTiWB1tF2RyYHk6u9w') """) shouldBe
+    await(repl.execute(""" transactionHeightById(base58'GgjvCxoDP2FtNrKMqsWrUqJZfMGTiWB1tF2RyYHk6u9w') """)) shouldBe
       Right("res7: Int|Unit = 661401")
 
-    repl.execute(""" assetInfo(base58'AMFteLfPzPhTsFc3NfvHG7fSRUnsp3tJXPH88G1PCisT') """) shouldBe
+    await(repl.execute(""" assetInfo(base58'AMFteLfPzPhTsFc3NfvHG7fSRUnsp3tJXPH88G1PCisT') """)) shouldBe
       Right(
         """
           |res8: Asset|Unit = Asset(
@@ -209,7 +217,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
         """.trim.stripMargin
       )
 
-    repl.execute(""" blockInfoByHeight(662371) """) shouldBe
+    await(repl.execute(""" blockInfoByHeight(662371) """)) shouldBe
       Right(
         """
           |res9: BlockInfo|Unit = BlockInfo(
@@ -225,21 +233,21 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
         """.trim.stripMargin
       )
 
-    repl.execute(
+    await(repl.execute(
       """ addressFromRecipient(Alias("aaaa")) ==
           addressFromRecipient(Address(base58'3N9bnz3AtjeC1p92CR7jFkTnv9PZjtoPkMQ'))
       """
-    ) shouldBe
+    )) shouldBe
       Right("res10: Boolean = true")
 
-    repl.execute(
+    await(repl.execute(
       """ assetBalance(
             Address(base58'3Mrhtzv9KEtjx4mG47oxgjahHKW33oTntEV'),
             base58'HUdXNRE4VcCx64PCPYwh6KL2cxvRaKcR8bXe3Ar9fG4p'
           )
        """
-    ).explicitGet() should fullyMatch regex "res11: Int = \\d+".r
+    )).explicitGet() should fullyMatch regex "res11: Int = \\d+".r
 
-    repl.execute(""" this.wavesBalance() """).explicitGet() should fullyMatch regex "res12: Int = \\d+".r
+    await(repl.execute(""" this.wavesBalance() """)).explicitGet() should fullyMatch regex "res12: Int = \\d+".r
   }
 }

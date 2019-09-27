@@ -14,7 +14,7 @@ import monix.execution.atomic.{Atomic, AtomicBuilder}
   * @tparam F - Result context type
   */
 trait TaskMT[F[_], S, E, R] {
-  val inner: Kleisli[Eval, EvalRef[S], F[Either[E, R]]]
+  protected[task] val inner: Kleisli[Eval, EvalRef[S], F[Either[E, R]]]
 
   def run[RS <: Atomic[S]](initial: S)(implicit b: AtomicBuilder[S, RS]): Eval[(S, F[Either[E, R]])] = {
     val stateRef = EvalRef.of(initial)
@@ -32,16 +32,16 @@ trait TaskMT[F[_], S, E, R] {
     }))
 
   def flatMap[B](f: R => TaskMT[F, S, E, B])(implicit ev: Monad[F]): TaskMT[F, S, E, B] = {
-    TaskMT[F, S, E, B] { s: S =>
+    TaskMT.fromEvalRef[F, S, E, B] { s =>
       inner.run(s).map(_.flatMap {
-        case Right(v)  => f(v).run(s).map(_._2).value
+        case Right(v)  => f(v).inner.run(s).value
         case Left(err) => err.asLeft[B].pure[F]
       })
     }
   }
 
   def handleErrorWith(f: E => TaskMT[F, S, E, R])(implicit ev: Monad[F]): TaskMT[F, S, E, R] =
-    TaskMT[F, S, E, R] { s: S =>
+    TaskMT.fromEvalRef[F, S, E, R] { s =>
       inner.run(s).map(_.flatMap {
         case Right(v)  => v.asRight[E].pure[F]
         case Left(err) => f(err).inner.run(s).value
@@ -55,7 +55,11 @@ object TaskMT {
       override protected[task] val inner: Kleisli[Eval, EvalRef[S], F[Either[E, R]]] = in
     }
 
-  def apply[F[_], S, E, R](f: S => Eval[F[Either[E, R]]]): TaskMT[F, S, E, R] = new TaskMT[F, S, E, R] {
-    override protected[task] val inner: Kleisli[Eval, EvalRef[S], F[Either[E, R]]] = Kleisli(_.read >>= f)
-  }
+  def apply[F[_], S, E, R](f: S => Eval[F[Either[E, R]]]): TaskMT[F, S, E, R] =
+    fromEvalRef(_.read flatMap f)
+
+  private def fromEvalRef[F[_], S, E, R](f: EvalRef[S] => Eval[F[Either[E, R]]]): TaskMT[F, S, E, R] =
+    new TaskMT[F, S, E, R] {
+      override protected[task] val inner: Kleisli[Eval, EvalRef[S], F[Either[E, R]]] = Kleisli(f)
+    }
 }

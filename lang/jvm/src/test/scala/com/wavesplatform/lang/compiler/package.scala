@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import cats.data.EitherT
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.directives.values._
@@ -14,15 +14,15 @@ package object compiler {
 
   val pointType   = CASETYPEREF("Point", List("x" -> LONG, "y" -> LONG))
   val listOfLongs = LIST
-  val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), ("p1", TYPEPARAM('T'))) {
+  val idT = NativeFunction[Id]("idT", 1, 10000: Short, TYPEPARAM('T'), ("p1", TYPEPARAM('T'))) {
     case a :: Nil => Right(a)
   }
   val returnsListLong =
-    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE) { case _ => ??? }
+    NativeFunction[Id]("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE) { case _ => ??? }
   val idOptionLong =
-    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, ("opt", UNION(LONG, UNIT))) { case _ => Right(unit) }
+    NativeFunction[Id]("idOptionLong", 1, 1003: Short, UNIT, ("opt", UNION(LONG, UNIT))) { case _ => Right(unit) }
   val functionWithTwoPrarmsOfTheSameType =
-    NativeFunction("functionWithTwoPrarmsOfTheSameType",
+    NativeFunction[Id]("functionWithTwoPrarmsOfTheSameType",
                    1,
                    1005: Short,
                    TYPEPARAM('T'),
@@ -33,14 +33,14 @@ package object compiler {
   val testContext = Monoid
     .combine(
       PureContext.build(Global, V3),
-      CTX(
+      CTX[Id](
         Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
         Map(
           ("p", (Common.AorB, null)),
           ("tv", (Common.AorBorC, null)),
-          ("l", (LIST(LONG), LazyVal(EitherT.pure(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))))),
-          ("lpa", (LIST(Common.pointTypeA), LazyVal(EitherT.pure(arr)))),
-          ("lpabc", (LIST(Common.AorBorC), LazyVal(EitherT.pure(arr))))
+          ("l", (LIST(LONG), LazyVal.fromEvaluated[Id](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)))))),
+          ("lpa", (LIST(Common.pointTypeA), LazyVal.fromEvaluated[Id](arr))),
+          ("lpabc", (LIST(Common.AorBorC), LazyVal.fromEvaluated[Id](arr)))
         ),
         Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
       )

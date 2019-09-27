@@ -32,7 +32,7 @@ object RideFullContext {
     ds:       DirectiveSet,
     wavesEnv: Environment[Id] = dummyEnv
   ): CTX[Id] = {
-    val wavesCtx = WavesContext.build(ds, wavesEnv)
+    val wavesCtx = WavesContext.build[Id](ds, wavesEnv)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion)
     val pureCtx = PureContext.build(Global, ds.stdLibVersion)
     pureCtx |+| cryptoCtx |+| wavesCtx

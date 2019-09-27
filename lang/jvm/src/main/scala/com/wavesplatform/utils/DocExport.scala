@@ -27,7 +27,7 @@ object DocExport {
       val outputFile  = args(3)
 
       val version = DirectiveDictionary[StdLibVersion].idMap(versionStr.toInt)
-      val wavesContext = WavesContext.build(
+      val wavesContext = WavesContext.build[Id](
         DirectiveSet(version, Account, Expression).explicitGet(),
         new Environment[Id] {
           override def height: Long                                                                                    = ???

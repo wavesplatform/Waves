@@ -1,12 +1,14 @@
 package com.wavesplatform.lang.v1.repl
 
-import cats.Monad
+import cats.{Id, Monad}
+import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeSignature, LazyVal}
+import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 
 import scala.util.Try
@@ -19,37 +21,41 @@ class ReplEngine[F[_] : Monad] {
      compileCtx: CompilerContext,
      evalCtx:    EvaluationContext[F]
   ): F[Either[String, (String, (CompilerContext, EvaluationContext[F]))]] = {
-    val result =
-      for {
-        parsed <- Parser.parseExprOrDecl(expr).fold(
-          { case (_, _, err) => Left(err.traced.toString) },
-          { case (result, _) => Right(result) }
-        )
-        (newCompileCtx, compiled, exprType) <- tryEi(ExpressionCompiler.applyWithCtx(compileCtx, parsed))
-        evaluated                           <- tryEi(evaluator.applyWithCtx(evalCtx, compiled))
-      } yield resultWithCtx(evaluated, compileCtx, newCompileCtx, exprType)
-    result.bitraverse(_.pure[F], identity)
+    val r = for {
+      parsed                              <- EitherT.fromEither[F](parse(expr))
+      (newCompileCtx, compiled, exprType) <- EitherT.fromEither[F](tryEi[Id,  (CompilerContext, Terms.EXPR, FINAL)](ExpressionCompiler.applyWithCtx(compileCtx, parsed)))
+      evaluated                           <- EitherT(tryEi(evaluator.applyWithCtx(evalCtx, compiled)))
+      result = resultWithCtx(evaluated, compileCtx, newCompileCtx, exprType)
+    } yield result
+    r.value
   }
 
+  private def parse(expr: String): Either[String, EXPR] =
+    Parser.parseExprOrDecl(expr)
+      .fold(
+        { case (_, _, err) => Left(err.traced.toString) },
+        { case (result, _) => Right(result) }
+      )
+
   private def resultWithCtx(
-    evaluated:     F[(EvaluationContext[F], EVALUATED)],
+    evaluated:     (EvaluationContext[F], EVALUATED),
     compileCtx:    CompilerContext,
     newCompileCtx: CompilerContext,
-    exprType:      FINAL,
-  ) =
-    Monad[F].map(evaluated) { case (newEvalCtx, eval) =>
+    exprType:      FINAL
+  ) = {
+      val (newEvalCtx, result) = evaluated
       val filteredCompileCtx = excludeInternalDecls(newCompileCtx)
-      val resultO = assignedResult(exprType, eval, filteredCompileCtx)
+      val resultO = assignedResult(exprType, result, filteredCompileCtx)
       val output = mkOutput(resultO, compileCtx, filteredCompileCtx)
       val newCtx = resultO.fold((filteredCompileCtx, newEvalCtx))(addResultToCtx(_, filteredCompileCtx, newEvalCtx))
       (output, newCtx)
     }
 
-  private def tryEi[R](r: => Either[String, R]): Either[String, R] =
+  private def tryEi[M[_] : Monad, R](r: => M[Either[String, R]]): M[Either[String, R]] =
     Try(r)
       .toEither
       .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
-      .flatten
+      .flatSequence
 
   private def excludeInternalDecls(compileCtx: CompilerContext) =
     compileCtx.copy(varDefs = compileCtx.varDefs.filterNot(v => internalVarPrefixes.contains(v._1.head)))
@@ -124,7 +130,7 @@ class ReplEngine[F[_] : Monad] {
     val (name, t, value) = result
     (
       compileCtx.copy(varDefs = compileCtx.varDefs + (name -> t)),
-      evalCtx.copy(letDefs = evalCtx.letDefs + (name -> LazyVal(value.pure[F].pure)))
+      evalCtx.copy(letDefs = evalCtx.letDefs + (name -> LazyVal.fromEvaluated(value)))
     )
   }
 }

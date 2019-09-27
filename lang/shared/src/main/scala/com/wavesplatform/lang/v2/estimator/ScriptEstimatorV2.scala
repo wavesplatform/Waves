@@ -89,7 +89,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       ctx <-  get[Id, EstimatorContext, ExecutionError]
       bodyComplexity <- predefFuncs.get(ctx).get(header).map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
         .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, args)))
-        .getOrElse(raiseError(s"function '$header' not found"))
+        .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, Long](s"function '$header' not found"))
     } yield bodyComplexity
 
   private def evalUserFuncCall(func: FUNC, args: List[EXPR]): EvalM[Long] =

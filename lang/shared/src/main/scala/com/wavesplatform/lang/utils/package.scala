@@ -53,7 +53,7 @@ package object utils {
             Seq(
               PureContext.build(Global, version),
               CryptoContext.build(Global, version),
-              WavesContext.build(ds, environment)
+              WavesContext.build[Id](ds, environment)
             )
           )
         )

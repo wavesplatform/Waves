@@ -1,26 +1,23 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.nio.charset.StandardCharsets
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.{BufferUnderflowException, ByteBuffer}
 
-import cats.data.EitherT
-import cats.kernel.Monoid
+import cats.Id
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.MalformedInputException
-import java.nio.{BufferUnderflowException, ByteBuffer}
-
-import cats.Id
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
@@ -609,10 +606,10 @@ object PureContext {
   lazy val unitVarName = "unit"
 
   private def singleObj(ty: CASETYPEREF, v: Map[String,EVALUATED] = Map.empty): (CASETYPEREF, LazyVal[Id]) =
-    ty -> LazyVal(EitherT.pure(CaseObj(ty, v)))
+    ty -> LazyVal.fromEvaluated(CaseObj(ty, v))
 
   private lazy val vars: Map[String, (FINAL, LazyVal[Id])] = Map(
-    (unitVarName, (UNIT, LazyVal(EitherT.pure(unit)))),
+    (unitVarName, (UNIT, LazyVal.fromEvaluated(unit))),
     ("UP", singleObj(roundUp)),
     ("HALFUP", singleObj(roundHalfUp)),
     ("HALFDOWN", singleObj(roundHalfDown)),
@@ -622,7 +619,7 @@ object PureContext {
     ("FLOOR", singleObj(roundFloor))
   )
 
-  private lazy val ctx = CTX(
+  private lazy val ctx: CTX[Id] = CTX(
     Seq(
       UNIT,
       LONG,
@@ -692,7 +689,7 @@ object PureContext {
           ctx,
           CTX(
             Seq.empty,
-            Map(("nil", (LIST(NOTHING), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))): Map[String, (FINAL, LazyVal[Id])],
+            Map(("nil", (LIST(NOTHING), LazyVal.fromEvaluated(ARR(IndexedSeq.empty[EVALUATED]))))): Map[String, (FINAL, LazyVal[Id])],
             Array(
               value,
               valueOrErrorMessage,

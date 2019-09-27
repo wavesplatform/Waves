@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
 import cats.implicits._
-import cats.{Eval, Monad}
+import cats.{Eval, Monad, ~>}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
@@ -20,6 +20,8 @@ sealed trait BaseFunction[F[_]] {
   @JSExport def name: String
   @JSExport def args: Array[String]
   @JSExport def deprecated: Boolean = false
+
+  def mapK[G[_]](f: F ~> G): BaseFunction[G]
 }
 
 object BaseFunction {
@@ -30,21 +32,24 @@ object BaseFunction {
 case class FunctionTypeSignature(result: TYPE, args: Seq[(String, TYPE)], header: FunctionHeader)
 
 @JSExportTopLevel("NativeFunction")
-case class NativeFunction[F[_] : Monad](
+case class NativeFunction[F[_]](
   @(JSExport @field) name: String,
   costByLibVersion: Map[StdLibVersion, Long],
   @(JSExport @field) signature: FunctionTypeSignature,
-  ev: List[EVALUATED] => F[Either[String, EVALUATED]],
+  ev: List[EVALUATED] => F[Either[ExecutionError, EVALUATED]],
   @(JSExport @field) args: Array[String]
 ) extends BaseFunction[F] {
   def eval(args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
     EitherT.apply[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](ev(args).pure[Eval])
+
+  override def mapK[G[_]](f: F ~> G): BaseFunction[G] =
+    copy(ev = ev.andThen(evalArgs => f(evalArgs)))
 }
 
 object NativeFunction {
 
   def apply[F[_] : Monad](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
-      ev: PartialFunction[List[EVALUATED], F[Either[String, EVALUATED]]]): NativeFunction[F] =
+      ev: PartialFunction[List[EVALUATED], F[Either[ExecutionError, EVALUATED]]]): NativeFunction[F] =
     new NativeFunction(
       name = name,
       costByLibVersion = DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
@@ -57,7 +62,7 @@ object NativeFunction {
             costByLibVersion: Map[StdLibVersion, Long],
             internalName: Short,
             resultType: TYPE,
-            args: (String, TYPE, String)*)(ev: List[EVALUATED] => F[Either[String, EVALUATED]]): NativeFunction[F] =
+            args: (String, TYPE, String)*)(ev: List[EVALUATED] => F[Either[ExecutionError, EVALUATED]]): NativeFunction[F] =
     new NativeFunction(
       name = name,
       costByLibVersion = costByLibVersion,
@@ -76,7 +81,11 @@ case class UserFunction[F[_]](
   @(JSExport@field) signature: FunctionTypeSignature,
   ev: EXPR,
   @(JSExport@field) args: Array[String]
-) extends BaseFunction[F]
+) extends BaseFunction[F] {
+
+  override def mapK[G[_]](f: F ~> G): BaseFunction[G] =
+    asInstanceOf[UserFunction[G]]
+}
 
 object UserFunction {
 

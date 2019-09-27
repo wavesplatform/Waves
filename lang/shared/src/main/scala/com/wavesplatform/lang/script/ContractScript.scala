@@ -1,8 +1,6 @@
 package com.wavesplatform.lang.script
 
 import cats.implicits._
-import cats.instances.map
-import cats.kernel.Order
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}

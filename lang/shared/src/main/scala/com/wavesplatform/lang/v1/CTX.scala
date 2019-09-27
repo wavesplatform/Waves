@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import cats.{Id, Monoid}
+import cats.{Id, Monad, Monoid, ~>}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
@@ -56,12 +56,20 @@ case class CTX[F[_]](
     ident = 0
   )
 
+  def mapK[G[_] : Monad](f: F ~> G): CTX[G] =
+    copy(
+      functions = functions.map(_.mapK(f)),
+      vars = vars.mapValues { case(t, value) => (t, value.mapK(f)) }
+    )
 }
 object CTX {
   val empty: CTX[Id] = CTX(Seq.empty, Map.empty, Array.empty[BaseFunction[Id]])
 
   implicit def monoid[F[_]]: Monoid[CTX[F]] = new Monoid[CTX[F]] {
-    override val empty: CTX[F]                   = CTX.empty.asInstanceOf[CTX[F]]
-    override def combine(x: CTX[F], y: CTX[F]): CTX[F] = CTX(x.types ++ y.types, x.vars ++ y.vars, x.functions ++ y.functions)
+    override val empty: CTX[F] =
+      CTX.empty.asInstanceOf[CTX[F]]
+
+    override def combine(x: CTX[F], y: CTX[F]): CTX[F] =
+      CTX(x.types ++ y.types, x.vars ++ y.vars, x.functions ++ y.functions)
   }
 }

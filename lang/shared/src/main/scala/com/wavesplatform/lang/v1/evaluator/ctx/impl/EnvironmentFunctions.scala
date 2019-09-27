@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.Monad
 import cats.implicits._
+import cats.Monad
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 class EnvironmentFunctions[F[_] : Monad](environment: Environment[F]) {
 
-  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, F[Option[Any]]] = {
+  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[String, Option[Any]]] = {
     val objTypeName = addressOrAlias.caseType.name
 
     val recipientEi =
@@ -31,7 +31,7 @@ class EnvironmentFunctions[F[_] : Monad](environment: Environment[F]) {
         Left(s"$addressOrAlias neither Address nor alias")
       }
 
-    recipientEi.map(environment.data(_, key, dataType))
+    recipientEi.traverse(environment.data(_, key, dataType))
   }
 
   def addressFromAlias(name: String): F[Either[ExecutionError, Recipient.Address]] =
