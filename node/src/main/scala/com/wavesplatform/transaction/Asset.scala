@@ -6,38 +6,37 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 sealed trait Asset
 object Asset {
   final case class IssuedAsset(id: ByteStr) extends Asset
   case object Waves                         extends Asset
 
-  implicit val assetReads: Reads[IssuedAsset] = Reads {
-    case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
-    case JsString(str) =>
-      Base58.tryDecodeWithLimit(str) match {
-        case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
-        case _            => JsError("Expected base58-encoded assetId")
-      }
-    case _ => JsError("Expected base58-encoded assetId")
-  }
-  implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
-    JsString(asset.id.base58)
-  }
+  private[this] val assetJsonFormat: Format[IssuedAsset] = Format(
+    Reads {
+      case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
+      case JsString(str) =>
+        Base58.tryDecodeWithLimit(str) match {
+          case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
+          case Failure(err) => JsError(s"Expected base58-encoded assetId (${Option(err.getMessage).getOrElse("unknown")})")
+        }
+      case _ => JsError("Expected base58-encoded assetId")
+    },
+    Writes(asset => JsString(asset.id.base58))
+  )
 
-  implicit val assetIdReads: Reads[Asset] = Reads {
-    case json: JsString => assetReads.reads(json)
-    case JsNull         => JsSuccess(Waves)
-    case _              => JsError("Expected base58-encoded assetId or null")
-  }
-  implicit val assetIdWrites: Writes[Asset] = Writes {
-    case Waves           => JsNull
-    case IssuedAsset(id) => JsString(id.base58)
-  }
-
-  implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
-  implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
+  implicit val assetIdJsonFormat: Format[Asset] = Format(
+    Reads {
+      case assetId: JsString => assetJsonFormat.reads(assetId)
+      case JsNull            => JsSuccess(Waves)
+      case _                 => JsError("Expected base58-encoded assetId or null")
+    },
+    Writes {
+      case Waves               => JsNull
+      case ia @ IssuedAsset(_) => assetJsonFormat.writes(ia)
+    }
+  )
 
   implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
     AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
