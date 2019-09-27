@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.UInt32Value
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
@@ -16,7 +15,6 @@ import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
-import scala.util.Try
 
 class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
   private[this] val commonApi = new CommonBlocksApi(blockchain)
@@ -28,9 +26,8 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = {
     def validateFilter(): Either[GenericError, Unit] = request.filter match {
       case Filter.Generator(generator) =>
-        val isValidPK      = Try(PublicKey(generator.toByteStr).toAddress).isSuccess
         val isValidAddress = PBRecipients.toAddress(generator).isRight
-        Either.cond(isValidPK || isValidAddress, (), GenericError(s"Invalid generator: ${generator.toByteStr}"))
+        Either.cond(isValidAddress, (), GenericError(s"Invalid generator parameter: ${generator.toByteStr}"))
 
       case Filter.Empty => Right(())
     }
@@ -53,12 +50,8 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
         val filteredStream = stream.filter {
           case BlockWithHeight(Some(PBBlock(Some(header), _, _)), _) =>
             request.filter match {
-              case BlockRangeRequest.Filter.Generator(generator) =>
-                header.generator == generator || PBRecipients
-                  .toAddress(generator)
-                  .toOption
-                  .contains(PublicKey(header.generator.toByteArray).toAddress)
-              case BlockRangeRequest.Filter.Empty => true
+              case BlockRangeRequest.Filter.Generator(generator) => header.generator.toAddress == generator.toAddress
+              case BlockRangeRequest.Filter.Empty                => true
             }
 
           case _ => true
