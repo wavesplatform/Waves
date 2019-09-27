@@ -16,7 +16,7 @@ package object grpc extends PBImplicitConversions {
       import org.reactivestreams.{Subscriber, Subscription}
 
       val rxs = new Subscriber[T] with Cancelable {
-        private[this] val queue = new LinkedBlockingQueue[T](1024)
+        private[this] val queue = new LinkedBlockingQueue[T](32)
 
         @volatile
         private[this] var subscription: Subscription = _
@@ -34,14 +34,10 @@ package object grpc extends PBImplicitConversions {
           this.subscription = subscription
 
           def pushElement(): Unit = Option(queue.peek()) match {
-            case Some(value) if this.isReady =>
+            case Some(_) if this.isReady =>
               val qv = queue.poll()
-              if (qv == value) {
-                streamObserver.onNext(value)
-                subscription.request(1)
-              } else {
-                pushElement()
-              }
+              streamObserver.onNext(qv)
+              subscription.request(1)
 
             case None if this.isReady =>
               subscription.request(1)
