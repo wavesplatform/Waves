@@ -30,13 +30,13 @@ class TransactionsApiGrpcImpl(
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, publishTransaction)
 
-  override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
+  override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = responseObserver.interceptErrors {
     val transactions =
       if (!request.sender.isEmpty) commonApi.transactionsByAddress(request.sender.toAddress)
       else if (request.recipient.isDefined) commonApi.transactionsByAddress(request.getRecipient.toAddress)
       else Observable.empty
 
-    val filter = transactionFilter(request.sender, request.recipient, request.transactionIds.toSet, _)
+    val filter = filterTransactions(request.sender, request.recipient, request.transactionIds.toSet) _
     val stream = transactions.collect {
       case (height, transaction) if filter(transaction) =>
         TransactionResponse(transaction.id(), height, Some(transaction.toPB))
@@ -45,19 +45,20 @@ class TransactionsApiGrpcImpl(
     responseObserver.completeWith(stream)
   }
 
-  override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = {
+  override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = responseObserver.interceptErrors {
     val stream = {
       val txIds = request.transactionIds.toSet
 
+      val txFilter = filterTransactions(request.sender, request.recipient, txIds) _
       Observable(commonApi.unconfirmedTransactions(): _*)
-        .filter(transactionFilter(request.sender, request.recipient, txIds, _))
+        .filter(txFilter)
         .map(tx => TransactionResponse(tx.id(), transaction = Some(tx.toPB)))
     }
 
     responseObserver.completeWith(stream)
   }
 
-  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResult]): Unit = {
+  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResult]): Unit = responseObserver.interceptErrors {
     import com.wavesplatform.state.{InvokeScriptResult => VISR}
 
     val result = Observable(request.transactionIds: _*)
@@ -67,7 +68,7 @@ class TransactionsApiGrpcImpl(
     responseObserver.completeWith(result)
   }
 
-  override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit = {
+  override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit = responseObserver.interceptErrors {
     val result = Observable(request.transactionIds: _*).map { txId =>
       blockchain.transactionHeight(txId) match {
         case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height)
@@ -102,12 +103,11 @@ class TransactionsApiGrpcImpl(
       .explicitGetErr()
   }
 
-  private[this] def transactionFilter(
+  private[this] def filterTransactions(
       sender: ByteString,
       recipient: Option[Recipient],
-      transactionIds: Set[ByteString],
-      tx: VanillaTransaction
-  ): Boolean = {
+      transactionIds: Set[ByteString]
+  )(tx: VanillaTransaction): Boolean = {
     val senderMatches = sender.isEmpty || (tx match {
       case a: AuthorizedTransaction => sender.isEmpty || a.sender.toAddress == sender.toAddress
       case _                        => false

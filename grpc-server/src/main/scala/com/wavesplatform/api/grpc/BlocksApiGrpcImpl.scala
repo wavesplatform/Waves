@@ -23,7 +23,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     Future.successful(UInt32Value(commonApi.currentHeight()))
   }
 
-  override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = {
+  override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {
     def validateFilter(): Either[GenericError, Unit] = request.filter match {
       case Filter.Generator(generator) =>
         val isValidAddress = PBRecipients.toAddress(generator).isRight
@@ -34,7 +34,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
 
     validateFilter() match {
       case Left(error) =>
-        responseObserver.onError(GRPCErrors.toStatusException(error))
+        responseObserver.failWith(error)
 
       case Right(_) =>
         val stream = if (request.includeTransactions) {

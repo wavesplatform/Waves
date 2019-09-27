@@ -9,6 +9,8 @@ import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
+import scala.util.control.NonFatal
+
 package object grpc extends PBImplicitConversions {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
     // TODO: More convenient back-pressure implementation
@@ -94,6 +96,10 @@ package object grpc extends PBImplicitConversions {
     def failWith(error: ApiError): Unit = {
       streamObserver.onError(GRPCErrors.toStatusException(error))
     }
+
+    def interceptErrors(f: => Unit): Unit =
+      try f
+      catch { case NonFatal(e) => streamObserver.onError(GRPCErrors.toStatusException(e)) }
   }
 
   implicit class EitherVEExt[T](e: Either[ValidationError, T]) {
