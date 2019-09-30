@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.{Eval, Monad, StackSafeMonad}
 import com.wavesplatform.lang.EvalF
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext.Implicits.{global => g}
 import scala.concurrent.Future
 
 object Implicits {
