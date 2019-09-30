@@ -13,12 +13,10 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
   import NetworkUniqueConnectionsTestSuite._
 
   "nodes should up and connect with each other" in {
-    val firstNode = docker.startNode(FirstNodeConfig)
+    val firstNode = docker.startNode(FirstNodeConfig, autoConnect = false)
 
     val status = firstNode.status()
-
     log.trace(s"#### $status")
-
     assert(status.blockchainHeight >= status.stateHeight)
 
     val secondNode = {

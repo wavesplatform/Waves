@@ -248,7 +248,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     // API start
     if (settings.restAPISettings.enable) {
       if (settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
-        log.error("Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf")
+        log.error(
+          "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
+        )
         forceStopApplication(InvalidApiKey)
       }
 
@@ -283,7 +285,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
-        RewardApiRoute(blockchainUpdater),
+        RewardApiRoute(blockchainUpdater)
       )
 
       val apiTypes: Set[Class[_]] = Set(

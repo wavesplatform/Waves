@@ -8,6 +8,7 @@ import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
+import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 
@@ -56,6 +57,9 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
         commonApi
           .blockAtHeight(if (height > 0) height else blockchain.height + height)
           .map(block => BlockWithHeight(Some(block.toPB), height))
+
+      case Request.Reference(_) =>
+        throw new StatusRuntimeException(Status.UNIMPLEMENTED)
 
       case Request.Empty =>
         None
