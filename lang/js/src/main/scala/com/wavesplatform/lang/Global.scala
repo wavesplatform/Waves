@@ -115,7 +115,7 @@ object Global extends BaseGlobal {
   }
 
   override def requestNode(url: String): Future[NodeResponse] =
-    impl.Global.makeNodeRequest(js.Dynamic.literal(url = url))
+    impl.Global.httpGet(js.Dynamic.literal(url = url))
      .toFuture
      .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
 }

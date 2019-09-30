@@ -22,5 +22,5 @@ object Global extends Object {
   def sha256(message: ArrayBuffer): ArrayBuffer                                                          = native
   def merkleVerify(root: ArrayBuffer, proof: ArrayBuffer, data: ArrayBuffer): Boolean                    = native
 
-  def makeNodeRequest(params: js.Dynamic): Promise[js.Dynamic] = native
+  def httpGet(params: js.Dynamic): Promise[js.Dynamic] = native
 }
