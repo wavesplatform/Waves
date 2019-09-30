@@ -9,7 +9,7 @@ import scala.concurrent.Future
 
 object Implicits {
   implicit def stackUnsafeMonad[F[_] : Monad]: Monad[EvalF[F, ?]] =
-    new StackSafeMonad[λ[a => Eval[F[a]]]] {
+    new StackSafeMonad[EvalF[F, ?]] {
       override def flatMap[A, B](fa: Eval[F[A]])(f: A => Eval[F[B]]): Eval[F[B]] =
         fa.map(_.flatMap(f(_).value))
 

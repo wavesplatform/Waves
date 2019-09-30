@@ -465,14 +465,14 @@ object WavesContext {
         UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)))
 
     val commonVars = Map(
-      ("height", (LONG, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](heightCoeval))))
+      ("height", (LONG, LazyVal.fromEval(heightCoeval)))
     )
 
     val txVar =
-      ("tx", (scriptInputType, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](inputEntityCoeval.map(_.pure[F])))))
+      ("tx", (scriptInputType, LazyVal.fromEval(inputEntityCoeval.map(_.pure[F]))))
 
-    lazy val accountThisVar = ("this", (addressType, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](accountThisCoeval))))
-    lazy val assetThisVar   = ("this", (assetType,   LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](assetThisCoeval))))
+    lazy val accountThisVar = ("this", (addressType, LazyVal.fromEval((accountThisCoeval))))
+    lazy val assetThisVar   = ("this", (assetType,   LazyVal.fromEval((assetThisCoeval))))
     lazy val thisVar = ds.scriptType match {
       case Account => accountThisVar
       case Asset   => assetThisVar
@@ -481,15 +481,15 @@ object WavesContext {
     val vars = Map(
       1 -> Map(txVar),
       2 -> Map(
-        ("Sell", (ordTypeType, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](sellOrdTypeCoeval.map(_.pure[F]))))),
-        ("Buy", (ordTypeType, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](buyOrdTypeCoeval.map(_.pure[F]))))),
+        ("Sell", (ordTypeType, LazyVal.fromEval((sellOrdTypeCoeval.map(_.pure[F]))))),
+        ("Buy", (ordTypeType, LazyVal.fromEval((buyOrdTypeCoeval.map(_.pure[F]))))),
         txVar
       ),
       3 -> {
         val v3Part1: Map[String, (FINAL, LazyVal[F])] = Map(
-          ("Sell", (sellType, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](sellOrdTypeCoeval.map(_.pure[F]))))),
-          ("Buy", (buyType, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](buyOrdTypeCoeval.map(_.pure[F]))))),
-          ("lastBlock", (blockInfo, LazyVal(EitherT[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](lastBlockCoeval))))
+          ("Sell", (sellType, LazyVal.fromEval((sellOrdTypeCoeval.map(_.pure[F]))))),
+          ("Buy", (buyType, LazyVal.fromEval((buyOrdTypeCoeval.map(_.pure[F]))))),
+          ("lastBlock", (blockInfo, LazyVal.fromEval((lastBlockCoeval))))
         )
         val v3Part2: Map[String, (FINAL, LazyVal[F])] = if (ds.contentType == Expression) Map(txVar, thisVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)

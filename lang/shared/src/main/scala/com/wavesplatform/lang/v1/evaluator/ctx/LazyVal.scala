@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import cats.{Eval, Functor, Monad, ~>}
+import cats.data.EitherT
 import cats.implicits._
-import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
+import cats.{Eval, Monad, ~>}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.LogCallback
+import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 sealed trait LazyVal[F[_]] {
   val value: Eval[F[Either[ExecutionError, EVALUATED]]]
@@ -29,6 +30,9 @@ object LazyVal {
 
   def apply[F[_] : Monad](v: TrampolinedExecResult[F, EVALUATED]): LazyVal[F] =
     LazyValImpl(v.value, _ => Monad[F].unit)
+
+  def fromEval[F[_] : Monad](v: Eval[F[Either[String, EVALUATED]]]): LazyVal[F] =
+    LazyValImpl(v, _ => Monad[F].unit)
 
   def fromEvaluated[F[_] : Monad](v: EVALUATED, lc: LogCallback[F]): LazyVal[F] =
     LazyValImpl(v.pure[Either[ExecutionError, ?]].pure[F].pure[Eval], lc)

@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.{Eval, Monad, ~>}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
+import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -40,7 +40,7 @@ case class NativeFunction[F[_]](
   @(JSExport @field) args: Array[String]
 ) extends BaseFunction[F] {
   def eval(args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
-    EitherT.apply[λ[q => Eval[F[q]]], ExecutionError, EVALUATED](ev(args).pure[Eval])
+    EitherT.apply[EvalF[F, ?], ExecutionError, EVALUATED](ev(args).pure[Eval])
 
   override def mapK[G[_]](f: F ~> G): BaseFunction[G] =
     copy(ev = ev.andThen(evalArgs => f(evalArgs)))
