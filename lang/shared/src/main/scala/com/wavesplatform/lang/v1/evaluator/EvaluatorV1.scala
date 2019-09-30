@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.implicits._
-import cats.{Id, Monad}
-import com.wavesplatform.lang.ExecutionError
+import cats.{Eval, Id, Monad, StackSafeMonad}
+import com.wavesplatform.lang.{EvalF, ExecutionError}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -13,11 +13,19 @@ import com.wavesplatform.lang.v1.task.imports._
 import scala.collection.mutable.ListBuffer
 
 object EvaluatorV1 {
+  implicit val idEvalFMonad: Monad[EvalF[Id, ?]] = new StackSafeMonad[EvalF[Id, ?]] {
+    override def flatMap[A, B](fa: Eval[A])(f: A => Eval[B]): Eval[B] =
+      fa.flatMap(f).memoize
+
+    override def pure[A](x: A): Eval[A] =
+      Eval.now(x)
+  }
+
   private def evaluator = new EvaluatorV1[Id]
   def apply(): EvaluatorV1[Id] = evaluator
 }
 
-class EvaluatorV1[F[_] : Monad] {
+class EvaluatorV1[F[_] : Monad](implicit ev: Monad[EvalF[F, ?]]) {
   private val lenses = new Lenses[F]
   import lenses._
 

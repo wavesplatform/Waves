@@ -63,7 +63,7 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
   protected def estimate(functionCosts: Map[FunctionHeader, Coeval[Long]], script: EXPR) =
     estimator(ctx.evaluationContext.letDefs.keySet, functionCosts, script)
 
-  ignore("successful on very deep expressions(stack overflow check)") {
+  property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
       FUNCTION_CALL(Plus, List(CONST_LONG(1), acc))
     }

@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeSignature, LazyVal}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
+import Implicits._
 
 import scala.util.Try
 

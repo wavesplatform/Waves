@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script.estimator
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -29,7 +30,7 @@ import scorex.crypto.encode.Base64
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
-  private def estimate(expr: Terms.EXPR, ctx: CTX, funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] =
+  private def estimate(expr: Terms.EXPR, ctx: CTX[Id], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] =
     estimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
 
   private val ctxV1 = {

@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.task
 import cats.{Eval, Monad}
 import cats.data.Kleisli
 import cats.implicits._
+import com.wavesplatform.lang.EvalF
 
 trait TaskMTFunctions {
 
@@ -35,9 +36,9 @@ trait TaskMTFunctions {
   def inspect[F[_] : Monad, S, E, A](f: S => A): TaskMT[F, S, E, A] =
     get[F, S, E].map(f)
 
-  def inspectFlat[F[_] : Monad, S, E, A](f: S => TaskMT[F, S, E, A]): TaskMT[F, S, E, A] =
+  def inspectFlat[F[_] : Monad, S, E, A](f: S => TaskMT[F, S, E, A])(implicit m: Monad[EvalF[F, ?]]): TaskMT[F, S, E, A] =
     get[F, S, E].flatMap(f)
 
-  def modify[F[_] : Monad, S, E](f: S => S): TaskMT[F, S, E, Unit] =
+  def modify[F[_] : Monad, S, E](f: S => S)(implicit m: Monad[EvalF[F, ?]]): TaskMT[F, S, E, Unit] =
     get[F, S, E].flatMap(f andThen set[F, S, E])
 }

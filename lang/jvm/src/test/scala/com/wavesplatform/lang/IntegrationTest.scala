@@ -878,7 +878,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(sampleScript) should produce("Undefined type: `UndefinedType` of variable `a`, expected: Int, String")
   }
 
-  ignore("big let assignment chain") {
+  property("big let assignment chain") {
     val count = 5000
     val script =
       s"""
@@ -890,7 +890,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  ignore("big function assignment chain") {
+  property("big function assignment chain") {
     val count = 2000
     val script =
       s"""
@@ -904,7 +904,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  ignore("big let assignment chain with function") {
+  property("big let assignment chain with function") {
     val count = 5000
     val script =
       s"""

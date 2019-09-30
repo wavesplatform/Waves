@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import cats.arrow.FunctionK
 import cats.implicits._
-import cats.{Id, Monad, ~>}
+import cats.{Id, ~>}
 import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -14,7 +14,6 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.concurrent.ExecutionContext.Implicits.{global => g}
 import scala.concurrent.Future
-import scala.util.Try
 
 package object repl {
   val global: BaseGlobal = com.wavesplatform.lang.Global
@@ -35,7 +34,6 @@ package object repl {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Future[Either[String, Long]] = unavailable
   }
 
-  implicit val futureMonad: Monad[Future] = Monad[Future]
   val id2Future: Id ~> Future = new FunctionK[Id, Future] {
     def apply[A](a: A): Future[A] = Future.successful(a)
   }
@@ -49,18 +47,4 @@ package object repl {
 
   val internalVarPrefixes: Set[Char] = Set('@', '$')
   val internalFuncPrefix: String = "_"
-
-  def method(v: { def f(a: Int): String }): String = v.f(1)
-
-
-
-  object O {
-    def f(a: Int): String = ""
-  }
-  class C {
-    def f(a: Int): String = ""
-  }
-  method(O)
-  method(new C())
-  method(new { def f(a: Int): String = "" })
 }
