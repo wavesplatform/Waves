@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extends Environment[Future] {
-  private val client = NodeClient(settings.url)
+  private val client = NodeClient(settings.normalizedUrl)
   private val mappings = ImplicitMappings(settings.chainId)
   import mappings._
 

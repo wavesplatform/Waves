@@ -161,6 +161,12 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     repl.info("_isInstanceOf") shouldBe "_isInstanceOf not found in context"
   }
 
+  property("url slash strip") {
+    val url = "testnodes.wavesnodes.com"
+    val settings = NodeConnectionSettings(url + "///", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
+    settings.normalizedUrl shouldBe url
+  }
+
   ignore("waves context") {
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
     val repl = Repl(Some(settings))
