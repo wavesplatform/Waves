@@ -1,11 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import cats.data.EitherT
 import cats.implicits._
 import cats.{Eval, Monad, ~>}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.LogCallback
-import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
+import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
 
 sealed trait LazyVal[F[_]] {
   val value: Eval[F[Either[ExecutionError, EVALUATED]]]
@@ -19,7 +18,7 @@ object LazyVal {
     lc: LogCallback[F]
   ) extends LazyVal[F] {
     override val value: Eval[F[Either[ExecutionError, EVALUATED]]] =
-      v.flatTap(a => Eval.now(lc(a)).memoize)
+      v.flatTap(a => Eval.now(lc(a))).memoize
 
     override def mapK[G[_]: Monad](f: F ~> G): LazyVal[G] =
       copy(v = v.map(inner => f(inner)), _ => Monad[F].unit)
