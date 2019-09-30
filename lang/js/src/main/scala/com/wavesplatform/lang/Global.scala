@@ -7,7 +7,7 @@ import cats.implicits._
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
-import com.wavesplatform.lang.v1.repl.http.response.model.NodeResponse
+import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
 import scala.scalajs.js

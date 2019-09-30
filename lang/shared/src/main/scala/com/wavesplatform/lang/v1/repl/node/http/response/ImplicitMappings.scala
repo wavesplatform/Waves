@@ -1,6 +1,6 @@
-package com.wavesplatform.lang.v1.repl.http.response
+package com.wavesplatform.lang.v1.repl.node.http.response
 
-import com.wavesplatform.lang.v1.repl.http.response.model._
+import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo, Tx}
 

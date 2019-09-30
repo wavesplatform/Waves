@@ -4,7 +4,7 @@ import cats.Functor
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
-import com.wavesplatform.lang.v1.repl.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import monix.execution.atomic.Atomic
 
 import scala.concurrent.ExecutionContext.Implicits.{global => g}

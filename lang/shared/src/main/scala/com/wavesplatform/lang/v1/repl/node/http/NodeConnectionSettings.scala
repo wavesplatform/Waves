@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.repl.http
+package com.wavesplatform.lang.v1.repl.node.http
 
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}

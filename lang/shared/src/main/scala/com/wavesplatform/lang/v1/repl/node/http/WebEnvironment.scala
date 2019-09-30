@@ -1,12 +1,12 @@
-package com.wavesplatform.lang.v1.repl.http
+package com.wavesplatform.lang.v1.repl.node.http
 
 import cats.implicits._
 import cats.{Functor, Id}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.v1.repl.http.NodeClient._
-import com.wavesplatform.lang.v1.repl.http.response._
-import com.wavesplatform.lang.v1.repl.http.response.model._
+import com.wavesplatform.lang.v1.repl.node.http.NodeClient._
+import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
+import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
@@ -16,7 +16,6 @@ import io.circe.generic.auto._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.language.higherKinds
 
 private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extends Environment[Future] {
   private val client = NodeClient(settings.url)

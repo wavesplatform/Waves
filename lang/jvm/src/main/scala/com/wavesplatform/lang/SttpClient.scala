@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError, Request, Response, SttpBackend}
 import com.softwaremill.sttp.{Response, sttp, _}
-import com.wavesplatform.lang.v1.repl.http.response.model.NodeResponse
+import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
