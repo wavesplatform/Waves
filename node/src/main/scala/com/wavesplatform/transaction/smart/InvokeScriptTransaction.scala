@@ -119,6 +119,23 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     else
       Right(Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
 
+  def checkPayments(
+    tx: InvokeScriptTransaction,
+    multiPaymentAllowedByNode:   Boolean,
+    multiPaymentAllowedByScript: Boolean
+  ): Either[ExecutionError, Unit] =
+    if (multiPaymentAllowedByNode)
+      if (!multiPaymentAllowedByScript)
+        Left("Script doesn't support multiple payments")
+      else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
+        Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
+      else
+        Right(())
+    else if (tx.payments.size > 1)
+      Left("Multiple payments isn't allowed now")
+    else
+      Right(())
+
   override val typeId: Byte                 = 16
   override val supportedVersions: Set[Byte] = Set(1)
 

@@ -6,15 +6,17 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
+import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
+import shapeless.Inl
 
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
@@ -23,10 +25,19 @@ object ScriptRunner {
             blockchain: Blockchain,
             script: Script,
             isAssetScript: Boolean,
-            scriptContainerAddress: ByteStr): (Log, Either[ExecutionError, EVALUATED]) = {
+            scriptContainerAddress: ByteStr): (Log, Either[ExecutionError, EVALUATED]) =
     script match {
       case s: ExprScript =>
-        val ctx = BlockchainContext.build(
+        val paymentCheck = in match {
+          case Inl(ist: InvokeScriptTransaction) =>
+            InvokeScriptTransaction.checkPayments(
+              ist,
+              blockchain.multiPaymentAllowed,
+              s.stdLibVersion >= V4
+            )
+          case _ => Right(())
+        }
+        lazy val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
@@ -36,7 +47,7 @@ object ScriptRunner {
           false,
           Coeval(scriptContainerAddress)
         )
-        EvaluatorV1.applyWithLogging[EVALUATED](ctx, s.expr)
+        EvaluatorV1.applyWithLogging[EVALUATED](paymentCheck.flatMap(_ => ctx), s.expr)
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf), version)) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
@@ -63,5 +74,4 @@ object ScriptRunner {
         })
       case _ => (List.empty, "Unsupported script version".asLeft[EVALUATED])
     }
-  }
 }
