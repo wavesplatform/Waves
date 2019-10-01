@@ -120,14 +120,14 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     assert(data2 == List(entry3, entry2))
 
     nodes.rollback(tx1height, returnToUTX = false)
-    nodes.waitForSameBlockHeadesAt(tx1height)
+    nodes.waitForSameBlockHeadersAt(tx1height)
 
     val data1 = node.getData(firstAddress)
     assert(data1 == List(entry1))
     sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore1
 
     nodes.rollback(tx1height - 1, returnToUTX = false)
-    nodes.waitForSameBlockHeadesAt(tx1height - 1)
+    nodes.waitForSameBlockHeadersAt(tx1height - 1)
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
@@ -202,7 +202,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     sender.connect(miner.networkAddress)
     miner.connect(sender.networkAddress)
 
-    nodes.waitForSameBlockHeadesAt(height)
+    nodes.waitForSameBlockHeadersAt(height)
 
     nodes.waitForHeightArise()
 
@@ -223,7 +223,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
       val rollbackNodes = Random.shuffle(nodes).take(num)
       rollbackNodes.foreach(_.rollback(baseHeight - 1))
       nodes.waitForHeightArise()
-      nodes.waitForSameBlockHeadesAt(baseHeight)
+      nodes.waitForSameBlockHeadersAt(baseHeight)
     }
   }
 }

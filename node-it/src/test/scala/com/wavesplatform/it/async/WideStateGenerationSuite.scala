@@ -61,7 +61,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
       _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 7.minutes)
 
       height <- traverse(nodes)(_.height).map(_.max)
-      _      <- Await.ready(nodes.waitForSameBlockHeadesAt(height + 1), 5.minutes)
+      _      <- Await.ready(nodes.waitForSameBlockHeadersAt(height + 1), 5.minutes)
 
       _ <- Await.ready(traverse(nodes)(assertHasTxs(_, uploadedTxs.map(_.id).toSet)), 5.minutes)
     } yield ()
