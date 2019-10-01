@@ -38,7 +38,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     local {
       val letResult = (false, evalExpr(let.value))
       for {
-        _ <- modify[EstimatorContext, ExecutionError](lets.modify(_)(_.updated(let.name, letResult)))
+        _ <- update(lets.modify(_)(_.updated(let.name, letResult)))
         r <- evalExpr(inner)
       } yield r + 5
     }
@@ -46,23 +46,19 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     local {
       for {
-        ctx <- get
-        _ <- modify[EstimatorContext, ExecutionError]((userFuncs ~ callChain).modify(_) {
-          case (funcs, calls) => (storeFuncArgsCtx(funcs, func, ctx), calls - func.name)
-        })
+        _ <- checkFuncCtx(func)
+        _ <- update(userFuncs.modify(_)(_ + (FunctionHeader.User(func.name) -> func)))
         r <- evalExpr(inner)
       } yield r + 5
     }
 
-  private def storeFuncArgsCtx(
-    funcDef: Map[FunctionHeader, (FUNC, EstimatorContext)],
-    func:    FUNC,
-    ctx:     EstimatorContext
-  ): Map[FunctionHeader, (FUNC, EstimatorContext)] =
-      funcDef.updated(
-        FunctionHeader.User(func.name),
-        (func, lets.set(ctx)(func.args.map((_, (false, const(1)))).toMap))
-      )
+  private def checkFuncCtx(func: FUNC): EvalM[Unit] =
+    local {
+      for {
+        _ <- update(lets.modify(_)(_ ++ func.args.map((_, (true, const(0)))).toMap))
+        _ <- evalExpr(func.body)
+      } yield ()
+    }
 
   private def evalRef(key: String): EvalM[Long] =
     for {
@@ -75,7 +71,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     } yield r + 2
 
   private def setRefEvaluated(key: String, lzy: EvalM[Long]): EvalM[Long] =
-    modify[EstimatorContext, ExecutionError](lets.modify(_)(_.updated(key, (true, lzy))))
+    update(lets.modify(_)(_.updated(key, (true, lzy))))
       .flatMap(_ => lzy)
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
@@ -92,32 +88,29 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     for {
       ctx <- get
       bodyComplexity <- predefFuncs.get(ctx).get(header).map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
-        .orElse(userFuncs.get(ctx).get(header)
-          .map { case (func, funcCtx) =>
-            if (ctx.callChain.contains(func.name))
-              raiseError[EstimatorContext, ExecutionError, Long](s"Recursive call ${func.name}()")
-            else
-              evalUserFuncCall(func, funcCtx, args)
-          })
+        .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, args)))
         .getOrElse(raiseError(s"function '$header' not found"))
     } yield bodyComplexity
 
-  private def evalUserFuncCall(
-    func:    FUNC,
-    funcCtx: EstimatorContext,
-    args:    List[EXPR]
-  ): EvalM[Long] =
+  private def evalUserFuncCall(func: FUNC, args: List[EXPR]): EvalM[Long] =
     for {
       argsComplexity <- evalFuncArgs(args)
-      _              <- modify[EstimatorContext, ExecutionError]((lets ~ callChain).modify(_) {
-        case (l, c) => (l ++ funcCtx.letDefs, c + func.name)
-      })
+      ctx <- get
+      _   <- update(lets.modify(_)(_ ++ ctx.overlappedRefs))
+      overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map((arg, _))).toMap
+      ctxArgs    = func.args.map((_, (false, const(1)))).toMap
+      _              <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l ++ ctxArgs, or ++ overlapped)})
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
-      _              <- modify[EstimatorContext, ExecutionError](callChain.modify(_)(_ - func.name))
+      evaluatedCtx   <- get
+      overlappedChanges = overlapped.map { case ref@(name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
+      _              <- update((lets ~ overlappedRefs).modify(_){ case (l, or) => (l -- ctxArgs.keys ++ overlapped, or ++ overlappedChanges)})
     } yield bodyComplexity + argsComplexity
 
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =
     args.traverse(evalExpr).map(_.sum)
+
+  private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
+    modify[EstimatorContext, ExecutionError](f)
 
   private def const(l: Long): EvalM[Long] =
     Monad[EvalM].pure(l)

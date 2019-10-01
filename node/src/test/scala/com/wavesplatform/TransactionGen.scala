@@ -492,6 +492,25 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         .get
     }
 
+  def issueGen(sender: KeyPair, timestamp: Long): Gen[IssueTransactionV1] =
+    for {
+      (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
+    } yield {
+      IssueTransactionV1
+        .selfSigned(
+          sender,
+          assetName,
+          description,
+          quantity,
+          decimals,
+          reissuable = false,
+          1 * Constants.UnitsInWave,
+          timestamp
+        )
+        .right
+        .get
+    }
+
   val issueGen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)

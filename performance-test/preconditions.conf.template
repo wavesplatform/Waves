@@ -1,0 +1,23 @@
+preconditions {
+  faucet = "${faucet}"
+
+  # Accounts to create
+  # { seed = "seed1", balance = 123, script-file = "script1.ride" }
+  accounts = [
+    ${accounts}
+  ]
+
+  # Leases
+  # { from = "seed1", to = "address", amount = 123 }
+  leases = [
+    ${leases}
+  ]
+
+  # Assets to issue
+  # { issuer = "seed1", name = "Asset#1", description = "SomeAsset", amount = 100000000, decimals = 8, reissuable = true, script-file = "asset-script.ride" }
+  assets = [
+    ${assets}
+  ]
+}
+
+include "preconditions.local.conf"

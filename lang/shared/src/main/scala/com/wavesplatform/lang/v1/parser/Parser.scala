@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
-import fastparse.{WhitespaceApi, core, noApi}
+import fastparse.{WhitespaceApi, core}
 
 object Parser {
 

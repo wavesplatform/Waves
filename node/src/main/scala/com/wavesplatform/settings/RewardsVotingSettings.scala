@@ -1,3 +1,3 @@
 package com.wavesplatform.settings
 
-case class RewardsVotingSettings(target: Option[Long])
+case class RewardsVotingSettings(desired: Option[Long])
