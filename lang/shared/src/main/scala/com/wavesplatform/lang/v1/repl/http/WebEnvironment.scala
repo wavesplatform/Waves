@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.repl.http.NodeClient._
 import com.wavesplatform.lang.v1.repl.http.response._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.generic.auto._
 
@@ -55,13 +55,14 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
     client.get[Either[String, ?], BalanceResponse](s"/addresses/balance/${address(recipient)}")
       .map(_.balance)
 
-  override def inputEntity: InputEntity                     = ???
-  override def transactionById(id: Array[Byte]): Option[Tx] = ???
-
   private def address(addressOrAlias: Recipient) =
     addressOrAlias match {
       case Address(bytes) => bytes.toString
       case Alias(name)    => resolveAlias(name).explicitGet().bytes.toString
     }
-  override def blockHeaderParser(bytes: Array[Byte]) = ???
+
+  override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader] = ???
+  override def inputEntity: InputEntity                                   = ???
+  override def transactionById(id: Array[Byte]): Option[Tx]               = ???
+  override def multiPaymentAllowed: Boolean                               = ???
 }
