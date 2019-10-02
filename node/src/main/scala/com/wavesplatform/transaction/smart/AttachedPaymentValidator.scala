@@ -1,0 +1,53 @@
+package com.wavesplatform.transaction.smart
+
+import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, Asset, DApp, Expression, V4}
+import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.traits.domain.Payments
+
+object AttachedPaymentValidator {
+  def extractPayments(
+    tx: InvokeScriptTransaction,
+    multiPaymentAllowedByNode:   Boolean,
+    multiPaymentAllowedByScript: Boolean
+  ): Either[ExecutionError, Payments] =
+    if (multiPaymentAllowedByNode)
+      if (!multiPaymentAllowedByScript)
+        Left("Script doesn't support multiple payments")
+      else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
+        Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
+      else
+        Right(Payments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
+    else if (tx.payments.size > 1)
+      Left("Multiple payments isn't allowed now")
+    else
+      Right(Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
+
+  def checkPayments(
+    tx: InvokeScriptTransaction,
+    multiPaymentAllowedByNode: Boolean,
+    ds                       : DirectiveSet
+  ): Either[ExecutionError, Payments] =
+    if (multiPaymentAllowedByNode)
+      if (ds.stdLibVersion < V4)
+        Left(scriptErrorMessage(ds))
+      else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
+        Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
+      else
+        Right(Payments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
+    else if (tx.payments.size > 1)
+      Left("Multiple payments isn't allowed now")
+    else
+      Right(Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
+
+  def scriptErrorMessage(ds: DirectiveSet): String = {
+    val name = (ds.scriptType, ds.contentType) match {
+      case (Account, DApp)       => "DApp"
+      case (Account, Expression) => "Invoker script"
+      case (Asset,   Expression) => "Attached asset script"
+      case _ => ???
+    }
+    s"$name version ${ds.stdLibVersion.id} < 4 doesn't support multiple payment attachment"
+  }
+}

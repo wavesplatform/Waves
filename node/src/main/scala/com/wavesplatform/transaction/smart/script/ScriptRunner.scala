@@ -3,23 +3,29 @@ package com.wavesplatform.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, Asset, Expression, V4}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
+import com.wavesplatform.lang.v1.traits.domain.Payments
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.transaction.{Authorized, Proven}
+import com.wavesplatform.transaction.{Authorized, Proven, Transaction}
 import monix.eval.Coeval
-import shapeless.Inl
+import shapeless.{:+:, CNil, Inl}
 
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
+  type PaymentsTxOrd = (Transaction, Option[Payments]) :+: Order :+: ScriptTransfer :+: CNil
 
   def apply(in: TxOrd,
             blockchain: Blockchain,
@@ -30,11 +36,8 @@ object ScriptRunner {
       case s: ExprScript =>
         val paymentCheck = in match {
           case Inl(ist: InvokeScriptTransaction) =>
-            InvokeScriptTransaction.checkPayments(
-              ist,
-              blockchain.multiPaymentAllowed,
-              s.stdLibVersion >= V4
-            )
+            val ds = DirectiveSet(s.stdLibVersion, if (isAssetScript) Asset else Account, Expression).explicitGet()
+            AttachedPaymentValidator.checkPayments(ist, blockchain.multiPaymentAllowed, ds)
           case _ => Right(())
         }
         lazy val ctx = BlockchainContext.build(

@@ -114,6 +114,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     dAppVersion:         StdLibVersion,
     verifierVersion:     StdLibVersion,
     assetsScriptVersion: StdLibVersion,
+    message: String
   ): Unit =
     forAll(multiPaymentPreconditions(
       dApp(dAppVersion),
@@ -128,9 +129,9 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     }
 
   property("multi payment fails if any script has version lower V4") {
-    assertScriptError(dAppVersion = V3, V4, V4)
-    assertScriptError(V4, verifierVersion = V3, V4)
-    assertScriptError(V4, V4, assetsScriptVersion = V3)
+    assertScriptError(dAppVersion = V3, V4, V4, "DApp version V3 < V4 doesn't support multiple payment attachment")
+    assertScriptError(V4, verifierVersion = V3, V4, "Invoker verifier version V3 < V4 doesn't support multiple payment attachment")
+    assertScriptError(V4, V4, assetsScriptVersion = V3, "Attached asset script version V3 < V4 doesn't support multiple payment attachment")
   }
 
   property("multi payment with verifier and scripted assets transfer") {

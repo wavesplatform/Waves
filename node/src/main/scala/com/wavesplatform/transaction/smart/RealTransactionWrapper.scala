@@ -104,7 +104,7 @@ object RealTransactionWrapper {
         Tx.CI(
           proven(ci),
           ci.dAppAddressOrAlias,
-          InvokeScriptTransaction.extractPayments(ci, multiPaymentAllowed, version >= V4).explicitGet(),
+          AttachedPaymentValidator.extractPayments(ci, multiPaymentAllowed, version >= V4).explicitGet(),
           ci.feeAssetId.compatId,
           ci.funcCallOpt.map(_.function.funcName),
           ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
