@@ -38,7 +38,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       assert(!isBlacklisted(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklist(address, "")
+      peerDatabase.blacklist(address.getAddress, "")
       assert(isBlacklisted(address))
       assert(!peerDatabase.knownPeers.contains(address))
 
