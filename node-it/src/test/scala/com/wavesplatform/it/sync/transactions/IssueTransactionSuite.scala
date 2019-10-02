@@ -57,22 +57,35 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
                                "Accounts balance errors")
   }
 
-  test("Try to put incorrect script") {
-    val assetName        = "myasset"
-    val assetDescription = "my asset description"
-
-    assertBadRequestAndMessage(
-      sender.issue(firstAddress,
-                   assetName,
-                   assetDescription,
-                   someAssetAmount,
-                   2,
-                   reissuable = false,
-                   issueFee,
-                   version = 2,
-                   script = Some("base64:AQa3b8tZ")),
-      "ScriptParseError(Invalid checksum)"
+  val invalidScript =
+    Table(
+      ("script", "error"),
+      ("base64:AQa3b8tZ", "Invalid checksum"),
+      ("base64:", "Can't parse empty script bytes"),
+      ("base64:AA==", "Illegal length of script: 1"),
+      ("base64:AAQB", "Invalid content type of script: 4"),
+      ("base64:AAEF", "Invalid version of script: 5"),
+      ("base64:CAEF", "Invalid version of script: 8"),
     )
+
+  forAll(invalidScript) { (script: String, error: String) =>
+    test(s"Try to put incorrect script=$script") {
+      val assetName        = "myasset"
+      val assetDescription = "my asset description"
+
+      assertBadRequestAndMessage(
+        sender.issue(firstAddress,
+          assetName,
+          assetDescription,
+          someAssetAmount,
+          2,
+          reissuable = false,
+          issueFee,
+          version = 2,
+          script = Some(script)),
+        s"ScriptParseError($error)"
+      )
+    }
   }
 
   val invalidAssetValue =
