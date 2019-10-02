@@ -2,7 +2,8 @@ package com.wavesplatform.lang
 
 import java.nio.ByteBuffer
 
-import cats.{Eval, Id}
+import cats.Id
+import cats.implicits._
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
@@ -199,7 +200,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         typeDefs = Map.empty,
         letDefs = Map(
           ("p", LazyVal.fromEvaluated[Id](pointInstance)),
-          ("badVal", LazyVal.apply[Id](EitherT.leftT[EvalF[Id, ?], EVALUATED]("Error")))
+          ("badVal", LazyVal.apply[Id](EitherT.leftT[({type L[A] = EvalF[Id, A]})#L, EVALUATED]("Error")))
         ),
         functions = Map.empty
       )
