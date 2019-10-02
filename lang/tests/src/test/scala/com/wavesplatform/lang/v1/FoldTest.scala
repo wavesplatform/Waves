@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.Global
@@ -18,7 +19,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
-  private val emptyEnv = new Environment {
+  private val emptyEnv = new Environment[Id] {
     lazy val unavailable = throw new RuntimeException(s"Blockchain state is unavailable")
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 0
@@ -37,14 +38,14 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
-    val ctx: CTX =
+    val ctx: CTX[Id] =
       Monoid.combineAll(Seq(
         PureContext.build(Global, V3),
         WavesContext.build(DirectiveSet.contractDirectiveSet, emptyEnv),
         CryptoContext.build(Global, V3)
       ))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
   }
 
   property("sum") {

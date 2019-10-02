@@ -2,6 +2,7 @@ package com.wavesplatform.utils
 
 import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 
+import cats.Id
 import cats.syntax.monoid._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
@@ -123,10 +124,10 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
   }
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
-    val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
+    val untyped      = Parser.parseExpr(code).get.value
+    val ctx: CTX[Id] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
   }
 
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -21,7 +22,7 @@ object BlockchainContext {
             blockchain: Blockchain,
             isTokenContext: Boolean,
             isContract: Boolean,
-            address: Coeval[ByteStr]): Either[ExecutionError, EvaluationContext] =
+            address: Coeval[ByteStr]): Either[ExecutionError, EvaluationContext[Id]] =
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),

@@ -20,7 +20,7 @@ object WavesEnvironment {
 }
 
 class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain, address: Coeval[ByteStr])
-    extends Environment {
+    extends Environment[Id] {
   override def height: Long = h()
 
   override def inputEntity: Environment.InputEntity = {

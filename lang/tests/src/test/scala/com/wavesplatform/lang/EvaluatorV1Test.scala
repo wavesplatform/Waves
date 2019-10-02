@@ -2,6 +2,8 @@ package com.wavesplatform.lang
 
 import java.nio.ByteBuffer
 
+import cats.Id
+import cats.implicits._
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
@@ -39,7 +41,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 
-  private def defaultFullContext(environment: Environment): CTX = Monoid.combineAll(
+  private def defaultFullContext(environment: Environment[Id]): CTX[Id] = Monoid.combineAll(
     Seq(
       defaultCryptoContext,
       pureContext,
@@ -50,10 +52,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
   )
 
-  private val pureEvalContext: EvaluationContext = PureContext.build(Global, version).evaluationContext
+  private val pureEvalContext: EvaluationContext[Id] = PureContext.build(Global, version).evaluationContext
 
-  private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV1[T](context, expr)
+  private def ev[T <: EVALUATED](context: EvaluationContext[Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
+    EvaluatorV1()[T](context, expr)
 
   private def simpleDeclarationAndUsage(i: Int, blockBuilder: (LET, EXPR) => EXPR) = blockBuilder(LET("x", CONST_LONG(i)), REF("x"))
 
@@ -65,7 +67,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = EvaluatorV1.applyWithLogging[EVALUATED](
+      val (log, Left(err)) = EvaluatorV1().applyWithLogging[EVALUATED](
         pureEvalContext,
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -172,7 +174,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       context = Monoid.combine(pureEvalContext,
                                EvaluationContext(
                                  typeDefs = Map.empty,
-                                 letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
+                                 letDefs = Map(("p", LazyVal.fromEvaluated[Id](pointInstance))),
                                  functions = Map.empty
                                )),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2)))
@@ -194,9 +196,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointInstance = CaseObj(pointType, Map("X" -> 3L, "Y" -> 4L))
     val context = Monoid.combine(
       pureEvalContext,
-      EvaluationContext(
+      EvaluationContext[Id](
         typeDefs = Map.empty,
-        letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
+        letDefs = Map(
+          ("p", LazyVal.fromEvaluated[Id](pointInstance)),
+          ("badVal", LazyVal.apply[Id](EitherT.leftT[({type L[A] = EvalF[Id, A]})#L, EVALUATED]("Error")))
+        ),
         functions = Map.empty
       )
     )
@@ -212,7 +217,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
+      val f = NativeFunction[Id]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
         case _ =>
           functionEvaluated = functionEvaluated + 1
           evaluated(1L)
@@ -241,7 +246,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = EvaluationContext(
       typeDefs = Map.empty,
-      letDefs = Map("fooInstance" -> LazyVal(EitherT.pure(fooInstance))),
+      letDefs = Map("fooInstance" -> LazyVal.fromEvaluated[Id](fooInstance)),
       functions = Map.empty
     )
 
@@ -252,7 +257,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
+    val fooCtor = NativeFunction[Id]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
       case _ =>
         evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
     }
@@ -270,7 +275,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
+    val fooCtor = NativeFunction[Id]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
       case _ =>
         evaluated(
           CaseObj(
@@ -282,7 +287,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           ))
     }
     val fooTransform =
-      NativeFunction("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
+      NativeFunction[Id]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
         case (fooObj: CaseObj) :: Nil => evaluated(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
@@ -681,7 +686,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         defaultCryptoContext.evaluationContext,
         EvaluationContext.build(
           typeDefs = Map.empty,
-          letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))),
+          letDefs = Map("tx" -> LazyVal.fromEvaluated[Id](txObj)),
           functions = Seq.empty
         )
       ))
@@ -707,7 +712,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                        alicePK: PublicKey,
                        bobPK: PublicKey,
                        aliceProof: Signature,
-                       bobProof: Signature): (Log, Either[ExecutionError, Boolean]) = {
+                       bobProof: Signature): (Log[Id], Either[ExecutionError, Boolean]) = {
     val txType = CASETYPEREF(
       "Transaction",
       List(
@@ -728,17 +733,17 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, (FINAL, LazyVal)] = Map(
-      ("tx", (txType, LazyVal(EitherT.pure(txObj)))),
-      ("alicePubKey", (BYTESTR, LazyVal(EitherT.pure(ByteStr(alicePK))))),
-      ("bobPubKey", (BYTESTR, LazyVal(EitherT.pure(ByteStr(bobPK)))))
+    val vars: Map[String, (FINAL, LazyVal[Id])] = Map(
+      ("tx", (txType, LazyVal.fromEvaluated[Id](txObj))),
+      ("alicePubKey", (BYTESTR, LazyVal.fromEvaluated[Id](ByteStr(alicePK)))),
+      ("bobPubKey", (BYTESTR, LazyVal.fromEvaluated[Id](ByteStr(bobPK))))
     )
 
     val context = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
-        CTX(Seq(txType), vars, Array.empty)
+        CTX(Seq(txType), vars, Array.empty[BaseFunction[Id]])
       ))
 
     val script =
@@ -749,7 +754,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
          |aliceSigned && bobSigned
    """.stripMargin
 
-    val r = EvaluatorV1
+    val r = EvaluatorV1.apply
       .applyWithLogging[EVALUATED](context.evaluationContext,
                                    ExpressionCompiler
                                      .compile(script, context.compilerContext)
@@ -840,18 +845,18 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction("F", 1, 258: Short, LONG, ("_", LONG)) {
+    val f = NativeFunction[Id]("F", 1, 258: Short, LONG, ("_", LONG)) {
       case _ =>
         functionEvaluated = functionEvaluated + 1
         evaluated(1L)
     }
 
-    val doubleFst = UserFunction("ID", 0, LONG, ("x", LONG)) {
+    val doubleFst = UserFunction[Id]("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
     val context = Monoid.combine(pureEvalContext,
-                                 EvaluationContext(
+                                 EvaluationContext[Id](
                                    typeDefs = Map.empty,
                                    letDefs = Map.empty,
                                    functions = Map(f.header -> f, doubleFst.header -> doubleFst)
@@ -868,11 +873,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
-    val doubleFn = UserFunction("doubleFn", 0, LONG, ("x", LONG)) {
+    val doubleFn = UserFunction[Id]("doubleFn", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val subFn = UserFunction("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
+    val subFn = UserFunction[Id]("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
       FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
 
@@ -880,11 +885,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     // let y = 100
     val context = Monoid.combine(
       pureEvalContext,
-      EvaluationContext(
+      EvaluationContext[Id](
         typeDefs = Map.empty,
         letDefs = Map(
-          "x" -> LazyVal(EitherT.pure(3L)),
-          "y" -> LazyVal(EitherT.pure(100L))
+          "x" -> LazyVal.fromEvaluated[Id](3L),
+          "y" -> LazyVal.fromEvaluated[Id](100L)
         ),
         functions = Map(
           doubleFn.header -> doubleFn,

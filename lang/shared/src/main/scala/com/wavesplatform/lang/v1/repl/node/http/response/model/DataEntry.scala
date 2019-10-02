@@ -1,11 +1,11 @@
-package com.wavesplatform.lang.v1.repl.http.response
+package com.wavesplatform.lang.v1.repl.node.http.response.model
 
 import com.wavesplatform.lang.v1.traits.DataType
 import io.circe.{Decoder, DecodingFailure, HCursor}
 
-private[http] case class DataEntry(key: String, value: Any, `type`: DataType)
+private[node] case class DataEntry(key: String, value: Any, `type`: DataType)
 
-private[http] object DataEntry {
+private[node] object DataEntry {
   implicit val decoder: Decoder[DataEntry] = (c: HCursor) =>
     for {
       rawType <- c.downField("type").as[String]

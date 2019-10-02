@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.diffs.ProduceError
@@ -22,11 +23,11 @@ object Common {
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
-  val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
+  val addCtx: CTX[Id]            = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 
-  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
+  def ev[T <: EVALUATED](context: EvaluationContext[Id] = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
                          expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV1[T](context, expr)
+    EvaluatorV1().apply[T](context, expr)
 
   trait NoShrink {
     implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
@@ -34,7 +35,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: NativeFunction =
+  val multiplierFunction: NativeFunction[Id] =
     NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {
       case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
       case _                                                   => ??? // suppress pattern match warning
@@ -62,9 +63,9 @@ object Common {
                                                                                UNION.create(CorD.typeList, Some("PointCD")))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
+    EvaluationContext.build(Map.empty, Map("p" -> LazyVal.fromEvaluated[Id](instance)), Seq.empty)
 
-  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
+  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] = new Environment[Id] {
     override def height: Long  = h
     override def chainId: Byte = nByte
     override def inputEntity   = in()

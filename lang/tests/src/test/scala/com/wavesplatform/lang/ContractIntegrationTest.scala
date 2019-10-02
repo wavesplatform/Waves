@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.Id
 import cats.syntax.monoid._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
@@ -22,8 +23,8 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
-  val ctx: CTX =
-    PureContext.build(Global, V3) |+|
+  val ctx: CTX[Id] =
+      PureContext.build(Global, V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         DirectiveSet(V3, Account, DApp).explicitGet(),
@@ -145,7 +146,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   def parseCompileAndEvaluate(script: String,
                               func: String,
                               args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
-                             ): Either[(ExecutionError, Log), ScriptResult] = {
+                             ): Either[(ExecutionError, Log[Id]), ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
 
@@ -169,7 +170,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
     val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
-    EvaluatorV1.evalWithLogging(Right(ctx.evaluationContext), evalm)._2
+    EvaluatorV1().evalWithLogging(Right(ctx.evaluationContext), evalm)._2
   }
 
   property("Simple verify") {

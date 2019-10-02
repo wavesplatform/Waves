@@ -1,5 +1,6 @@
 package com.wavesplatform.utils
 
+import cats.Id
 import cats.kernel.Monoid
 import com.github.mustachejava._
 import com.wavesplatform.common.utils.EitherExt2
@@ -26,9 +27,9 @@ object DocExport {
       val outputFile  = args(3)
 
       val version = DirectiveDictionary[StdLibVersion].idMap(versionStr.toInt)
-      val wavesContext = WavesContext.build(
+      val wavesContext = WavesContext.build[Id](
         DirectiveSet(version, Account, Expression).explicitGet(),
-        new Environment {
+        new Environment[Id] {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66
           override def inputEntity: Environment.InputEntity                                                            = ???
@@ -78,7 +79,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(Global, version), cryptoContext, wavesContext))
+      val fullContext: CTX[Id] = Monoid.combineAll(Seq(PureContext.build(Global, version), cryptoContext, wavesContext))
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 

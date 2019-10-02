@@ -1,5 +1,6 @@
 package com.wavesplatform.utils
 
+import cats.Id
 import cats.syntax.monoid._
 import com.google.common.primitives.Ints
 import com.wavesplatform.common.utils.Base64
@@ -107,9 +108,9 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
+    val ctx: CTX[Id] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
   }
 
   private def scriptSrc(root: Array[Byte], proof: Array[Byte], value: Array[Byte]): String = {

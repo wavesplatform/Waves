@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.values.V3
@@ -26,9 +27,9 @@ class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers 
 
   private def eval(code: String): Either[String, EVALUATED] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = Monoid.combineAll(Seq(PureContext.build(Global, V3)))
+    val ctx: CTX[Id] = Monoid.combineAll(Seq(PureContext.build(Global, V3)))
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[EVALUATED](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply[EVALUATED](ctx.evaluationContext, v._1))
   }
 
   property("multiple libraries") {

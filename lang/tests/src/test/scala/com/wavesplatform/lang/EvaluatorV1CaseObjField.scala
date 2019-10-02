@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
@@ -15,7 +16,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class EvaluatorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.build(Global, V1).evaluationContext, sampleUnionContext(p))
+  def context(p: CaseObj): EvaluationContext[Id] = Monoid.combine(PureContext.build(Global, V1).evaluationContext, sampleUnionContext(p))
 
   property("case custom type field access") {
     ev[CONST_LONG](

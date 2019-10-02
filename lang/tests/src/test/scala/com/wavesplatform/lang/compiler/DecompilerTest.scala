@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -28,7 +29,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     def shouldEq(s2: String) = s1.replace("\r\n", "\n") shouldEqual s2.replace("\r\n", "\n")
   }
 
-  val ctx: CTX =
+  val ctx: CTX[Id] =
     Monoid.combineAll(Seq(
       testContext,
       CryptoContext.build(Global, V3),

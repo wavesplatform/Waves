@@ -1,9 +1,9 @@
-package com.wavesplatform.lang.v1.repl.http.response
+package com.wavesplatform.lang.v1.repl.node.http.response.model
 
 import io.circe.generic.auto._
 import io.circe.{Decoder, DecodingFailure, HCursor}
 
-private[http] trait TransferTransaction {
+private[node] trait TransferTransaction {
   def id: ByteString
   def recipient: ByteString
   def amount: Long
@@ -19,7 +19,7 @@ private[http] trait TransferTransaction {
   def proofs: List[ByteString]
 }
 
-private[http] case class TransferTransactionV1(
+private[node] case class TransferTransactionV1(
   id: ByteString,
   recipient: ByteString,
   amount: Long,
@@ -37,7 +37,7 @@ private[http] case class TransferTransactionV1(
   override def proofs: List[ByteString] = List(signature)
 }
 
-private[http] case class TransferTransactionV2(
+private[node] case class TransferTransactionV2(
   id: ByteString,
   recipient: ByteString,
   amount: Long,
@@ -53,7 +53,7 @@ private[http] case class TransferTransactionV2(
   proofs: List[ByteString]
 ) extends TransferTransaction
 
-private[http] object TransferTransaction {
+private[node] object TransferTransaction {
  implicit val decoder: Decoder[TransferTransaction] = (c: HCursor) =>
    for {
      version <- c.downField("version").as[Int]

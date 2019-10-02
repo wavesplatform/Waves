@@ -1,5 +1,6 @@
 package com.wavesplatform.utils
 
+import cats.Id
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, TRUE}
 import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
@@ -11,9 +12,9 @@ class UtilsSpecification extends FreeSpec with Matchers {
 
   "estimate()" - {
     "handles functions that depend on each other" in {
-      val callee = UserFunction("callee", 0, BOOLEAN)(TRUE)
-      val caller = UserFunction("caller", 0, BOOLEAN)(FUNCTION_CALL(callee.header, List.empty))
-      val ctx = EvaluationContext(
+      val callee = UserFunction[Id]("callee", 0, BOOLEAN)(TRUE)
+      val caller = UserFunction[Id]("caller", 0, BOOLEAN)(FUNCTION_CALL(callee.header, List.empty))
+      val ctx = EvaluationContext[Id](
         typeDefs = Map.empty,
         letDefs = Map.empty,
         functions = Seq(caller, callee).map(f => f.header -> f)(collection.breakOut)

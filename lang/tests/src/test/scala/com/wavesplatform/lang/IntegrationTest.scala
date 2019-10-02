@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
@@ -123,14 +124,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   private def eval[T <: EVALUATED](code: String,
                                    pointInstance: Option[CaseObj] = None,
                                    pointType: FINAL = AorBorC,
-                                   ctxt: CTX = CTX.empty): Either[String, T] = {
+                                   ctxt: CTX[Id] = CTX.empty): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
-    val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
-    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX =
+    val lazyVal                                                = LazyVal.fromEvaluated[Id](pointInstance.orNull)
+    val stringToTuple: Map[String, (FINAL, LazyVal[Id])] = Map(("p", (pointType, lazyVal)))
+    val ctx: CTX[Id] =
       Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply(ctx.evaluationContext, v._1))
   }
 
   property("function call") {
@@ -323,7 +324,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction("ID", 0, LONG, ("x", LONG)) {
+    val doubleFst = UserFunction[Id]("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
@@ -331,7 +332,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
-        letDefs = Map("x"                -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
+        letDefs = Map("x"                -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
         functions = Map(doubleFst.header -> doubleFst)
       )
     )
@@ -345,7 +346,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       PureContext.build(Global, V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
+        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
         functions = Map.empty
       )
     )
@@ -514,8 +515,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("arr" -> (BYTESTR -> LazyVal(EitherT.fromEither(CONST_BYTESTR(array))))), Array())
+    val arrVal = LazyVal.fromEvaluated[Id](CONST_BYTESTR(array).explicitGet())
+    eval[EVALUATED](
+      src,
+      ctxt = CTX[Id](
+        Seq(),
+        Map("arr" -> (BYTESTR -> arrVal)),
+        Array()
+      )
     ) shouldBe Right(CONST_LONG(0x0101010101010101L))
   }
 
@@ -601,8 +608,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val str = "a" * 32766 + "z"
     val src =
       """ str.indexOf("z", 32766) """
-    eval[EVALUATED](src, ctxt = CTX(Seq(),
-      Map("str" -> (STRING -> LazyVal(EitherT.pure(CONST_STRING(str).explicitGet())))), Array())
+    eval[EVALUATED](
+      src,
+      ctxt = CTX[Id](
+        Seq(),
+        Map("str" -> (STRING -> LazyVal.fromEvaluated[Id](CONST_STRING(str).explicitGet()))),
+        Array()
+      )
     ) shouldBe Right(CONST_LONG(32766L))
   }
 
@@ -677,7 +689,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """ str.lastIndexOf("z", 32766) """
     eval(src, ctxt = CTX(Seq(),
-      Map("str" -> (STRING -> LazyVal(EitherT.fromEither(CONST_STRING(str))))), Array())
+      Map("str" -> (STRING -> LazyVal.fromEvaluated[Id](CONST_STRING(str).explicitGet()))), Array())
     ) shouldBe Right(CONST_LONG(32766L))
   }
 

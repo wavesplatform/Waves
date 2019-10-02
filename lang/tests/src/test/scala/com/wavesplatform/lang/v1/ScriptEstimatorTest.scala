@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1
 
+import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
@@ -46,9 +47,9 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
         PureContext.build(Global, V3),
         CryptoContext.build(Global, V3),
         WavesContext.build(DirectiveSet.contractDirectiveSet, Common.emptyBlockchainEnvironment()),
-        CTX(
+        CTX[Id](
           Seq(transactionType),
-          Map(("tx", (transactionType, LazyVal(EitherT.pure(tx))))),
+          Map(("tx", (transactionType, LazyVal.fromEvaluated[Id](tx)))),
           Array.empty
         )
       ))
