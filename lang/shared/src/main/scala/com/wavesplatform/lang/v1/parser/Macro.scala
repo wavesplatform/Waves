@@ -4,7 +4,6 @@ import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions._
 
 import scala.annotation.tailrec
-import scala.util.Random
 
 object Macro {
   def unwrapFold(

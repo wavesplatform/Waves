@@ -9,6 +9,6 @@ homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-
 developers := List(Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com")))
 libraryDependencies ++=
   Seq(
-    "org.scala-js"                      %% "scalajs-stubs" % "1.0.0-RC1" % Provided,
+    "org.scala-js"                      %% "scalajs-stubs" % "1.0.0" % Provided,
     "com.github.spullara.mustache.java" % "compiler"       % "0.9.5"
   )

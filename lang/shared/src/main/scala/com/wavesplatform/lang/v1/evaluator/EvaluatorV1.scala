@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.Monad
 import cats.implicits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
