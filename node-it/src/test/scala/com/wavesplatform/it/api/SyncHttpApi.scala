@@ -4,11 +4,12 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
-import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
@@ -25,9 +26,8 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
+import org.scalatest.Matchers._
 import org.scalatest.{Assertion, Assertions, Matchers}
-import Matchers._
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import play.api.libs.json.Json.parse
 import play.api.libs.json._
 
@@ -37,18 +37,18 @@ import scala.concurrent.{Await, Awaitable, Future}
 import scala.util._
 import scala.util.control.NonFatal
 
-object SyncHttpApi extends Assertions with ApiErrorSupport {
+object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-  @deprecated(message = "Use assertApiErrorAndCheck()", since = "1.1.3")
+  @deprecated(message = "Use assertApiError()", since = "1.1.3")
   def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
     case Failure(e)                                                  => Assertions.fail(e)
     case _                                                           => Assertions.fail("Expecting bad request")
   }
 
-  @deprecated(message = "Use assertApiErrorAndCheck()", since = "1.1.3")
+  @deprecated(message = "Use assertApiError()", since = "1.1.3")
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(
@@ -59,7 +59,7 @@ object SyncHttpApi extends Assertions with ApiErrorSupport {
     case _          => Assertions.fail("Expecting bad request")
   }
 
-  @deprecated(message = "Use assertApiErrorAndCheck()", since = "1.1.3")
+  @deprecated(message = "Use assertApiError()", since = "1.1.3")
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion =
     Try(f) match {
       case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
@@ -68,25 +68,25 @@ object SyncHttpApi extends Assertions with ApiErrorSupport {
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
-  def assertApiError[R, E <: ApiError: Reads](f: => R)(expectedError: E): Assertion =
-    assertApiErrorAndCheck[R, E](f)(error => error shouldBe expectedError)
-
-  def assertApiErrorType[R, E <: ApiError: Reads](f: => R): Assertion =
-    assertApiErrorAndCheck[R, E](f)(_ => Assertions.succeed)
-
-  def assertApiErrorAndCheck[R, E <: ApiError: Reads](f: => R)(check: E => Assertion): Assertion =
+  def assertApiError[R, E <: ApiError](f: => R, expectedError: E): Assertion =
     Try(f) match {
       case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-        parse(responseBody).validate[E] match {
-          case JsSuccess(error, _) =>
-            statusCode shouldBe error.code.intValue()
-            check(error)
-          case JsError(errors) => Assertions.fail(errors.map { case (_, es) => es.mkString("(", ",", ")") }.mkString(","))
+        parse(responseBody) shouldBe expectedError.json
+        statusCode shouldBe expectedError.code.intValue()
+      case Failure(e) => Assertions.fail(e)
+      case Success(s) => Assertions.fail(s"Expecting error: $expectedError, but handle $s")
+    }
+
+  def assertApiError[R](f: => R)(check: GenericApiError => Assertion): Assertion =
+    Try(f) match {
+      case Failure(UnexpectedStatusCodeException(_, _, code, responseBody)) =>
+        parse(responseBody).validate[GenericApiError] match {
+          case JsSuccess(error, _) => check(error.copy(statusCode = code))
+          case JsError(errors)     => Assertions.fail(errors.map { case (_, es) => es.mkString("(", ",", ")") }.mkString(","))
         }
       case Failure(e) => Assertions.fail(e)
       case Success(s) => Assertions.fail(s"Expecting error but handle $s")
     }
-
 
   val RequestAwaitTime: FiniteDuration = 50.seconds
 

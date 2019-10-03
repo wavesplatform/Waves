@@ -1,5 +1,6 @@
 package com.wavesplatform.it.api
 
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
@@ -356,4 +357,23 @@ object FeeInfo {
 case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
 object PaymentRequest {
   implicit val paymentFormat: Format[PaymentRequest] = Json.format
+}
+
+
+case class GenericApiError(id: Int, message: String, statusCode: Int, json: JsObject)
+
+object GenericApiError {
+  import play.api.libs.functional.syntax._
+  import play.api.libs.json.Reads._
+  import play.api.libs.json._
+
+  def apply(id: Int, message: String, code: StatusCode, json: JsObject): GenericApiError = new GenericApiError(id, message, code.intValue(), json)
+
+  implicit val genericApiErrorReads: Reads[GenericApiError] = (
+
+    (JsPath \ "error").read[Int] and
+      (JsPath \ "message").read[String] and
+      JsPath.read[JsObject]
+
+    )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
 }
