@@ -17,7 +17,7 @@ package object smart {
         order => Coproduct[InputEntity](RealTransactionWrapper.ord(order)).asRight[ExecutionError],
         _.eliminate(
           scriptTransfer => Coproduct[InputEntity](scriptTransfer).asRight[ExecutionError],
-          ???
+          _ => ???
         )
       )
     )
