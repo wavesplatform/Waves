@@ -92,11 +92,11 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
 
     val env = new WavesEnvironment(
       'T',
-      Coeval(???),
+      ???,
       Coeval(???),
       EmptyBlockchain,
       Coeval(???),
-      V3
+      ds
     )
 
     val untyped  = Parser.parseExpr(code).get.value

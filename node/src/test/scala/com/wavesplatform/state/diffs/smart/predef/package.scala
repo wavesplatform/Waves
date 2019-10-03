@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -10,6 +12,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
+import com.wavesplatform.transaction.smart.mapInput
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -27,7 +30,7 @@ package object predef {
       (typedExpr, _) = compileResult
       evalContext <- BlockchainContext.build(version,
                                              chainId,
-                                             Coeval.evalOnce(t),
+                                             mapInput(t, blockchain, DirectiveSet.contractDirectiveSet).explicitGet(),
                                              Coeval.evalOnce(blockchain.height),
                                              blockchain,
                                              isTokenContext = false,

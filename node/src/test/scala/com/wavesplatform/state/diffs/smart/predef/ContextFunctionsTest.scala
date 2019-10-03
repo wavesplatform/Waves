@@ -460,14 +460,15 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           val ctx = {
             utils.functionCosts(V3)
+            val directives = DirectiveSet(V3, Account, Expression).explicitGet()
             Monoid
               .combineAll(
                 Seq(
                   PureContext.build(Global, V3),
                   CryptoContext.build(Global, V3),
                   WavesContext.build(
-                    DirectiveSet(V3, Account, Expression).explicitGet(),
-                    new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
+                    directives,
+                    new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives)
                   )
                 ))
           }

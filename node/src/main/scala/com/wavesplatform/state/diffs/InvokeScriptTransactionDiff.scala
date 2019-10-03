@@ -26,14 +26,14 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{AttachedPaymentValidator, InvokeScriptTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{AttachedPaymentValidator, InvokeScriptTransaction, WavesEnvironment, mapInput}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -54,19 +54,12 @@ object InvokeScriptTransactionDiff {
       case Right(Some(sc @ ContractScriptImpl(_, contract))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-            val environment = new WavesEnvironment(
-              AddressScheme.current.chainId,
-              Coeval(tx.asInstanceOf[In]),
-              Coeval(blockchain.height),
-              blockchain,
-              Coeval(tx.dAppAddressOrAlias.bytes),
-              contract.version
-            )
             val invoker = tx.sender.toAddress.bytes
             val result = for {
+              directives <- DirectiveSet(contract.version, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              input <- mapInput(Coproduct[TxOrd](tx: Transaction), blockchain, directives).leftMap((_, List.empty[LogItem]))
               invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
-              payments <- AttachedPaymentValidator.extractPayments(tx, blockchain.multiPaymentAllowed, contract.version >= V4).leftMap((_, List.empty[LogItem]))
+              payments <- AttachedPaymentValidator.extractPayments(tx, directives, blockchain.multiPaymentAllowed).leftMap((_, List.empty[LogItem]))
               invocation = ContractEvaluator.Invocation(
                 functioncall,
                 Recipient.Address(invoker),
@@ -76,6 +69,14 @@ object InvokeScriptTransactionDiff {
                 tx.id.value,
                 tx.fee,
                 tx.feeAssetId.compatId
+              )
+              environment = new WavesEnvironment(
+                AddressScheme.current.chainId,
+                input,
+                Coeval(blockchain.height),
+                blockchain,
+                Coeval(tx.dAppAddressOrAlias.bytes),
+                directives
               )
               evaluator <- ContractEvaluator(
                 Monoid

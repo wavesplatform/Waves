@@ -125,13 +125,13 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
         features
-      )(_ should produce("Script doesn't support multiple payments"))
+      )(_ should produce(message))
     }
 
   property("multi payment fails if any script has version lower V4") {
-    assertScriptError(dAppVersion = V3, V4, V4, "DApp version V3 < V4 doesn't support multiple payment attachment")
-    assertScriptError(V4, verifierVersion = V3, V4, "Invoker verifier version V3 < V4 doesn't support multiple payment attachment")
-    assertScriptError(V4, V4, assetsScriptVersion = V3, "Attached asset script version V3 < V4 doesn't support multiple payment attachment")
+    assertScriptError(dAppVersion = V3, V4, V4, "DApp version 3 < 4 doesn't support multiple payment attachment")
+    assertScriptError(V4, verifierVersion = V3, V4, "Invoker script version 3 < 4 doesn't support multiple payment attachment")
+    assertScriptError(V4, V4, assetsScriptVersion = V3, "Attached asset script version 3 < 4 doesn't support multiple payment attachment")
   }
 
   property("multi payment with verifier and scripted assets transfer") {

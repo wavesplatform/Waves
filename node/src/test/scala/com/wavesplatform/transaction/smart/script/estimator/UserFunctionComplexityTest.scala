@@ -27,14 +27,15 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV1 = {
     utils.functionCosts(V1)
+    val directives = DirectiveSet(V1, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
           PureContext.build(Global, V1),
           CryptoContext.build(Global, V1),
           WavesContext.build(
-            DirectiveSet(V1, Account, Expression).explicitGet(),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3),
+            directives,
+            new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives),
           )
         ))
   }
@@ -92,14 +93,15 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV2 = {
     utils.functionCosts(V2)
+    val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
           PureContext.build(Global, V2),
           CryptoContext.build(Global, V2),
           WavesContext.build(
-            DirectiveSet(V2, Account, Expression).explicitGet(),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
+            directives,
+            new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives)
           )
         ))
   }
@@ -157,14 +159,15 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV3 = {
     utils.functionCosts(V3)
+    val directives = DirectiveSet(V3, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
           PureContext.build(Global, V3),
           CryptoContext.build(Global, V3),
           WavesContext.build(
-            DirectiveSet(V3, Account, Expression).explicitGet(),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), V3)
+            directives,
+            new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives)
           )
         ))
   }

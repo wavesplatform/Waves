@@ -1,22 +1,24 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.transaction.assets.exchange.Order
+import cats.implicits._
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
+import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.v1.traits.Environment.InputEntity
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import shapeless._
 
 package object smart {
-  object InputPoly extends Poly1 {
-    implicit def caseOrd        = at[Order](o => RealTransactionWrapper.ord(o))
-    implicit def scriptTransfer = at[ScriptTransfer](o => o)
-    implicit def caseTx(implicit multiPaymentAllowed: Boolean, v: StdLibVersion) =
-      at[Transaction](tx => RealTransactionWrapper(tx, multiPaymentAllowed, v))
-  }
-
-  object PaymentsInputPoly extends Poly1 {
-    implicit def caseOrd        = at[Order](o => RealTransactionWrapper.ord(o))
-    implicit def scriptTransfer = at[ScriptTransfer](o => o)
-    implicit def caseTx =        at[Transaction](tx => RealTransactionWrapper(tx, multiPaymentAllowed, v))
-
-  }
+  def mapInput(in: TxOrd, blockchain: Blockchain, ds: DirectiveSet): Either[ExecutionError, InputEntity] =
+    in.eliminate(
+      tx => RealTransactionWrapper(tx, blockchain.multiPaymentAllowed, ds).map(Coproduct[InputEntity](_)),
+      _.eliminate(
+        order => Coproduct[InputEntity](RealTransactionWrapper.ord(order)).asRight[ExecutionError],
+        _.eliminate(
+          scriptTransfer => Coproduct[InputEntity](scriptTransfer).asRight[ExecutionError],
+          ???
+        )
+      )
+    )
 }

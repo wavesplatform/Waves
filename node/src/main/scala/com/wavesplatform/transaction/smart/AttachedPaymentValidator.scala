@@ -9,25 +9,8 @@ import com.wavesplatform.lang.v1.traits.domain.Payments
 object AttachedPaymentValidator {
   def extractPayments(
     tx: InvokeScriptTransaction,
-    multiPaymentAllowedByNode:   Boolean,
-    multiPaymentAllowedByScript: Boolean
-  ): Either[ExecutionError, Payments] =
-    if (multiPaymentAllowedByNode)
-      if (!multiPaymentAllowedByScript)
-        Left("Script doesn't support multiple payments")
-      else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
-        Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
-      else
-        Right(Payments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
-    else if (tx.payments.size > 1)
-      Left("Multiple payments isn't allowed now")
-    else
-      Right(Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
-
-  def checkPayments(
-    tx: InvokeScriptTransaction,
-    multiPaymentAllowedByNode: Boolean,
-    ds                       : DirectiveSet
+    ds: DirectiveSet,
+    multiPaymentAllowedByNode: Boolean
   ): Either[ExecutionError, Payments] =
     if (multiPaymentAllowedByNode)
       if (ds.stdLibVersion < V4)
@@ -41,7 +24,7 @@ object AttachedPaymentValidator {
     else
       Right(Payments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
 
-  def scriptErrorMessage(ds: DirectiveSet): String = {
+  private def scriptErrorMessage(ds: DirectiveSet): String = {
     val name = (ds.scriptType, ds.contentType) match {
       case (Account, DApp)       => "DApp"
       case (Account, Expression) => "Invoker script"

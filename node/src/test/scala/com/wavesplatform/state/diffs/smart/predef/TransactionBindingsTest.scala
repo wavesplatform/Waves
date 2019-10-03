@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
+import com.wavesplatform.transaction.smart.mapInput
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
@@ -634,6 +635,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
+    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
       PureContext
         .build(Global, V2) |+|
@@ -641,8 +643,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           .build(Global, V2) |+|
         WavesContext
           .build(
-            DirectiveSet(V2, Asset, Expression).explicitGet(),
-            new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null), V3)
+            directives,
+            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(null), directives)
           )
 
     for {
@@ -657,14 +659,15 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
+    val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     val ctx =
       PureContext.build(Global, V2) |+|
         CryptoContext
           .build(Global, V2) |+|
         WavesContext
           .build(
-            DirectiveSet(V2, Account, Expression).explicitGet(),
-            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null), V3)
+            directives,
+            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(null), directives)
           )
 
     for {
