@@ -21,9 +21,7 @@ package object utils extends ScorexLogging {
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
-    new Thread(() => {
       System.exit(reason.code)
-    }, "waves-platform-shutdown-thread").start()
 
   def humanReadableSize(bytes: Long, si: Boolean = true): String = {
     val (baseValue, unitStrings) =
