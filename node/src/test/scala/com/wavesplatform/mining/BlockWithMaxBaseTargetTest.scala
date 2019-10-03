@@ -24,6 +24,7 @@ import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TransactionGen, WithDB}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.scalacheck.{Arbitrary, Gen}
@@ -63,7 +64,11 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           })
 
           val forgeBlock = PrivateMethod[MinerImpl]('forgeBlock)
-          miner invokePrivate forgeBlock(account)
+          try {
+            miner invokePrivate forgeBlock(account)
+          } catch {
+            case _: SecurityException => // NOP
+          }
 
           signal.tryAcquire(10, TimeUnit.SECONDS)
 
@@ -95,7 +100,9 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock)
+          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith {
+            case _: SecurityException => Task.unit
+          }
           Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
 
           signal.tryAcquire(10, TimeUnit.SECONDS)
@@ -166,11 +173,13 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
 
 object BlockWithMaxBaseTargetTest {
 
-  final case class Env(settings: WavesSettings,
-                       pos: PoSSelector,
-                       bcu: BlockchainUpdater with NG,
-                       utxPool: UtxPoolImpl,
-                       schedulerService: SchedulerService,
-                       miner: KeyPair,
-                       lastBlock: Block)
+  final case class Env(
+      settings: WavesSettings,
+      pos: PoSSelector,
+      bcu: BlockchainUpdater with NG,
+      utxPool: UtxPoolImpl,
+      schedulerService: SchedulerService,
+      miner: KeyPair,
+      lastBlock: Block
+  )
 }
