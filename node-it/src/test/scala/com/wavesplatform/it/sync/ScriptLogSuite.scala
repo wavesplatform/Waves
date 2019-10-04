@@ -105,7 +105,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
         )
         .explicitGet()
 
-    assertBadRequest(sender.signedBroadcast(mkInvData().json()))
+    assertApiErrorRaised(sender.signedBroadcast(mkInvData().json()))
 
     def async = com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi _
 

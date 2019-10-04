@@ -168,14 +168,17 @@ object ApiError {
 
   final case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
     override val id: Int          = StateCheckFailed.Id
-    override val message: String  = s"${StateCheckFailed.MessagePrefix} $err"
-    override val code: StatusCode = StatusCodes.BadRequest
+    override val message: String  = StateCheckFailed.message(err)
+    override val code: StatusCode = StateCheckFailed.Code
     override lazy val json        = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
   }
 
   case object StateCheckFailed {
-    val Id = 112
+    val Id            = 112
     val MessagePrefix = "State check failed. Reason:"
+    val Code          = StatusCodes.BadRequest
+
+    def message(err: String): String = s"${StateCheckFailed.MessagePrefix} $err"
   }
 
   case object OverflowError extends ApiError {
@@ -230,11 +233,12 @@ object ApiError {
   final case class Mistiming(errorMessage: String) extends ApiError {
     override val id: Int          = Mistiming.Id
     override val message: String  = errorMessage
-    override val code: StatusCode = StatusCodes.BadRequest
+    override val code: StatusCode = Mistiming.Code
   }
 
   object Mistiming {
-    val Id = 303
+    val Id               = 303
+    val Code: StatusCode = StatusCodes.BadRequest
   }
 
   case object DataKeyDoesNotExist extends ApiError {
@@ -277,13 +281,15 @@ object ApiError {
 
   final case class TransactionNotAllowedByAssetScript(tx: Transaction) extends ApiError {
     override val id: Int             = TransactionNotAllowedByAssetScript.Id
-    override val code: StatusCode    = StatusCodes.BadRequest
-    override val message: String     = s"Transaction is not allowed by token-script"
+    override val code: StatusCode    = TransactionNotAllowedByAssetScript.Code
+    override val message: String     = TransactionNotAllowedByAssetScript.Message
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 
   object TransactionNotAllowedByAssetScript {
-    val Id = 308
+    val Id      = 308
+    val Message = s"Transaction is not allowed by token-script"
+    val Code    = StatusCodes.BadRequest
   }
 
   final case class SignatureError(error: String) extends ApiError {

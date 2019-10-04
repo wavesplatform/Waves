@@ -29,7 +29,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val aliasFee         = calcAliasFee(firstAddress, alias)
     miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
 
-    assertBadRequest(sender.createAlias(firstAddress, alias, minFee))
+    assertApiErrorRaised(sender.createAlias(firstAddress, alias, minFee))
     miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
 

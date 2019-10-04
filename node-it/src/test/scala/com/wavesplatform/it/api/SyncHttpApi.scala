@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
@@ -41,14 +41,29 @@ object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-  @deprecated(message = "Use assertApiError()", since = "1.1.3")
-  def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
-    case Failure(e)                                                  => Assertions.fail(e)
-    case _                                                           => Assertions.fail("Expecting bad request")
+  case class GenericApiError(id: Int, message: String, statusCode: Int, json: JsObject)
+
+  object GenericApiError {
+    import play.api.libs.functional.syntax._
+    import play.api.libs.json.Reads._
+    import play.api.libs.json._
+
+    def apply(id: Int, message: String, code: StatusCode, json: JsObject): GenericApiError =
+      new GenericApiError(id, message, code.intValue(), json)
+
+    implicit val genericApiErrorReads: Reads[GenericApiError] = (
+      (JsPath \ "error").read[Int] and
+        (JsPath \ "message").read[String] and
+        JsPath.read[JsObject]
+    )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
   }
 
-  @deprecated(message = "Use assertApiError()", since = "1.1.3")
+  case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
+
+  implicit class ApiErrorOps(error: ApiError) {
+    def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
+  }
+
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(
@@ -59,7 +74,6 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail("Expecting bad request")
   }
 
-  @deprecated(message = "Use assertApiError()", since = "1.1.3")
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion =
     Try(f) match {
       case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
@@ -68,10 +82,27 @@ object SyncHttpApi extends Assertions {
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
-  def assertApiError[R, E <: ApiError](f: => R, expectedError: E): Assertion =
+  def assertApiErrorRaised[R](f: => R, expectedStatusCode: Int = StatusCodes.BadRequest.intValue): Assertion =
+    assertApiError(f)(_ => Assertions.succeed)
+
+  def assertApiError[R](f: => R, expectedError: AssertiveApiError): Assertion =
+    assertApiError(f) { error =>
+      error.id shouldBe expectedError.id
+      error.statusCode shouldBe expectedError.code.intValue()
+      if (expectedError.matchMessage)
+        error.message should include regex expectedError.message
+      else
+        error.message shouldBe expectedError.message
+    }
+
+  def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
     Try(f) match {
       case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-        parse(responseBody) shouldBe expectedError.json
+        import play.api.libs.json._
+        parse(responseBody).validate[JsObject] match {
+          case JsSuccess(json, _) => (json - "trace") shouldBe expectedError.json
+          case JsError(_)         => Assertions.fail(s"Expecting error: ${expectedError.json}, but handle $responseBody")
+        }
         statusCode shouldBe expectedError.code.intValue()
       case Failure(e) => Assertions.fail(e)
       case Success(s) => Assertions.fail(s"Expecting error: $expectedError, but handle $s")
