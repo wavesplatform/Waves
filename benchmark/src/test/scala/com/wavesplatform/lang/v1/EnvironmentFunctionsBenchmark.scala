@@ -92,6 +92,7 @@ object EnvironmentFunctionsBenchmark {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
+    override def multiPaymentAllowed: Boolean                                                                    = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

@@ -8,6 +8,7 @@ import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -128,10 +129,11 @@ object WavesEnvironmentBenchmark {
       val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
       new WavesEnvironment(
         AddressScheme.current.chainId,
-        Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
+        throw new NotImplementedError("`tx` is not implemented"),
         Coeval(state.height),
         state,
-        Coeval.raiseError(new NotImplementedError("`this` is not implemented"))
+        Coeval.raiseError(new NotImplementedError("`this` is not implemented")),
+        DirectiveSet.contractDirectiveSet
       )
     }
 
