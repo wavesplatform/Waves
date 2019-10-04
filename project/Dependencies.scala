@@ -94,7 +94,7 @@ object Dependencies {
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
       "ch.obermuhlner"       % "big-math" % "2.1.0",
-      "org.scorexfoundation" %% "scrypto" % "2.0.4",
+      ("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.whispersystems", "curve25519-java"),
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
@@ -144,6 +144,7 @@ object Dependencies {
       "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
       "org.bitlet" % "weupnp" % "0.1.4",
+      "com.wavesplatform" % "curve25519-java" % "0.6.0",
       akkaModule("slf4j") % Runtime,
       kindProjector,
       monixModule("reactive").value,

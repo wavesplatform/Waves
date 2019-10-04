@@ -1,6 +1,6 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 
 trait PoSCalculator {
@@ -23,6 +23,10 @@ object PoSCalculator {
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
     System.arraycopy(publicKey.arr, 0, s, crypto.DigestSize, crypto.DigestSize)
     crypto.fastHash(s)
+  }
+
+  private[consensus] def generatorVRFSignature(signature: Array[Byte], privateKey: PrivateKey): Array[Byte] = {
+    crypto.signVRF(privateKey, signature)
   }
 
   private[consensus] def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)

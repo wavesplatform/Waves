@@ -113,7 +113,7 @@ class MinerImpl(allChannels: ChannelGroup,
                             currentTime: Long): Either[String, NxtLikeConsensusBlockData] = {
     pos
       .consensusData(
-        account.publicKey,
+        account,
         height,
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,

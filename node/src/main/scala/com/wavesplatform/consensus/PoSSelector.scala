@@ -1,11 +1,12 @@
 package com.wavesplatform.consensus
 
 import cats.implicits._
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -24,7 +25,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     if (fairPosActivated(height)) FairPoSCalculator
     else NxtPoSCalculator
 
-  def consensusData(accountPublicKey: PublicKey,
+  def consensusData(account: KeyPair,
                     height: Int,
                     targetBlockDelay: FiniteDuration,
                     refBlockBT: Long,
@@ -37,7 +38,14 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       result =>
         blockchain.lastBlock
           .map(_.consensusData.generationSignature.arr)
-          .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generatorSignature(gs, accountPublicKey))))
+          .map(gs => {
+            val signature = if (height <= blockchainSettings.functionalitySettings.useGeneratingVRFSignatureAfterHeight) {
+              generatorSignature(gs, account.publicKey)
+            } else {
+              generatorVRFSignature(gs, account.privateKey)
+            }
+            NxtLikeConsensusBlockData(bt, ByteStr(signature))
+          })
           .toRight(GenericError("No blocks in blockchain")))
   }
 
@@ -58,12 +66,22 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
   def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, Unit] = {
     val blockGS = block.consensusData.generationSignature.arr
-    blockchain.lastBlock
-      .toRight(GenericError("No blocks in blockchain"))
-      .map(b => generatorSignature(b.consensusData.generationSignature.arr, block.signerData.generator))
-      .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(
-        _ sameElements blockGS)
-      .map(_ => ())
+
+    if (height <= blockchainSettings.functionalitySettings.useGeneratingVRFSignatureAfterHeight) {
+      blockchain.lastBlock
+        .toRight(GenericError("No blocks in blockchain"))
+        .map(b => generatorSignature(b.consensusData.generationSignature.arr, block.signerData.generator))
+        .ensureOr(
+          vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}")
+        )(_ sameElements blockGS)
+        .map(_ => ())
+    } else {
+      blockchain.lastBlock
+        .toRight(GenericError("No blocks in blockchain"))
+        .map(b => crypto.verifyVRF(b.consensusData.generationSignature, b.consensusData.generationSignature, block.signerData.generator).arr)
+        .ensureOr(cvgs => GenericError(s"Generation VRF signatures is not valid"))(_ sameElements blockGS)
+        .map(_ => ())
+    }
   }
 
   def checkBaseTargetLimit(baseTarget: Long, height: Int): Either[ValidationError, Unit] = {
@@ -109,7 +127,11 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       else blockchain.lastBlock
 
     blockForHit.map(b => {
-      val genSig = b.consensusData.generationSignature.arr
+      val genSig = if (height <= blockchainSettings.functionalitySettings.useGeneratingVRFSignatureAfterHeight) {
+        b.consensusData.generationSignature.arr
+      } else {
+        crypto.verifyVRF(b.consensusData.generationSignature, b.consensusData.generationSignature, b.signerData.generator).arr
+      }
       hit(generatorSignature(genSig, accountPublicKey))
     })
   }

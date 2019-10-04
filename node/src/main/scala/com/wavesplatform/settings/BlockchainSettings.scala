@@ -70,7 +70,8 @@ case class FunctionalitySettings(
     maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,
-    leaseExpiration: Int = 1000000
+    leaseExpiration: Int = 1000000,
+    useGeneratingVRFSignatureAfterHeight: Int = Int.MaxValue
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -111,7 +112,8 @@ object FunctionalitySettings {
     lastTimeBasedForkParameter = 1530161445559L,
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
-    doubleFeaturesPeriodsAfterHeight = 810000
+    doubleFeaturesPeriodsAfterHeight = 810000,
+    useGeneratingVRFSignatureAfterHeight = Int.MaxValue
   )
 
   val TESTNET = apply(
@@ -120,14 +122,16 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 51500,
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-    lastTimeBasedForkParameter = 1492560000000L
+    lastTimeBasedForkParameter = 1492560000000L,
+    useGeneratingVRFSignatureAfterHeight = Int.MaxValue
   )
 
   val STAGENET = apply(
     featureCheckBlocksPeriod = 100,
     blocksForFeatureActivation = 40,
     doubleFeaturesPeriodsAfterHeight = 1000000000,
-    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap
+    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
+    useGeneratingVRFSignatureAfterHeight = Int.MaxValue
   )
 
   val configPath = "waves.blockchain.custom.functionality"
