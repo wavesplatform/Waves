@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -22,6 +23,116 @@ import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+  property("multi payment with verifier and scripted assets transfer") {
+    forAll(
+      multiPaymentPreconditions(dApp(V4), accountVerifierGen(V4), verifier(V4, Asset))
+    ) { case (genesis, setDApp, setVerifier, ci, issues, recipient) =>
+      assertDiffAndState(
+        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+        TestBlock.create(Seq(ci)),
+        features
+      ) { case (diff, blockchain) =>
+        val assetBalance = issues
+          .map(_.id.value)
+          .map(IssuedAsset)
+          .map(asset => asset -> blockchain.balance(recipient, asset))
+          .toMap
+
+        assetBalance shouldBe diff.portfolios(recipient).assets
+      }
+    }
+  }
+
+  property("multi payment fails if asset script forbids tx") {
+    forAll(
+      multiPaymentPreconditions(
+        dApp(V4),
+        accountVerifierGen(V4),
+        verifier(V4, Asset),
+        Some(Gen.oneOf(
+          verifier(V4, Asset, result = "throw()"),
+          verifier(V4, Asset, result = "false")
+        ))
+      )
+    ) { case (genesis, setDApp, setVerifier, ci, issues, _) =>
+      assertDiffEi(
+        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+        TestBlock.create(Seq(ci)),
+        features
+      ) { _ should produce("type = Asset") }
+    }
+  }
+
+  property("multi payment fails if any script has version lower V4") {
+    assertScriptVersionError(
+      v => s"DApp version $v < 4 doesn't support multiple payment attachment",
+      dAppVersionGen = V3
+    )
+    assertScriptVersionError(
+      v => s"Invoker script version $v < 4 doesn't support multiple payment attachment",
+      verifierVersionGen = oldVersions
+    )
+    assertScriptVersionError(
+      v => s"Attached asset script version $v < 4 doesn't support multiple payment attachment",
+      assetsScriptVersionGen = oldVersions
+    )
+  }
+
+  private def multiPaymentPreconditions(
+    dApp: Script,
+    verifier: Gen[Script],
+    commonAssetScript: Script,
+    additionalAssetScript: Option[Gen[Script]] = None
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair)] =
+    for {
+      master        <- accountGen
+      invoker       <- accountGen
+      ts            <- timestampGen
+      fee           <- ciFee(10)
+      accountScript <- verifier
+      commonIssues  <- Gen.listOfN(
+        ContractLimits.MaxAttachedPaymentAmount - 1,
+        smartIssueTransactionGen(invoker, Gen.const(Some(commonAssetScript)))
+      )
+      specialIssue <- smartIssueTransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
+    } yield {
+      for {
+        genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+        genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        setVerifier <- SetScriptTransaction.selfSigned(invoker, Some(accountScript), fee, ts + 2)
+        setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp), fee, ts + 2)
+        issues = specialIssue :: commonIssues
+        payments = issues.map(issue => Payment(1, IssuedAsset(issue.id.value)))
+        ci <- InvokeScriptTransaction.selfSigned(invoker, master, None, payments, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master)
+    }.explicitGet()
+
+  private def assertScriptVersionError(
+    message:                Int => String,
+    dAppVersionGen:         Gen[StdLibVersion] = V4,
+    verifierVersionGen:     Gen[StdLibVersion] = V4,
+    assetsScriptVersionGen: Gen[StdLibVersion] = V4,
+  ): Unit =
+    forAll(
+      for {
+        dAppVersion         <- dAppVersionGen
+        verifierVersion     <- verifierVersionGen
+        assetsScriptVersion <- assetsScriptVersionGen
+        (genesis, setVerifier, setDApp, ci, issues, _) <- multiPaymentPreconditions(
+          dApp(dAppVersion),
+          accountVerifierGen(verifierVersion),
+          verifier(assetsScriptVersion, Asset)
+        )
+        oldVersion = List(dAppVersion, verifierVersion, assetsScriptVersion).filter(_ < V4).head
+      } yield (genesis, setVerifier, setDApp, ci, issues, oldVersion)
+    ) { case (genesis, setVerifier, setDApp, ci, issues, oldVersion) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+          TestBlock.create(Seq(ci)),
+          features
+        )(_ should produce(message(oldVersion.id)))
+    }
+
   private def dApp(version: StdLibVersion): Script = {
     val script =
       s"""
@@ -56,14 +167,14 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     ContractScript(version, contract).explicitGet()
   }
 
-  private def verifier(version: StdLibVersion, scriptType: ScriptType): Script = {
+  private def verifier(version: StdLibVersion, scriptType: ScriptType, result: String = "true"): Script = {
     val script =
       s"""
          | {-# STDLIB_VERSION ${version.id}      #-}
          | {-# CONTENT_TYPE   EXPRESSION         #-}
          | {-# SCRIPT_TYPE    ${scriptType.text} #-}
          |
-         | true
+         | $result
          |
        """.stripMargin
 
@@ -73,7 +184,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
   }
 
   private def accountVerifierGen(version: StdLibVersion) =
-    Gen.oneOf(verifier(version, Account), dAppVerifier(version))
+    if (version >= V3)
+      Gen.oneOf(verifier(version, Account), dAppVerifier(version))
+    else
+      Gen.const(verifier(version, Account))
 
   private val features = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Seq(
@@ -84,79 +198,5 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     ).map(_.id -> 0).toMap
   )
 
-  private def multiPaymentPreconditions(
-    dApp:         Script,
-    verifier:     Gen[Script],
-    assetScript:  Script
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair)] =
-    for {
-      master        <- accountGen
-      invoker       <- accountGen
-      ts            <- timestampGen
-      fee           <- ciFee(10)
-      accountScript <- verifier
-      issues        <- Gen.listOfN(
-        ContractLimits.MaxAttachedPaymentAmount,
-        smartIssueTransactionGen(invoker, Gen.const(Some(assetScript)))
-      )
-    } yield {
-      for {
-        genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-        setVerifier <- SetScriptTransaction.selfSigned(invoker, Some(accountScript), fee, ts + 2)
-        setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp), fee, ts + 2)
-        payments = issues.map(issue => Payment(1, IssuedAsset(issue.id.value)))
-        ci <- InvokeScriptTransaction.selfSigned(invoker, master, None, payments, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master)
-    }.explicitGet()
-
-  private def assertScriptError(
-    dAppVersion:         StdLibVersion,
-    verifierVersion:     StdLibVersion,
-    assetsScriptVersion: StdLibVersion,
-    message: String
-  ): Unit =
-    forAll(multiPaymentPreconditions(
-      dApp(dAppVersion),
-      accountVerifierGen(verifierVersion),
-      verifier(assetsScriptVersion, Asset)
-    )) { case (genesis, setVerifier, setDApp, ci, issues, _) =>
-      assertDiffEi(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features
-      )(_ should produce(message))
-    }
-
-  property("multi payment fails if any script has version lower V4") {
-    assertScriptError(dAppVersion = V3, V4, V4, "DApp version 3 < 4 doesn't support multiple payment attachment")
-    assertScriptError(V4, verifierVersion = V3, V4, "Invoker script version 3 < 4 doesn't support multiple payment attachment")
-    assertScriptError(V4, V4, assetsScriptVersion = V3, "Attached asset script version 3 < 4 doesn't support multiple payment attachment")
-  }
-
-  property("multi payment with verifier and scripted assets transfer") {
-    forAll(
-      multiPaymentPreconditions(
-        dApp(V4),
-        accountVerifierGen(V4),
-        verifier(V4, Asset)
-      )
-    ) { case (genesis, setDApp, setVerifier, ci, issues, recipient) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features
-      ) { case (diff, blockchain) =>
-        val assetBalance = issues
-          .map(_.id.value)
-          .map(IssuedAsset)
-          .map(asset => asset -> blockchain.balance(recipient, asset))
-          .toMap
-
-        val assetsDiff = diff.portfolios(recipient).assets
-
-        assetsDiff shouldBe assetBalance
-      }
-    }
-  }
+  private val oldVersions = Gen.oneOf(V1, V2, V3)
 }
