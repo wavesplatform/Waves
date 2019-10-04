@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
@@ -24,9 +25,9 @@ object WavesEnvironment {
   type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
 }
 
-case class WavesEnvironment(
+class WavesEnvironment(
   nByte: Byte,
-  inputEntity: Environment.InputEntity,
+  in: Coeval[Environment.InputEntity],
   h: Coeval[Int],
   blockchain: Blockchain,
   address: Coeval[ByteStr],
@@ -42,6 +43,9 @@ case class WavesEnvironment(
       .transactionInfo(ByteStr(id))
       .map(_._2)
       .map(tx => RealTransactionWrapper(tx, multiPaymentAllowed, ds).explicitGet())
+
+  override def inputEntity: InputEntity =
+    in.value
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain

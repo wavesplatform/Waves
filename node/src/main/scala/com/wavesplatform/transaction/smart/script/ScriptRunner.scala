@@ -39,7 +39,7 @@ object ScriptRunner {
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
-            mi,
+            Coeval.evalOnce(mi),
             Coeval.evalOnce(blockchain.height),
             blockchain,
             isAssetScript,
@@ -56,7 +56,7 @@ object ScriptRunner {
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
-            mi,
+            Coeval.evalOnce(mi),
             Coeval.evalOnce(blockchain.height),
             blockchain,
             isAssetScript,

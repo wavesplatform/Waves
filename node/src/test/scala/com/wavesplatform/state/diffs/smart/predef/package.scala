@@ -28,9 +28,10 @@ package object predef {
     for {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
+      directives = DirectiveSet(version, Account, Expression).explicitGet()
       evalContext <- BlockchainContext.build(version,
                                              chainId,
-                                             mapInput(t, blockchain, DirectiveSet.contractDirectiveSet).explicitGet(),
+                                             Coeval.evalOnce(mapInput(t, blockchain, directives)).map(_.explicitGet()),
                                              Coeval.evalOnce(blockchain.height),
                                              blockchain,
                                              isTokenContext = false,

@@ -35,7 +35,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
           CryptoContext.build(Global, V1),
           WavesContext.build(
             directives,
-            new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives),
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives),
           )
         ))
   }
@@ -101,7 +101,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
           CryptoContext.build(Global, V2),
           WavesContext.build(
             directives,
-            new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives)
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives)
           )
         ))
   }
@@ -167,7 +167,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
           CryptoContext.build(Global, V3),
           WavesContext.build(
             directives,
-            new WavesEnvironment('T'.toByte, ???, Coeval(???), EmptyBlockchain, Coeval(???), directives)
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives)
           )
         ))
   }

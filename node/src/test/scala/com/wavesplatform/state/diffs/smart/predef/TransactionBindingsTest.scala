@@ -660,15 +660,21 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     val Success(expr, _) = Parser.parseExpr(script)
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
+    val blockchain  = stub[Blockchain]
+    (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+
+    val env = new WavesEnvironment(
+      chainId,
+      Coeval(mapInput(t, blockchain, directives).explicitGet()),
+      null,
+      EmptyBlockchain,
+      Coeval(null),
+      directives
+    )
     val ctx =
       PureContext.build(Global, V2) |+|
-        CryptoContext
-          .build(Global, V2) |+|
-        WavesContext
-          .build(
-            directives,
-            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(null), directives)
-          )
+      CryptoContext.build(Global, V2) |+|
+      WavesContext.build(directives, env)
 
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)

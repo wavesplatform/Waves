@@ -26,14 +26,13 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{AttachedPaymentValidator, InvokeScriptTransaction, WavesEnvironment, mapInput}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -72,7 +71,7 @@ object InvokeScriptTransactionDiff {
               )
               environment = new WavesEnvironment(
                 AddressScheme.current.chainId,
-                input,
+                Coeval.evalOnce(input),
                 Coeval(blockchain.height),
                 blockchain,
                 Coeval(tx.dAppAddressOrAlias.bytes),

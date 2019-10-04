@@ -17,7 +17,7 @@ object BlockchainContext {
   type In = WavesEnvironment.In
   def build(version: StdLibVersion,
             nByte: Byte,
-            in: Environment.InputEntity,
+            in: Coeval[Environment.InputEntity],
             h: Coeval[Int],
             blockchain: Blockchain,
             isTokenContext: Boolean,

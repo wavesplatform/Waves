@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
+import monix.eval.Coeval
 import shapeless._
 
 object Environment {
