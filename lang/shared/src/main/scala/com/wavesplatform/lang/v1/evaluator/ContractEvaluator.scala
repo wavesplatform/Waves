@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
+import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
@@ -25,7 +26,7 @@ object ContractEvaluator {
                         fee: Long,
                         feeAssetId: Option[ByteStr])
 
-  private def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
+  private def eval(c: DApp, i: Invocation): EvalM[Id, EVALUATED] = {
     val functionName = i.funcCall.function.funcName
 
     val contractFuncAndCallOpt = c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCall))
@@ -37,7 +38,7 @@ object ContractEvaluator {
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName' doesn't exist in the script"
-        raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
+        raiseError[Id, LoggedEvaluationContext[Id], ExecutionError, EVALUATED](message)
 
       case Some((f, fc)) =>
         val takingArgsNumber = f.u.args.size
@@ -62,30 +63,30 @@ object ContractEvaluator {
             )
           )
         } else {
-          raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](
+          raiseError[Id, LoggedEvaluationContext[Id], ExecutionError, EVALUATED](
             s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
           )
         }
     }
   }
 
-  private def withDecls(dec: List[DECLARATION], block: BLOCK): EvalM[EVALUATED] =
-    EvaluatorV1.evalExpr(dec.foldRight(block)((d, e) => BLOCK(d, e)))
+  private def withDecls(dec: List[DECLARATION], block: BLOCK): EvalM[Id, EVALUATED] =
+    EvaluatorV1().evalExpr(dec.foldRight(block)((d, e) => BLOCK(d, e)))
 
   private def verifierBlock(v: VerifierFunction, entity: CaseObj) =
     BLOCK(LET(v.annotation.invocationArgName, entity), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity))))
 
-  def verify(decls: List[DECLARATION], v: VerifierFunction, tx: Tx): EvalM[EVALUATED] =
+  def verify(decls: List[DECLARATION], v: VerifierFunction, tx: Tx): EvalM[Id, EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.transactionObject(tx, proofsEnabled = true)))
 
-  def verify(decls: List[DECLARATION], v: VerifierFunction, ord: Ord): EvalM[EVALUATED] =
+  def verify(decls: List[DECLARATION], v: VerifierFunction, ord: Ord): EvalM[Id, EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.orderObject(ord, proofsEnabled = true)))
 
-  def verify(decls: List[DECLARATION], v: VerifierFunction, ct: ScriptTransfer): EvalM[EVALUATED] =
+  def verify(decls: List[DECLARATION], v: VerifierFunction, ct: ScriptTransfer): EvalM[Id, EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.scriptTransfer(ct)))
 
-  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[(ExecutionError, Log), ScriptResult] = {
-    val (log, result) = EvaluatorV1.evalWithLogging(ctx, eval(c, i))
+  def apply(ctx: EvaluationContext[Id], c: DApp, i: Invocation): Either[(ExecutionError, Log[Id]), ScriptResult] = {
+    val (log, result) = EvaluatorV1().evalWithLogging(ctx, eval(c, i))
     result
       .flatMap(ScriptResult.fromObj)
       .leftMap((_, log))

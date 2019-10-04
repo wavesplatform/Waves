@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
@@ -73,8 +74,8 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
-              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
+              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(

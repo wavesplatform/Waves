@@ -19,7 +19,7 @@ case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTyp
 
 object CompilerContext {
 
-  def build(predefTypes: Seq[FINAL], varDefs: VariableTypes, functions: Seq[BaseFunction]) = new CompilerContext(
+  def build[F[_]](predefTypes: Seq[FINAL], varDefs: VariableTypes, functions: Seq[BaseFunction[F]]) = new CompilerContext(
     predefTypes = predefTypes.map(t => t.name -> t).toMap,
     varDefs = varDefs,
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }

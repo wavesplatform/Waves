@@ -3,19 +3,18 @@ package com.wavesplatform.lang.v1
 import java.math.RoundingMode
 
 import cats.implicits._
-import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
 
@@ -194,7 +193,7 @@ trait BaseGlobal {
       case BaseGlobal.RoundFloor()    => FLOOR
     }
 
-  implicit val sttpBackend: SttpBackend[Future, Nothing]
+  def requestNode(url: String): Future[NodeResponse]
 }
 
 object BaseGlobal {

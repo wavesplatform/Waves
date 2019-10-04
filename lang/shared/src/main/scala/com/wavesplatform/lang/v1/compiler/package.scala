@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1
 
+import cats.Id
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.task.TaskM
@@ -13,7 +14,10 @@ package object compiler {
 
   implicit class EiExt[A](ei: Either[CompilationError, A]) {
     def toCompileM: CompileM[A] =
-      ei.fold(raiseError, _.pure[CompileM])
+      ei.fold(
+        raiseError[Id, CompilerContext, CompilationError, A],
+        _.pure[CompileM]
+      )
   }
 
   def сontainsBlockV2(e: EXPR): Boolean = {
