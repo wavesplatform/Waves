@@ -55,8 +55,6 @@ lazy val langJS = lang.js
     libraryDependencies += Dependencies.circeJsInterop.value
   )
 
-lazy val `node-it` = project.dependsOn(node, `grpc-server`)
-
 lazy val `lang-testkit` = project
   .dependsOn(langJVM)
   .in(file("lang/testkit"))
@@ -76,7 +74,7 @@ lazy val langDoc = project
 
 lazy val node             = project.dependsOn(langJVM, `lang-testkit` % "test")
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `node-it`        = project.dependsOn(node)
+lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node-it` % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
