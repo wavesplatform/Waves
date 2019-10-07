@@ -49,7 +49,7 @@ object VerifierLoggerBenchmark {
     ).explicitGet()
 
     private val dataTxObj: Terms.CaseObj = Bindings.transactionObject(
-      RealTransactionWrapper(dataTx, multiPaymentAllowed = true, DirectiveSet.contractDirectiveSet).explicitGet(),
+      RealTransactionWrapper(dataTx, ???, DirectiveSet.contractDirectiveSet).explicitGet(),
       proofsEnabled = true
     )
 

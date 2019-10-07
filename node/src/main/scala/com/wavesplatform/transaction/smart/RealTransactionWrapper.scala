@@ -63,11 +63,7 @@ object RealTransactionWrapper {
     case a: Alias   => Recipient.Alias(a.name)
   }
 
-  def apply(
-    tx: Transaction,
-    multiPaymentAllowed: Boolean,
-    ds: DirectiveSet
-  ): Either[ExecutionError, Tx] =
+  def apply(tx: Transaction, blockchain: Blockchain, ds: DirectiveSet): Either[ExecutionError, Tx] =
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
@@ -103,7 +99,7 @@ object RealTransactionWrapper {
           }.toIndexedSeq
         ).asRight
       case ci: InvokeScriptTransaction =>
-        AttachedPaymentValidator.extractPayments(ci, ds, multiPaymentAllowed)
+        AttachedPaymentValidator.extractPayments(ci, ds, blockchain)
             .map { payments =>
               Tx.CI(
                 proven(ci),

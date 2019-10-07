@@ -42,7 +42,7 @@ class WavesEnvironment(
     blockchain
       .transactionInfo(ByteStr(id))
       .map(_._2)
-      .map(tx => RealTransactionWrapper(tx, multiPaymentAllowed, ds).explicitGet())
+      .map(tx => RealTransactionWrapper(tx, blockchain, ds).explicitGet())
 
   override def inputEntity: InputEntity =
     in.value

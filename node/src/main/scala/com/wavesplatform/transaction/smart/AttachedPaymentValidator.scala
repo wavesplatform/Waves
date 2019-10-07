@@ -1,18 +1,20 @@
 package com.wavesplatform.transaction.smart
 
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Asset, DApp, Expression, V4}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Payments
+import com.wavesplatform.state.Blockchain
 
 object AttachedPaymentValidator {
   def extractPayments(
     tx: InvokeScriptTransaction,
     ds: DirectiveSet,
-    multiPaymentAllowedByNode: Boolean
+    blockchain: Blockchain
   ): Either[ExecutionError, Payments] =
-    if (multiPaymentAllowedByNode)
+    if (blockchain.multiPaymentAllowed)
       if (ds.stdLibVersion < V4)
         Left(scriptErrorMessage(ds))
       else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)

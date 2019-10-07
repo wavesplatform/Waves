@@ -7,7 +7,6 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -58,7 +57,7 @@ object InvokeScriptTransactionDiff {
               directives <- DirectiveSet(contract.version, Account, DAppType).leftMap((_, List.empty[LogItem]))
               input <- mapInput(Coproduct[TxOrd](tx: Transaction), blockchain, directives).leftMap((_, List.empty[LogItem]))
               invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              payments <- AttachedPaymentValidator.extractPayments(tx, directives, blockchain.multiPaymentAllowed).leftMap((_, List.empty[LogItem]))
+              payments <- AttachedPaymentValidator.extractPayments(tx, directives, blockchain).leftMap((_, List.empty[LogItem]))
               invocation = ContractEvaluator.Invocation(
                 functioncall,
                 Recipient.Address(invoker),

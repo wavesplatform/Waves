@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -64,7 +63,7 @@ object ScriptRunner {
             Coeval(scriptContainerAddress)
           )
           entity <- in.eliminate(
-            t => RealTransactionWrapper(t, blockchain.multiPaymentAllowed, ds).map(ContractEvaluator.verify(decls, vf, _)),
+            t => RealTransactionWrapper(t, blockchain, ds).map(ContractEvaluator.verify(decls, vf, _)),
             _.eliminate(
               t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)).asRight[ExecutionError],
               _ => ???
