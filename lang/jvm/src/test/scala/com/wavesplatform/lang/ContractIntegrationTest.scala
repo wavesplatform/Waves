@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Payments, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, AttachedPayments, Recipient, Tx}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -156,7 +156,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
         Recipient.Address(callerAddress),
         callerPublicKey,
-        Payments.Single(None),
+        AttachedPayments.Single(None),
         ByteStr.empty,
         transactionId,
         fee,
@@ -220,7 +220,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         proofs = IndexedSeq.empty
       ),
       dAppAddressOrAlias = Recipient.Address(ByteStr.empty),
-      payments = Payments.Single(None),
+      payments = AttachedPayments.Single(None),
       feeAssetId = None,
       funcName = Some("foo"),
       funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes).explicitGet(), CONST_STRING("ok").explicitGet())

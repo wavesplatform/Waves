@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 
 object Types {
 
@@ -65,7 +66,7 @@ object Types {
   def invocationType(v: StdLibVersion) =
     CASETYPEREF(
       "Invocation",
-      payments(multiPaymentAllowed(v)) ::
+      payments(v.supportsMultiPayment) ::
       List(
         "caller"          -> addressType,
         "callerPublicKey" -> BYTESTR,
@@ -143,7 +144,7 @@ object Types {
           "feeAssetId" -> optionByteVector,
           "function"   -> STRING,
           "args"       -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
-        ) ++ header ++ proven :+ payments(version >= V4),
+        ) ++ header ++ proven :+ payments(version.supportsMultiPayment),
         proofsEnabled
       )
     )
@@ -325,8 +326,6 @@ object Types {
       buildTransferTransactionType(proofsEnabled),
       buildSetAssetScriptTransactionType(proofsEnabled)
     ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty)
-
-  private def multiPaymentAllowed(v: StdLibVersion) = v >= V4
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++

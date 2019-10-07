@@ -30,12 +30,12 @@ object Tx {
   case class Burn(p: Proven, quantity: Long, assetId: ByteStr)                         extends Tx
 
   case class CI(
-      p: Proven,
-      dAppAddressOrAlias: Recipient,
-      payments: Payments,
-      feeAssetId: Option[ByteStr],
-      funcName: Option[String],
-      funcArgs: List[EVALUATED]
+                 p: Proven,
+                 dAppAddressOrAlias: Recipient,
+                 payments: AttachedPayments,
+                 feeAssetId: Option[ByteStr],
+                 funcName: Option[String],
+                 funcArgs: List[EVALUATED]
   ) extends Tx
 
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                 extends Tx

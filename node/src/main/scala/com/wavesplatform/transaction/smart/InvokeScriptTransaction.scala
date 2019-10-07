@@ -10,7 +10,7 @@ import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
-import com.wavesplatform.lang.v1.traits.domain.Payments
+import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._

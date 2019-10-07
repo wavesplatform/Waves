@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{Ord, Payments, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{Ord, AttachedPayments, Recipient, Tx}
 
 object ContractEvaluator {
 
@@ -19,7 +19,7 @@ object ContractEvaluator {
   case class Invocation(funcCall: FUNCTION_CALL,
                         caller: Recipient.Address,
                         callerPk: ByteStr,
-                        payments: Payments,
+                        payments: AttachedPayments,
                         dappAddress: ByteStr,
                         transactionId: ByteStr,
                         fee: Long,

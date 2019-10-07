@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
@@ -36,7 +35,7 @@ class WavesEnvironment(
   
   override def height: Long = h()
 
-  override def multiPaymentAllowed: Boolean = blockchain.multiPaymentAllowed
+  override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
     blockchain

@@ -60,10 +60,10 @@ object Bindings {
       case OrdType.Sell => sellType
     }), Map.empty)
 
-  private def buildPayments(payments: Payments): (String, EVALUATED) =
+  private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
     payments match {
-      case Payments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
-      case Payments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector)
+      case AttachedPayments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
+      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector)
     }
 
   private def mapPayment(payment: (Long, Option[ByteStr])): CaseObj = {

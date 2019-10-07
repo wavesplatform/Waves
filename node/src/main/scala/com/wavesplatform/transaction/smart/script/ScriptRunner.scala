@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
-import com.wavesplatform.lang.v1.traits.domain.Payments
+import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -23,7 +23,7 @@ import shapeless._
 
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
-  type PaymentsTxOrd = (Transaction, Option[Payments]) :+: Order :+: ScriptTransfer :+: CNil
+  type PaymentsTxOrd = (Transaction, Option[AttachedPayments]) :+: Order :+: ScriptTransfer :+: CNil
 
   def apply(in: TxOrd,
             blockchain: Blockchain,
