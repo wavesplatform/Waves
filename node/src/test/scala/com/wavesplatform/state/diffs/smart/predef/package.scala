@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.mapInput
+import com.wavesplatform.transaction.smart.buildThisValue
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -31,7 +31,7 @@ package object predef {
       directives = DirectiveSet(version, Account, Expression).explicitGet()
       evalContext <- BlockchainContext.build(version,
                                              chainId,
-                                             Coeval.evalOnce(mapInput(t, blockchain, directives)).map(_.explicitGet()),
+                                             Coeval.evalOnce(buildThisValue(t, blockchain, directives, None)).map(_.explicitGet()),
                                              Coeval.evalOnce(blockchain.height),
                                              blockchain,
                                              isTokenContext = false,

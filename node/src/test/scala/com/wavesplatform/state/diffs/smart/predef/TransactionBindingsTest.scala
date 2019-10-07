@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.transaction.smart.mapInput
+import com.wavesplatform.transaction.smart.buildThisValue
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
@@ -665,7 +665,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     val env = new WavesEnvironment(
       chainId,
-      Coeval(mapInput(t, blockchain, directives).explicitGet()),
+      Coeval(buildThisValue(t, blockchain, directives, None).explicitGet()),
       null,
       EmptyBlockchain,
       Coeval(null),

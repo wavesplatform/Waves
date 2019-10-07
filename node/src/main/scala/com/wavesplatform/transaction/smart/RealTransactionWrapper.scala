@@ -3,10 +3,9 @@ package com.wavesplatform.transaction.smart
 import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -63,7 +62,12 @@ object RealTransactionWrapper {
     case a: Alias   => Recipient.Alias(a.name)
   }
 
-  def apply(tx: Transaction, blockchain: Blockchain, ds: DirectiveSet): Either[ExecutionError, Tx] =
+  def apply(
+    tx: Transaction,
+    blockchain: Blockchain,
+    stdLibVersion: StdLibVersion,
+    target: AttachedPaymentTarget
+  ): Either[ExecutionError, Tx] =
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
@@ -99,7 +103,7 @@ object RealTransactionWrapper {
           }.toIndexedSeq
         ).asRight
       case ci: InvokeScriptTransaction =>
-        AttachedPaymentValidator.extractPayments(ci, ds, blockchain)
+        AttachedPaymentExtractor.extractPayments(ci, stdLibVersion, blockchain, target)
             .map { payments =>
               Tx.CI(
                 proven(ci),

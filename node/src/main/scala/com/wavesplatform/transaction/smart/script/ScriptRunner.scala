@@ -16,8 +16,9 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget}
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.transaction.{Authorized, Proven, Transaction}
+import com.wavesplatform.transaction.{Authorized, Proven, Transaction, smart}
 import monix.eval.Coeval
 import shapeless._
 
@@ -34,7 +35,7 @@ object ScriptRunner {
       case s: ExprScript =>
         val evalCtx = for {
           ds  <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
-          mi  <- mapInput(in, blockchain, ds)
+          mi  <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress))
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -51,7 +52,7 @@ object ScriptRunner {
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf), _)) =>
          val r = for {
           ds  <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
-          mi  <- mapInput(in, blockchain, ds)
+          mi  <- buildThisValue(in, blockchain, ds, None)
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -63,7 +64,7 @@ object ScriptRunner {
             Coeval(scriptContainerAddress)
           )
           entity <- in.eliminate(
-            t => RealTransactionWrapper(t, blockchain, ds).map(ContractEvaluator.verify(decls, vf, _)),
+            t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget).map(ContractEvaluator.verify(decls, vf, _)),
             _.eliminate(
               t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)).asRight[ExecutionError],
               _ => ???

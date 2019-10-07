@@ -11,7 +11,9 @@ object AttachedPayments {
   case class Single(p: Option[Payment]) extends AttachedPayments
   case class Multi(p: Seq[Payment]) extends AttachedPayments
 
+  val MultiPaymentSupportedVersion: StdLibVersion = V4
+
   implicit class StdLibVersionMultiPaymentOps(version: StdLibVersion) {
-    def supportsMultiPayment: Boolean = version >= V4
+    def supportsMultiPayment: Boolean = version >= MultiPaymentSupportedVersion
   }
 }

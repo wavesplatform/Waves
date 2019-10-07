@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{AttachedPaymentValidator, InvokeScriptTransaction, WavesEnvironment, mapInput}
+import com.wavesplatform.transaction.smart.{AttachedPaymentExtractor, DApp, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -55,9 +55,9 @@ object InvokeScriptTransactionDiff {
             val invoker = tx.sender.toAddress.bytes
             val result = for {
               directives <- DirectiveSet(contract.version, Account, DAppType).leftMap((_, List.empty[LogItem]))
-              input <- mapInput(Coproduct[TxOrd](tx: Transaction), blockchain, directives).leftMap((_, List.empty[LogItem]))
+              input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem]))
               invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              payments <- AttachedPaymentValidator.extractPayments(tx, directives, blockchain).leftMap((_, List.empty[LogItem]))
+              payments <- AttachedPaymentExtractor.extractPayments(tx, contract.version, blockchain, DApp).leftMap((_, List.empty[LogItem]))
               invocation = ContractEvaluator.Invocation(
                 functioncall,
                 Recipient.Address(invoker),

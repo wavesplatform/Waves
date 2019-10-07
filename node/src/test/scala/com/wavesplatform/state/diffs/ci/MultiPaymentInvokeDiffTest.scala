@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -93,15 +94,15 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
 
   property("multi payment fails if any script has version lower V4") {
     assertScriptVersionError(
-      v => s"DApp version $v < 4 doesn't support multiple payment attachment",
+      (v, _) => s"DApp version $v < 4 doesn't support multiple payment attachment",
       dAppVersionGen = V3
     )
     assertScriptVersionError(
-      v => s"Invoker script version $v < 4 doesn't support multiple payment attachment",
+      (v, _) => s"Invoker script version $v < 4 doesn't support multiple payment attachment",
       verifierVersionGen = oldVersions
     )
     assertScriptVersionError(
-      v => s"Attached asset script version $v < 4 doesn't support multiple payment attachment",
+      (v, id) => s"Attached asset script id=$id version $v < 4 doesn't support multiple payment attachment",
       assetsScriptVersionGen = oldVersions
     )
   }
@@ -168,7 +169,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     }.explicitGet()
 
   private def assertScriptVersionError(
-    message:                Int => String,
+    message:                (Int, ByteStr) => String,
     dAppVersionGen:         Gen[StdLibVersion] = V4,
     verifierVersionGen:     Gen[StdLibVersion] = V4,
     assetsScriptVersionGen: Gen[StdLibVersion] = V4,
@@ -184,13 +185,14 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           verifier(assetsScriptVersion, Asset)
         )
         oldVersion = List(dAppVersion, verifierVersion, assetsScriptVersion).filter(_ < V4).head
-      } yield (genesis, setVerifier, setDApp, ci, issues, oldVersion)
-    ) { case (genesis, setVerifier, setDApp, ci, issues, oldVersion) =>
+        maybeFailedAssetId = issues.find(_.script.nonEmpty).get.id.value
+      } yield (genesis, setVerifier, setDApp, ci, issues, oldVersion, maybeFailedAssetId)
+    ) { case (genesis, setVerifier, setDApp, ci, issues, oldVersion, maybeFailedAssetId) =>
         assertDiffEi(
           Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
           TestBlock.create(Seq(ci)),
           features
-        )(_ should produce(message(oldVersion.id)))
+        )(_ should produce(message(oldVersion.id, maybeFailedAssetId)))
     }
 
   private def dApp(version: StdLibVersion, transferPaymentAmount: Int, transferRecipient: KeyPair): Script = {
