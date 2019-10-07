@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
@@ -26,10 +26,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
   property("multi payment with verifier and transfer set") {
     val wavesTransfer = 111
     forAll(multiPaymentPreconditions(
-      dApp(V4, transferAmount = wavesTransfer, _),
+      dApp(V4, transferPaymentAmount = wavesTransfer, _),
       accountVerifierGen(V4),
       verifier(V4, Asset)
-    )) { case (genesis, setDApp, setVerifier, ci, issues, dAppAcc, invoker, fee) =>
+    )) { case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, invoker, fee) =>
       assertDiffAndState(
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
@@ -50,11 +50,11 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
 
   property("multi payment with repeated asset") {
     forAll(multiPaymentPreconditions(
-      dApp(V4, transferAmount = 1, _),
+      dApp(V4, transferPaymentAmount = 1, _),
       accountVerifierGen(V4),
       verifier(V4, Asset),
       repeatAdditionalAsset = true
-    )) { case (genesis, setDApp, setVerifier, ci, issues, dAppAcc, _, _) =>
+    )) { case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, _, _) =>
       assertDiffAndState(
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
@@ -74,7 +74,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
   property("multi payment fails if one of attached asset scripts forbids tx") {
     forAll(
       multiPaymentPreconditions(
-        dApp(V4, transferAmount = 1, _),
+        dApp(V4, transferPaymentAmount = 1, _),
         accountVerifierGen(V4),
         verifier(V4, Asset),
         additionalAssetScript = Some(Gen.oneOf(
@@ -82,12 +82,12 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           verifier(V4, Asset, result = "false")
         ))
       )
-    ) { case (genesis, setDApp, setVerifier, ci, issues, _, _, _) =>
+    ) { case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
       assertDiffEi(
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
         features
-      ) { _ should produce("type = Asset") }
+      )(_ should produce("type = Asset"))
     }
   }
 
@@ -106,18 +106,41 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     )
   }
 
+  property("fee proportionality") {
+    forAll(multiPaymentPreconditions(
+      dApp(V4, transferPaymentAmount = 1, _),
+      accountVerifierGen(V4),
+      verifier(V4, Asset),
+      withLowFee = false
+    )) { case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
+      assertDiffEi(
+        Seq(TestBlock.create(genesis ++ issues ++ Seq(setVerifier, setDApp))),
+        TestBlock.create(Seq(ci)),
+        features
+      ){
+        val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
+        _ should produce(
+          s"Fee in WAVES for InvokeScriptTransaction " +
+          s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
+          s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
+        )
+      }
+    }
+  }
+
   private def multiPaymentPreconditions(
     dApp: KeyPair => Script,
     verifier: Gen[Script],
     commonAssetScript: Script,
     additionalAssetScript: Option[Gen[Script]] = None,
-    repeatAdditionalAsset: Boolean = false
+    repeatAdditionalAsset: Boolean = false,
+    withLowFee: Boolean = true
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)] =
     for {
       master        <- accountGen
       invoker       <- accountGen
       ts            <- timestampGen
-      fee           <- ciFee(10)
+      fee           <- if (withLowFee) ciFee(ContractLimits.MaxAttachedPaymentAmount) else Gen.const(1L)
       accountScript <- verifier
       commonIssues  <- Gen.listOfN(
         ContractLimits.MaxAttachedPaymentAmount - 1,
@@ -156,7 +179,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         verifierVersion     <- verifierVersionGen
         assetsScriptVersion <- assetsScriptVersionGen
         (genesis, setVerifier, setDApp, ci, issues, _, _, _) <- multiPaymentPreconditions(
-          dApp(dAppVersion, transferAmount = 1, _),
+          dApp(dAppVersion, transferPaymentAmount = 1, _),
           accountVerifierGen(verifierVersion),
           verifier(assetsScriptVersion, Asset)
         )
@@ -170,7 +193,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         )(_ should produce(message(oldVersion.id)))
     }
 
-  private def dApp(version: StdLibVersion, transferAmount: Int, transferRecipient: KeyPair): Script = {
+  private def dApp(version: StdLibVersion, transferPaymentAmount: Int, transferRecipient: KeyPair): Script = {
     val script =
       s"""
          | {-# STDLIB_VERSION ${version.id} #-}
@@ -180,7 +203,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          | @Callable(i)
          | func default() = TransferSet([ScriptTransfer(
          |    Address(base58'${transferRecipient.stringRepr}'),
-         |    $transferAmount,
+         |    $transferPaymentAmount,
          |    unit
          | )])
          |
