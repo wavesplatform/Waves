@@ -48,7 +48,30 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     }
   }
 
-  property("multi payment fails if asset script forbids tx") {
+  property("multi payment with repeated asset") {
+    forAll(multiPaymentPreconditions(
+      dApp(V4, transferAmount = 1, _),
+      accountVerifierGen(V4),
+      verifier(V4, Asset),
+      repeatAdditionalAsset = true
+    )) { case (genesis, setDApp, setVerifier, ci, issues, dAppAcc, _, _) =>
+      assertDiffAndState(
+        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+        TestBlock.create(Seq(ci)),
+        features
+      ) { case (diff, blockchain) =>
+        val assetBalance = issues
+          .map(_.id.value)
+          .map(IssuedAsset)
+          .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+          .toMap
+
+        diff.portfolios(dAppAcc).assets shouldBe assetBalance
+      }
+    }
+  }
+
+  property("multi payment fails if one of attached asset scripts forbids tx") {
     forAll(
       multiPaymentPreconditions(
         dApp(V4, transferAmount = 1, _),
@@ -87,7 +110,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     dApp: KeyPair => Script,
     verifier: Gen[Script],
     commonAssetScript: Script,
-    additionalAssetScript: Option[Gen[Script]] = None
+    additionalAssetScript: Option[Gen[Script]] = None,
+    repeatAdditionalAsset: Boolean = false
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)] =
     for {
       master        <- accountGen
@@ -106,8 +130,16 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
         setVerifier <- SetScriptTransaction.selfSigned(invoker, Some(accountScript), fee, ts + 2)
         setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp(invoker)), fee, ts + 2)
-        issues = specialIssue :: commonIssues
-        payments = issues.map(issue => Payment(1, IssuedAsset(issue.id.value)))
+        (issues, payments) =
+          if (repeatAdditionalAsset) {
+            val issues = specialIssue :: commonIssues.drop(1)
+            val payments = (specialIssue :: issues).map(i => Payment(1, IssuedAsset(i.id.value)))
+            (issues, payments)
+          } else {
+            val issues = specialIssue :: commonIssues
+            val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value)))
+            (issues, payments)
+          }
         ci <- InvokeScriptTransaction.selfSigned(invoker, master, None, payments, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()

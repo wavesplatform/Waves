@@ -190,7 +190,6 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
       )
       _ <- checkAmounts(p)
-      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), GenericError("duplicate payments"))
       _ <- Either.cond(
         fc.isEmpty || fc.get.args.forall(x => x.isInstanceOf[EVALUATED] && !x.isInstanceOf[CaseObj] && !x.isInstanceOf[ARR]),
         (),
