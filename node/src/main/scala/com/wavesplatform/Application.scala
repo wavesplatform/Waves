@@ -188,7 +188,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val utxSynchronizerScheduler = Schedulers.fixedPool(settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
-        utxSynchronizerScheduler)
+        utxSynchronizerScheduler
+      )
 
     transactions.foreach {
       case (channel, transaction) => utxSynchronizer.tryPublish(transaction, channel)
@@ -219,8 +220,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool            = utxStorage
 
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
-      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                                                      = app.actorSystem
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -232,7 +233,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     if (settings.restAPISettings.enable) {
       if (settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
-        log.error("Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf")
+        log.error(
+          "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
+        )
         forceStopApplication(InvalidApiKey)
       }
 
@@ -267,7 +270,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
         AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
-        RewardApiRoute(blockchainUpdater),
+        RewardApiRoute(blockchainUpdater)
       )
 
       val apiTypes: Set[Class[_]] = Set(

@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script.estimator
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -21,7 +22,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
-  private def estimate(expr: EXPR, ctx: CTX, funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
+  private def estimate(expr: EXPR, ctx: CTX[Id], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
     estimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
   }
 

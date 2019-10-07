@@ -352,6 +352,7 @@ case class DebugApiRoute(
             case _ =>
           }
         }
+        peerDatabase.blacklist(address, "Debug API request")
         complete(StatusCodes.OK)
       } catch {
         case NonFatal(_) => complete(StatusCodes.BadRequest)

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.Show
+import cats.{Id, Show}
 import cats.implicits._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -31,7 +31,7 @@ object ContractCompiler {
       annotationBindings = annotations.flatMap(_.dic.toList)
       compiledBody <- local {
         for {
-          _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
+          _ <- modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
           r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, annotationBindings.map(_._1))
         } yield r
       }
@@ -142,10 +142,10 @@ object ContractCompiler {
           if (vf.u.args.isEmpty)
             Option.apply(vf).pure[CompileM]
           else
-            raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
+            raiseError[Id, CompilerContext, CompilationError, Option[VerifierFunction]](
               Generic(contract.position.start, contract.position.start, "Verifier function must have 0 arguments"))
         case _ =>
-          raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
+          raiseError[Id, CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
     } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
@@ -176,7 +176,7 @@ object ContractCompiler {
       _ <- annotatedFuncsArgTypesCM.flatMap { annotatedFuncs =>
         annotatedFuncs.find(af => af._3.find(!Types.nativeTypeList.contains(_)).nonEmpty).fold(().pure[CompileM]) { af =>
           val wrongArgType = af._3.find(!Types.nativeTypeList.contains(_)).getOrElse("")
-          raiseError[CompilerContext, CompilationError, Unit](WrongArgumentType(af._1.start, af._1.end, af._2, wrongArgType, Types.nativeTypeList))
+          raiseError[Id, CompilerContext, CompilationError, Unit](WrongArgumentType(af._1.start, af._1.end, af._2, wrongArgType, Types.nativeTypeList))
         }
       }
     } yield ()
@@ -184,7 +184,7 @@ object ContractCompiler {
 
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {
-      ctx <- get[CompilerContext, CompilationError]
+      ctx <- get[Id, CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, PART.VALID[String]](handleValid)
       annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
         (af.anns.flatMap(_.args), af.f.args.map(_._1)))
@@ -197,14 +197,14 @@ object ContractCompiler {
       }
       _ <- annotationVars.flatMap(a =>
         a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
-          raiseError[CompilerContext, CompilationError, Unit](
+          raiseError[Id, CompilerContext, CompilationError, Unit](
             Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
       })
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
           case None => ().pure[CompileM]
           case Some(PART.VALID(p, n)) =>
-            raiseError[CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
+            raiseError[Id, CompilerContext, CompilationError, Unit](Generic(p.start, p.start, s"Script func arg `$n` override annotation bindings"))
         }
       }
     } yield ()
