@@ -101,8 +101,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
-      V3
+      None
     )
   }
 
@@ -143,8 +142,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
-      V3
+      None
     )
   }
 
@@ -184,8 +182,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             )
           )
         )),
-      None,
-      V3
+      None
     )
   }
 

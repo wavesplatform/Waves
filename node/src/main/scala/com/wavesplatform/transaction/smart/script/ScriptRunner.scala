@@ -49,7 +49,7 @@ object ScriptRunner {
         } yield ctx
         EvaluatorV1.applyWithLogging[EVALUATED](evalCtx, s.expr)
 
-      case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf), _)) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
          val r = for {
           ds  <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
           mi  <- buildThisValue(in, blockchain, ds, None)
@@ -74,7 +74,7 @@ object ScriptRunner {
 
         r.fold(e => (Nil, e.asLeft[EVALUATED]), identity)
 
-      case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None, _)) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
         val t: Proven with Authorized =
           in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], _ => ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {

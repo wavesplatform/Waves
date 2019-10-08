@@ -152,7 +152,7 @@ object ContractCompiler {
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
       }
-    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt, version)
+    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {

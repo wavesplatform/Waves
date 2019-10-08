@@ -117,8 +117,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           VerifierFunction(
             VerifierAnnotation("t"),
             FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty).explicitGet())))
-          )),
-        V3
+          ))
       ))
     compiler.ContractCompiler(ctx, expr, V3) shouldBe expectedResult
   }
@@ -176,8 +175,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             )
           )
         ),
-        None,
-        V3
+        None
       ))
     compiler.ContractCompiler(ctx, expr, V3) shouldBe expectedResult
   }

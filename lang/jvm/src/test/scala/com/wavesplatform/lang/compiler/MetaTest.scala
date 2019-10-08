@@ -75,7 +75,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
       CallableFunction(CallableAnnotation("invocation"), FUNC("bar", List("a"), REF("")))
     )
-    val dApp = DApp(meta, Nil, callables, None, V3)
+    val dApp = DApp(meta, Nil, callables, None)
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
         "callableFuncTypes" -> Chain(List(

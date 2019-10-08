@@ -13,8 +13,7 @@ case class DApp(
     meta: DAppMeta,
     decs: List[DECLARATION],
     callableFuncs: List[CallableFunction],
-    verifierFuncOpt: Option[VerifierFunction],
-    version: StdLibVersion
+    verifierFuncOpt: Option[VerifierFunction]
 )
 
 object DApp {

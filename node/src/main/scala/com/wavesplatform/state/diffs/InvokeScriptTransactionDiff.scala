@@ -49,15 +49,15 @@ object InvokeScriptTransactionDiff {
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(_, contract))) =>
+      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
             val result = for {
-              directives <- DirectiveSet(contract.version, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              directives <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem]))
               input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem]))
               invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              payments <- AttachedPaymentExtractor.extractPayments(tx, contract.version, blockchain, DApp).leftMap((_, List.empty[LogItem]))
+              payments <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem]))
               invocation = ContractEvaluator.Invocation(
                 functioncall,
                 Recipient.Address(invoker),
@@ -87,7 +87,8 @@ object InvokeScriptTransactionDiff {
                   )
                   .evaluationContext,
                 contract,
-                invocation
+                invocation,
+                version
               )
             } yield (evaluator, invocationComplexity)
 

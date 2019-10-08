@@ -59,8 +59,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
             )
           )
         )
-      ),
-      V3
+      )
     )
 
     ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((41, Map("first" -> 32, "default" -> 20, "third" -> 41)))
@@ -112,8 +111,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
             )
           )
         )
-      ),
-      V3
+      )
     )
 
     ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "third" -> 51)))
@@ -165,8 +163,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
             )
           )
         )
-      ),
-      V3
+      )
     )
 
     ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "second" -> 51)))

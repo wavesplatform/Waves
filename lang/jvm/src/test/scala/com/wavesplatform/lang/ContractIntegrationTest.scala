@@ -161,7 +161,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         transactionId,
         fee,
         feeAssetId
-      )
+      ),
+      V3
     )
   }
 

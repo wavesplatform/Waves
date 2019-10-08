@@ -79,7 +79,7 @@ object Script {
   ): Long = {
     val (totalComplexity, cm) = complexity
     script match {
-      case ContractScriptImpl(_, DApp(_, _, _, Some(vf), _)) if cm.contains(vf.u.name) => cm(vf.u.name)
+      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
       case _ => totalComplexity
     }
   }

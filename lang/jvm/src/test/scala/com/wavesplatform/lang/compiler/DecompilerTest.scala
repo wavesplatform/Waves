@@ -258,8 +258,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             )
           )
         )),
-      Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))),
-      V3
+      Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
     Decompiler(contract: DApp, decompilerContext) shouldEq
       """|func foo () = false
@@ -300,8 +299,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             )
           )
         )),
-      None,
-      V3
+      None
     )
     Decompiler(contract, decompilerContext) shouldEq
       """func foo (bar,buz) = true
@@ -333,8 +331,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             )
           )
         )),
-      None,
-      V3
+      None
     )
     Decompiler(contract, decompilerContext) shouldEq
       """func foo (bar,buz) = true

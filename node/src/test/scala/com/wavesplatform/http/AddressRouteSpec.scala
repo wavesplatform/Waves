@@ -208,8 +208,7 @@ class AddressRouteSpec
           FUNC("call3", Nil, CONST_BOOLEAN(true))
         )
       ),
-      verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))),
-      version = V3
+      verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
 
     (blockchain.accountScriptWithComplexity _)

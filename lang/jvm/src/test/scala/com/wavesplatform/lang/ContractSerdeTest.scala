@@ -23,7 +23,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
   "roundtrip" - {
 
-    "empty" in roundTrip(DApp(DAppMeta(), Nil, Nil, None, V3))
+    "empty" in roundTrip(DApp(DAppMeta(), Nil, Nil, None))
 
 //    "empty" in {
 //      val cf = ContractFunction(
@@ -41,8 +41,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           LET("letName", CONST_BOOLEAN(true))
         ),
         List.empty,
-        None,
-        V3
+        None
       ))
 
     "two-declarations" in roundTrip(
@@ -53,8 +52,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
         ),
         List.empty,
-        None,
-        V3
+        None
       ))
 
     "callable function" in roundTrip(
@@ -67,8 +65,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             FUNC("foo", List("a"), REF("a"))
           )
         ),
-        None,
-        V3
+        None
       ))
 
     "default function" in roundTrip(
@@ -81,8 +78,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             FUNC("default", List(), TRUE)
           )
         ),
-        None,
-        V3
+        None
       )
     )
 
@@ -91,8 +87,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
         DAppMeta(),
         List(),
         List(),
-        Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))),
-        V3
+        Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
       )
     )
 
@@ -118,8 +113,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             VerifierAnnotation("hmmm"),
             FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
           )
-        ),
-        V3
+        )
       ))
 
     "full contract with meta" in roundTrip(
@@ -151,8 +145,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             VerifierAnnotation("hmmm"),
             FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
           )
-        ),
-        V3
+        )
       ))
   }
 }

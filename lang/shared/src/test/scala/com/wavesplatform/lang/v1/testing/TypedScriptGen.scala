@@ -60,7 +60,7 @@ trait TypedScriptGen {
       callables   <- Gen.listOfN(nCallables, callableGen)
       defaultFunc <- Gen.option(defaultFuncGen)
       verifier    <- Gen.option(verifierGen)
-      c = DApp(DAppMeta(), lets ++ funcs, callables ++ defaultFunc, verifier, V3)
+      c = DApp(DAppMeta(), lets ++ funcs, callables ++ defaultFunc, verifier)
       if ContractSerDe.serialize(c).explicitGet().size < Short.MaxValue - 3 - 4
     } yield c
 

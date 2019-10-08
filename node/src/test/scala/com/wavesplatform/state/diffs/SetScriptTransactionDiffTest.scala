@@ -55,8 +55,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
         DAppMeta(),
         List.empty,
         List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
-        None,
-        V3
+        None
       )
     )
   } yield (genesis, SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet())
