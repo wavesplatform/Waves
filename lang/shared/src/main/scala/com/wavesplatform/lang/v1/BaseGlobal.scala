@@ -169,6 +169,7 @@ trait BaseGlobal {
         val funcsName = dApp.callableFuncs.map(_.u.name)
         val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
         Dic(dic.m.updated(MetaMapperStrategyV1.FieldName, paramsWithFunc))
+      case _ => Dic(Map())
     }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
