@@ -12,13 +12,13 @@ trait MiningConstraint {
 
 object MiningConstraint {
   case object Unlimited extends MiningConstraint {
-    override def isFull: Boolean                                              = false
-    override def isOverfilled: Boolean                                         = false
+    override def isFull: Boolean                                                           = false
+    override def isOverfilled: Boolean                                                     = false
     override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MiningConstraint = this
   }
 }
 
-case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn, description: String = "") extends MiningConstraint {
+case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn, description: String) extends MiningConstraint {
   override def isFull: Boolean = {
     rest < estimator.minEstimate
   }
@@ -36,7 +36,7 @@ case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn
 }
 
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
-  override def isFull: Boolean      = constraints.exists(_.isFull)
+  override def isFull: Boolean       = constraints.exists(_.isFull)
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
   override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, diff)))
@@ -51,17 +51,16 @@ object MultiDimensionalMiningConstraint {
   def formatOverfilledConstraints(currRest: MultiDimensionalMiningConstraint, updatedRest: MultiDimensionalMiningConstraint): Iterator[String] = {
     if (currRest.constraints.length == updatedRest.constraints.length) {
       (for ((curr, upd) <- currRest.constraints.toList.iterator.zip(updatedRest.constraints.toList.iterator) if upd.isOverfilled)
-        yield
-          (curr, upd) match {
-            case (OneDimensionalMiningConstraint(rest, _, description), OneDimensionalMiningConstraint(newRest, _, _)) =>
-              Iterator.single(s"$description($rest -> $newRest)")
+        yield (curr, upd) match {
+          case (OneDimensionalMiningConstraint(rest, _, description), OneDimensionalMiningConstraint(newRest, _, _)) =>
+            Iterator.single(s"$description($rest -> $newRest)")
 
-            case (m: MultiDimensionalMiningConstraint, m1: MultiDimensionalMiningConstraint) =>
-              Iterator.empty ++ formatOverfilledConstraints(m, m1)
+          case (m: MultiDimensionalMiningConstraint, m1: MultiDimensionalMiningConstraint) =>
+            Iterator.empty ++ formatOverfilledConstraints(m, m1)
 
-            case _ =>
-              Iterator.single(s"$curr -> $upd")
-          }).flatten
+          case _ =>
+            Iterator.single(s"$curr -> $upd")
+        }).flatten
     } else {
       updatedRest.constraints.toList.iterator
         .filter(_.isOverfilled)

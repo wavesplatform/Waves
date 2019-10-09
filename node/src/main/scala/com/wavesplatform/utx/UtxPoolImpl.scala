@@ -201,20 +201,21 @@ class UtxPoolImpl(
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration
-  ): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (reversedValidTxs, _, finalConstraint, totalIterations) = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
-      type R = (Seq[Transaction], Diff, MultiDimensionalMiningConstraint, Int)
+      type R = (Option[Seq[Transaction]], Diff, MultiDimensionalMiningConstraint, Int)
       @inline def bumpIterations(r: R): R = r.copy(_4 = r._4 + 1)
 
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
-        .foldLeft((Seq.empty[Transaction], Monoid[Diff].empty, initialConstraint, 0)) {
+        .foldLeft[R]((None, Monoid[Diff].empty, initialConstraint, 0)) {
           case (r @ (packedTransactions, diff, currentConstraint, iterationCount), tx) =>
-            if (currentConstraint.isFull || (packedTransactions.nonEmpty && isTimeLimitReached)) r // don't run any checks here to speed up mining
+            if (currentConstraint.isFull || (packedTransactions.exists(_.nonEmpty) && isTimeLimitReached))
+              r // don't run any checks here to speed up mining
             else if (TxCheck.isExpired(tx)) {
               log.debug(s"Transaction ${tx.id()} expired")
               remove(tx.id())
@@ -229,10 +230,10 @@ class UtxPoolImpl(
                       s"Transaction ${tx.id()} does not fit into the block: " +
                         s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}"
                     )
-                    bumpIterations(r)
+                    (packedTransactions.orElse(Some(Seq.empty[Transaction])), diff, currentConstraint, iterationCount + 1)
                   } else {
                     log.trace(s"Packing transaction ${tx.id()}")
-                    (tx +: packedTransactions, Monoid.combine(diff, newDiff), updatedConstraint, iterationCount + 1)
+                    (Some(packedTransactions.fold(Seq(tx))(tx +: _)), Monoid.combine(diff, newDiff), updatedConstraint, iterationCount + 1)
                   }
                 case Left(error) =>
                   log.debug(s"Transaction ${tx.id()} removed due to $error")
@@ -243,9 +244,14 @@ class UtxPoolImpl(
         }
     }
 
-    val txs = reversedValidTxs.reverse
-    if (txs.nonEmpty) log.trace(s"Packed ${txs.length} transactions of $totalIterations checked, final constraint: $finalConstraint")
-    (txs, finalConstraint)
+    reversedValidTxs match {
+      case None =>
+        log.trace(s"After checking $totalIterations transactions UTX is empty")
+        (None, finalConstraint)
+      case Some(txs) =>
+        if (txs.nonEmpty) log.trace(s"Packed ${txs.length} transactions of $totalIterations checked, final constraint: $finalConstraint")
+        (Some(txs.reverse), finalConstraint)
+    }
   }
 
   //noinspection ScalaStyle
