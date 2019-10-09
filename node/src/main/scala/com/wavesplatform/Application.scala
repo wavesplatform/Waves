@@ -270,6 +270,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           peerDatabase,
           establishedConnections,
           blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
+          discardedTxs => utxStorage.addAndCleanup(discardedTxs),
           allChannels,
           utxStorage,
           miner,

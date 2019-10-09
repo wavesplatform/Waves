@@ -54,6 +54,7 @@ case class DebugApiRoute(
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
+    discardedTxsToUtx: Seq[Transaction] => Unit,
     allChannels: ChannelGroup,
     utxStorage: UtxPool,
     miner: Miner with MinerDebugInfo,
@@ -183,7 +184,7 @@ case class DebugApiRoute(
     rollbackTask(blockId).asyncBoundary
       .map(_.map { blocks =>
         allChannels.broadcast(LocalScoreChanged(ng.score))
-        if (returnTransactionsToUtx) blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
+        if (returnTransactionsToUtx) discardedTxsToUtx(blocks.view.flatMap(_.transactionData))
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString)
       })
