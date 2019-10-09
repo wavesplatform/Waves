@@ -377,7 +377,7 @@ node("vostok||wavesnode"){
                     
                     stage('Deploy Wallet'){
                         if (taskInfo['wallet'].runTask){
-                            gitCheckout(branch: 'newApproach', url: Constants.KUBERNETES_REPO, relativeTargetDir: 'kubernetes', repoCreds: Constants.KUBERNETES_REPO_CREDS)
+                            gitCheckout(url: Constants.KUBERNETES_REPO, relativeTargetDir: 'kubernetes', repoCreds: Constants.KUBERNETES_REPO_CREDS)
                             
                             dir('wallet/build-wallet'){
                                 stash includes: '**', excludes: 'Dockerfile', name: 'docker', useDefaultExcludes: false
