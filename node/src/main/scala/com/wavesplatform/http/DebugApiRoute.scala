@@ -11,14 +11,13 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
-import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
+import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.extensions.Distributions
@@ -31,7 +30,6 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
@@ -53,9 +51,7 @@ case class DebugApiRoute(
     ng: NG,
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
-    rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
-    discardedTxsToUtx: Seq[Transaction] => Unit,
-    allChannels: ChannelGroup,
+    rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
     utxStorage: UtxPool,
     miner: Miner with MinerDebugInfo,
     historyReplier: HistoryReplier,
@@ -181,13 +177,8 @@ case class DebugApiRoute(
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
       implicit ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
-    rollbackTask(blockId).asyncBoundary
-      .map(_.map { blocks =>
-        allChannels.broadcast(LocalScoreChanged(ng.score))
-        if (returnTransactionsToUtx) discardedTxsToUtx(blocks.view.flatMap(_.transactionData))
-        miner.scheduleMining()
-        Json.obj("BlockId" -> blockId.toString)
-      })
+    rollbackTask(blockId, returnTransactionsToUtx)
+      .map(_ => Right(Json.obj("BlockId" -> blockId.toString)))
       .runAsyncLogErr(Scheduler(ec))
   }
 

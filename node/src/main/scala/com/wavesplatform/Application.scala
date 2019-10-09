@@ -269,9 +269,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           peerDatabase,
           establishedConnections,
-          blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
-          discardedTxs => utxStorage.addAndCleanup(discardedTxs),
-          allChannels,
+          (blockId, returnTxsToUtx) =>
+            Task(blockchainUpdater.removeAfter(blockId))
+              .executeOn(appenderScheduler)
+              .asyncBoundary
+              .map {
+                case Right(discardedBlocks) =>
+                  allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
+                  if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
+                  miner.scheduleMining()
+                  Right(())
+                case Left(error) => Left(error)
+              },
           utxStorage,
           miner,
           historyReplier,
