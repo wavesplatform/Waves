@@ -1,0 +1,484 @@
+#!/usr/bin/env groovy
+import devops.waves.*
+@Library('jenkins-shared-lib') _
+
+ut = new utils()
+scripts = new scripts()
+devnet = new devnet()
+wallet = new wallet()
+
+def jsonParameters = [:]
+def updateNodeTasks = [:]
+def restartNodeTasks = [:]
+def localConfTemplateMap = [:]
+def applicationTemplateMap = [:]
+def preconditionsConfMap = [:]
+def dexConfTemplateMap = [:]
+def remote = [:]
+def actions = [deployDex: false, deployNode: false, runGenerator: false]
+def options = [dataDrop: false, walletDrop: false, dexDataDrop: false, updateLocalConf: false, updateWavesConf: false, deployWallet: false]
+def servers = []
+def deploymentGroup = false
+def networkPort = false
+def parentDir = { path -> path[0..<path.lastIndexOf('/')] }
+
+def taskInfo = [
+    dex : [branch: false, tag: false, version: false, runTask: false],
+    node: [branch: false, tag: false, version: false, runTask: false],
+    wallet: [branch: false, tag: false, version: false, runTask: false]
+]
+
+def artifactsDir = 'out'
+def localConfLocation = artifactsDir + '/local.conf'
+def dexConfLocation = artifactsDir + '/dex.conf'
+def localConfLocationOnNode = '/usr/share/waves-devnet/conf/local.conf'
+def wavesConfLocationOnNode = '/usr/share/waves-devnet/conf/waves.conf'
+def dexConfLocationOnNode = '/usr/share/waves-devnet/conf/dex.conf'
+def applicationConfLocation = 'node-generator/src/main/resources/application.conf'
+def preconditionsConfLocation = 'node-generator/src/main/resources/preconditions.conf'
+def debFileLocationOnNode = '/tmp/waves_deb'
+def debDexFileLocationOnNode = '/tmp/waves_dex_deb'
+def nodeServiceName = 'waves-devnet'
+def jdkVersion = 'openjdk8'
+def sbtVersion = 'sbt-1.2.8'
+def debFileLocation = ''
+def isPrivate = ''
+def dexServerName = ''
+def repoInfo = Constants.WAVES_REPO_INFO
+
+withCredentials([usernamePassword(credentialsId: "${repoInfo['node'].repoToken}", usernameVariable: 'nodeUser', passwordVariable: 'nodePassword')]) {
+    withCredentials([usernamePassword(credentialsId: "${repoInfo['dex'].repoToken}", usernameVariable: 'dexUser', passwordVariable: 'dexPassword')]) {
+    properties([
+        parameters([
+            ut.choiceParameterObject('actions', "return ['Deploy Node:selected', 'Deploy Dex:selected', 'Run generator', 'Deploy Wallet client' ]", 'PARAMETER_TYPE_CHECK_BOX'),
+            ut.choiceParameterObject('options', "return ['Update local.conf:selected', 'Update waves.conf', 'Drop Dex data', 'Drop Node state', 'Drop Wallet data']", 'PARAMETER_TYPE_CHECK_BOX'),
+            ut.cascadeChoiceParameterObject('repoSource', devnet.repoSourceScript(), 'actions', 'PARAMETER_TYPE_SINGLE_SELECT', true),
+            ut.cascadeChoiceParameterObject('dexBranch', devnet.branchesScript('dex', repoInfo, "${dexUser}:${dexPassword}"), 'actions,repoSource', 'PARAMETER_TYPE_SINGLE_SELECT', true),
+            ut.cascadeChoiceParameterObject('nodeBranch', devnet.branchesScript('node', repoInfo, "${nodeUser}:${nodePassword}"), 'actions,repoSource', 'PARAMETER_TYPE_SINGLE_SELECT', true),
+            ut.cascadeChoiceParameterObject('walletBranch', devnet.branchesScript('wallet', repoInfo), 'actions,repoSource', 'PARAMETER_TYPE_SINGLE_SELECT', true),
+            ut.stringParameterDefinitionObject('dexTag','', 'Optional Git tag (must start with \'v\')'),
+            ut.stringParameterDefinitionObject('nodeTag','', 'Optional Git tag (must start with \'v\')'),
+            ut.choiceParameterObject('deploymentGroup', "return ['devnet3', 'devCore']"),
+            ut.cascadeChoiceParameterObject('deploymentServers', devnet.getDeploymentServers(), 'deploymentGroup', 'PARAMETER_TYPE_CHECK_BOX'),
+            extendedChoice(bindings: '', description: '', groovyClasspath: '', groovyScript: devnet.getPerformanceTestParams(), multiSelectDelimiter: ',', name: 'parameters', quoteValue: false, saveJSONParameterToFile: false, type: 'PT_JSON', visibleItemCount: 5)
+            ])
+        ])
+    }
+}
+
+@NonCPS
+def getJsonObjects(){
+    return new groovy.json.JsonSlurperClassic().parseText(parameters)
+}
+
+@NonCPS
+def getFormatedAccOrServerString(def accOrServerString, def identifier){
+    def formatedAccOrServerString = ''
+    if (identifier == 'account'){
+        accOrServerString.replaceAll('[\\[\\]\\s]','').split(',').each { formatedAccOrServerString += "\n    \"${it}\"," }
+    } else if (identifier == 'server'){
+        accOrServerString.replaceAll('[\\[\\]\\s]','').split(',').each { formatedAccOrServerString += "\n    {\n      network-address = \"${it}\"\n      api-address = \"http://${it}:6869\"\n    }," }
+    }
+    return formatedAccOrServerString.replaceAll(",\$", "");
+}
+
+@NonCPS
+def getFormatedPreconditionsString(def preconditionsString, def identifier){
+    def formatedPreconditionsString=''
+    def map = [:]
+    List <String> mapList = []
+
+    if (preconditionsString.contains('],'))
+        mapList = preconditionsString.split('\\],')
+    else mapList.add(preconditionsString)
+
+    mapList.each {
+        it.replaceAll('[\\[\\]\\s]','').split(',').each {
+            it.split(':').with {
+                map[it[0].trim()] = it[1].trim()
+            }
+        }
+        if (identifier == 'leases'){
+            formatedPreconditionsString = "${formatedPreconditionsString}\n    { from = \"${map.from}\", to = \"${map.to}\", amount = \"${map.amount}\" },"
+        } else if (identifier == 'accounts'){
+            formatedPreconditionsString = "${formatedPreconditionsString}\n    { seed = \"${map.seed}\", balance = \"${map.balance}\", script-file = \"${map.scriptFile}\" },"
+        } else if (identifier == 'assets'){
+            formatedPreconditionsString = "${formatedPreconditionsString}\n    { issuer = \"${map.issuer}\", name = \"${map.name}\", description = \"${map.description}\", amount = \"${map.amount}\", decimals = \"${map.decimals}\", reissuable = \"${map.reissuable}\" }, script-file = \"${map.scriptFile}\" },"
+        }
+    }
+    return formatedPreconditionsString.replaceAll(",\$", "");
+}
+
+def checkOption(def optionText, def param='options'){
+    return (params."${param}".toLowerCase().contains(optionText)) ? true : false
+}
+
+stage('Build information'){
+    echo "Parameters specified: ${params}"
+    if ( !params.deploymentGroup && !params.actions.toLowerCase().contains('deploy wallet')
+        || !params.parameters && !params.actions.toLowerCase().contains('deploy wallet')
+        || (params.actions.toLowerCase().contains('deploy node') && !params.deploymentServers) && !params.actions.toLowerCase().contains('deploy wallet')
+        || (params.actions.toLowerCase().contains('deploy') && (!params.dexBranch || params.dexBranch.contains('---')) && (!params.nodeBranch || params.nodeBranch.contains('---')))&& !params.actions.toLowerCase().contains('deploy wallet')
+    )
+    {
+        echo "Aborting this build. Please run it again with the required parameters specified"
+        currentBuild.result = Constants.PIPELINE_ABORTED
+        return
+    }
+    isPrivate = (params.repoSource == 'private') ? true : false
+    deploymentGroup = params.deploymentGroup
+    taskInfo.each{ def item = it.key
+        taskInfo[item].runTask = checkOption("deploy ${item}", 'actions')
+        actions."deploy${item.capitalize()}" = taskInfo[item].runTask
+        taskInfo[item].branch = (taskInfo[item].runTask) ? params."${item}Branch" : false
+        if (params."${item}Tag" && params."${item}Tag" !='v' && params."${item}Tag".take(1) == 'v'){
+            taskInfo[item].tag = params."${item}Tag"
+        }
+    }
+    println devnet.dexNetworkServerNameMap()
+    println devnet.dexNetworkServerNameMap()[deploymentGroup]
+    println devnet.dexNetworkServerNameMap()[deploymentGroup].dexServer
+    networkPort = devnet.dexNetworkServerNameMap()[deploymentGroup].port
+    dexServerName = devnet.dexNetworkServerNameMap()[deploymentGroup].dexServer
+    if(deploymentServers)
+        servers = deploymentServers.split(',').collect{it.toLowerCase()}
+    if (taskInfo['dex'].runTask && !servers.contains(dexServerName)){
+        servers.add(dexServerName)
+    }
+
+    options.updateLocalConf = checkOption('local.conf')
+    options.updateWavesConf = checkOption('waves.conf')
+    options.dataDrop = checkOption('drop node state')
+    options.walletDrop = checkOption('drop wallet')
+    options.dexDataDrop = checkOption('drop dex')
+    options.deployWallet = checkOption('deploy wallet')
+    actions.runGenerator = checkOption('run generator', 'actions')
+    echo "Actions: ${actions}"
+    echo "Options: ${options}"
+    jsonParameters = getJsonObjects()
+    def configMiner = jsonParameters.configs.miner
+    def configBlockchain = jsonParameters.configs.blockchain
+    def configWorker = jsonParameters.configs.worker
+    def configProbabilities = jsonParameters.configs.probabilities
+    def configGenerator = jsonParameters.configs.generator
+    def configPreconditions = jsonParameters.configs.preconditions
+    dexCongTemplateMap = [
+        account: devnet.dexNetworkServerNameMap()[deploymentGroup].account
+    ]
+    localConfTemplateMap = [
+        blockchainType: configBlockchain.blockchainType.join(' '),
+        customAddressSchemeCharacter: configBlockchain.customAddressSchemeCharacter.join(' '),
+        featuresSupported: configBlockchain.featuresSupported.join(' '),
+        preActivatedFeatures: configBlockchain.preActivatedFeatures.join(' '),
+        microBlockInterval: configMiner.microBlockInterval.join(' '),
+        maxTransactionssInMicroBlock: configMiner.maxTransactionssInMicroBlock.join(' '),
+        minMicroBlockAge: configMiner.minMicroBlockAge.join(' '),
+        port: networkPort,
+        dexConf: '',
+        declaredAddress: '',
+        knownPeers:'',
+        hostId: '',
+        nodeMiner: '',
+        devnetWalletSeed: '']
+        
+    println "'local.conf' parameters are specified:\n" + localConfTemplateMap + "\n"
+
+    applicationTemplateMap = [
+        chainId: configGenerator.chainId.join(' '),
+        accounts: getFormatedAccOrServerString(configGenerator.accounts.account.join(' '), 'account'),
+        networkServers: getFormatedAccOrServerString(configGenerator.networkServers.networkServer.join(' '), 'server'),
+        workerDelay: configWorker.workerDelay.join(' '),
+        workerUtxLimit: configWorker.workerUtxLimit.join(' '),
+        workerWorkingTime: configWorker.workerWorkingTime.join(' '),
+        issueTransactionsV2: configProbabilities.issueTransactionsV2.join(' '),
+        transferTransactionsV2: configProbabilities.transferTransactionsV2.join(' '),
+        reissueTransactionsV2: configProbabilities.reissueTransactionsV2.join(' '),
+        burnTransactionsV2: configProbabilities.burnTransactionsV2.join(' '),
+        exchangeTransactionsV2: configProbabilities.exchangeTransactionsV2.join(' '),
+        leaseTransactionsV2: configProbabilities.leaseTransactionsV2.join(' '),
+        leaseCancelTransactionsV2: configProbabilities.leaseCancelTransactionsV2.join(' '),
+        createAliasTransactionsV2: configProbabilities.createAliasTransactionsV2.join(' '),
+        massTransferTransactions: configProbabilities.massTransferTransactions.join(' '),
+        dataTransactions: configProbabilities.dataTransactions.join(' '),
+        sponsorFeeTransactions: configProbabilities.sponsorFeeTransactions.join(' '),
+        invokeScriptTransactions: configProbabilities.invokeScriptTransactions.join(' ') ]
+    println "'application.conf' parameters are specified:\n" + applicationTemplateMap + "\n"
+
+    preconditionsConfMap = [
+        faucet: configPreconditions.faucet.join(' '),
+        accounts: getFormatedPreconditionsString(configPreconditions.accounts.join(' '), 'accounts'),
+        leases: getFormatedPreconditionsString(configPreconditions.leases.join(' '), 'leases'),
+        assets: getFormatedPreconditionsString(configPreconditions.assets.join(' '), 'assets')
+    ]
+    println "'preconditions.conf' Parameters are specified:\n" + applicationTemplateMap + "\n"
+}
+
+if (currentBuild.result == Constants.PIPELINE_ABORTED){
+    return
+}
+
+node("vostok||wavesnode"){
+    currentBuild.result = Constants.PIPELINE_SUCCESS
+
+    timestamps {
+        try {
+
+            withEnv(["NTP_SERVER=${jsonParameters.environment.ntpServer}"]) {
+                currentBuild.displayName = "#${env.BUILD_NUMBER} - ${nodeBranch}"
+
+                stage('Checkout') {
+                    sh 'env'
+                    step([$class: 'WsCleanup'])
+                    taskInfo.each{ 
+                            def task = it.value
+                            def taskName = it.key
+                            if (task.runTask){
+                                if (isPrivate) {
+                                    gitCheckout(branch: task.branch, url: repoInfo[taskName]['private'], repoCreds: repoInfo[taskName].repoToken, relativeTargetDir: taskName)
+                                } else{
+                                    gitCheckout(branch: task.branch, url: repoInfo[taskName]['public'], relativeTargetDir: taskName)
+                                }
+                                dir (taskName){
+                                    if (task.tag){
+                                        sh "git tag -f -a '${task.tag}' -m '${env.JOB_NAME}:${env.BUILD_NUMBER}'"
+                                    }
+                                    task.version = ut.shWithOutput("git describe --tags")
+                                    stash includes: "**/**", name: taskName, useDefaultExcludes: false
+                                }
+                            }
+                        }
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} - ${repoSource}${taskInfo.collect{ it.key + '-' + it.value.version }}"
+                        sh "mkdir -p node/${artifactsDir}"
+                }
+
+                withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
+                    
+            
+
+                    servers.each { serverName ->
+                        println "server: " + serverName
+                        remote[serverName] = [:]
+                        remote[serverName].host = serverName
+                        remote[serverName].name = serverName
+                        remote[serverName].allowAnyHosts = true
+                        remote[serverName].user = userName
+                        remote[serverName].identityFile = identity
+                        ut.remoteExec(remote[serverName], true, "systemctl stop ${nodeServiceName}")
+                    }
+
+                    stage('Updating nodes') {
+                        dir('node'){
+                            if (options.updateLocalConf) {
+                                def allServers = devnet."${deploymentGroup}Nodes"().clone()
+                                servers.each { serverName ->
+                                    echo "Generating local.conf-${serverName}"
+                                    localConfTemplateMap.dexConf = (serverName == dexServerName) ? 'include "dex.conf"' : ''
+                                    localConfTemplateMap.declaredAddress = devnet.devnetNodesIpAddressesMap()[serverName] + ':' + networkPort
+                                    localConfTemplateMap.hostId = devnet.devnetNodesIpMap()[serverName]
+                                    localConfTemplateMap.nodeMiner = devnet.devnetNodesMiner()[serverName]
+                                    localConfTemplateMap.devnetWalletSeed = devnet.devnetNodesWalletSeed()[serverName]
+                                    localConfTemplateMap.knownPeers = """[ ${allServers.findAll{!it.contains("${serverName}")}.collect{ "\"${devnet.devnetNodesIpAddressesMap()[it]}:${networkPort}\"" }.join(",")} ]"""
+                                    cookThisTemplate(
+                                        templateMap: localConfTemplateMap,
+                                        template: devnet.getLocalTemplate(),
+                                        output: localConfLocation + '-' + serverName
+                                    )
+                                }
+                                echo "Generating dex.conf"
+                                cookThisTemplate(
+                                    templateMap: dexCongTemplateMap,
+                                    template: devnet.getDexConfTemplate(),
+                                    output: dexConfLocation
+                                )
+                            }
+                            if (taskInfo['node'].runTask) {
+                                echo "Building package"
+                                ut.sbtPreconditions(jdkVersion, sbtVersion, '-Xmx2g -XX:ReservedCodeCacheSize=128m -Dnetwork=devnet')
+                                sh "sbt packageAll"
+                                debFileLocation = findFiles(glob: '**/*.deb')
+                            }
+
+                            servers.each { serverName ->
+                                updateNodeTasks["Updating node ${serverName}"] = {
+                                    if (taskInfo['node'].runTask) {
+                                        echo "Updating node ${serverName}"
+                                        if (options.updateWavesConf){
+                                            echo "Removing exisitng '${wavesConfLocationOnNode}' configuration file"
+                                            ut.remoteExec(remote["${serverName}"], true, "rm -f ${wavesConfLocationOnNode} || true")
+                                        }
+                                        debFileLocation.each { deb ->
+                                            ut.remoteExec(remote[serverName], true, "bash -c '[[ -d ${debFileLocationOnNode} ]] && rm -rf ${debFileLocationOnNode}/* || mkdir -p ${debFileLocationOnNode} && chmod -R 777 ${debFileLocationOnNode}'")
+                                            ut.remotePut(remote[serverName], deb.path, "${debFileLocationOnNode}/" + deb.name)
+                                            ut.remoteExec(remote[serverName], true, "dpkg --force-confnew -i ${debFileLocationOnNode}/${deb.name}")
+                                        }
+                                    }
+                                    if (options.updateLocalConf) {
+                                        echo "Updating node ${serverName} config"
+                                        ut.remoteExec(remote[serverName], true, "setfacl -R -m u:${userName}:rwx ${parentDir localConfLocationOnNode}")
+                                        ut.remoteExec(remote[serverName], true, "rm -f ${localConfLocationOnNode} || true")
+                                        if (serverName == dexServerName){
+                                            ut.remotePut(remote[serverName], dexConfLocation, dexConfLocationOnNode)
+                                        }
+                                        ut.remotePut(remote[serverName], localConfLocation+"-${serverName}", localConfLocationOnNode)
+                                        ut.remoteExec(remote[serverName], true, "chown ${nodeServiceName}:${nodeServiceName} ${localConfLocationOnNode}")
+                                    }
+                                }
+                            }
+                            parallel updateNodeTasks
+                            if (! taskInfo['node']['runTask']) {
+                                org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Updating nodes')
+                            }
+                        }
+                    }
+
+                    stage('Updating DEX') {
+                        if (taskInfo['dex']['runTask']) {
+                            dir('dex'){
+                                echo "Building DEX"
+                                ut.sbtPreconditions(jdkVersion, sbtVersion, '-XX:ReservedCodeCacheSize=128m -Xmx2g')
+                                sh "sbt release"
+                                debFileLocation = findFiles(glob: '**/*devnet*.deb')
+                                echo "Updating DEX"
+                                debFileLocation.each {
+                                    ut.remoteExec(remote[dexServerName], true, "bash -c '[[ -d ${debDexFileLocationOnNode} ]] && rm -rf ${debDexFileLocationOnNode}/* || mkdir -p ${debDexFileLocationOnNode} && chmod -R 777 ${debDexFileLocationOnNode}'")
+                                    ut.remotePut(remote[dexServerName], it.path, "${debDexFileLocationOnNode}/" + it.name)
+                                    ut.remoteExec(remote[dexServerName], true, "dpkg --force-confnew -i ${debDexFileLocationOnNode}/${it.name}")
+                                }
+                            }
+                        } else{
+                            org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Updating DEX')
+                        }
+                    }
+
+                    stage('Data drop') {
+                        servers.each { serverName ->
+                            restartNodeTasks["Restarting node ${serverName}"] = {
+
+                                if (options.dataDrop) {
+                                    echo "Removing node state"
+                                    ut.remoteExec(remote[serverName], true, "rm -rf /var/lib/${nodeServiceName}/{data,peers.dat}")
+                                }
+                                if (options.walletDrop) {
+                                    echo "Removing wallet data"
+                                    ut.remoteExec(remote[serverName], true, "rm -rf /var/lib/${nodeServiceName}/wallet")
+                                }
+                                if (options.dexDataDrop) {
+                                    echo "Removing matcher data"
+                                    ut.remoteExec(remote[serverName], true, "rm -rf /var/lib/${nodeServiceName}/matcher/data")
+                                }
+                                ut.remoteExec(remote[serverName], true, "systemctl restart ${nodeServiceName}")
+                            }
+                            parallel restartNodeTasks
+                        }
+                        if (!(options.dataDrop || options.walletDrop || options.dexDataDrop)) {
+                            org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Data drop')
+                        }
+                    }
+                    
+                    stage('Deploy Wallet'){
+                        if (taskInfo['wallet'].runTask){
+                            gitCheckout(branch: 'newApproach', url: Constants.KUBERNETES_REPO, relativeTargetDir: 'kubernetes', repoCreds: Constants.KUBERNETES_REPO_CREDS)
+                            
+                            dir('wallet/build-wallet'){
+                                stash includes: '**', excludes: 'Dockerfile', name: 'docker', useDefaultExcludes: false
+                            }
+                            unstash name: 'docker'
+
+                            sh """
+                            sed 's/\\(.*matcher.*https:\\/\\/\\).*",\$/\\1${dexServerName}",/g' wallet/configs/mainnet.json > wallet/configs/devnet.json
+                            """
+                            // configure nginx template
+                            def wavesWalletNginxMap = wallet.wavesWalletNginxMap().clone()
+                            wavesWalletNginxMap.nginxPlatform = 'web'
+                            cookThisTemplate(
+                                templateMap: wavesWalletNginxMap,
+                                template: './nginx/default.conf'
+                            )
+                            
+                            // configure Dockerfile template
+                            writeFile file: './Dockerfile', text: devnet.devnetWalletDockerfile()
+                            imageIt(
+                                imageName: 'waves/wallet-devnet',
+                                dockerTag: taskInfo['wallet'].branch + '.latest',
+                                args: " --build-arg trading_view_token=${wallet.wavesWalletTradingViewToken()}" + 
+                                      " --no-cache"
+                            )
+
+                            def wavesWalletDeploymentMap = [
+                                domainName: 'devnet-wavesplatform-com',
+                                network: 'devnet',
+                                tag: taskInfo['wallet'].branch + '.latest',
+                                imageName: 'wallet-devnet'
+                            ]
+
+                            def deploymentFileOutput = kubeIt(
+                                deploymentTemplate: "./kubernetes/waves-wallet-devnet/deployment.yaml",
+                                deploymentMap: wavesWalletDeploymentMap
+                            )
+                            sh "cp -R kubeItOut node/${artifactsDir}"
+                        }
+                    }
+                }
+            }
+
+            stage('Run generator') {
+                if (actions.runGenerator){
+                    dir('node'){
+                        println "Generate generator configs"
+                        String applicationConfFileContent = ut.replaceStringTemplate(devnet.getApplicationTemplate(), applicationTemplateMap)
+                        writeFile file: applicationConfLocation, text: applicationConfFileContent
+                        sh "cp ${applicationConfLocation} ${artifactsDir}/"
+                        String preconditionsConfFileContent = ut.replaceStringTemplate(devnet.getPreconditionsTemplate(), preconditionsConfMap)
+                        writeFile file: preconditionsConfLocation, text: preconditionsConfFileContent
+                        sh "cp ${preconditionsConfLocation} ${artifactsDir}/"
+
+                        def nodesHeight = [:]
+                        def height = ""
+                        while (true){
+                            sleep(5)
+                            servers.each { serverName ->
+                                height = ut.shWithOutput "curl -sX 'GET' http://${serverName}:6869/node/status | grep -m 1 'blockchainHeight\":' | cut -d, -f 1 | tr -cd '[0-9]='"
+                                nodesHeight[serverName] = height
+                                println "server '${serverName}': height '${nodesHeight[serverName]}'"
+                            }
+
+                            servers.each { serverName ->
+                                if (nodesHeight[serverName] == height){
+                                    nodesHeight.remove(serverName)
+                                }
+                            }
+
+                            if (nodesHeight.values().size() == 0){
+                                break
+                            }
+                        }
+                        println "Launch generator!"
+                        ut.sbt "node-generator/run"
+                    }
+                }
+                else{
+                org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Run generator')
+                }
+            }
+        }
+        catch (err) {
+            currentBuild.result = Constants.PIPELINE_FAILURE
+            println("ERROR caught")
+            println(err)
+            println(err.getMessage())
+            println(err.getStackTrace())
+            println(err.getCause())
+            println(err.getLocalizedMessage())
+            println(err.toString())
+        }
+        finally{
+            dir ("node/${artifactsDir}"){
+                def isNotEmpty = ut.shWithOutput('ls')
+                if (isNotEmpty)
+                archiveArtifacts artifacts: "**/**"
+            }
+            
+            ut.notifySlack("jenkins-notifications", currentBuild.result)
+        }
+    }
+}
