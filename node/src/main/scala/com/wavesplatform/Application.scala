@@ -313,8 +313,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // on unexpected shutdown
     sys.addShutdownHook {
-      Await.ready(Kamon.stopAllReporters(), 20.seconds)
-      Metrics.shutdown()
       shutdown(utxStorage, network)
     }
   }
@@ -401,6 +399,10 @@ object Application {
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
+    sys.addShutdownHook { () =>
+      Kamon.stopAllReporters()
+      Metrics.shutdown()
+    }
 
     if (config.getBoolean("kamon.enable")) {
       Kamon.addReporter(new InfluxDBReporter())
