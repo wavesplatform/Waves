@@ -146,7 +146,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/meta"), dappBase64) ~> route ~> check {
       val json = responseAs[JsValue]
       json.toString shouldBe
-        """{"callableFuncTypes":[
+        """{"version":"1","callableFuncTypes":[
           |{"a":"Int","b":"ByteVector","c":"Boolean","d":"String"},
           |{"x":"String","y":"Boolean","z":"ByteVector","w":"Int"},
           |{}
