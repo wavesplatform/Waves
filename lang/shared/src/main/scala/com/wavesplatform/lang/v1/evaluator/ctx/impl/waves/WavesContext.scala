@@ -30,7 +30,7 @@ object WavesContext {
   lazy val scriptResultType =
     CASETYPEREF(FieldNames.ScriptResult, List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType))
 
-  def build[F[_] : Monad](ds: DirectiveSet, env: Environment[F]): CTX[F] = {
+  def build[F[_] : Monad](ds: DirectiveSet, env: Environment[F]): CTX[F, Environment[F]] = {
 
     val version = ds.stdLibVersion
     val isTokenContext = ds.scriptType match {

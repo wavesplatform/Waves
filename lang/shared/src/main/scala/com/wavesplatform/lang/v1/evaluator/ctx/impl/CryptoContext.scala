@@ -48,18 +48,18 @@ object CryptoContext {
 
   private def digestAlgValue(tpe: CASETYPEREF): LazyVal[Id] = LazyVal.fromEvaluated(CaseObj(tpe, Map.empty))
 
-  def build(global: BaseGlobal, version: StdLibVersion): CTX[Id] = {
-    def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction[Id] =
+  def build(global: BaseGlobal, version: StdLibVersion): CTX[Id, Nothing] = {
+    def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction[Id, Nothing] =
       NativeFunction(name, cost, internalName, BYTESTR, ("bytes", BYTESTR)) {
         case CONST_BYTESTR(m: ByteStr) :: Nil => CONST_BYTESTR(ByteStr(h(m.arr)))
         case xs                               => notImplemented[Id](s"$name(bytes: ByteVector)", xs)
       }
 
-    val keccak256F: BaseFunction[Id]  = hashFunction("keccak256", KECCAK256, 10)(global.keccak256)
-    val blake2b256F: BaseFunction[Id] = hashFunction("blake2b256", BLAKE256, 10)(global.blake2b256)
-    val sha256F: BaseFunction[Id]     = hashFunction("sha256", SHA256, 10)(global.sha256)
+    val keccak256F: BaseFunction[Id, Nothing]  = hashFunction("keccak256", KECCAK256, 10)(global.keccak256)
+    val blake2b256F: BaseFunction[Id, Nothing] = hashFunction("blake2b256", BLAKE256, 10)(global.blake2b256)
+    val sha256F: BaseFunction[Id, Nothing]     = hashFunction("sha256", SHA256, 10)(global.sha256)
 
-    def sigVerifyF(contextVer: StdLibVersion): BaseFunction[Id] =
+    def sigVerifyF(contextVer: StdLibVersion): BaseFunction[Id, Nothing] =
       NativeFunction("sigVerify",
                      100,
                      SIGVERIFY,
@@ -75,7 +75,7 @@ object CryptoContext {
         case xs => notImplemented[Id](s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
 
-    val rsaVerifyF: BaseFunction[Id] =
+    val rsaVerifyF: BaseFunction[Id, Nothing] =
       NativeFunction(
         "rsaVerify",
         300,
@@ -96,29 +96,29 @@ object CryptoContext {
         case xs => notImplemented[Id](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
 
-    def toBase58StringF: BaseFunction[Id] = NativeFunction("toBase58String", 10, TOBASE58, STRING, ("bytes", BYTESTR)) {
+    def toBase58StringF: BaseFunction[Id, Nothing] = NativeFunction("toBase58String", 10, TOBASE58, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id]("toBase58String(bytes: ByteVector)", xs)
     }
 
-    def fromBase58StringF: BaseFunction[Id] =
+    def fromBase58StringF: BaseFunction[Id, Nothing] =
       NativeFunction("fromBase58String", 10, FROMBASE58, BYTESTR, ("str", STRING)) {
         case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id]("fromBase58String(str: String)", xs)
       }
 
-    def toBase64StringF: BaseFunction[Id] = NativeFunction("toBase64String", 10, TOBASE64, STRING, ("bytes", BYTESTR)) {
+    def toBase64StringF: BaseFunction[Id, Nothing] = NativeFunction("toBase64String", 10, TOBASE64, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id]("toBase64String(bytes: ByteVector)", xs)
     }
 
-    def fromBase64StringF: BaseFunction[Id] =
+    def fromBase64StringF: BaseFunction[Id, Nothing] =
       NativeFunction("fromBase64String", 10, FROMBASE64, BYTESTR, ("str", STRING)) {
         case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id]("fromBase64String(str: String)", xs)
       }
 
-    val checkMerkleProofF: BaseFunction[Id] =
+    val checkMerkleProofF: BaseFunction[Id, Nothing] =
       NativeFunction(
         "checkMerkleProof",
         30,
@@ -133,12 +133,12 @@ object CryptoContext {
         case xs => notImplemented[Id](s"checkMerkleProof(merkleRoot: ByteVector, merkleProof: ByteVector, valueBytes: ByteVector)", xs)
       }
 
-    def toBase16StringF: BaseFunction[Id] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
+    def toBase16StringF: BaseFunction[Id, Nothing] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id]("toBase16String(bytes: ByteVector)", xs)
     }
 
-    def fromBase16StringF: BaseFunction[Id] =
+    def fromBase16StringF: BaseFunction[Id, Nothing] =
       NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
         case CONST_STRING(str: String) :: Nil => global.base16Decode(str).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id]("fromBase16String(str: String)", xs)
@@ -194,11 +194,11 @@ object CryptoContext {
       )
 
     version match {
-      case V1 | V2 => CTX(Seq.empty, Map.empty, v1Functions)
-      case V3      => CTX(v3Types, v3Vars, v1Functions ++ v3Functions)
+      case V1 | V2 => CTX(???, Seq.empty, Map.empty, v1Functions)
+      case V3      => CTX(???, v3Types, v3Vars, v1Functions ++ v3Functions)
     }
   }
 
-  def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext[Id] = build(global, version).evaluationContext
+  def evalContext(global: BaseGlobal, version: StdLibVersion): EvaluationContext[Id, Nothing] = build(global, version).evaluationContext
   def compilerContext(global: BaseGlobal, version: StdLibVersion): CompilerContext   = build(global, version).compilerContext
 }
