@@ -17,6 +17,8 @@ import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
+import scala.util.Try
+
 case class TransferTransaction(
     version: Byte,
     timestamp: Long,
@@ -92,6 +94,8 @@ object TransferTransaction {
     case 1 => Bytes.concat(Array(typeId), t.proofs.proofs.head, bodyBytes(t))
     case 2 => Bytes.concat(Array(0: Byte), bodyBytes(t), t.proofs.bytes())
   }
+
+  def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = ???
 
   def validate(tx: TransferTransaction): Either[ValidationError, Unit] =
     validate(tx.amount, tx.assetId, tx.fee, tx.feeAssetId, tx.attachment)

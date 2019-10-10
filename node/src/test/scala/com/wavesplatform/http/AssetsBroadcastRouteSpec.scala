@@ -190,12 +190,12 @@ class AssetsBroadcastRouteSpec
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransaction] shouldBe defined
+        responseAs[TransferTransaction].version shouldBe 1.toByte
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransaction] shouldBe defined
+        responseAs[TransferTransaction].version shouldBe 2.toByte
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
@@ -215,7 +215,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.toString
+      proofs.toSignature.toString
     )
   }
 
