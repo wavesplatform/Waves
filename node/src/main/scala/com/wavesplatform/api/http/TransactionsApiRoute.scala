@@ -149,7 +149,7 @@ case class TransactionsApiRoute(
         "sender" -> senderPk
       )
 
-      createTransaction(senderPk, enrichedJsv) { tx =>
+      TransactionFactory.fromSignedRequest(enrichedJsv).map { tx =>
         commonApi
           .calculateFee(tx)
           .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount" -> assetAmount) }

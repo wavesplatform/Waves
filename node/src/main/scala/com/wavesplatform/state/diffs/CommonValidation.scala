@@ -116,7 +116,7 @@ object CommonValidation {
       case _: BurnTransactionV1     => Right(tx)
       case _: PaymentTransaction    => Right(tx)
       case _: GenesisTransaction    => Right(tx)
-      case _: TransferTransactionV1 => Right(tx)
+      case t: TransferTransaction if t.version == 1 => Right(tx)
       case _: IssueTransactionV1    => Right(tx)
       case _: ReissueTransactionV1  => Right(tx)
       case _: ExchangeTransactionV1 => Right(tx)
@@ -141,7 +141,7 @@ object CommonValidation {
           case Some(sc) => scriptActivation(sc)
         }
 
-      case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case t: TransferTransaction if t.version == 2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2 =>
         it.script match {
           case None     => Right(tx)

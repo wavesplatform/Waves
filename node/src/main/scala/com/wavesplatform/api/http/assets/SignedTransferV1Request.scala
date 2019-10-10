@@ -3,6 +3,7 @@ package com.wavesplatform.api.http.assets
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.transfer._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -45,7 +46,7 @@ case class SignedTransferV1Request(@ApiModelProperty(value = "Base58 encoded sen
                                    @ApiModelProperty(required = true)
                                    signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, TransferTransactionV1] =
+  def toTx: Either[ValidationError, TransferTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToAssetId(assetId, "invalid.assetId") //parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", transaction.AssetIdStringLength).map(AssetId.fromCompatId)
@@ -53,6 +54,5 @@ case class SignedTransferV1Request(@ApiModelProperty(value = "Base58 encoded sen
       _signature  <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _account    <- AddressOrAlias.fromString(recipient)
-      t           <- TransferTransactionV1.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment.arr, _signature)
-    } yield t
+    } yield TransferTransaction(1.toByte, timestamp, _sender, _account, _assetId, amount,  _feeAssetId, fee, _attachment.arr, Proofs(Seq(_signature)))
 }

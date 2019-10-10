@@ -10,7 +10,7 @@ import play.api.libs.json.Json
 trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
 
-  def builder: TransactionParser
+  def typeId: Byte
   def assetFee: (Asset, Long)
   def timestamp: Long
   def chainByte: Option[Byte] = None

@@ -1,27 +1,33 @@
 package com.wavesplatform.transaction.transfer
 
-import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, PrivateKey, PublicKey}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.validation._
+import com.wavesplatform.transaction._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
-  def assetId: Asset
-  def recipient: AddressOrAlias
-  def amount: Long
-  def feeAssetId: Asset
-  def fee: Long
-  def attachment: Array[Byte]
-  def version: Byte
+case class TransferTransaction(
+    version: Byte,
+    timestamp: Long,
+    sender: PublicKey,
+    recipient: AddressOrAlias,
+    assetId: Asset,
+    amount: Long,
+    feeAssetId: Asset,
+    fee: Long,
+    attachment: Array[Byte],
+    proofs: Proofs
+) extends ProvenTransaction
+    with VersionedTransaction
+    with FastHashId {
 
+  override val bodyBytes               = Coeval.evalOnce(TransferTransaction.bodyBytes(this))
+  override val bytes                   = Coeval.evalOnce(TransferTransaction.bytes(this))
   override val assetFee: (Asset, Long) = (feeAssetId, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
@@ -32,28 +38,11 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
-    ))
-
-  final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val timestampBytes  = Longs.toByteArray(timestamp)
-    val assetIdBytes    = assetId.byteRepr
-    val feeAssetIdBytes = feeAssetId.byteRepr
-    val amountBytes     = Longs.toByteArray(amount)
-    val feeBytes        = Longs.toByteArray(fee)
-
-    Bytes.concat(
-      sender,
-      assetIdBytes,
-      feeAssetIdBytes,
-      timestampBytes,
-      amountBytes,
-      feeBytes,
-      recipient.bytes.arr,
-      Deser.serializeArray(attachment)
     )
-  }
+  )
+
   override def checkedAssets(): Seq[IssuedAsset] = assetId match {
-    case Waves => Seq()
+    case Waves          => Seq()
     case a: IssuedAsset => Seq(a)
   }
 }
@@ -65,17 +54,47 @@ object TransferTransaction {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  def validate(tx: TransferTransaction): Either[ValidationError, Unit] = {
-    validate(tx.amount, tx.assetId, tx.fee, tx.feeAssetId, tx.attachment)
+  final protected def bytesBase(t: TransferTransaction): Array[Byte] = {
+    val timestampBytes  = Longs.toByteArray(t.timestamp)
+    val assetIdBytes    = t.assetId.byteRepr
+    val feeAssetIdBytes = t.feeAssetId.byteRepr
+    val amountBytes     = Longs.toByteArray(t.amount)
+    val feeBytes        = Longs.toByteArray(t.fee)
+
+    Bytes.concat(
+      t.sender,
+      assetIdBytes,
+      feeAssetIdBytes,
+      timestampBytes,
+      amountBytes,
+      feeBytes,
+      t.recipient.bytes.arr,
+      Deser.serializeArray(t.attachment)
+    )
   }
 
-  def validate(amt: Long, maybeAmtAsset: Asset, feeAmt: Long, maybeFeeAsset: Asset, attachment: Array[Byte]): Either[ValidationError, Unit] = {
-    (
-      validateAmount(amt, maybeAmtAsset.maybeBase58Repr.getOrElse("waves")),
-      validateFee(feeAmt),
-      validateAttachment(attachment)
-    ).mapN { case _ => () }
-      .toEither
-      .leftMap(_.head)
+  def bodyBytes(t: TransferTransaction): Array[Byte] = t.version match {
+    case 1 => Array(typeId) ++ bytesBase(t)
+    case 2 => Array(typeId, t.version) ++ bytesBase(t)
   }
+
+  def bytes(t: TransferTransaction): Array[Byte] = t.version match {
+    case 1 => Bytes.concat(Array(typeId), t.proofs.proofs.head, bodyBytes(t))
+    case 2 => Bytes.concat(Array(0: Byte), bodyBytes(t), t.proofs.bytes())
+  }
+
+  def validate(tx: TransferTransaction): Either[ValidationError, Unit] = ???
+
+  def apply(
+      version: Byte,
+      asset: Asset,
+      sender: PublicKey,
+      recipient: AddressOrAlias,
+      amount: Long,
+      timestamp: Long,
+      feeAsset: Asset,
+      fee: Long,
+      attachment: Array[Byte],
+      signer: PrivateKey
+  ): Either[ValidationError, TransferTransaction] = ???
 }

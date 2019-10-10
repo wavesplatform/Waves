@@ -14,6 +14,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
@@ -414,7 +415,7 @@ case class UtilsApiRoute(
   )
   def transactionSerialize: Route =
     path("transactionSerialize")(jsonPost[JsObject] { jsv =>
-      parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
+      TransactionFactory.fromSignedRequest(jsv).map(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
     })
 }
 

@@ -21,7 +21,6 @@ object TransactionParsers {
     GenesisTransaction,
     PaymentTransaction,
     IssueTransactionV1,
-    TransferTransactionV1,
     ReissueTransactionV1,
     BurnTransactionV1,
     ExchangeTransactionV1,
@@ -35,7 +34,6 @@ object TransactionParsers {
 
   private val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
     DataTransaction,
-    TransferTransactionV2,
     SetScriptTransaction,
     IssueTransactionV2,
     CreateAliasTransactionV2,
