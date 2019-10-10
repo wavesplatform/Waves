@@ -1,12 +1,18 @@
 package com.wavesplatform.transaction.transfer
 
+import cats.syntax.apply._
+import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{AddressOrAlias, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.validation.{validateAmount, validateAttachment, validateFee}
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -26,9 +32,10 @@ case class TransferTransaction(
     with VersionedTransaction
     with FastHashId {
 
-  override val bodyBytes               = Coeval.evalOnce(TransferTransaction.bodyBytes(this))
-  override val bytes                   = Coeval.evalOnce(TransferTransaction.bytes(this))
-  override val assetFee: (Asset, Long) = (feeAssetId, fee)
+  override val typeId: Byte                   = TransferTransaction.typeId
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransferTransaction.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(TransferTransaction.bytes(this))
+  override val assetFee: (Asset, Long)        = (feeAssetId, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
@@ -45,6 +52,9 @@ case class TransferTransaction(
     case Waves          => Seq()
     case a: IssuedAsset => Seq(a)
   }
+
+  //TODO: remove after refactoring
+  override def builder: TransactionParser = ???
 }
 
 object TransferTransaction {
@@ -83,7 +93,33 @@ object TransferTransaction {
     case 2 => Bytes.concat(Array(0: Byte), bodyBytes(t), t.proofs.bytes())
   }
 
-  def validate(tx: TransferTransaction): Either[ValidationError, Unit] = ???
+  def validate(tx: TransferTransaction): Either[ValidationError, Unit] =
+    validate(tx.amount, tx.assetId, tx.fee, tx.feeAssetId, tx.attachment)
+
+  //noinspection UnnecessaryPartialFunction
+  def validate(amt: Long, maybeAmtAsset: Asset, feeAmt: Long, maybeFeeAsset: Asset, attachment: Array[Byte]): Either[ValidationError, Unit] =
+    (
+      validateAmount(amt, maybeAmtAsset.maybeBase58Repr.getOrElse("waves")),
+      validateFee(feeAmt),
+      validateAttachment(attachment)
+    ).mapN { case _ => () }
+      .toEither
+      .leftMap(_.head)
+
+  def apply(
+      version: Byte,
+      asset: Asset,
+      sender: PublicKey,
+      recipient: AddressOrAlias,
+      amount: Long,
+      timestamp: Long,
+      feeAsset: Asset,
+      fee: Long,
+      attachment: Array[Byte],
+      proofs: Proofs
+  ): Either[ValidationError, TransferTransaction] =
+    validate(amount, asset, fee, feeAsset, attachment)
+      .map(_ => TransferTransaction(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, proofs))
 
   def apply(
       version: Byte,
@@ -96,5 +132,22 @@ object TransferTransaction {
       fee: Long,
       attachment: Array[Byte],
       signer: PrivateKey
-  ): Either[ValidationError, TransferTransaction] = ???
+  ): Either[ValidationError, TransferTransaction] =
+    apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, Proofs.empty)
+      .map { unsigned =>
+        unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+      }
+
+  def selfSigned(
+      version: Byte,
+      asset: Asset,
+      sender: KeyPair,
+      recipient: AddressOrAlias,
+      amount: Long,
+      timestamp: Long,
+      feeAsset: Asset,
+      fee: Long,
+      attachment: Array[Byte]
+  ): Either[ValidationError, TransferTransaction] =
+    apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, sender)
 }

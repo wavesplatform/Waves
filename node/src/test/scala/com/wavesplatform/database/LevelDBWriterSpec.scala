@@ -16,7 +16,7 @@ import com.wavesplatform.state.utils.{BlockchainAddressTransactionsList, _}
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
@@ -159,8 +159,8 @@ class LevelDBWriterSpec
   }
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
-    TransferTransactionV1
-      .selfSigned(Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
+    TransferTransaction
+      .selfSigned(1.toByte, Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
       .explicitGet()
   }
 
@@ -246,7 +246,7 @@ class LevelDBWriterSpec
     "return txs in correct ordering without fromId" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, None)
           .explicitGet()
 
         val ordering = Ordering
@@ -273,7 +273,7 @@ class LevelDBWriterSpec
         val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
 
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
 
         txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
       }
@@ -283,18 +283,18 @@ class LevelDBWriterSpec
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         // using pagination
         val firstTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, None)
           .explicitGet()
           .head
 
         val secondTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, Some(firstTx._2.id()))
           .explicitGet()
           .head
 
         // without pagination
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
           .explicitGet()
 
         txs shouldBe Seq(firstTx, secondTx)
@@ -304,11 +304,11 @@ class LevelDBWriterSpec
     "return an empty Seq when paginating from the last transaction" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
           .explicitGet()
 
         val txsFromLast = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, Some(txs.last._2.id()))
           .explicitGet()
 
         txs.length shouldBe 2

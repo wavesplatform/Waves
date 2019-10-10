@@ -156,36 +156,33 @@ class AssetsBroadcastRouteSpec
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      TransferTransactionV1
-        .selfSigned(
-          assetId = Asset.Waves,
-          sender = senderPrivateKey,
-          recipient = receiverPrivateKey.toAddress,
-          amount = 1 * Waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.Waves,
-          feeAmount = Waves / 3,
-          attachment = Array.emptyByteArray
-        )
-        .right
-        .get
+      TransferTransaction(
+        version = 1.toByte,
+        asset = Asset.Waves,
+        sender = senderPrivateKey,
+        recipient = receiverPrivateKey.toAddress,
+        amount = 1 * Waves,
+        timestamp = System.currentTimeMillis(),
+        feeAsset = Asset.Waves,
+        fee = Waves / 3,
+        attachment = Array.emptyByteArray,
+        signer = senderPrivateKey
+      ).right.get
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      TransferTransactionV2
-        .create(
-          assetId = Asset.Waves,
-          sender = senderPrivateKey,
-          recipient = receiverPrivateKey.toAddress,
-          amount = 1 * Waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.Waves,
-          feeAmount = Waves / 3,
-          attachment = Array.emptyByteArray,
-          proofs = Proofs(Seq.empty)
-        )
-        .right
-        .get
+      TransferTransaction(
+        version = 2.toByte,
+        asset = Asset.Waves,
+        sender = senderPrivateKey,
+        recipient = receiverPrivateKey.toAddress,
+        amount = 1 * Waves,
+        timestamp = System.currentTimeMillis(),
+        feeAsset = Asset.Waves,
+        fee = Waves / 3,
+        attachment = Array.emptyByteArray,
+        proofs = Proofs(Seq.empty)
+      ).right.get
     )
 
     "/transfer" - {
@@ -193,22 +190,21 @@ class AssetsBroadcastRouteSpec
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransactionV1] shouldBe defined
+        responseAs[TransferTransaction] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransactionV2] shouldBe defined
+        responseAs[TransferTransaction] shouldBe defined
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
-
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
     import tx._
     SignedTransferV1Request(
       Base58.encode(tx.sender),
@@ -223,7 +219,7 @@ class AssetsBroadcastRouteSpec
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
       Base58.encode(tx.sender),

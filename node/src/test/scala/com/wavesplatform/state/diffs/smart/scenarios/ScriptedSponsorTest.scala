@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV2}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -122,8 +122,9 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           timestamp + 4
         )
         .explicitGet()
-      transferToRecipient = TransferTransactionV2
+      transferToRecipient = TransferTransaction
         .selfSigned(
+          2.toByte,
           IssuedAsset(issueTx.id()),
           contract,
           recipient,
@@ -142,8 +143,9 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           System.currentTimeMillis() + 6
         )
         .explicitGet()
-      transferTx = TransferTransactionV2
+      transferTx = TransferTransaction
         .selfSigned(
+          2.toByte,
           Waves,
           recipient,
           accountGen.sample.get,
@@ -190,8 +192,9 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           timestamp + 4
         )
         .explicitGet()
-      transferToContract = TransferTransactionV2
+      transferToContract = TransferTransaction
         .selfSigned(
+          2.toByte,
           IssuedAsset(issueTx.id()),
           sponsor,
           contract,
@@ -210,8 +213,9 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           System.currentTimeMillis() + 6
         )
         .explicitGet()
-      transferTx = TransferTransactionV2
+      transferTx = TransferTransaction
         .selfSigned(
+          2.toByte,
           Waves,
           contract,
           sponsor,

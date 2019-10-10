@@ -43,7 +43,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
 
       posting(req) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactionV1]
+        responseAs[TransferTransaction]
       }
     }
 

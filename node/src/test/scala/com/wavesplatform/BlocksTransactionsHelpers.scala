@@ -8,7 +8,7 @@ import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
-import com.wavesplatform.transaction.transfer.{TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import org.scalacheck.Gen
 
@@ -16,26 +16,32 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
   object QuickTX {
     val FeeAmount = 400000
 
-    def transfer(from: KeyPair,
-                 to: AddressOrAlias = accountGen.sample.get,
-                 amount: Long = smallFeeGen.sample.get,
-                 timestamp: Gen[Long] = timestampGen): Gen[Transaction] =
+    def transfer(
+        from: KeyPair,
+        to: AddressOrAlias = accountGen.sample.get,
+        amount: Long = smallFeeGen.sample.get,
+        timestamp: Gen[Long] = timestampGen
+    ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransactionV1.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
-    def transferV2(from: KeyPair,
-                   to: AddressOrAlias = accountGen.sample.get,
-                   amount: Long = smallFeeGen.sample.get,
-                   timestamp: Gen[Long] = timestampGen): Gen[Transaction] =
+    def transferV2(
+        from: KeyPair,
+        to: AddressOrAlias = accountGen.sample.get,
+        amount: Long = smallFeeGen.sample.get,
+        timestamp: Gen[Long] = timestampGen
+    ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransactionV2.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(2.toByte, Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
-    def lease(from: KeyPair,
-              to: AddressOrAlias = accountGen.sample.get,
-              amount: Long = smallFeeGen.sample.get,
-              timestamp: Gen[Long] = timestampGen): Gen[LeaseTransactionV1] =
+    def lease(
+        from: KeyPair,
+        to: AddressOrAlias = accountGen.sample.get,
+        amount: Long = smallFeeGen.sample.get,
+        timestamp: Gen[Long] = timestampGen
+    ): Gen[LeaseTransactionV1] =
       for {
         timestamp <- timestamp
       } yield LeaseTransactionV1.selfSigned(from, amount, FeeAmount, timestamp, to).explicitGet()
@@ -52,12 +58,14 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
   }
 
   object UnsafeBlocks {
-    def unsafeChainBaseAndMicro(totalRefTo: ByteStr,
-                                base: Seq[Transaction],
-                                micros: Seq[Seq[Transaction]],
-                                signer: KeyPair,
-                                version: Byte,
-                                timestamp: Long): (Block, Seq[MicroBlock]) = {
+    def unsafeChainBaseAndMicro(
+        totalRefTo: ByteStr,
+        base: Seq[Transaction],
+        micros: Seq[Seq[Transaction]],
+        signer: KeyPair,
+        version: Byte,
+        timestamp: Long
+    ): (Block, Seq[MicroBlock]) = {
       val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
       val microBlocks = micros
         .foldLeft((block, Seq.empty[MicroBlock])) {
@@ -69,12 +77,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
       (block, microBlocks)
     }
 
-    def unsafeMicro(totalRefTo: ByteStr,
-                    prevTotal: Block,
-                    txs: Seq[Transaction],
-                    signer: KeyPair,
-                    version: Byte,
-                    ts: Long): (Block, MicroBlock) = {
+    def unsafeMicro(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair, version: Byte, ts: Long): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
       val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
       val signature     = crypto.sign(signer, unsigned.bytes())
@@ -82,12 +85,14 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
       (newTotalBlock, signed)
     }
 
-    def unsafeBlock(reference: ByteStr,
-                    txs: Seq[Transaction],
-                    signer: KeyPair,
-                    version: Byte,
-                    timestamp: Long,
-                    bTarget: Long = DefaultBaseTarget): Block = {
+    def unsafeBlock(
+        reference: ByteStr,
+        txs: Seq[Transaction],
+        signer: KeyPair,
+        version: Byte,
+        timestamp: Long,
+        bTarget: Long = DefaultBaseTarget
+    ): Block = {
       val unsigned = Block(
         version = version,
         timestamp = timestamp,

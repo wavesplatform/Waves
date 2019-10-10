@@ -113,7 +113,7 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (x, i) =>
           createSignedTransferRequest(
-            TransferTransactionV2
+            TransferTransaction
               .selfSigned(
                 assetId = Waves,
                 sender = KeyPair(Base58.decode(x.senderSeed)),
@@ -144,7 +144,7 @@ trait TransferSending extends ScorexLogging {
       .map(_.flatten)
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
       Base58.encode(tx.sender),

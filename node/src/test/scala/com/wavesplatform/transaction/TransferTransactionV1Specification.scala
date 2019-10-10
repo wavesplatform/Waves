@@ -14,8 +14,8 @@ import play.api.libs.json.Json
 class TransferTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Transfer serialization roundtrip") {
-    forAll(transferV1Gen) { transfer: TransferTransactionV1 =>
-      val recovered = TransferTransactionV1.parseBytes(transfer.bytes()).get
+    forAll(transferV1Gen) { transfer: TransferTransaction =>
+      val recovered = TransferTransaction.parseBytes(transfer.bytes()).get
 
       recovered.sender.stringRepr shouldEqual transfer.sender.stringRepr
       recovered.assetId shouldBe transfer.assetId
@@ -30,7 +30,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
   }
 
   property("Transfer serialization from TypedTransaction") {
-    forAll(transferV1Gen) { tx: TransferTransactionV1 =>
+    forAll(transferV1Gen) { tx: TransferTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
@@ -56,20 +56,18 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
                         }
     """)
 
-    val tx = TransferTransactionV1
-      .create(
-        Waves,
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
-        1900000,
-        1526552510868L,
-        Waves,
-        100000,
-        Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
-        ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get
-      )
-      .right
-      .get
+    val tx = TransferTransaction(
+      1.toByte,
+      Waves,
+      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+      Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
+      1900000,
+      1526552510868L,
+      Waves,
+      100000,
+      Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
+      Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
+    ).right.get
 
     tx.json() shouldEqual js
   }
@@ -78,7 +76,8 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
     for {
       (_, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
       sender                                                              <- accountGen
-    } yield
-      TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, timestamp, Waves, feeAmount, attachment) should produce("insufficient fee")
+    } yield TransferTransaction.selfSigned(1.toByte, Waves, sender, recipient, amount, timestamp, Waves, feeAmount, attachment) should produce(
+      "insufficient fee"
+    )
   }
 }

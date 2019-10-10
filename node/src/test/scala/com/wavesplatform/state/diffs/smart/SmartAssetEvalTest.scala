@@ -20,7 +20,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  val preconditions: Gen[(GenesisTransaction, IssueTransactionV2, SetAssetScriptTransaction, TransferTransactionV1)] =
+  val preconditions: Gen[(GenesisTransaction, IssueTransactionV2, SetAssetScriptTransaction, TransferTransaction)] =
     for {
       firstAcc  <- accountGen
       secondAcc <- accountGen
@@ -84,8 +84,8 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
         .signed(AddressScheme.current.chainId, firstAcc, asset, Some(typedScript), 1000, ts + 10, firstAcc)
         .explicitGet()
 
-      assetTransferTransaction = TransferTransactionV1
-        .selfSigned(asset, firstAcc, secondAcc, 1, ts + 20, Waves, 1000, Array.empty)
+      assetTransferTransaction = TransferTransaction
+        .selfSigned(1.toByte, asset, firstAcc, secondAcc, 1, ts + 20, Waves, 1000, Array.empty)
         .explicitGet()
 
     } yield (genesis, issueTransaction, setAssetScriptTransaction, assetTransferTransaction)

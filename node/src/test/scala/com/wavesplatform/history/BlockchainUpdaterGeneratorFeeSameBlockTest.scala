@@ -17,7 +17,7 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     with Matchers
     with TransactionGen {
 
-  type Setup = (GenesisTransaction, TransferTransactionV1, TransferTransactionV1)
+  type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction)
 
   val preconditionsAndPayments: Gen[Setup] = for {
     sender    <- accountGen
@@ -25,8 +25,8 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     fee       <- smallFeeGen
     ts        <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(sender, ENOUGH_AMT, ts).explicitGet()
-    payment: TransferTransactionV1 <- wavesTransferGeneratorP(ts, sender, recipient)
-    generatorPaymentOnFee: TransferTransactionV1 = createWavesTransfer(defaultSigner, recipient, payment.fee, fee, ts + 1).explicitGet()
+    payment: TransferTransaction <- wavesTransferGeneratorP(ts, sender, recipient)
+    generatorPaymentOnFee: TransferTransaction = createWavesTransfer(defaultSigner, recipient, payment.fee, fee, ts + 1).explicitGet()
   } yield (genesis, payment, generatorPaymentOnFee)
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {

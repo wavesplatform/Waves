@@ -33,7 +33,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
@@ -58,7 +58,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       BlockchainFeatures.SmartAssets.id    -> 0,
       BlockchainFeatures.Ride4DApps.id     -> 0,
       BlockchainFeatures.FeeSponsorship.id -> 0
-    ))
+    )
+  )
 
   val assetAllowed = ExprScript(
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
@@ -83,8 +84,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument").explicitGet(), REF(argName))),
           FUNCTION_CALL(
             Native(1100),
-            List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))),
-                 REF("nil"))
+            List(
+              FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))),
+              REF("nil")
+            )
           )
         )
 
@@ -103,20 +106,24 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                 FUNCTION_CALL(
                   Native(1100),
                   datas
-                ))
+                )
+              )
             )
           )
-        )),
+        )
+      ),
       None
     )
   }
 
-  def paymentContract(senderBinding: String,
-                      argName: String,
-                      funcName: String,
-                      recipientAddress: Address,
-                      recipientAmount: Long,
-                      assets: List[Asset] = List(Waves)): DApp = {
+  def paymentContract(
+      senderBinding: String,
+      argName: String,
+      funcName: String,
+      recipientAddress: Address,
+      recipientAmount: Long,
+      assets: List[Asset] = List(Waves)
+  ): DApp = {
 
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(
       a =>
@@ -127,7 +134,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
-      ))
+        )
+    )
 
     val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) {
       case (elem, tail) => FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
@@ -147,16 +155,19 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               List(payments)
             )
           )
-        )),
+        )
+      ),
       None
     )
   }
 
-  def defaultPaymentContract(senderBinding: String,
-                             argName: String,
-                             recipientAddress: Address,
-                             recipientAmount: Long,
-                             assets: List[Asset] = List(Waves)): DApp = {
+  def defaultPaymentContract(
+      senderBinding: String,
+      argName: String,
+      recipientAddress: Address,
+      recipientAmount: Long,
+      assets: List[Asset] = List(Waves)
+  ): DApp = {
 
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(
       a =>
@@ -167,7 +178,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
-      ))
+        )
+    )
 
     val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) {
       case (elem, tail) => FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
@@ -187,7 +199,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               List(payments)
             )
           )
-        )),
+        )
+      ),
       None
     )
   }
@@ -225,7 +238,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               DirectiveSet(V3, Account, Expression).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
             )
-          ))
+          )
+        )
     }
 
     compiler.ContractCompiler(ctx.compilerContext, expr)
@@ -293,19 +307,21 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               DirectiveSet(V3, Account, DAppType).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
             )
-          ))
+          )
+        )
     }
 
     compiler.ContractCompiler(ctx.compilerContext, expr).right.get
   }
 
-  def simplePreconditionsAndSetContract(invokerGen: Gen[KeyPair] = accountGen,
-                                        masterGen: Gen[KeyPair] = accountGen,
-                                        payment: Option[Payment] = None,
-                                        feeGen: Gen[Long] = ciFee(0),
-                                        sponsored: Boolean = false,
-                                        invocationParamsCount: Int = 1)
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] = {
+  def simplePreconditionsAndSetContract(
+      invokerGen: Gen[KeyPair] = accountGen,
+      masterGen: Gen[KeyPair] = accountGen,
+      payment: Option[Payment] = None,
+      feeGen: Gen[Long] = ciFee(0),
+      sponsored: Boolean = false,
+      invocationParamsCount: Int = 1
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -329,10 +345,16 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           master,
           Some(fc),
           payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
+          if (sponsored) {
+            sponsorTx.minSponsoredAssetFee.get * 5
+          } else {
+            fee
+          },
           if (sponsored) {
             IssuedAsset(issueTx.id())
-          } else { Waves },
+          } else {
+            Waves
+          },
           ts
         )
         .explicitGet()
@@ -357,14 +379,15 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield defaultPaymentContract(senderBinging, argBinding, address, amount, assets)
 
-  def preconditionsAndSetContract(senderBindingToContract: String => Gen[DApp],
-                                  invokerGen: Gen[KeyPair] = accountGen,
-                                  masterGen: Gen[KeyPair] = accountGen,
-                                  payment: Option[Payment] = None,
-                                  feeGen: Gen[Long] = ciFee(0),
-                                  sponsored: Boolean = false,
-                                  isCIDefaultFunc: Boolean = false)
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
+  def preconditionsAndSetContract(
+      senderBindingToContract: String => Gen[DApp],
+      invokerGen: Gen[KeyPair] = accountGen,
+      masterGen: Gen[KeyPair] = accountGen,
+      payment: Option[Payment] = None,
+      feeGen: Gen[Long] = ciFee(0),
+      sponsored: Boolean = false,
+      isCIDefaultFunc: Boolean = false
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -388,10 +411,16 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           master,
           fc,
           payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
+          if (sponsored) {
+            sponsorTx.minSponsoredAssetFee.get * 5
+          } else {
+            fee
+          },
           if (sponsored) {
             IssuedAsset(issueTx.id())
-          } else { Waves },
+          } else {
+            Waves
+          },
           ts + 3
         )
         .explicitGet()
@@ -406,13 +435,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       feeGen: Gen[Long] = ciFee(1),
       sponsored: Boolean = false,
       isCIDefaultFunc: Boolean = false
-  ): Gen[(List[GenesisTransaction],
-          SetScriptTransaction,
-          SetScriptTransaction,
-          InvokeScriptTransaction,
-          KeyPair,
-          IssueTransaction,
-          SponsorFeeTransaction)] =
+  ): Gen[
+    (List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)
+  ] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -437,23 +462,30 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           master,
           fc,
           payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
+          if (sponsored) {
+            sponsorTx.minSponsoredAssetFee.get * 5
+          } else {
+            fee
+          },
           if (sponsored) {
             IssuedAsset(issueTx.id())
-          } else { Waves },
+          } else {
+            Waves
+          },
           ts + 3
         )
         .explicitGet()
     } yield (List(genesis, genesis2), setVerifier, setContract, ci, master, issueTx, sponsorTx)
 
-  def preconditionsAndSetContractWithAlias(senderBindingToContract: String => Gen[DApp],
-                                           invokerGen: Gen[KeyPair] = accountGen,
-                                           masterGen: Gen[KeyPair] = accountGen,
-                                           payment: Option[Payment] = None,
-                                           feeGen: Gen[Long] = ciFee(0),
-                                           sponsored: Boolean = false,
-                                           isCIDefaultFunc: Boolean = false)
-    : Gen[(List[GenesisTransaction], KeyPair, SetScriptTransaction, InvokeScriptTransaction, InvokeScriptTransaction, CreateAliasTransaction)] =
+  def preconditionsAndSetContractWithAlias(
+      senderBindingToContract: String => Gen[DApp],
+      invokerGen: Gen[KeyPair] = accountGen,
+      masterGen: Gen[KeyPair] = accountGen,
+      payment: Option[Payment] = None,
+      feeGen: Gen[Long] = ciFee(0),
+      sponsored: Boolean = false,
+      isCIDefaultFunc: Boolean = false
+  ): Gen[(List[GenesisTransaction], KeyPair, SetScriptTransaction, InvokeScriptTransaction, InvokeScriptTransaction, CreateAliasTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -480,10 +512,16 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           masterAlias,
           fc,
           payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
+          if (sponsored) {
+            sponsorTx.minSponsoredAssetFee.get * 5
+          } else {
+            fee
+          },
           if (sponsored) {
             IssuedAsset(issueTx.id())
-          } else { Waves },
+          } else {
+            Waves
+          },
           ts + 3
         )
         .explicitGet()
@@ -493,10 +531,16 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           fakeAlias,
           fc,
           payment.toSeq,
-          if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee },
+          if (sponsored) {
+            sponsorTx.minSponsoredAssetFee.get * 5
+          } else {
+            fee
+          },
           if (sponsored) {
             IssuedAsset(issueTx.id())
-          } else { Waves },
+          } else {
+            Waves
+          },
           ts + 3
         )
         .explicitGet()
@@ -514,7 +558,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
                 "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
-              ))
+              )
+            )
 
             blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
           }
@@ -679,10 +724,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       asset = IssueTransactionV2
         .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
-      r <- preconditionsAndSetContract(contractGen,
-                                       invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(1, IssuedAsset(asset.id()))),
-                                       feeGen = ciFee(1))
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.oneOf(Seq(invoker)),
+        payment = Some(Payment(1, IssuedAsset(asset.id()))),
+        feeGen = ciFee(1)
+      )
     } yield (a, am, r._1, r._2, r._3, r._4, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, dAppAddress, asset, invoker) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -753,10 +800,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       asset = IssueTransactionV2
         .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
-      r <- preconditionsAndSetContract(contractGen,
-                                       invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(1, IssuedAsset(asset.id()))),
-                                       feeGen = ciFee(1))
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.oneOf(Seq(invoker)),
+        payment = Some(Payment(1, IssuedAsset(asset.id()))),
+        feeGen = ciFee(1)
+      )
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, asset, invoker) =>
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
@@ -906,8 +955,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (a, am, r._1, r._2, r._3, asset, master, ts)) {
       case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
         val t =
-          TransferTransactionV2
-            .selfSigned(IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+          TransferTransaction
+            .selfSigned(2.toByte, IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("NegativeAmount")
@@ -958,10 +1007,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       asset = IssueTransactionV2
         .selfSigned(chainId, invoker, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
-      r <- preconditionsAndSetContract(contractGen,
-                                       invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(1, IssuedAsset(asset.id()))),
-                                       feeGen = ciFee(0))
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.oneOf(Seq(invoker)),
+        payment = Some(Payment(1, IssuedAsset(asset.id()))),
+        feeGen = ciFee(0)
+      )
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, asset, invoker) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
@@ -977,10 +1028,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       contractGen = (paymentContractGen(a, am) _)
       invoker <- accountGen
       ts      <- timestampGen
-      r <- preconditionsAndSetContract(contractGen,
-                                       invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(Long.MaxValue, Waves)),
-                                       feeGen = ciFee(1))
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.oneOf(Seq(invoker)),
+        payment = Some(Payment(Long.MaxValue, Waves)),
+        feeGen = ciFee(1)
+      )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
@@ -1015,12 +1068,24 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (ts, a, am, r._1, r._2, r._3, r._4, r._5, r._6)) {
       case (ts, acc, amount, genesis, setScript, ci, master, sponsoredAsset, setSponsorship) =>
         val t =
-          TransferTransactionV2
-            .selfSigned(IssuedAsset(sponsoredAsset.id()), master, ci.sender, sponsoredAsset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+          TransferTransaction
+            .selfSigned(
+              2.toByte,
+              IssuedAsset(sponsoredAsset.id()),
+              master,
+              ci.sender,
+              sponsoredAsset.quantity / 10,
+              ts,
+              Waves,
+              enoughFee,
+              Array[Byte]()
+            )
             .explicitGet()
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),
-                           TestBlock.create(Seq(ci)),
-                           fs) {
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),
+          TestBlock.create(Seq(ci)),
+          fs
+        ) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
             newState.balance(acc, Waves) shouldBe amount

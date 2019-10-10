@@ -12,13 +12,13 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NgStateTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  def preconditionsAndPayments(amt: Int): Gen[(GenesisTransaction, Seq[TransferTransactionV1])] =
+  def preconditionsAndPayments(amt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      payments: Seq[TransferTransactionV1] <- Gen.listOfN(amt, wavesTransferGeneratorP(master, recipient))
+      payments: Seq[TransferTransaction] <- Gen.listOfN(amt, wavesTransferGeneratorP(master, recipient))
     } yield (genesis, payments)
 
   property("can forge correctly signed blocks") {
