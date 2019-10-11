@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import cats.{Monad, Monoid}
+import cats.{Id, Monad, Monoid}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
@@ -35,6 +35,9 @@ case class CTX[C[_[_]]](
 
   def evaluationContext[F[_]: Monad](implicit ev: C[F] =:= NoContext[F]): EvaluationContext[C, F] =
     evaluationContext[F](Contextful.dummy[F])
+
+  def withEnvironment[D[_[_]]](implicit ev: C[Id] =:= NoContext[Id]): CTX[D] =
+    asInstanceOf[CTX[D]]
 
   lazy val compilerContext: CompilerContext = CompilerContext(
     typeDefs,
@@ -78,7 +81,4 @@ object CTX {
     override def combine(x: CTX[C], y: CTX[C]): CTX[C] =
       CTX[C](x.types ++ y.types, x.vars ++ y.vars, x.functions ++ y.functions)
   }
-
-  implicit def fillEnvironment[C[_[_]]](ctx: CTX[NoContext]): CTX[C] =
-    asInstanceOf[CTX[C]]
 }

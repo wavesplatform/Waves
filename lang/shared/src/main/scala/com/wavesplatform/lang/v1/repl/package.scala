@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1
 import cats.implicits._
 import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
 import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.v1.CTX._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.node.ErrorMessageEnvironment
@@ -18,8 +17,8 @@ package object repl {
   val internalFuncPrefix: String = "_"
 
   val initialCtx: CTX[Environment] =
-    (CryptoContext.build(global, V3): CTX[Environment]) |+|
-    (PureContext.build(global, V3): CTX[Environment])   |+|
+    CryptoContext.build(global, V3).withEnvironment[Environment] |+|
+    PureContext.build(global, V3).withEnvironment[Environment]   |+|
     WavesContext.build(contractDirectiveSet)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =

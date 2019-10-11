@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
-import com.wavesplatform.lang.v1.CTX._
 import monix.eval.Coeval
 
 import scala.collection.mutable
@@ -53,8 +52,8 @@ package object utils {
         val ctx = Coeval.evalOnce(
           Monoid.combineAll(
             Seq(
-              PureContext.build(Global, version): CTX[Environment],
-              CryptoContext.build(Global, version): CTX[Environment],
+              PureContext.build(Global, version).withEnvironment[Environment],
+              CryptoContext.build(Global, version).withEnvironment[Environment],
               WavesContext.build(ds)
             )
           )
