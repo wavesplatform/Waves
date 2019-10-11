@@ -1,3 +1,4 @@
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,17 +15,19 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
-import com.wavesplatform.lang.v1.repl.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
-import scala.scalajs.js.{Any, Dictionary, UndefOr}
+import scala.scalajs.js.{Any, Dictionary, Promise, UndefOr}
 
 object JsAPI {
   private def toJs(ast: EXPR): js.Object = {
@@ -60,7 +63,7 @@ object JsAPI {
     WavesContext.build(
       DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) DAppType else Expression)
         .explicitGet(),
-      new Environment {
+      new Environment[Id] {
         override def height: Long                                                                                    = 0
         override def chainId: Byte                                                                                   = 1: Byte
         override def inputEntity: Environment.InputEntity                                                            = null
@@ -89,14 +92,14 @@ object JsAPI {
     case t       => t.toString
   }
 
-  private val fullContractContext: CTX =
+  private val fullContractContext: CTX[Id] =
     buildContractContext(V3)
 
-  private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX = {
+  private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Id] = {
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
   }
 
-  private def buildContractContext(v: StdLibVersion): CTX = {
+  private def buildContractContext(v: StdLibVersion): CTX[Id] = {
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, false, true)))
   }
 
@@ -258,9 +261,11 @@ object JsAPI {
       "clear"     -> repl.clear _
     )
 
-  private def mapResult(eval: Either[String, String]): js.Dynamic =
-    eval.fold(
-      e => jObj("error" -> e),
-      r => jObj("result" -> r)
-    )
+  private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =
+    eval
+      .map(_.fold(
+        e => jObj("error" -> e),
+        r => jObj("result" -> r)
+      ))
+      .toJSPromise
 }

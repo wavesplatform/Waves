@@ -28,11 +28,8 @@ import scala.util.Random
 
 trait NS {
   def connect(remoteAddress: InetSocketAddress): Unit
-
   def shutdown(): Unit
-
   val messages: Messages
-
   val closedChannels: Observable[Channel]
 }
 
@@ -262,11 +259,8 @@ object NetworkServer extends ScorexLogging {
 
     new NS {
       override def connect(remoteAddress: InetSocketAddress): Unit = doConnect(remoteAddress)
-
       override def shutdown(): Unit = doShutdown()
-
       override val messages: Messages = networkMessages
-
       override val closedChannels: Observable[Channel] = closedChannelsSubject
     }
   }

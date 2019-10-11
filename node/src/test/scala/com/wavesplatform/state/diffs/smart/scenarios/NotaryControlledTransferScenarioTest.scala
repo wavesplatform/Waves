@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
+import cats.Id
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -114,13 +115,13 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        accountBDataTransaction,
        transferFromAToB)
 
-  def dummyEvalContext(version: StdLibVersion): EvaluationContext =
+  def dummyEvalContext(version: StdLibVersion): EvaluationContext[Id] =
     lazyContexts(DirectiveSet(V1, Asset, Expression).explicitGet())().evaluationContext
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
     val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).map(_._1)
-    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
+    typed.flatMap(EvaluatorV1().apply[EVALUATED](dummyEvalContext(V1), _))
   }
 
   property("Script toBase58String") {

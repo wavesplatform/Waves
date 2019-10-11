@@ -1,41 +1,57 @@
 package com.wavesplatform.lang.v1.repl
 
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
-import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.compiler.Types.FINAL
-import com.wavesplatform.lang.v1.compiler.Types.UNIT
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeSignature, LazyVal}
-import com.wavesplatform.lang.v1.parser.Parser
-
+import cats.Monad
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeSignature, LazyVal}
+import com.wavesplatform.lang.v1.parser.Expressions.EXPR
+import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.repl.Implicits._
+
 import scala.util.Try
 
-object ReplEngine {
+class ReplEngine[F[_] : Monad] {
+  val evaluator = new EvaluatorV1[F]
+
   def eval(
      expr:       String,
      compileCtx: CompilerContext,
-     evalCtx:    EvaluationContext
-  ): Either[String, (String, (CompilerContext, EvaluationContext))] =
-    for {
-      parsed <- Parser.parseExprOrDecl(expr).fold(
+     evalCtx:    EvaluationContext[F]
+  ): F[Either[String, (String, (CompilerContext, EvaluationContext[F]))]] = {
+    val r =
+      for {
+        parsed                              <- EitherT.fromEither[F](parse(expr))
+        (newCompileCtx, compiled, exprType) <- EitherT.fromEither[F](ExpressionCompiler.applyWithCtx(compileCtx, parsed))
+        evaluated                           <- EitherT(evaluator.applyWithCtx(evalCtx, compiled))
+      } yield resultWithCtx(evaluated, compileCtx, newCompileCtx, exprType)
+
+    r.value
+  }
+
+  private def parse(expr: String): Either[String, EXPR] =
+    Parser.parseExprOrDecl(expr)
+      .fold(
         { case (_, _, err) => Left(err.traced.toString) },
         { case (result, _) => Right(result) }
       )
-      (newCompileCtx, compiled, exprType) <- tryEi(ExpressionCompiler.applyWithCtx(compileCtx, parsed))
-      (newEvalCtx, eval)                  <- tryEi(EvaluatorV1.applyWithCtx(evalCtx, compiled))
-      filteredCompileCtx = excludeInternalDecls(newCompileCtx)
-      resultO = assignedResult(exprType, eval, filteredCompileCtx)
-      output = mkOutput(resultO, compileCtx, filteredCompileCtx)
-      newCtx = resultO.fold((filteredCompileCtx, newEvalCtx))(addResultToCtx(_, filteredCompileCtx, newEvalCtx))
-    } yield (output, newCtx)
 
-  private def tryEi[R](r: => Either[String, R]): Either[String, R] =
-    Try(r)
-      .toEither
-      .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
-      .flatten
+  private def resultWithCtx(
+    evaluated:     (EvaluationContext[F], EVALUATED),
+    compileCtx:    CompilerContext,
+    newCompileCtx: CompilerContext,
+    exprType:      FINAL
+  ) = {
+    val (newEvalCtx, result) = evaluated
+    val filteredCompileCtx = excludeInternalDecls(newCompileCtx)
+    val resultO = assignedResult(exprType, result, filteredCompileCtx)
+    val output = mkOutput(resultO, compileCtx, filteredCompileCtx)
+    val newCtx = resultO.fold((filteredCompileCtx, newEvalCtx))(addResultToCtx(_, filteredCompileCtx, newEvalCtx))
+    (output, newCtx)
+  }
 
   private def excludeInternalDecls(compileCtx: CompilerContext) =
     compileCtx.copy(varDefs = compileCtx.varDefs.filterNot(v => internalVarPrefixes.contains(v._1.head)))
@@ -105,12 +121,12 @@ object ReplEngine {
   private def addResultToCtx(
     result:     (String, FINAL, EVALUATED),
     compileCtx: CompilerContext,
-    evalCtx:    EvaluationContext
-  ): (CompilerContext, EvaluationContext) = {
+    evalCtx:    EvaluationContext[F]
+  ): (CompilerContext, EvaluationContext[F]) = {
     val (name, t, value) = result
     (
       compileCtx.copy(varDefs = compileCtx.varDefs + (name -> t)),
-      evalCtx.copy(letDefs = evalCtx.letDefs + (name -> LazyVal(EitherT.pure(value))))
+      evalCtx.copy(letDefs = evalCtx.letDefs + (name -> LazyVal.fromEvaluated(value)))
     )
   }
 }

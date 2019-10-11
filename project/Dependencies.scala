@@ -13,8 +13,8 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String) = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
+  private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
@@ -66,7 +66,8 @@ object Dependencies {
       catsModule("kernel").value,
       catsModule("macros").value,
       shapeless.value
-    ))
+    )
+  )
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
 
@@ -96,13 +97,12 @@ object Dependencies {
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
         .exclude("org.typelevel", "cats-testkit_2.12"),
-      "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4"
-    ) ++ protobuf.value ++ circe.value
+    ) ++ scalapbRuntime.value ++ circe.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -134,13 +134,13 @@ object Dependencies {
       kamonModule("influxdb", "1.0.2"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json"     % "2.7.1",
-      "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      "com.google.code.findbugs"     % "jsr305"             % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"            %% "play-json"         % "2.7.1",
+      "org.ethereum"                 % "leveldbjni-all"     % "1.18.3",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
-      "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
+      "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
-      "org.bitlet" % "weupnp" % "0.1.4",
+      "org.bitlet"        % "weupnp" % "0.1.4",
       akkaModule("slf4j") % Compile,
       kindProjector,
       monixModule("reactive").value,
@@ -153,13 +153,17 @@ object Dependencies {
 
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto"
-  lazy val protobuf = Def.setting {
+
+  lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
-      protoSchemasLib        % "protobuf"
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
     )
+  }
+
+  lazy val protobuf = Def.setting {
+    scalapbRuntime.value :+ protoSchemasLib % "protobuf"
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
