@@ -1,31 +1,41 @@
 package com.wavesplatform.lang.v1
 
-import cats.{Id, Monad, Monoid, Semigroup, ~>}
-import cats.implicits._
+import cats.{Monad, Monoid}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
 
 @JSExportTopLevel("CTX")
-case class CTX[F[_], C](
-  environment: C,
+case class CTX[C[_[_]]](
   @(JSExport @field) types: Seq[FINAL],
-  @(JSExport @field) vars: Map[String, (FINAL, LazyVal[F])],
-  @(JSExport @field) functions: Array[BaseFunction[F, C]]
+  @(JSExport @field) vars: Map[String, (FINAL, ContextfulVal[C])],
+  @(JSExport @field) functions: Array[BaseFunction[C]]
 ) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap
-  lazy val evaluationContext: EvaluationContext[F, C] = {
+
+  def evaluationContext[F[_]: Monad](env: C[F]): EvaluationContext[C, F] = {
     if (functions.map(_.header).distinct.length != functions.length) {
       val dups = functions.groupBy(_.header).filter(_._2.length != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
-    EvaluationContext(environment, typeDefs, vars.mapValues(_._2), functions.map(f => f.header -> f).toMap)
+    EvaluationContext(
+      env,
+      typeDefs,
+      vars.mapValues(v => LazyVal.fromEval(v._2(env))),
+      functions.map(f => f.header -> f).toMap
+    )
   }
+
+  def evaluationContext[F[_]: Monad](implicit ev: C[F] =:= NoContext[F]): EvaluationContext[C, F] =
+    evaluationContext[F](Contextful.dummy[F])
+
   lazy val compilerContext: CompilerContext = CompilerContext(
     typeDefs,
     vars.mapValues(_._1),
@@ -57,26 +67,18 @@ case class CTX[F[_], C](
       .toMap,
     ident = 0
   )
-
-  def mapK[G[_] : Monad](f: F ~> G): CTX[G, C] =
-    copy(
-      functions = functions.map(_.mapK(f)),
-      vars = vars.mapValues { case(t, value) => (t, value.mapK(f)) }
-    )
 }
+
 object CTX {
-  val empty: CTX[Id, _] = CTX(???, Seq.empty, Map.empty, Array.empty[BaseFunction[Id, _]])
+  val empty: CTX[NoContext] = CTX[NoContext](Seq.empty, Map.empty, Array.empty)
 
-  implicit def monoid[F[_], C]: Monoid[CTX[F, C]] = new Monoid[CTX[F, C]] {
-    override val empty: CTX[F, C] =
-      CTX.empty.asInstanceOf[CTX[F, C]]
+  implicit def monoid[C[_[_]]]: Monoid[CTX[C]] = new Monoid[CTX[C]] {
+    override val empty: CTX[C] = CTX.empty
 
-    override def combine(x: CTX[F, C], y: CTX[F, C]): CTX[F, C] =
-      CTX(
-        x.environment,
-        x.types ++ y.types,
-        x.vars ++ y.vars,
-        x.functions ++ y.functions
-      )
+    override def combine(x: CTX[C], y: CTX[C]): CTX[C] =
+      CTX[C](x.types ++ y.types, x.vars ++ y.vars, x.functions ++ y.functions)
   }
+
+  implicit def fillEnvironment[C[_[_]]](ctx: CTX[NoContext]): CTX[C] =
+    asInstanceOf[CTX[C]]
 }

@@ -11,17 +11,16 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeS
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.repl.Implicits._
-
-import scala.util.Try
+import com.wavesplatform.lang.v1.traits.Environment
 
 class ReplEngine[F[_] : Monad] {
-  val evaluator = new EvaluatorV1[F]
+  val evaluator = new EvaluatorV1[F, Environment]
 
   def eval(
      expr:       String,
      compileCtx: CompilerContext,
-     evalCtx:    EvaluationContext[F]
-  ): F[Either[String, (String, (CompilerContext, EvaluationContext[F]))]] = {
+     evalCtx:    EvaluationContext[Environment, F]
+  ): F[Either[String, (String, (CompilerContext, EvaluationContext[Environment, F]))]] = {
     val r =
       for {
         parsed                              <- EitherT.fromEither[F](parse(expr))
@@ -40,7 +39,7 @@ class ReplEngine[F[_] : Monad] {
       )
 
   private def resultWithCtx(
-    evaluated:     (EvaluationContext[F], EVALUATED),
+    evaluated:     (EvaluationContext[Environment, F], EVALUATED),
     compileCtx:    CompilerContext,
     newCompileCtx: CompilerContext,
     exprType:      FINAL
@@ -121,8 +120,8 @@ class ReplEngine[F[_] : Monad] {
   private def addResultToCtx(
     result:     (String, FINAL, EVALUATED),
     compileCtx: CompilerContext,
-    evalCtx:    EvaluationContext[F]
-  ): (CompilerContext, EvaluationContext[F]) = {
+    evalCtx:    EvaluationContext[Environment, F]
+  ): (CompilerContext, EvaluationContext[Environment, F]) = {
     val (name, t, value) = result
     (
       compileCtx.copy(varDefs = compileCtx.varDefs + (name -> t)),

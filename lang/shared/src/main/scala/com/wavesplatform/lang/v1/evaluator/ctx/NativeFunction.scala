@@ -2,17 +2,17 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
 import cats.implicits._
-import cats.{Eval, Monad, ~>}
+import cats.{Eval, Monad}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.NativeFunction.{Input, Output}
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.evaluator.{Contextful, UserContextfulFunction}
+import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 import scala.annotation.meta.field
+import scala.language.implicitConversions
 import scala.scalajs.js.annotation._
 
 sealed trait BaseFunction[C[_[_]]] {
@@ -22,12 +22,10 @@ sealed trait BaseFunction[C[_[_]]] {
   @JSExport def name: String
   @JSExport def args: Array[String]
   @JSExport def deprecated: Boolean = false
-
-  def mapK[G[_]](f: F ~> G): BaseFunction[G, C]
 }
 
 object BaseFunction {
-  implicit def header[F[_], C](bf: BaseFunction[F, C]): FunctionHeader = bf.header
+  implicit def header[C[_[_]]](bf: BaseFunction[C]): FunctionHeader = bf.header
 }
 
 @JSExportTopLevel("FunctionTypeSignature")
@@ -38,40 +36,37 @@ case class NativeFunction[C[_[_]]](
   @(JSExport @field) name: String,
   costByLibVersion: Map[StdLibVersion, Long],
   @(JSExport @field) signature: FunctionTypeSignature,
-  ev: Input[C, ?] ~> Output,
+  ev: Contextful[C],
   @(JSExport @field) args: Array[String]
 ) extends BaseFunction[C] {
-  def eval[F[_]](context: C[F], args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
+  def eval[F[_] : Monad](context: C[F], args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
     EitherT.apply[EvalF[F, ?], ExecutionError, EVALUATED](ev((context, args)).pure[Eval])
-
-  override def mapK[G[_]](f: F ~> G): BaseFunction[G, C] =
-    copy(ev = (ctx, args) => f(ev(ctx, args)))
 }
 
 object NativeFunction {
-  type Input[C[_[_]], F[_]]  = (C[F], List[EVALUATED])
-  type Output[F[_]] = F[Either[ExecutionError, EVALUATED]]
-
-  def withEnvironment[F[_] : Monad, C](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
-      ev: PartialFunction[(C, List[EVALUATED]), F[Either[ExecutionError, EVALUATED]]]): NativeFunction[F, C] =
+  def withEnvironment[C[_[_]]](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+      ev: Contextful[C]): NativeFunction[C] =
     new NativeFunction(
       name = name,
       costByLibVersion = DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
-      ev = ev.orElse { case _ => "Passed argument with wrong type".asLeft[EVALUATED].pure[F] }(_, _),
+      ev = ev /*ev.orElse { case _ => "Passed argument with wrong type".asLeft[EVALUATED].pure[F] }(_, _)*/,
       args = args.map(_._1).toArray
     )
 
-  def apply[F[_] : Monad](
-    name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*
-  )(ev: PartialFunction[List[EVALUATED], F[Either[ExecutionError, EVALUATED]]]): NativeFunction[F, Nothing] =
-    withEnvironment(name, cost, internalName, resultType, args: _*) { case (_, args) => ev(args) }
+  def apply[C[_[_]]](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+    ev: List[EVALUATED] => Either[ExecutionError, EVALUATED]
+  ): NativeFunction[C] =
+    withEnvironment[C](name, cost, internalName, resultType, args: _*)(new Contextful[C] {
+      override def apply[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        ev(a._2).pure[F]
+    })
 
-  def apply[F[_] : Monad, C](name: String,
+  def apply[C[_[_]]](name: String,
             costByLibVersion: Map[StdLibVersion, Long],
             internalName: Short,
             resultType: TYPE,
-            args: (String, TYPE, String)*)(ev: (C, List[EVALUATED]) => F[Either[ExecutionError, EVALUATED]]): NativeFunction[F, C] =
+            args: (String, TYPE, String)*)(ev: Contextful[C]): NativeFunction[C] =
     new NativeFunction(
       name = name,
       costByLibVersion = costByLibVersion,
@@ -83,40 +78,50 @@ object NativeFunction {
 }
 
 @JSExportTopLevel("UserFunction")
-case class UserFunction[F[_]](
+case class UserFunction[C[_[_]]](
   @(JSExport@field) name: String,
   @(JSExport@field) internalName: String,
   costByLibVersion: Map[StdLibVersion, Long],
   @(JSExport@field) signature: FunctionTypeSignature,
-  ev: EXPR,
+  ev: UserContextfulFunction[C],
   @(JSExport@field) args: Array[String]
-) extends BaseFunction[F, Nothing] {
-
-  override def mapK[G[_]](f: F ~> G): BaseFunction[G, Nothing] =
-    asInstanceOf[UserFunction[G]]
-}
+) extends BaseFunction[C]
 
 object UserFunction {
+  def withEnvironment[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: UserContextfulFunction[C]): UserFunction[C] =
+    UserFunction.withEnvironment(
+      name = name,
+      internalName = name,
+      DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
+      resultType,
+      args: _*
+    )(ev)
 
-  def apply[F[_]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[F] =
-    UserFunction(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
+  def apply[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[C] =
+    UserFunction.withEnvironment[C](name, cost, resultType, args: _ *)(new UserContextfulFunction[C] {
+      override def apply[F[_] : Monad](context: C[F]): EXPR = ev
+    })
 
-  def deprecated[F[_]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[F] =
+  def deprecated[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: EXPR): UserFunction[C] =
     UserFunction.deprecated(name, name, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
 
-  def apply[F[_]](name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, args: (String, TYPE)*)(
-      ev: EXPR): UserFunction[F] =
+  def apply[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, args: (String, TYPE)*)(
+      ev: EXPR): UserFunction[C] =
     UserFunction(name, name, costByLibVersion, resultType, args: _*)(ev)
 
-  def apply[F[_]](name: String, internalName: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(
-      ev: EXPR): UserFunction[F] =
-    UserFunction(name, internalName, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(ev)
+  def apply[C[_[_]]](name: String, internalName: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(
+      ev: EXPR): UserFunction[C] =
+    UserFunction.withEnvironment[C](name, internalName, DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap, resultType, args: _*)(
+      UserContextfulFunction.pure[C](ev)
+    )
 
-  def apply[F[_]](name: String,
-            internalName: String,
-            costByLibVersion: Map[StdLibVersion, Long],
-            resultType: TYPE,
-            args: (String, TYPE)*)(ev: EXPR): UserFunction[F] =
+  def withEnvironment[C[_[_]]](
+    name: String,
+    internalName: String,
+    costByLibVersion: Map[StdLibVersion, Long],
+    resultType: TYPE,
+    args: (String, TYPE)*
+  )(ev: UserContextfulFunction[C]): UserFunction[C] =
     new UserFunction(
       name = name,
       internalName = internalName,
@@ -126,19 +131,32 @@ object UserFunction {
       args = args.map(_._1).toArray
     )
 
-  def deprecated[F[_]](
+  def apply[C[_[_]]](
     name: String,
     internalName: String,
     costByLibVersion: Map[StdLibVersion, Long],
     resultType: TYPE,
     args: (String, TYPE)*
-  )(ev: EXPR): UserFunction[F] =
-    new UserFunction[F](
+  )(ev: EXPR): UserFunction[C] =
+    withEnvironment[C](name, internalName, costByLibVersion, resultType, args: _*)(
+      UserContextfulFunction.pure[C](ev)
+    )
+
+  def deprecated[C[_[_]]](
+    name: String,
+    internalName: String,
+    costByLibVersion: Map[StdLibVersion, Long],
+    resultType: TYPE,
+    args: (String, TYPE)*
+  )(ev: EXPR): UserFunction[C] =
+    new UserFunction[C](
       name = name,
       internalName = internalName,
       costByLibVersion = costByLibVersion,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName, name)),
-      ev = ev,
+      UserContextfulFunction.pure[C](ev),
       args = args.map(_._1).toArray
-    ) { override def deprecated = true }
+    ) {
+      override def deprecated = true
+    }
 }

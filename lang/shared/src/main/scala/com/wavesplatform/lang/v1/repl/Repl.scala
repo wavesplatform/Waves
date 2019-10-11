@@ -5,19 +5,20 @@ import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.traits.Environment
 import monix.execution.atomic.Atomic
 
 import scala.concurrent.ExecutionContext.Implicits.{global => g}
 import scala.concurrent.Future
 
 case class Repl(settings: Option[NodeConnectionSettings] = None) {
-  private val initialCtx = buildInitialCtx(settings)
-  private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext), view)
+  private val environment  = buildEnvironment(settings)
+  private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext(environment)), view)
   private val currentState = Atomic(initialState)
   private val engine = new ReplEngine[Future]()
 
   private def state[S, V](s: S, view: S => V): (S, V) = (s, view(s))
-  private def view(ctx: (CompilerContext, EvaluationContext[Future])) = StateView(ctx._1)
+  private def view(ctx: (CompilerContext, EvaluationContext[Environment, Future])) = StateView(ctx._1)
 
   def clear(): Unit = currentState.set(initialState)
 
@@ -29,11 +30,11 @@ case class Repl(settings: Option[NodeConnectionSettings] = None) {
     perform(
       currentState,
       view,
-      (oldCtx: (CompilerContext, EvaluationContext[Future])) =>
+      (oldCtx: (CompilerContext, EvaluationContext[Environment, Future])) =>
         engine.eval(expr, oldCtx._1, oldCtx._2).map {
           case Left(e)            => (Left(e),  oldCtx)
           case Right((r, newCtx)) => (Right(r), newCtx)
-        }: Future[(Either[String, String], (CompilerContext, EvaluationContext[Future]))]
+        }: Future[(Either[String, String], (CompilerContext, EvaluationContext[Environment, Future]))]
     )
 
   private def perform[F[_] : Functor, S, R, V](
