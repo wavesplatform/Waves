@@ -34,7 +34,6 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -85,10 +84,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
+  // This handler is needed in case Fatal exception is thrown inside the task
+  private def stopOnAppendError(cause: Throwable): Unit = {
+    log.error("Error in Appender", cause)
+    forceStopApplication(FatalDBError)
+  }
+
+  private val appenderScheduler = singleThread("appender", stopOnAppendError)
+
   private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
   private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
   private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
-  private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = log.error("Error in Miner", _))
 
@@ -184,10 +190,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject
     ) {
       case (c, b) =>
-        processFork(c, b.blocks).onErrorHandle { e =>
-          log.error("Fatal DB error while processing fork, force stopping node", e)
-          forceStopApplication(FatalDBError)
-          Left(GenericError(e))
+        processFork(c, b.blocks).doOnFinish {
+          case None => Task.now(())
+          case Some(e) => Task(stopOnAppendError(e))
         }
     }
 
@@ -204,16 +209,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     val microBlockSink = microblockData
-      .mapEval(scala.Function.tupled(processMicroBlock))
+      .mapEval(processMicroBlock.tupled)
 
     val blockSink = newBlocks
-      .mapEval(scala.Function.tupled(processBlock))
+      .mapEval(processBlock.tupled)
 
     Observable(microBlockSink, blockSink).merge
-      .onErrorHandle { e =>
-        log.error("Fatal DB error, force stopping node", e)
-        forceStopApplication(FatalDBError)
-      }
+      .onErrorHandle(stopOnAppendError)
       .subscribe()
 
     miner.scheduleMining()
