@@ -81,7 +81,7 @@ node('vostok'){
                                 mkdir -p ./.ivy2 ./.sbt
                             """
                             replacement="as builder\nCOPY ./.ivy2 /root/.ivy2\nCOPY ./.sbt /root/.sbt"
-                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement)
+                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement).replace('DEB_PACKCAGE_NETWORKS','DEB_PACKAGE_NETWORKS')
                         }
                         def dockerImageBuilder = imageIt(
                             dockerRegistryAddress: dockerRegistryAddress,
@@ -163,7 +163,7 @@ node('vostok'){
                 stage ('Pushing docker image'){
                     docker.withRegistry(dockerRegistryAddress, dockerRegistryCreds) {
                         if (dockerTags.contains(wavesVersion)){
-                            dockerImage.push()    
+                            dockerImage.push()
                         }
                         if (dockerTags.contains('latest')){
                             dockerImage.push("latest")
