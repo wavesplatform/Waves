@@ -81,7 +81,7 @@ node('vostok'){
                                 mkdir -p ./.ivy2 ./.sbt
                             """
                             replacement="as builder\nCOPY ./.ivy2 /root/.ivy2\nCOPY ./.sbt /root/.sbt"
-                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement).replace('sbt "node/assembly"','true')replace('DEB_PACKCAGE_NETWORKS','DEB_PACKAGE_NETWORKS')
+                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement).replace('sbt "node/assembly"','true').replace('DEB_PACKCAGE_NETWORKS','DEB_PACKAGE_NETWORKS')
                         }
                         def dockerImageBuilder = imageIt(
                             dockerRegistryAddress: dockerRegistryAddress,
