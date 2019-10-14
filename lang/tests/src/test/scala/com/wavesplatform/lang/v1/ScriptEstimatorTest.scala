@@ -466,8 +466,6 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
   }
 
   property("isolated if/then blocks estimation") {
-    val costs = functionCosts(V3)
-
     def expr(invokeValInThenBlock: Boolean) =
       s"""
          | func complex() = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
@@ -479,6 +477,22 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
          |   else WriteSet([DataEntry("a", b)])
       """.stripMargin
 
+    val costs = functionCosts(V3)
     estimate(costs, compile(expr(true))) shouldBe estimate(costs, compile(expr(false)))
+  }
+
+  property("let block outer scope reach") {
+    val script =
+      """
+        | let a = 1
+        | let b = a
+        | let c = {
+        |   let unused = 1
+        |   a
+        | }
+        | c == b
+      """.stripMargin
+
+    estimate(functionCosts(V3), compile(script))  shouldBe Right(30)
   }
 }

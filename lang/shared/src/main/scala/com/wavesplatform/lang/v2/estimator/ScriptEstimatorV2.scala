@@ -34,14 +34,13 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
     }
 
-  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
-    local {
-      val letResult = (false, evalExpr(let.value))
-      for {
-        _ <- update(lets.modify(_)(_.updated(let.name, letResult)))
-        r <- evalExpr(inner)
-      } yield r + 5
-    }
+  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] = {
+    val letResult = (false, evalExpr(let.value))
+    for {
+      _ <- update(lets.modify(_)(_.updated(let.name, letResult)))
+      r <- evalExpr(inner)
+    } yield r + 5
+  }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     local {
