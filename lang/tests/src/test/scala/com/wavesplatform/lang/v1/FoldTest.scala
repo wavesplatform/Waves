@@ -38,14 +38,14 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
-    val ctx: CTX[Id] =
+    val ctx: CTX[Environment] =
       Monoid.combineAll(Seq(
-        PureContext.build(Global, V3),
-        WavesContext.build(DirectiveSet.contractDirectiveSet, emptyEnv),
-        CryptoContext.build(Global, V3)
+        PureContext.build(Global, V3).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet.contractDirectiveSet),
+        CryptoContext.build(Global, V3).withEnvironment[Environment]
       ))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext(emptyEnv), v._1))
   }
 
   property("sum") {

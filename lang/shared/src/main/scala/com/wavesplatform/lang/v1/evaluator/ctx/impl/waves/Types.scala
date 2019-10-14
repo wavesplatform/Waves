@@ -5,9 +5,9 @@ import com.wavesplatform.lang.v1.compiler.Types._
 
 object Types {
 
-  val addressType        = CASETYPEREF("Address", List("bytes" -> BYTESTR))
-  val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
-  val addressOrAliasType = UNION(addressType, aliasType)
+  lazy val addressType        = CASETYPEREF("Address", List("bytes" -> BYTESTR))
+  lazy val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
+  lazy val addressOrAliasType = UNION(addressType, aliasType)
 
   val assetType = CASETYPEREF(
     "Asset",
@@ -45,7 +45,7 @@ object Types {
 
   val optionPayment = UNION(paymentType, UNIT)
 
-  val verifierInput = UNION.create(
+  lazy val verifierInput = UNION.create(
     buildOrderType(true) :: buildActiveTransactionTypes(true, V3),
     Some("VerifierInput")
   )
@@ -108,7 +108,7 @@ object Types {
     "timestamp" -> LONG,
     "version"   -> LONG,
   )
-  private val proven = List(
+  private lazy val proven = List(
     "sender"          -> addressType,
     "senderPublicKey" -> BYTESTR,
     "bodyBytes"       -> BYTESTR

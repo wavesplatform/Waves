@@ -3,7 +3,8 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 import cats._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
-import com.wavesplatform.lang.v1.evaluator.LetLogCallback
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.{Contextful, LetLogCallback}
 import shapeless.{Lens, lens}
 
 case class EvaluationContext[C[_[_]], F[_]](
@@ -50,5 +51,17 @@ object EvaluationContext {
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
     EvaluationContext(environment, typeDefs, letDefs, functions.map(f => f.header -> f).toMap)
+  }
+
+  def build(
+    typeDefs:    Map[String, FINAL],
+    letDefs:     Map[String, LazyVal[Id]],
+    functions:   Seq[BaseFunction[NoContext]] = Seq()
+  ): EvaluationContext[NoContext, Id] = {
+    if (functions.distinct.size != functions.size) {
+      val dups = functions.groupBy(_.header).filter(_._2.size != 1)
+      throw new Exception(s"Duplicate runtime functions names: $dups")
+    }
+    EvaluationContext[NoContext, Id](Contextful.dummy[Id], typeDefs, letDefs, functions.map(f => f.header -> f).toMap)
   }
 }

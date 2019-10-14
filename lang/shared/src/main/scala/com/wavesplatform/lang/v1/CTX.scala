@@ -76,7 +76,7 @@ object CTX {
   val empty: CTX[NoContext] = CTX[NoContext](Seq.empty, Map.empty, Array.empty)
 
   implicit def monoid[C[_[_]]]: Monoid[CTX[C]] = new Monoid[CTX[C]] {
-    override val empty: CTX[C] = CTX.empty
+    override val empty: CTX[C] = CTX.empty.withEnvironment[C]
 
     override def combine(x: CTX[C], y: CTX[C]): CTX[C] =
       CTX[C](x.types ++ y.types, x.vars ++ y.vars, x.functions ++ y.functions)

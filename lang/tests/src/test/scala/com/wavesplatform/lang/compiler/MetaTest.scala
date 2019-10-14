@@ -28,8 +28,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(V3, Account, DAppType).explicitGet(),
-          Common.emptyBlockchainEnvironment()
+          DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
     )

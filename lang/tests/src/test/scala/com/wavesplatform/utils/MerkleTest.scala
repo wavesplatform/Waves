@@ -9,7 +9,9 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import org.scalacheck.{Arbitrary, Gen}
@@ -106,11 +108,13 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
     }
   }
 
+  private val evaluator = new EvaluatorV1[Id, NoContext]()
+
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX[Id] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
+    val ctx: CTX[NoContext] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
   }
 
   private def scriptSrc(root: Array[Byte], proof: Array[Byte], value: Array[Byte]): String = {

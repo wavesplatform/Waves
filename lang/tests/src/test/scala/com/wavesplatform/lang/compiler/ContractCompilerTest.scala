@@ -14,10 +14,11 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
@@ -29,10 +30,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   property("contract compiles when uses annotation bindings and correct return type") {
     val ctx = Monoid.combine(
       compilerContext,
-      WavesContext
-        .build(
-          DirectiveSet(V3, Account, DAppType).explicitGet(),
-          Common.emptyBlockchainEnvironment()
+      WavesContext.build(
+          DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
     )
@@ -127,8 +126,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(V3, Account, DAppType).explicitGet(),
-          Common.emptyBlockchainEnvironment()
+          DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
     )
@@ -183,8 +181,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   private val cmpCtx: CompilerContext =
     WavesContext
       .build(
-        DirectiveSet(V3, Account, DAppType).explicitGet(),
-        Common.emptyBlockchainEnvironment()
+        DirectiveSet(V3, Account, DAppType).explicitGet()
       )
       .compilerContext
 
@@ -330,11 +327,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3),
-          CryptoContext.build(com.wavesplatform.lang.Global, V3),
+          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
-            DirectiveSet(V3, Account, DAppType).explicitGet(),
-            Common.emptyBlockchainEnvironment()
+            DirectiveSet(V3, Account, DAppType).explicitGet()
           )
         ))
       .compilerContext
@@ -560,13 +556,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
+    val verifierTypes = Types.verifierInput.typeList.map(_.name)
     compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.mkString(", "))
   }
 
   property("expression matching case with non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
-    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
+    val verifierTypes = Types.verifierInput.typeList.map(_.name)
 
     val expr = {
       val script =
@@ -589,7 +585,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
   property("matching case with union type containing non-existing type should produce error message with suitable types") {
     val ctx           = Monoid.combine(compilerContext, cmpCtx)
-    val verifierTypes = WavesContext.verifierInput.typeList.map(_.name)
+    val verifierTypes = Types.verifierInput.typeList.map(_.name)
 
     val expr = {
       val script =
