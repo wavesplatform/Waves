@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.OrdType
 
-object WavesContextfulVals {
+object Vals {
   def tx(
     isTokenContext: Boolean,
     version: StdLibVersion,
@@ -83,11 +83,17 @@ object WavesContextfulVals {
         }
     }
 
+  val lastBlock = ("lastBlock", (blockInfo, lastBlockVal))
+
   val sellOrdTypeVal: ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
   val buyOrdTypeVal:  ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
+
+  val sell = ("Sell", (ordTypeType, sellOrdTypeVal))
+  val buy = ("Buy", (ordTypeType, buyOrdTypeVal))
 
   val height: (ExecutionError, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
 
   val accountThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
   val assetThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment]))   = ("this", (assetType,   assetThisVal))
+
 }

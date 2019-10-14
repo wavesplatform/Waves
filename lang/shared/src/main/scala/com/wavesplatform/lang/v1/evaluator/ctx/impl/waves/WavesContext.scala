@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContextfulVals._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
 import com.wavesplatform.lang.v1.traits._
 
 object WavesContext {
@@ -83,20 +83,11 @@ object WavesContext {
     val txVal = tx(isTokenContext, version, proofsEnabled)
     version match {
       case V1 => Map(txVal)
-      case V2 =>
-        Map(
-          ("Sell", (ordTypeType, sellOrdTypeVal)),
-          ("Buy", (ordTypeType, buyOrdTypeVal)),
-          txVal
-        )
+      case V2 => Map(sell, buy, txVal)
       case V3 =>
-        val common = Map(
-          ("Sell", (sellType, sellOrdTypeVal)),
-          ("Buy", (buyType, buyOrdTypeVal)),
-          ("lastBlock", (blockInfo, lastBlockVal)),
-          if (isTokenContext) assetThis else accountThis
-        )
+        val `this` = if (isTokenContext) assetThis else accountThis
         val txO = if (contentType == Expression) Map(txVal) else Map()
+        val common = Map(sell, buy, lastBlock, `this`)
         common ++ txO
     }
   }
