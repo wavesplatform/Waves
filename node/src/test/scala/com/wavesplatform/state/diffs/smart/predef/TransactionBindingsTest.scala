@@ -644,7 +644,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         WavesContext
           .build(
             directives,
-            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(null), directives)
+            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(???), directives)
           )
 
     for {
