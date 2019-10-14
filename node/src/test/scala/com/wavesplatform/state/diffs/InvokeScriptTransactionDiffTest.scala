@@ -20,6 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -28,16 +29,13 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{Asset, _}
-import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
-import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -219,11 +217,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3),
-            CryptoContext.build(Global, V3),
+            PureContext.build(Global, V3).withEnvironment[Environment],
+            CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
-              DirectiveSet(V3, Account, Expression).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              DirectiveSet(V3, Account, Expression).explicitGet()
             )
           ))
     }
@@ -287,11 +284,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3),
-            CryptoContext.build(Global, V3),
+            PureContext.build(Global, V3).withEnvironment[Environment],
+            CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
-              DirectiveSet(V3, Account, DAppType).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              DirectiveSet(V3, Account, DAppType).explicitGet()
             )
           ))
     }
