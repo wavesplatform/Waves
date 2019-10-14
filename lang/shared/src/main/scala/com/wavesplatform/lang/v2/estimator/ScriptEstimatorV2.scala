@@ -76,10 +76,18 @@ object ScriptEstimatorV2 extends ScriptEstimator {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
     for {
-      condComplexity  <- evalExpr(cond)
-      rightComplexity <- evalExpr(ifTrue)
-      leftComplexity  <- evalExpr(ifFalse)
-    } yield condComplexity + Math.max(leftComplexity, rightComplexity) + 1
+      condComplexity             <- evalExpr(cond)
+      right@(_, rightComplexity) <- local(withCtx(evalExpr(ifTrue)))
+      left@(_, leftComplexity)   <- local(withCtx(evalExpr(ifFalse)))
+      (newCtx, complexity) = if (rightComplexity > leftComplexity) right else left
+      _ <- set[Id, EstimatorContext, ExecutionError](newCtx)
+    } yield condComplexity + complexity + 1
+
+  private def withCtx(eval: EvalM[Long]): EvalM[(EstimatorContext, Long)] =
+    for {
+      r   <- eval
+      ctx <- get[Id, EstimatorContext, ExecutionError]
+    } yield (ctx, r)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
     evalExpr(expr).map(_ + 2)

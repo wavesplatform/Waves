@@ -176,6 +176,150 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
   }
 
   property("script complexity should be constant") {
+    /*
+        {-# STDLIB_VERSION 1 #-}
+        {-# CONTENT_TYPE EXPRESSION #-}
+
+        let maxTimeToBet = 1548770006000
+        let minTimeToTrading = 1548770126000
+        let maxTimeToTrading = 1548770186000
+        let fee = 10000000
+        let decimals = 2
+        let multiply = 100
+        let totalMoney = if (isDefined(getInteger(tx.sender, "totalMoney")))
+            then extract(getInteger(tx.sender, "totalMoney"))
+            else 0
+        let uniqueBets = if (isDefined(getInteger(tx.sender, "uniqueBets")))
+            then extract(getInteger(tx.sender, "uniqueBets"))
+            else 0
+        match tx {
+            case dt: DataTransaction =>
+                if (if ((maxTimeToBet >= tx.timestamp))
+                    then isDefined(getString(dt.data, "bet_s"))
+                    else false)
+                    then {
+                        let paymentTxId = extract(getString(dt.data, "paymentTxId"))
+                        let paymentTx = Native<1000>(fromBase58String(paymentTxId))
+                        let betGroup = extract(getString(dt.data, "bet_s"))
+                        let dtBetSummary = extract(getInteger(dt.data, betGroup))
+                        let betSummary = if (isDefined(getInteger(tx.sender, betGroup)))
+                            then extract(getInteger(tx.sender, betGroup))
+                            else 0
+                        let vBet = extract(getInteger(dt.data, "bet_v"))
+                        let kvpBet = extract(getString(dt.data, toString(vBet)))
+                        let vKvpBet = extract(getInteger(dt.data, ("v_" + toString(vBet))))
+                        let iBet = extract(getInteger(dt.data, "bet_i"))
+                        let dBet = extract(getInteger(dt.data, "bet_d"))
+                        let c = (decimals - size(toString(dBet)))
+                        let tBet = (((toString(iBet) + ".") + if ((c == 1))
+                            then "0"
+                            else if ((c == 2))
+                                then "00"
+                                else if ((c == 3))
+                                    then "000"
+                                    else if ((c == 4))
+                                        then "0000"
+                                        else if ((c == 5))
+                                            then "00000"
+                                            else if ((c == 6))
+                                                then "000000"
+                                                else if ((c == 7))
+                                                    then "0000000"
+                                                    else "") + toString(dBet))
+                        let betIsNew = if (!(isDefined(getInteger(tx.sender, betGroup))))
+                            then 1
+                            else 0
+                        let dtUniqueBets = extract(getInteger(dt.data, "uniqueBets"))
+                        match paymentTx {
+                            case payment: TransferTransaction =>
+                                if (if (if (if (if (if (if (if (!(isDefined(getString(tx.sender, paymentTxId))))
+                                    then (payment.recipient == tx.sender)
+                                    else false)
+                                    then (payment.amount > fee)
+                                    else false)
+                                    then (extract(getInteger(dt.data, "totalMoney")) == (totalMoney + (payment.amount - fee)))
+                                    else false)
+                                    then (dtBetSummary == (betSummary + (payment.amount - fee)))
+                                    else false)
+                                    then (vBet == ((iBet * multiply) + dBet))
+                                    else false)
+                                    then (kvpBet == betGroup)
+                                    else false)
+                                    then (dtUniqueBets == (uniqueBets + betIsNew))
+                                    else false)
+                                    then (vKvpBet == vBet)
+                                    else false
+                            case _ =>
+                                false
+                        }
+                        }
+                    else if (if ((tx.timestamp > minTimeToTrading))
+                        then !(isDefined(getString(tx.sender, "tradingTxId")))
+                        else false)
+                        then {
+                            let tradingTxId = extract(getString(dt.data, "tradingTxId"))
+                            let tradingTx = Native<1000>(fromBase58String(tradingTxId))
+                            let priceWin = extract(getInteger(dt.data, "priceWin"))
+                            let dtDelta = extract(getInteger(dt.data, "delta"))
+                            let dtSortNum = extract(getInteger(dt.data, "sortNum"))
+                            match tradingTx {
+                                case exchange: ExchangeTransaction =>
+                                    if (if (if (if ((priceWin == exchange.price))
+                                        then (exchange.timestamp >= minTimeToTrading)
+                                        else false)
+                                        then (maxTimeToTrading >= exchange.timestamp)
+                                        else false)
+                                        then (dtDelta == 100000000000)
+                                        else false)
+                                        then (dtSortNum == 0)
+                                        else false
+                                case _ =>
+                                    false
+                            }
+                            }
+                        else if (isDefined(getString(tx.sender, "tradingTxId")))
+                            then {
+                                let winBet = if (isDefined(getInteger(tx.sender, "winBet")))
+                                    then extract(getInteger(tx.sender, "delta"))
+                                    else 100000000000
+                                let priceWin = extract(getInteger(dt.data, "priceWin"))
+                                let dtSortNum = extract(getInteger(dt.data, "sortNum"))
+                                let sortNum = extract(getInteger(tx.sender, "sortNum"))
+                                let sortValue = extract(getInteger(tx.sender, "sortValue"))
+                                let sortValueText = extract(getString(tx.sender, "sortValueText"))
+                                let dtWinBet = extract(getInteger(tx.sender, "winBet"))
+                                let sortingExists = if ((0 > (priceWin - winBet)))
+                                    then (winBet - priceWin)
+                                    else (priceWin - winBet)
+                                let sortingNew = if ((0 > (priceWin - sortValue)))
+                                    then (sortValue - priceWin)
+                                    else (priceWin - sortValue)
+                                let sorting = if ((sortingExists > sortingNew))
+                                    then sortValue
+                                    else winBet
+                                let dtUniqueBets = extract(getInteger(dt.data, "uniqueBets"))
+                                if (if (if (if (if (if (if ((dtUniqueBets > dtSortNum))
+                                    then (dtSortNum == (sortNum + 1))
+                                    else false)
+                                    then isDefined(getInteger(tx.sender, ("v_" + toString(sortValue))))
+                                    else false)
+                                    then (sortValue == extract(getInteger(tx.sender, ("v_" + toString(sortValue)))))
+                                    else false)
+                                    then !(isDefined(getString(tx.sender, ("sort_" + toString(sortValue)))))
+                                    else false)
+                                    then (sortValueText == ("sort_" + toString(sortValue)))
+                                    else false)
+                                    then isDefined(getInteger(tx.sender, ("v_" + toString(dtWinBet))))
+                                    else false)
+                                    then (dtWinBet == sorting)
+                                    else false
+                                }
+                            else false
+            case _ =>
+                true
+        }
+     */
+
     val script = "AQQAAAAMbWF4VGltZVRvQmV0AAAAAWiZ4tPwBAAAABBtaW5UaW1lVG9UcmFkaW5nAAAAAWiZ5KiwBAAAABBtYXhUaW1lVG9UcmFkaW5nAAAAAWiZ5ZMQBAAAAANmZWUAAAAAAACYloAEAAAACGRlY2ltYWxzAAAAAAAAAAACBAAAAAhtdWx0aXBseQAAAAAAAAAAZAQAAAAKdG90YWxNb25leQMJAQAAAAlpc0RlZmluZWQAAAABCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXICAAAACnRvdGFsTW9uZXkJAQAAAAdleHRyYWN0AAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyAgAAAAp0b3RhbE1vbmV5AAAAAAAAAAAABAAAAAp1bmlxdWVCZXRzAwkBAAAACWlzRGVmaW5lZAAAAAEJAAQaAAAAAggFAAAAAnR4AAAABnNlbmRlcgIAAAAKdW5pcXVlQmV0cwkBAAAAB2V4dHJhY3QAAAABCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXICAAAACnVuaXF1ZUJldHMAAAAAAAAAAAAEAAAAByRtYXRjaDAFAAAAAnR4AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAA9EYXRhVHJhbnNhY3Rpb24EAAAAAmR0BQAAAAckbWF0Y2gwAwMJAABnAAAAAgUAAAAMbWF4VGltZVRvQmV0CAUAAAACdHgAAAAJdGltZXN0YW1wCQEAAAAJaXNEZWZpbmVkAAAAAQkABBMAAAACCAUAAAACZHQAAAAEZGF0YQIAAAAFYmV0X3MHBAAAAAtwYXltZW50VHhJZAkBAAAAB2V4dHJhY3QAAAABCQAEEwAAAAIIBQAAAAJkdAAAAARkYXRhAgAAAAtwYXltZW50VHhJZAQAAAAJcGF5bWVudFR4CQAD6AAAAAEJAAJZAAAAAQUAAAALcGF5bWVudFR4SWQEAAAACGJldEdyb3VwCQEAAAAHZXh0cmFjdAAAAAEJAAQTAAAAAggFAAAAAmR0AAAABGRhdGECAAAABWJldF9zBAAAAAxkdEJldFN1bW1hcnkJAQAAAAdleHRyYWN0AAAAAQkABBAAAAACCAUAAAACZHQAAAAEZGF0YQUAAAAIYmV0R3JvdXAEAAAACmJldFN1bW1hcnkDCQEAAAAJaXNEZWZpbmVkAAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyBQAAAAhiZXRHcm91cAkBAAAAB2V4dHJhY3QAAAABCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXIFAAAACGJldEdyb3VwAAAAAAAAAAAABAAAAAR2QmV0CQEAAAAHZXh0cmFjdAAAAAEJAAQQAAAAAggFAAAAAmR0AAAABGRhdGECAAAABWJldF92BAAAAAZrdnBCZXQJAQAAAAdleHRyYWN0AAAAAQkABBMAAAACCAUAAAACZHQAAAAEZGF0YQkAAaQAAAABBQAAAAR2QmV0BAAAAAd2S3ZwQmV0CQEAAAAHZXh0cmFjdAAAAAEJAAQQAAAAAggFAAAAAmR0AAAABGRhdGEJAAEsAAAAAgIAAAACdl8JAAGkAAAAAQUAAAAEdkJldAQAAAAEaUJldAkBAAAAB2V4dHJhY3QAAAABCQAEEAAAAAIIBQAAAAJkdAAAAARkYXRhAgAAAAViZXRfaQQAAAAEZEJldAkBAAAAB2V4dHJhY3QAAAABCQAEEAAAAAIIBQAAAAJkdAAAAARkYXRhAgAAAAViZXRfZAQAAAABYwkAAGUAAAACBQAAAAhkZWNpbWFscwkAATEAAAABCQABpAAAAAEFAAAABGRCZXQEAAAABHRCZXQJAAEsAAAAAgkAASwAAAACCQABLAAAAAIJAAGkAAAAAQUAAAAEaUJldAIAAAABLgMJAAAAAAAAAgUAAAABYwAAAAAAAAAAAQIAAAABMAMJAAAAAAAAAgUAAAABYwAAAAAAAAAAAgIAAAACMDADCQAAAAAAAAIFAAAAAWMAAAAAAAAAAAMCAAAAAzAwMAMJAAAAAAAAAgUAAAABYwAAAAAAAAAABAIAAAAEMDAwMAMJAAAAAAAAAgUAAAABYwAAAAAAAAAABQIAAAAFMDAwMDADCQAAAAAAAAIFAAAAAWMAAAAAAAAAAAYCAAAABjAwMDAwMAMJAAAAAAAAAgUAAAABYwAAAAAAAAAABwIAAAAHMDAwMDAwMAIAAAAACQABpAAAAAEFAAAABGRCZXQEAAAACGJldElzTmV3AwkBAAAAASEAAAABCQEAAAAJaXNEZWZpbmVkAAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyBQAAAAhiZXRHcm91cAAAAAAAAAAAAQAAAAAAAAAAAAQAAAAMZHRVbmlxdWVCZXRzCQEAAAAHZXh0cmFjdAAAAAEJAAQQAAAAAggFAAAAAmR0AAAABGRhdGECAAAACnVuaXF1ZUJldHMEAAAAByRtYXRjaDEFAAAACXBheW1lbnRUeAMJAAABAAAAAgUAAAAHJG1hdGNoMQIAAAATVHJhbnNmZXJUcmFuc2FjdGlvbgQAAAAHcGF5bWVudAUAAAAHJG1hdGNoMQMDAwMDAwMDCQEAAAABIQAAAAEJAQAAAAlpc0RlZmluZWQAAAABCQAEHQAAAAIIBQAAAAJ0eAAAAAZzZW5kZXIFAAAAC3BheW1lbnRUeElkCQAAAAAAAAIIBQAAAAdwYXltZW50AAAACXJlY2lwaWVudAgFAAAAAnR4AAAABnNlbmRlcgcJAABmAAAAAggFAAAAB3BheW1lbnQAAAAGYW1vdW50BQAAAANmZWUHCQAAAAAAAAIJAQAAAAdleHRyYWN0AAAAAQkABBAAAAACCAUAAAACZHQAAAAEZGF0YQIAAAAKdG90YWxNb25leQkAAGQAAAACBQAAAAp0b3RhbE1vbmV5CQAAZQAAAAIIBQAAAAdwYXltZW50AAAABmFtb3VudAUAAAADZmVlBwkAAAAAAAACBQAAAAxkdEJldFN1bW1hcnkJAABkAAAAAgUAAAAKYmV0U3VtbWFyeQkAAGUAAAACCAUAAAAHcGF5bWVudAAAAAZhbW91bnQFAAAAA2ZlZQcJAAAAAAAAAgUAAAAEdkJldAkAAGQAAAACCQAAaAAAAAIFAAAABGlCZXQFAAAACG11bHRpcGx5BQAAAARkQmV0BwkAAAAAAAACBQAAAAZrdnBCZXQFAAAACGJldEdyb3VwBwkAAAAAAAACBQAAAAxkdFVuaXF1ZUJldHMJAABkAAAAAgUAAAAKdW5pcXVlQmV0cwUAAAAIYmV0SXNOZXcHCQAAAAAAAAIFAAAAB3ZLdnBCZXQFAAAABHZCZXQHBwMDCQAAZgAAAAIIBQAAAAJ0eAAAAAl0aW1lc3RhbXAFAAAAEG1pblRpbWVUb1RyYWRpbmcJAQAAAAEhAAAAAQkBAAAACWlzRGVmaW5lZAAAAAEJAAQdAAAAAggFAAAAAnR4AAAABnNlbmRlcgIAAAALdHJhZGluZ1R4SWQHBAAAAAt0cmFkaW5nVHhJZAkBAAAAB2V4dHJhY3QAAAABCQAEEwAAAAIIBQAAAAJkdAAAAARkYXRhAgAAAAt0cmFkaW5nVHhJZAQAAAAJdHJhZGluZ1R4CQAD6AAAAAEJAAJZAAAAAQUAAAALdHJhZGluZ1R4SWQEAAAACHByaWNlV2luCQEAAAAHZXh0cmFjdAAAAAEJAAQQAAAAAggFAAAAAmR0AAAABGRhdGECAAAACHByaWNlV2luBAAAAAdkdERlbHRhCQEAAAAHZXh0cmFjdAAAAAEJAAQQAAAAAggFAAAAAmR0AAAABGRhdGECAAAABWRlbHRhBAAAAAlkdFNvcnROdW0JAQAAAAdleHRyYWN0AAAAAQkABBAAAAACCAUAAAACZHQAAAAEZGF0YQIAAAAHc29ydE51bQQAAAAHJG1hdGNoMQUAAAAJdHJhZGluZ1R4AwkAAAEAAAACBQAAAAckbWF0Y2gxAgAAABNFeGNoYW5nZVRyYW5zYWN0aW9uBAAAAAhleGNoYW5nZQUAAAAHJG1hdGNoMQMDAwMJAAAAAAAAAgUAAAAIcHJpY2VXaW4IBQAAAAhleGNoYW5nZQAAAAVwcmljZQkAAGcAAAACCAUAAAAIZXhjaGFuZ2UAAAAJdGltZXN0YW1wBQAAABBtaW5UaW1lVG9UcmFkaW5nBwkAAGcAAAACBQAAABBtYXhUaW1lVG9UcmFkaW5nCAUAAAAIZXhjaGFuZ2UAAAAJdGltZXN0YW1wBwkAAAAAAAACBQAAAAdkdERlbHRhAAAAABdIdugABwkAAAAAAAACBQAAAAlkdFNvcnROdW0AAAAAAAAAAAAHBwMJAQAAAAlpc0RlZmluZWQAAAABCQAEHQAAAAIIBQAAAAJ0eAAAAAZzZW5kZXICAAAAC3RyYWRpbmdUeElkBAAAAAZ3aW5CZXQDCQEAAAAJaXNEZWZpbmVkAAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyAgAAAAZ3aW5CZXQJAQAAAAdleHRyYWN0AAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyAgAAAAVkZWx0YQAAAAAXSHboAAQAAAAIcHJpY2VXaW4JAQAAAAdleHRyYWN0AAAAAQkABBAAAAACCAUAAAACZHQAAAAEZGF0YQIAAAAIcHJpY2VXaW4EAAAACWR0U29ydE51bQkBAAAAB2V4dHJhY3QAAAABCQAEEAAAAAIIBQAAAAJkdAAAAARkYXRhAgAAAAdzb3J0TnVtBAAAAAdzb3J0TnVtCQEAAAAHZXh0cmFjdAAAAAEJAAQaAAAAAggFAAAAAnR4AAAABnNlbmRlcgIAAAAHc29ydE51bQQAAAAJc29ydFZhbHVlCQEAAAAHZXh0cmFjdAAAAAEJAAQaAAAAAggFAAAAAnR4AAAABnNlbmRlcgIAAAAJc29ydFZhbHVlBAAAAA1zb3J0VmFsdWVUZXh0CQEAAAAHZXh0cmFjdAAAAAEJAAQdAAAAAggFAAAAAnR4AAAABnNlbmRlcgIAAAANc29ydFZhbHVlVGV4dAQAAAAIZHRXaW5CZXQJAQAAAAdleHRyYWN0AAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyAgAAAAZ3aW5CZXQEAAAADXNvcnRpbmdFeGlzdHMDCQAAZgAAAAIAAAAAAAAAAAAJAABlAAAAAgUAAAAIcHJpY2VXaW4FAAAABndpbkJldAkAAGUAAAACBQAAAAZ3aW5CZXQFAAAACHByaWNlV2luCQAAZQAAAAIFAAAACHByaWNlV2luBQAAAAZ3aW5CZXQEAAAACnNvcnRpbmdOZXcDCQAAZgAAAAIAAAAAAAAAAAAJAABlAAAAAgUAAAAIcHJpY2VXaW4FAAAACXNvcnRWYWx1ZQkAAGUAAAACBQAAAAlzb3J0VmFsdWUFAAAACHByaWNlV2luCQAAZQAAAAIFAAAACHByaWNlV2luBQAAAAlzb3J0VmFsdWUEAAAAB3NvcnRpbmcDCQAAZgAAAAIFAAAADXNvcnRpbmdFeGlzdHMFAAAACnNvcnRpbmdOZXcFAAAACXNvcnRWYWx1ZQUAAAAGd2luQmV0BAAAAAxkdFVuaXF1ZUJldHMJAQAAAAdleHRyYWN0AAAAAQkABBAAAAACCAUAAAACZHQAAAAEZGF0YQIAAAAKdW5pcXVlQmV0cwMDAwMDAwMJAABmAAAAAgUAAAAMZHRVbmlxdWVCZXRzBQAAAAlkdFNvcnROdW0JAAAAAAAAAgUAAAAJZHRTb3J0TnVtCQAAZAAAAAIFAAAAB3NvcnROdW0AAAAAAAAAAAEHCQEAAAAJaXNEZWZpbmVkAAAAAQkABBoAAAACCAUAAAACdHgAAAAGc2VuZGVyCQABLAAAAAICAAAAAnZfCQABpAAAAAEFAAAACXNvcnRWYWx1ZQcJAAAAAAAAAgUAAAAJc29ydFZhbHVlCQEAAAAHZXh0cmFjdAAAAAEJAAQaAAAAAggFAAAAAnR4AAAABnNlbmRlcgkAASwAAAACAgAAAAJ2XwkAAaQAAAABBQAAAAlzb3J0VmFsdWUHCQEAAAABIQAAAAEJAQAAAAlpc0RlZmluZWQAAAABCQAEHQAAAAIIBQAAAAJ0eAAAAAZzZW5kZXIJAAEsAAAAAgIAAAAFc29ydF8JAAGkAAAAAQUAAAAJc29ydFZhbHVlBwkAAAAAAAACBQAAAA1zb3J0VmFsdWVUZXh0CQABLAAAAAICAAAABXNvcnRfCQABpAAAAAEFAAAACXNvcnRWYWx1ZQcJAQAAAAlpc0RlZmluZWQAAAABCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXIJAAEsAAAAAgIAAAACdl8JAAGkAAAAAQUAAAAIZHRXaW5CZXQHCQAAAAAAAAIFAAAACGR0V2luQmV0BQAAAAdzb3J0aW5nBwcGRZ0fDg=="
     val costs = com.wavesplatform.lang.utils.functionCosts(V2)
     Script.fromBase64String(script)
@@ -319,5 +463,22 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
         3     /* 1 + 1 param            */ +
         1     /* 1 param                */ +
         1     /* 1 param                */
+  }
+
+  property("isolated if/then blocks estimation") {
+    val costs = functionCosts(V3)
+
+    def expr(invokeValInThenBlock: Boolean) =
+      s"""
+         | func complex() = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+         |
+         | let a = complex()
+         | let b = a + complex()
+         | if (true)
+         |   then WriteSet([${ if (invokeValInThenBlock) """DataEntry("a", a)""" else "" }])
+         |   else WriteSet([DataEntry("a", b)])
+      """.stripMargin
+
+    estimate(costs, compile(expr(true))) shouldBe estimate(costs, compile(expr(false)))
   }
 }
