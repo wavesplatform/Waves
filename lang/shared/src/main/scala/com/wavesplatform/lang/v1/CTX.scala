@@ -33,8 +33,8 @@ case class CTX[C[_[_]]](
     )
   }
 
-  def evaluationContext[F[_]: Monad](implicit ev: C[F] =:= NoContext[F]): EvaluationContext[C, F] =
-    evaluationContext[F](Contextful.dummy[F])
+  def evaluationContext[F[_]: Monad](implicit ev: NoContext[F] =:= C[F]): EvaluationContext[C, F] =
+    evaluationContext[F](Contextful.empty[F])
 
   def withEnvironment[D[_[_]]](implicit ev: C[Id] =:= NoContext[Id]): CTX[D] =
     asInstanceOf[CTX[D]]

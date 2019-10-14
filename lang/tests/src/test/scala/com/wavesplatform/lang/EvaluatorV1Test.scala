@@ -179,7 +179,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[EVALUATED](
       context = Monoid.combine(pureEvalContext,
                                EvaluationContext[NoContext, Id](
-                                 Contextful.dummy[Id],
+                                 Contextful.empty[Id],
                                  typeDefs = Map.empty,
                                  letDefs = Map(("p", LazyVal.fromEvaluated[Id](pointInstance))),
                                  functions = Map.empty
@@ -204,7 +204,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combine(
       pureEvalContext,
       EvaluationContext[NoContext, Id](
-        Contextful.dummy[Id],
+        Contextful.empty[Id],
         typeDefs = Map.empty,
         letDefs = Map(
           ("p", LazyVal.fromEvaluated[Id](pointInstance)),
@@ -233,7 +233,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
       val context = Monoid.combine(pureEvalContext,
                                    EvaluationContext[NoContext, Id](
-                                     Contextful.dummy[Id],
+                                     Contextful.empty[Id],
                                      typeDefs = Map.empty,
                                      letDefs = Map.empty,
                                      functions = Map(f.header -> f)

@@ -26,7 +26,7 @@ object LoggedEvaluationContext {
 
 object EvaluationContext {
 
-  val empty = EvaluationContext(???, Map.empty, Map.empty, Map.empty)
+  val empty = EvaluationContext(Contextful.empty[Id], Map.empty, Map.empty, Map.empty)
 
   implicit def monoid[F[_], C[_[_]]]: Monoid[EvaluationContext[C, F]] = new Monoid[EvaluationContext[C, F]] {
     override val empty: EvaluationContext[C, F] = EvaluationContext.empty.asInstanceOf[EvaluationContext[C, F]]
@@ -62,6 +62,6 @@ object EvaluationContext {
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
-    EvaluationContext[NoContext, Id](Contextful.dummy[Id], typeDefs, letDefs, functions.map(f => f.header -> f).toMap)
+    EvaluationContext[NoContext, Id](Contextful.empty[Id], typeDefs, letDefs, functions.map(f => f.header -> f).toMap)
   }
 }

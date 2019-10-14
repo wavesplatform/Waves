@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.{Contextful, EvaluatorV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
@@ -64,7 +64,11 @@ object Common {
                                                                                UNION.create(CorD.typeList, Some("PointCD")))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build[Id, NoContext](???, Map.empty, Map("p" -> LazyVal.fromEvaluated[Id](instance)), Seq.empty[BaseFunction[NoContext]])
+    EvaluationContext.build(
+      Map.empty,
+      Map("p" -> LazyVal.fromEvaluated[Id](instance)),
+      Seq.empty[BaseFunction[NoContext]]
+    )
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] = new Environment[Id] {
     override def height: Long  = h

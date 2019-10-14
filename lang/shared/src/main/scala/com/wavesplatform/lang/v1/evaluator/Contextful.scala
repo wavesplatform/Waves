@@ -46,7 +46,7 @@ object ContextfulVal {
 }
 
 object Contextful {
-  type NoContext[_[_]] = Nothing
-  def dummy[F[_]]: NoContext[F] = ???
+  type NoContext[_[_]] = Unit
+  def empty[F[_]]: NoContext[F] = ()
 }
 
