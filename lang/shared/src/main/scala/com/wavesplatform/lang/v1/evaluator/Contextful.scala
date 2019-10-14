@@ -5,17 +5,17 @@ import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 
-trait Contextful[C[_[_]]] {
+trait ContextfulNativeFunction[C[_[_]]] {
   def apply[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]]
 }
 
-trait UserContextfulFunction[C[_[_]]] {
+trait ContextfulUserFunction[C[_[_]]] {
   def apply[F[_]: Monad](context: C[F]): EXPR
 }
 
-object UserContextfulFunction {
-  def pure[C[_[_]]](expr: EXPR): UserContextfulFunction[C] =
-    new UserContextfulFunction[C] {
+object ContextfulUserFunction {
+  def pure[C[_[_]]](expr: EXPR): ContextfulUserFunction[C] =
+    new ContextfulUserFunction[C] {
       override def apply[F[_] : Monad](context: C[F]): EXPR = expr
     }
 }
@@ -49,4 +49,3 @@ object Contextful {
   type NoContext[_[_]] = Unit
   def empty[F[_]]: NoContext[F] = ()
 }
-

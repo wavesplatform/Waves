@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LIST, LONG, STRING, UNION, UNIT, optionLong}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.{Contextful, UserContextfulFunction}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, dataEntryType, optionAddress}
@@ -31,7 +31,7 @@ object Functions {
       ("addressOrAlias", addressOrAliasType),
       ("key", STRING)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[Terms.EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, (addressOrAlias: CaseObj) :: CONST_STRING(key) :: Nil) =>
@@ -124,7 +124,7 @@ object Functions {
 
   val addressFromPublicKeyF: BaseFunction[Environment] =
     UserFunction.withEnvironment[Environment]("addressFromPublicKey", 82, addressType, ("@publicKey", BYTESTR))(
-      new UserContextfulFunction[Environment] {
+      new ContextfulUserFunction[Environment] {
         override def apply[F[_] : Monad](env: Environment[F]): EXPR =
           FUNCTION_CALL(
             FunctionHeader.User("Address"),
@@ -197,7 +197,7 @@ object Functions {
 
   val addressFromStringF: BaseFunction[Environment] =
     UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
-      new UserContextfulFunction[Environment] {
+      new ContextfulUserFunction[Environment] {
         override def apply[F[_] : Monad](env: Environment[F]): EXPR =
           LET_BLOCK(
             LET("@afs_addrBytes",
@@ -257,7 +257,7 @@ object Functions {
       addressType,
       ("AddressOrAlias", addressOrAliasType)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
           input match {
             case (_, (c@CaseObj(`addressType`, _)) :: Nil) => (c: EVALUATED).asRight[ExecutionError].pure[F]
@@ -300,7 +300,7 @@ object Functions {
       ("addressOrAlias", addressOrAliasType),
       ("assetId", UNION(UNIT, BYTESTR))
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, (c: CaseObj) :: u :: Nil) if u == unit =>
@@ -322,7 +322,7 @@ object Functions {
       optionAsset,
       ("id", BYTESTR)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
@@ -348,7 +348,7 @@ object Functions {
       optionLong,
       ("id", BYTESTR)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
@@ -368,7 +368,7 @@ object Functions {
       UNION(UNIT, blockInfo),
       ("height", LONG)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_LONG(height: Long) :: Nil) =>
@@ -420,7 +420,7 @@ object Functions {
       txByIdReturnType(proofsEnabled, version),
       ("id", BYTESTR)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
@@ -441,7 +441,7 @@ object Functions {
       UNION(buildTransferTransactionType(proofsEnabled), UNIT),
       ("id", BYTESTR)
     ) {
-      new Contextful[Environment] {
+      new ContextfulNativeFunction[Environment] {
         override def apply[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
