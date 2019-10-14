@@ -217,7 +217,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              new WavesEnvironment('T'.toByte, null, Coeval(???), EmptyBlockchain, Coeval(???), DirectiveSet.contractDirectiveSet)
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), DirectiveSet.contractDirectiveSet)
             )
           ))
     }
