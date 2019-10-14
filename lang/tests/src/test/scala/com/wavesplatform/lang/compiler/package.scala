@@ -17,6 +17,7 @@ package object compiler {
   val listOfLongs = LIST
   val idT = NativeFunction[NoContext]("idT", 1, 10000: Short, TYPEPARAM('T'), ("p1", TYPEPARAM('T'))) {
     case a :: Nil => Right(a)
+    case _ => ???
   }
   val returnsListLong =
     NativeFunction[NoContext]("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE) { case _ => ??? }
