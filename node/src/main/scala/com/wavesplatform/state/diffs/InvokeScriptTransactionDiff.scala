@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResult}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.metrics._
@@ -80,12 +81,12 @@ object InvokeScriptTransactionDiff {
                 Monoid
                   .combineAll(
                     Seq(
-                      PureContext.build(Global, V3),
-                      CryptoContext.build(Global, V3),
-                      WavesContext.build(directives, environment)
+                      PureContext.build(Global, V3).withEnvironment[Environment],
+                      CryptoContext.build(Global, V3).withEnvironment[Environment],
+                      WavesContext.build(directives)
                     )
                   )
-                  .evaluationContext,
+                  .evaluationContext(environment),
                 contract,
                 invocation
               )

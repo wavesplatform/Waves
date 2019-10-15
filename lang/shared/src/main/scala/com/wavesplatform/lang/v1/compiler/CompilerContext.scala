@@ -4,6 +4,7 @@ import cats.Monoid
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, FunctionTypeSignature}
 import shapeless._
 
@@ -19,7 +20,7 @@ case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTyp
 
 object CompilerContext {
 
-  def build[F[_]](predefTypes: Seq[FINAL], varDefs: VariableTypes, functions: Seq[BaseFunction[F]]) = new CompilerContext(
+  def build(predefTypes: Seq[FINAL], varDefs: VariableTypes, functions: Seq[BaseFunction[NoContext]]) = new CompilerContext(
     predefTypes = predefTypes.map(t => t.name -> t).toMap,
     varDefs = varDefs,
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }

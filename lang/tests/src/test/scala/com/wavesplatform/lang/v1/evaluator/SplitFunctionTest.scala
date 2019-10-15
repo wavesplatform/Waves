@@ -1,16 +1,16 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.{AorBorC, NoShrink, addCtx, sampleTypes}
-import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
-import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -24,14 +24,20 @@ class SplitFunctionTest
     with  Matchers
     with  NoShrink {
 
+  private val evaluator = new EvaluatorV1[Id, NoContext]()
+
   private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
     val untyped                                                = Parser.parseExpr(code).get.value
-    val lazyVal                                                = LazyVal.fromEvaluated[Id](pointInstance.orNull)
-    val stringToTuple: Map[String, (FINAL, LazyVal[Id])] = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX[Id] =
-      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+    val lazyVal                                                = ContextfulVal.pure[NoContext](pointInstance.orNull)
+    val stringToTuple = Map(("p", (pointType, lazyVal)))
+    val ctx: CTX[NoContext] =
+      Monoid.combineAll(Seq(
+        PureContext.build(Global, V3),
+        CTX[NoContext](sampleTypes, stringToTuple, Array.empty),
+        addCtx
+      ))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
   }
 
   property("split string containing separators") {

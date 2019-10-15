@@ -15,13 +15,15 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, Log}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -41,21 +43,25 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 
-  private def defaultFullContext(environment: Environment[Id]): CTX[Id] = Monoid.combineAll(
-    Seq(
-      defaultCryptoContext,
-      pureContext,
-      WavesContext.build(
-        DirectiveSet(version, Account, Expression).explicitGet(),
-        environment
+  private val defaultFullContext: CTX[Environment] =
+    Monoid.combineAll(
+      Seq(
+        defaultCryptoContext.withEnvironment[Environment],
+        pureContext.withEnvironment[Environment],
+        WavesContext.build(
+          DirectiveSet(version, Account, Expression).explicitGet()
+        )
       )
     )
-  )
 
-  private val pureEvalContext: EvaluationContext[Id] = PureContext.build(Global, version).evaluationContext
+  private val pureEvalContext: EvaluationContext[NoContext, Id] =
+    PureContext.build(Global, version).evaluationContext
 
-  private def ev[T <: EVALUATED](context: EvaluationContext[Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV1()[T](context, expr)
+  private val noContextEvaluator = new EvaluatorV1[Id, NoContext]()
+  private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
+
+  private def ev[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
+    noContextEvaluator.apply[T](context, expr)
 
   private def simpleDeclarationAndUsage(i: Int, blockBuilder: (LET, EXPR) => EXPR) = blockBuilder(LET("x", CONST_LONG(i)), REF("x"))
 
@@ -67,7 +73,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = EvaluatorV1().applyWithLogging[EVALUATED](
+      val (log, Left(err)) = noContextEvaluator.applyWithLogging[EVALUATED](
         pureEvalContext,
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -172,7 +178,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointInstance = CaseObj(pointType, Map("X"    -> 3L, "Y"   -> 4L))
     ev[EVALUATED](
       context = Monoid.combine(pureEvalContext,
-                               EvaluationContext(
+                               EvaluationContext[NoContext, Id](
+                                 Contextful.empty[Id],
                                  typeDefs = Map.empty,
                                  letDefs = Map(("p", LazyVal.fromEvaluated[Id](pointInstance))),
                                  functions = Map.empty
@@ -196,7 +203,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointInstance = CaseObj(pointType, Map("X" -> 3L, "Y" -> 4L))
     val context = Monoid.combine(
       pureEvalContext,
-      EvaluationContext[Id](
+      EvaluationContext[NoContext, Id](
+        Contextful.empty[Id],
         typeDefs = Map.empty,
         letDefs = Map(
           ("p", LazyVal.fromEvaluated[Id](pointInstance)),
@@ -217,14 +225,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction[Id]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
+      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG)): _*) {
         case _ =>
           functionEvaluated = functionEvaluated + 1
           evaluated(1L)
       }
 
       val context = Monoid.combine(pureEvalContext,
-                                   EvaluationContext(
+                                   EvaluationContext[NoContext, Id](
+                                     Contextful.empty[Id],
                                      typeDefs = Map.empty,
                                      letDefs = Map.empty,
                                      functions = Map(f.header -> f)
@@ -244,10 +253,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val fooInstance = CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L))
 
-    val context = EvaluationContext(
+    val context = EvaluationContext.build(
       typeDefs = Map.empty,
       letDefs = Map("fooInstance" -> LazyVal.fromEvaluated[Id](fooInstance)),
-      functions = Map.empty
+      functions = Seq()
     )
 
     val expr = GETTER(REF("fooInstance"), "bar")
@@ -257,15 +266,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[Id]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
       case _ =>
         evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
     }
 
-    val context = EvaluationContext(
+    val context = EvaluationContext.build(
       typeDefs = Map.empty,
       letDefs = Map.empty,
-      functions = Map(fooCtor.header -> fooCtor)
+      functions = Seq(fooCtor)
     )
 
     val expr = GETTER(FUNCTION_CALL(fooCtor.header, List.empty), "bar")
@@ -275,7 +284,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[Id]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty: _*) {
       case _ =>
         evaluated(
           CaseObj(
@@ -287,18 +296,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           ))
     }
     val fooTransform =
-      NativeFunction[Id]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
+      NativeFunction[NoContext]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
         case (fooObj: CaseObj) :: Nil => evaluated(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
 
-    val context = EvaluationContext(
+    val context = EvaluationContext.build(
       typeDefs = Map.empty,
       letDefs = Map.empty,
-      functions = Map(
-        fooCtor.header      -> fooCtor,
-        fooTransform.header -> fooTransform
-      )
+      functions = Seq(fooCtor, fooTransform)
     )
 
     forAll(blockBuilder) { block =>
@@ -315,10 +321,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on simple function evaluation") {
     ev[EVALUATED](
-      context = EvaluationContext(
+      context = EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map.empty,
-        functions = Map(multiplierFunction.header -> multiplierFunction)
+        functions = Seq(multiplierFunction)
       ),
       expr = FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(3), CONST_LONG(4)))
     ) shouldBe evaluated(12)
@@ -530,7 +536,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromPublicKey works as the native one") {
     val environment = emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -543,14 +549,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         List(CONST_BYTESTR(ByteStr(pkBytes)).explicitGet())
       )
 
-      val actual = ev[CaseObj](ctx.evaluationContext, expr).map(_.fields("bytes"))
+      val actual = defaultEvaluator.apply[CaseObj](ctx.evaluationContext(environment), expr).map(_.fields("bytes"))
       actual shouldBe evaluated(ByteStr(addressFromPublicKey(environment.chainId, pkBytes)))
     }
   }
 
   property("addressFromString works as the native one: sunny without prefix") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -559,7 +565,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr                                   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual                                 = ev[CaseObj](ctx.evaluationContext, expr)
+      val actual                                 = defaultEvaluator.apply[CaseObj](ctx.evaluationContext(environment), expr)
       val a: Either[ExecutionError, EVALUATED]   = actual.map(_.fields("bytes"))
       val e: Either[String, Option[Array[Byte]]] = addressFromString(environment.chainId, addrStr)
       a shouldBe CONST_BYTESTR(ByteStr(e.explicitGet().get))
@@ -568,7 +574,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: sunny with prefix") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -577,7 +583,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = ev[CaseObj](ctx.evaluationContext, expr)
+      val actual = defaultEvaluator.apply[CaseObj](ctx.evaluationContext(environment), expr)
       val e      = addressFromString(environment.chainId, addrStr).explicitGet().get
       actual.map(_.fields("bytes")) shouldBe CONST_BYTESTR(ByteStr(e))
     }
@@ -585,7 +591,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: wrong length") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -594,14 +600,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = ev[EVALUATED](ctx.evaluationContext, expr)
+      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
 
   property("addressFromString works as the native one: wrong address version") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = for {
       seed           <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
@@ -614,14 +620,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = ev[EVALUATED](ctx.evaluationContext, expr)
+      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
 
   property("addressFromString works as the native one: from other network") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = for {
       seed    <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
@@ -634,14 +640,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = ev[EVALUATED](ctx.evaluationContext, expr)
+      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
 
   property("addressFromString works as the native one: wrong checksum") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext(environment)
+    val ctx         = defaultFullContext
 
     val gen = for {
       seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
@@ -656,7 +662,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = ev[EVALUATED](ctx.evaluationContext, expr)
+      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
@@ -683,7 +689,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combineAll(
       Seq(
         pureEvalContext,
-        defaultCryptoContext.evaluationContext,
+        defaultCryptoContext.evaluationContext[Id],
         EvaluationContext.build(
           typeDefs = Map.empty,
           letDefs = Map("tx" -> LazyVal.fromEvaluated[Id](txObj)),
@@ -733,17 +739,17 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, (FINAL, LazyVal[Id])] = Map(
-      ("tx", (txType, LazyVal.fromEvaluated[Id](txObj))),
-      ("alicePubKey", (BYTESTR, LazyVal.fromEvaluated[Id](ByteStr(alicePK)))),
-      ("bobPubKey", (BYTESTR, LazyVal.fromEvaluated[Id](ByteStr(bobPK))))
+    val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
+      ("tx", (txType, ContextfulVal.pure[NoContext](txObj))),
+      ("alicePubKey", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(alicePK)))),
+      ("bobPubKey", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bobPK))))
     )
 
-    val context = Monoid.combineAll(
+    val context: CTX[NoContext] = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
-        CTX(Seq(txType), vars, Array.empty[BaseFunction[Id]])
+        CTX[NoContext](Seq(txType), vars, Array.empty[BaseFunction[NoContext]])
       ))
 
     val script =
@@ -754,11 +760,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
          |aliceSigned && bobSigned
    """.stripMargin
 
-    val r = EvaluatorV1.apply
-      .applyWithLogging[EVALUATED](context.evaluationContext,
-                                   ExpressionCompiler
-                                     .compile(script, context.compilerContext)
-                                     .explicitGet())
+    val r = noContextEvaluator.applyWithLogging[EVALUATED](
+      context.evaluationContext[Id],
+      ExpressionCompiler
+        .compile(script, context.compilerContext)
+        .explicitGet()
+    )
     (r._1, r._2.map {
       case CONST_BOOLEAN(b) => b
       case _                => ???
@@ -774,7 +781,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): Either[ExecutionError, ByteStr] = {
-    val context = Monoid.combineAll(Seq(pureEvalContext, defaultCryptoContext.evaluationContext))
+    val context = Monoid.combineAll(Seq(pureEvalContext, defaultCryptoContext.evaluationContext[Id]))
 
     ev[CONST_BYTESTR](
       context = context,
@@ -809,7 +816,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointCtor = FunctionHeader.User(point)
 
     ev[EVALUATED](
-      context = EvaluationContext(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Map.empty),
+      context = EvaluationContext.build(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Seq()),
       FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
     ) shouldBe evaluated(CaseObj(pointType, Map("X" -> CONST_LONG(1), "Y" -> CONST_LONG(2))))
   }
@@ -845,21 +852,21 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction[Id]("F", 1, 258: Short, LONG, ("_", LONG)) {
+    val f = NativeFunction[NoContext]("F", 1, 258: Short, LONG, ("_", LONG)) {
       case _ =>
         functionEvaluated = functionEvaluated + 1
         evaluated(1L)
     }
 
-    val doubleFst = UserFunction[Id]("ID", 0, LONG, ("x", LONG)) {
+    val doubleFst = UserFunction[NoContext]("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
     val context = Monoid.combine(pureEvalContext,
-                                 EvaluationContext[Id](
+                                 EvaluationContext.build(
                                    typeDefs = Map.empty,
                                    letDefs = Map.empty,
-                                   functions = Map(f.header -> f, doubleFst.header -> doubleFst)
+                                   functions = Seq(f, doubleFst)
                                  ))
 
     // g(...(g(f(1000)))))
@@ -873,11 +880,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
-    val doubleFn = UserFunction[Id]("doubleFn", 0, LONG, ("x", LONG)) {
+    val doubleFn = UserFunction[NoContext]("doubleFn", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val subFn = UserFunction[Id]("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
+    val subFn = UserFunction[NoContext]("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
       FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
 
@@ -885,17 +892,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     // let y = 100
     val context = Monoid.combine(
       pureEvalContext,
-      EvaluationContext[Id](
-        typeDefs = Map.empty,
-        letDefs = Map(
-          "x" -> LazyVal.fromEvaluated[Id](3L),
-          "y" -> LazyVal.fromEvaluated[Id](100L)
-        ),
-        functions = Map(
-          doubleFn.header -> doubleFn,
-          subFn.header    -> subFn
+      EvaluationContext.build(
+          typeDefs = Map.empty,
+          letDefs = Map(
+            "x" -> LazyVal.fromEvaluated[Id](3L),
+            "y" -> LazyVal.fromEvaluated[Id](100L)
+          ),
+          functions = Seq(doubleFn, subFn)
         )
-      )
     )
 
     // sub(dub(x), 7)

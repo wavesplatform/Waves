@@ -9,7 +9,9 @@ import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
@@ -17,6 +19,8 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
+  private val evaluator = new EvaluatorV1[Id, NoContext]()
+
   private def processAndEval(src: String, libraries: Map[String, String]): Either[ExecutionError, EVALUATED] =
     for {
       directives <- DirectiveParser(src)
@@ -27,9 +31,9 @@ class ScriptPreprocessorTest extends PropSpec with PropertyChecks with Matchers 
 
   private def eval(code: String): Either[String, EVALUATED] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX[Id] = Monoid.combineAll(Seq(PureContext.build(Global, V3)))
+    val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(Global, V3)))
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1().apply[EVALUATED](ctx.evaluationContext, v._1))
+    typed.flatMap(v => evaluator.apply[EVALUATED](ctx.evaluationContext, v._1))
   }
 
   property("multiple libraries") {
