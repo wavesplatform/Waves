@@ -115,13 +115,14 @@ trait TransferSending extends ScorexLogging {
           createSignedTransferRequest(
             TransferTransaction
               .selfSigned(
-                assetId = Waves,
+                version = 2.toByte,
+                asset = Waves,
                 sender = KeyPair(Base58.decode(x.senderSeed)),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,
-                feeAssetId = Waves,
-                feeAmount = x.fee,
+                feeAsset = Waves,
+                fee = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
                 } else Array.emptyByteArray

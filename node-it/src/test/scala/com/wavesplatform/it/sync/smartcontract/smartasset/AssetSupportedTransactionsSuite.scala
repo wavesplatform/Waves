@@ -10,7 +10,7 @@ import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 import scala.concurrent.duration._
 
@@ -180,8 +180,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val blackTx = TransferTransactionV2
+    val blackTx = TransferTransaction
       .selfSigned(
+        2.toByte,
         IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),
@@ -194,8 +195,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       .right
       .get
 
-    val incorrectTx = TransferTransactionV2
+    val incorrectTx = TransferTransaction
       .selfSigned(
+        2.toByte,
         IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),

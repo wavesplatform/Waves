@@ -58,8 +58,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
 
       val tradeAssetDistribution = {
         tradeAssetIssue +: accounts.map(acc => {
-          TransferTransactionV2
+          TransferTransaction
             .selfSigned(
+              2.toByte,
               IssuedAsset(tradeAssetIssue.id()),
               issueTransactionSender,
               acc,
@@ -118,15 +119,16 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 )
             )
 
-          case TransferTransactionV2 =>
+          case TransactionParsers.transactionParserStub =>
             (
               for {
                 (sender, asset) <- randomSenderAndAsset(validIssueTxs)
                 useAlias = random.nextBoolean()
                 recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
                 tx <- logOption(
-                  TransferTransactionV2
+                  TransferTransaction
                     .selfSigned(
+                      2.toByte,
                       Asset.fromCompatId(asset),
                       sender,
                       recipient,

@@ -11,7 +11,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.NodeConfigs._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDocker {
 
@@ -24,8 +24,9 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   private def nodeB: Node = nodes.last
 
   test("should rebroadcast a transaction if that's allowed in config") {
-    val tx = TransferTransactionV2
-      .selfSigned(Waves,
+    val tx = TransferTransaction
+      .selfSigned(2.toByte,
+                  Waves,
                   nodeA.privateKey,
                   Address.fromString(nodeB.address).right.get,
                   transferAmount,
@@ -48,8 +49,9 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   }
   test("should not rebroadcast a transaction if that's not allowed in config") {
     dockerNodes().foreach(docker.restartNode(_, configWithRebroadcastNotAllowed))
-    val tx = TransferTransactionV2
-      .selfSigned(Waves,
+    val tx = TransferTransaction
+      .selfSigned(2.toByte,
+                  Waves,
                   nodeA.privateKey,
                   Address.fromString(nodeB.address).right.get,
                   transferAmount,

@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
@@ -249,15 +249,16 @@ object SyncHttpApi extends Assertions {
                           assetId: Option[String],
                           feeAssetId: Option[String],
                           waitForTx: Boolean = false): Transaction = {
-      val tx = TransferTransactionV2
+      val tx = TransferTransaction
         .selfSigned(
-          assetId = Asset.fromString(assetId),
+          version = 2.toByte,
+          asset = Asset.fromString(assetId),
           sender = source,
           recipient = AddressOrAlias.fromString(recipient).explicitGet(),
           amount = amount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.fromString(feeAssetId),
-          feeAmount = fee,
+          feeAsset = Asset.fromString(feeAssetId),
+          fee = fee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()

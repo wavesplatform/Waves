@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, CreateAliasTransactionV2, DataTransaction, Proofs}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import scorex.crypto.encode.Base64
@@ -323,8 +323,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val transferV1 = TransferTransactionV1
-    .create(
+  private val transferV1 = TransferTransaction(
+      1.toByte,
       Waves,
       publicKey,
       Address.fromString(sender.address).right.get,
@@ -333,13 +333,13 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       Waves,
       minFee,
       Base58.tryDecodeWithLimit("").get,
-      ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get
+      Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
     )
     .right
     .get
 
-  private val transferV2 = TransferTransactionV2
-    .create(
+  private val transferV2 = TransferTransaction(
+      2.toByte,
       Waves,
       publicKey,
       Address.fromString(sender.address).right.get,

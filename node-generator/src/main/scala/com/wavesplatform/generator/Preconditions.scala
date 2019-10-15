@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
@@ -74,8 +74,8 @@ object Preconditions {
 
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
-              val transferTx = TransferTransactionV2
-                .selfSigned(Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, Fee, "Generator".getBytes("UTF-8"))
+              val transferTx = TransferTransaction
+                .selfSigned(2.toByte, Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, Fee, "Generator".getBytes("UTF-8"))
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))

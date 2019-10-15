@@ -1,7 +1,6 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import play.api.libs.json.{Format, Writes}
 import supertagged._
 

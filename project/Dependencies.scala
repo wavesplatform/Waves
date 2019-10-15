@@ -13,17 +13,18 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String) = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
+  private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
+  private val paradise      = compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
 
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect")
@@ -69,7 +70,8 @@ object Dependencies {
       catsModule("macros").value,
       shapeless.value,
       kafka
-    ))
+    )
+  )
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
 
@@ -137,17 +139,19 @@ object Dependencies {
       kamonModule("influxdb", "1.0.2"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json"     % "2.7.1",
-      "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      "com.google.code.findbugs"     % "jsr305"             % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"            %% "play-json"         % "2.7.1",
+      "org.ethereum"                 % "leveldbjni-all"     % "1.18.3",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
-      "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
+      "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
-      "org.bitlet" % "weupnp" % "0.1.4",
+      "org.bitlet"        % "weupnp" % "0.1.4",
       akkaModule("slf4j") % Runtime,
       kindProjector,
+      paradise,
       monixModule("reactive").value,
       nettyModule("handler"),
+      "io.estatico"                       %% "newtype" % "0.4.3",
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
