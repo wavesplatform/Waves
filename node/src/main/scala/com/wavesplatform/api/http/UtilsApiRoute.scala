@@ -415,7 +415,7 @@ case class UtilsApiRoute(
   )
   def transactionSerialize: Route =
     path("transactionSerialize")(jsonPost[JsObject] { jsv =>
-      TransactionFactory.fromSignedRequest(jsv).map(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
+      parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
     })
 }
 

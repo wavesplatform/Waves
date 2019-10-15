@@ -12,18 +12,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.description.{
-  AddressOrAliasBytes,
-  AssetIdBytes,
-  ByteEntity,
-  BytesArrayUndefinedLength,
-  ConstantByte,
-  LongBytes,
-  OptionBytes,
-  ProofsBytes,
-  PublicKeyBytes,
-  SignatureBytes
-}
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.validation.{validateAmount, validateAttachment, validateFee}
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
@@ -68,10 +57,10 @@ case class TransferTransaction(
 
   //todo: (NODE-1915) from SignedTransaction
   override def proofField: Seq[(String, JsValue)] =
-    super.proofField ++ (if (version == 1.toByte) Seq("signature" -> JsString(this.proofs.head.toString)) else Seq())
+    super.proofField ++ (if (version == 1.toByte) Seq("signature" -> JsString(this.proofs.toSignature.toString)) else Seq())
 
   //todo: (NODE-1915) remove after refactoring
-  override def builder: TransactionParser = ???
+  override def builder: TransactionParser = TransferTransaction.transactionParserStub
 }
 
 object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
@@ -237,4 +226,16 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
         .map(_ => tx)
         .foldToTry
     } else Failure(new IllegalArgumentException(s"Unknown version: $version"))
+
+  // todo: (NODE-1915) #forTypeSet used in AddressTransactions, rewrite to new parsers
+  val transactionParserStub: TransactionParser = new TransactionParserFor[TransferTransaction]() {
+    override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = TransferTransaction.parseBytes(bytes)
+
+    override def typeId: Byte                                                      = TransferTransaction.typeId
+    override def supportedVersions: Set[Byte]                                      = TransferTransaction.supportedVersions.map(_.toByte)
+    override protected def parseHeader(bytes: Array[Byte]): Try[Int]               = ???
+    override protected def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = ???
+    override val byteHeaderDescription: ByteEntity[Unit]                           = BytesArrayUndefinedLength(0, "", 100).map(_ => ???)
+    override val byteTailDescription: ByteEntity[TransferTransaction]              = BytesArrayUndefinedLength(0, "", 100).map(_ => ???)
+  }
 }

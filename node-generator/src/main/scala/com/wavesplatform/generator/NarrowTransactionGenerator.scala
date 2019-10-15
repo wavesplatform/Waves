@@ -119,7 +119,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 )
             )
 
-          case TransactionParsers.transactionParserStub =>
+          case TransferTransaction.transactionParserStub =>
             (
               for {
                 (sender, asset) <- randomSenderAndAsset(validIssueTxs)

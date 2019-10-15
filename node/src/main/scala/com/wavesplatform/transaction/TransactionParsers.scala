@@ -3,7 +3,6 @@ package com.wavesplatform.transaction
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
-import com.wavesplatform.transaction.description.{ByteEntity, BytesArrayUndefinedLength}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -86,20 +85,8 @@ object TransactionParsers {
   def forTypes(types: Byte*): Set[TransactionParser] =
     forTypeSet(types.toSet)
 
-  // todo: (NODE-1915) #forTypeSet used in AddressTransactions, rewrite to new parsers
-  val transactionParserStub: TransactionParser = new TransactionParserFor[TransferTransaction]() {
-    override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = TransferTransaction.parseBytes(bytes)
-
-    override def typeId: Byte                                                      = TransferTransaction.typeId
-    override def supportedVersions: Set[Byte]                                      = TransferTransaction.supportedVersions.map(_.toByte)
-    override protected def parseHeader(bytes: Array[Byte]): Try[Int]               = ???
-    override protected def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = ???
-    override val byteHeaderDescription: ByteEntity[Unit]                           = BytesArrayUndefinedLength(0, "", 100).map(_ => ???)
-    override val byteTailDescription: ByteEntity[TransferTransaction]              = BytesArrayUndefinedLength(0, "", 100).map(_ => ???)
-  }
-
   def forTypeSet(types: Set[Byte]): Set[TransactionParser] =
-    (all.values.toList :+ transactionParserStub).filter(tp => types.contains(tp.typeId)).toSet
+    (all.values.toList :+ TransferTransaction.transactionParserStub).filter(tp => types.contains(tp.typeId)).toSet
 
   def allVersions(parsers: TransactionParser*): Set[TransactionParser] =
     forTypeSet(parsers.map(_.typeId).toSet)

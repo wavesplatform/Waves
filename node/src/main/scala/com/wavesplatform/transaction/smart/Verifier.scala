@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
 import shapeless.Coproduct
@@ -43,6 +44,8 @@ object Verifier extends ScorexLogging {
               .measureForType(stx.typeId)(stx.signaturesValid())
           case (et: ExchangeTransaction, scriptOpt) =>
             verifyExchange(et, blockchain, scriptOpt)
+          case (ttx: TransferTransaction, Some(_)) if ttx.version == 1.toByte => // todo: (NODE-1915) All Signed transactions with Version 1
+            Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_: SignedTransaction, Some(_)) =>
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_, Some(script)) =>
@@ -91,21 +94,21 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = Try {
-        val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
-        val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
-        val scriptResult = eval match {
-          case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
-          case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
-          case (_, Right(TRUE))       => Right(transaction)
-          case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
-        }
-        val logId = s"transaction ${transaction.id()}"
-        logIfNecessary(scriptResult, logId, eval)
-        scriptResult
-      } match {
-        case Failure(e) =>
-          Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
-        case Success(s) => s
+      val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
+      val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
+      val scriptResult = eval match {
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
+        case (_, Right(TRUE))       => Right(transaction)
+        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
+      }
+      val logId = s"transaction ${transaction.id()}"
+      logIfNecessary(scriptResult, logId, eval)
+      scriptResult
+    } match {
+      case Failure(e) =>
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
+      case Success(s) => s
     }
     val error2Trace: Option[ValidationError] => List[TraceStep] =
       e => {

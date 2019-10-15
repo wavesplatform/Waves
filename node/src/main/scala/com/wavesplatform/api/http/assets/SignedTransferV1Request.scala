@@ -27,25 +27,26 @@ object SignedTransferV1Request {
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
-case class SignedTransferV1Request(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                   senderPublicKey: String,
-                                   @ApiModelProperty(value = "Base58 encoded Asset ID")
-                                   assetId: Option[String],
-                                   @ApiModelProperty(value = "Recipient address", required = true)
-                                   recipient: String,
-                                   @ApiModelProperty(required = true, example = "1000000")
-                                   amount: Long,
-                                   @ApiModelProperty(required = true)
-                                   fee: Long,
-                                   @ApiModelProperty(value = "Fee asset ID")
-                                   feeAssetId: Option[String],
-                                   @ApiModelProperty(required = true)
-                                   timestamp: Long,
-                                   @ApiModelProperty(value = "Base58 encoded attachment")
-                                   attachment: Option[String],
-                                   @ApiModelProperty(required = true)
-                                   signature: String)
-    extends BroadcastRequest {
+case class SignedTransferV1Request(
+    @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+    senderPublicKey: String,
+    @ApiModelProperty(value = "Base58 encoded Asset ID")
+    assetId: Option[String],
+    @ApiModelProperty(value = "Recipient address", required = true)
+    recipient: String,
+    @ApiModelProperty(required = true, example = "1000000")
+    amount: Long,
+    @ApiModelProperty(required = true)
+    fee: Long,
+    @ApiModelProperty(value = "Fee asset ID")
+    feeAssetId: Option[String],
+    @ApiModelProperty(required = true)
+    timestamp: Long,
+    @ApiModelProperty(value = "Base58 encoded attachment")
+    attachment: Option[String],
+    @ApiModelProperty(required = true)
+    signature: String
+) extends BroadcastRequest {
   def toTx: Either[ValidationError, TransferTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
@@ -54,5 +55,6 @@ case class SignedTransferV1Request(@ApiModelProperty(value = "Base58 encoded sen
       _signature  <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _account    <- AddressOrAlias.fromString(recipient)
-    } yield TransferTransaction(1.toByte, timestamp, _sender, _account, _assetId, amount,  _feeAssetId, fee, _attachment.arr, Proofs(Seq(_signature)))
+      tx          <- TransferTransaction(1.toByte, _assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment.arr, Proofs(Seq(_signature)))
+    } yield tx
 }

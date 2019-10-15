@@ -85,7 +85,8 @@ object TransactionFactory {
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        signer)
+        signer
+      )
     } yield tx
 
   def transferAssetV2(request: TransferV2Request, sender: PublicKey): Either[ValidationError, TransferTransaction] =
@@ -108,10 +109,12 @@ object TransactionFactory {
   def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
     massTransferAsset(request, wallet, request.sender, time)
 
-  def massTransferAsset(request: MassTransferRequest,
-                        wallet: Wallet,
-                        signerAddress: String,
-                        time: Time): Either[ValidationError, MassTransferTransaction] =
+  def massTransferAsset(
+      request: MassTransferRequest,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, MassTransferTransaction] =
     for {
       sender    <- wallet.findPrivateKey(request.sender)
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
@@ -176,10 +179,12 @@ object TransactionFactory {
       )
     } yield tx
 
-  def setAssetScript(request: SetAssetScriptRequest,
-                     wallet: Wallet,
-                     signerAddress: String,
-                     time: Time): Either[ValidationError, SetAssetScriptTransaction] =
+  def setAssetScript(
+      request: SetAssetScriptRequest,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, SetAssetScriptTransaction] =
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
@@ -359,10 +364,12 @@ object TransactionFactory {
   def leaseCancelV1(request: LeaseCancelV1Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV1] =
     leaseCancelV1(request, wallet, request.sender, time)
 
-  def leaseCancelV1(request: LeaseCancelV1Request,
-                    wallet: Wallet,
-                    signerAddress: String,
-                    time: Time): Either[ValidationError, LeaseCancelTransactionV1] =
+  def leaseCancelV1(
+      request: LeaseCancelV1Request,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, LeaseCancelTransactionV1] =
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
@@ -387,10 +394,12 @@ object TransactionFactory {
   def leaseCancelV2(request: LeaseCancelV2Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV2] =
     leaseCancelV2(request, wallet, request.sender, time)
 
-  def leaseCancelV2(request: LeaseCancelV2Request,
-                    wallet: Wallet,
-                    signerAddress: String,
-                    time: Time): Either[ValidationError, LeaseCancelTransactionV2] =
+  def leaseCancelV2(
+      request: LeaseCancelV2Request,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, LeaseCancelTransactionV2] =
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
@@ -614,10 +623,12 @@ object TransactionFactory {
   def invokeScript(request: InvokeScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
     invokeScript(request, wallet, request.sender, time)
 
-  def invokeScript(request: InvokeScriptRequest,
-                   wallet: Wallet,
-                   signerAddress: String,
-                   time: Time): Either[ValidationError, InvokeScriptTransaction] =
+  def invokeScript(
+      request: InvokeScriptRequest,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, InvokeScriptTransaction] =
     for {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
@@ -773,6 +784,12 @@ object TransactionFactory {
     TransactionParsers.by(typeId, version) match {
       case _ if chainId.exists(_ != AddressScheme.current.chainId) =>
         Left(WrongChain(AddressScheme.current.chainId, chainId.get))
+      case None if typeId == TransferTransaction.typeId =>
+        version match {
+          case 1 => jsv.as[SignedTransferV1Request].toTx
+          case 2 => jsv.as[SignedTransferV2Request].toTx
+          case _ => Left(UnsupportedTypeAndVersion(typeId, version))
+        }
       case Some(txType) if pf.isDefinedAt(txType) => pf(txType)
       case _                                      => Left(UnsupportedTypeAndVersion(typeId, version))
     }
