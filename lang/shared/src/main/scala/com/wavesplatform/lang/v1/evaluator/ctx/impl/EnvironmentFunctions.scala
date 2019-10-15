@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
-class EnvironmentFunctions[F[_] : Monad](environment: Environment[F]) {
+class EnvironmentFunctions[F[_]: Monad](environment: Environment[F]) {
 
   def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[String, Option[Any]]] = {
     val objTypeName = addressOrAlias.caseType.name
@@ -39,9 +39,9 @@ class EnvironmentFunctions[F[_] : Monad](environment: Environment[F]) {
 }
 
 object EnvironmentFunctions {
-  val ChecksumLength = 4
-  val HashLength = 20
+  val ChecksumLength       = 4
+  val HashLength           = 20
   val AddressVersion: Byte = 1
-  val AddressLength: Int = 1 + 1 + ChecksumLength + HashLength
-  val AddressPrefix = "address:"
+  val AddressLength: Int   = 1 + 1 + ChecksumLength + HashLength
+  val AddressPrefix        = "address:"
 }

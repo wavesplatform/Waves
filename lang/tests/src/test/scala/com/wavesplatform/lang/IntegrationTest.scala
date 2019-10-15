@@ -1,7 +1,6 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
@@ -11,15 +10,31 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
+  private val evaluator = new EvaluatorV1[Id, NoContext]()
+
+  private def eval[T <: EVALUATED](code: String,
+                                   pointInstance: Option[CaseObj] = None,
+                                   pointType: FINAL = AorBorC,
+                                   ctxt: CTX[NoContext] = CTX.empty): Either[String, T] = {
+    val untyped = Parser.parseExpr(code).get.value
+    val lazyVal = ContextfulVal.pure[NoContext](pointInstance.orNull)
+    val stringToTuple = Map(("p", (pointType, lazyVal)))
+    val ctx: CTX[NoContext] =
+      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX[NoContext](sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
+    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
+    typed.flatMap(v => evaluator.apply(ctx.evaluationContext, v._1))
+  }
 
   property("simple let") {
     val src =
@@ -119,19 +134,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |
       """.stripMargin
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
-  }
-
-  private def eval[T <: EVALUATED](code: String,
-                                   pointInstance: Option[CaseObj] = None,
-                                   pointType: FINAL = AorBorC,
-                                   ctxt: CTX[Id] = CTX.empty): Either[String, T] = {
-    val untyped                                                = Parser.parseExpr(code).get.value
-    val lazyVal                                                = LazyVal.fromEvaluated[Id](pointInstance.orNull)
-    val stringToTuple: Map[String, (FINAL, LazyVal[Id])] = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX[Id] =
-      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1().apply(ctx.evaluationContext, v._1))
   }
 
   property("function call") {
@@ -324,16 +326,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction[Id]("ID", 0, LONG, ("x", LONG)) {
+    val doubleFst = UserFunction[NoContext]("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
     val context = Monoid.combine(
-      PureContext.build(Global, V1).evaluationContext,
-      EvaluationContext(
+      PureContext.build(Global, V1).evaluationContext[Id],
+      EvaluationContext.build(
         typeDefs = Map.empty,
-        letDefs = Map("x"                -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
-        functions = Map(doubleFst.header -> doubleFst)
+        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
+        functions = Seq(doubleFst)
       )
     )
 
@@ -343,11 +345,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(Global, V1).evaluationContext,
-      EvaluationContext(
+      PureContext.build(Global, V1).evaluationContext[Id],
+      EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
-        functions = Map.empty
+        functions = Seq()
       )
     )
 
@@ -515,10 +517,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    val arrVal = LazyVal.fromEvaluated[Id](CONST_BYTESTR(array).explicitGet())
+    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(array).explicitGet())
     eval[EVALUATED](
       src,
-      ctxt = CTX[Id](
+      ctxt = CTX[NoContext](
         Seq(),
         Map("arr" -> (BYTESTR -> arrVal)),
         Array()
@@ -610,9 +612,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """ str.indexOf("z", 32766) """
     eval[EVALUATED](
       src,
-      ctxt = CTX[Id](
+      ctxt = CTX[NoContext](
         Seq(),
-        Map("str" -> (STRING -> LazyVal.fromEvaluated[Id](CONST_STRING(str).explicitGet()))),
+        Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))),
         Array()
       )
     ) shouldBe Right(CONST_LONG(32766L))
@@ -688,8 +690,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val str = "a" * 32766 + "z"
     val src =
       """ str.lastIndexOf("z", 32766) """
-    eval(src, ctxt = CTX(Seq(),
-      Map("str" -> (STRING -> LazyVal.fromEvaluated[Id](CONST_STRING(str).explicitGet()))), Array())
+    eval(src, ctxt = CTX[NoContext](Seq(),
+      Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))), Array())
     ) shouldBe Right(CONST_LONG(32766L))
   }
 

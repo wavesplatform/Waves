@@ -1,4 +1,3 @@
-import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,8 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
@@ -62,26 +60,11 @@ object JsAPI {
   private def wavesContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
       DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) DAppType else Expression)
-        .explicitGet(),
-      new Environment[Id] {
-        override def height: Long                                                                                    = 0
-        override def chainId: Byte                                                                                   = 1: Byte
-        override def inputEntity: Environment.InputEntity                                                            = null
-        override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-        override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
-        override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
-        override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
-        override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
-        override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-        override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-        override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-        override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-        override def tthis: Recipient.Address                                                                        = ???
-      }
+        .explicitGet()
     )
 
-  private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version)
-  private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version)
+  private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
+  private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
   private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
   private def typeRepr(t: TYPE): js.Any = t match {
@@ -92,16 +75,14 @@ object JsAPI {
     case t       => t.toString
   }
 
-  private val fullContractContext: CTX[Id] =
+  private val fullContractContext: CTX[Environment] =
     buildContractContext(V3)
 
-  private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Id] = {
+  private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
-  }
 
-  private def buildContractContext(v: StdLibVersion): CTX[Id] = {
+  private def buildContractContext(v: StdLibVersion): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, false, true)))
-  }
 
   @JSExportTopLevel("getTypes")
   def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =

@@ -28,8 +28,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(V3, Account, DAppType).explicitGet(),
-          Common.emptyBlockchainEnvironment()
+          DirectiveSet(V3, Account, DAppType).explicitGet()
         )
         .compilerContext
     )
@@ -78,6 +77,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     val dApp = DApp(meta, Nil, callables, None)
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
+        "version" -> Single("1"),
         "callableFuncTypes" -> Chain(List(
           Dic(ListMap(
             "a" -> Single("Boolean|Int|String"),

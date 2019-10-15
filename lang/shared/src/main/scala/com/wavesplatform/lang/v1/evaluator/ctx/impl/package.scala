@@ -10,5 +10,5 @@ package object impl {
       s"Can't apply (${args.map(_.getClass.getSimpleName).mkString(", ")}) to '$funcName'"
         .asLeft[EVALUATED].pure[F]
 
-  lazy val unit: CaseObj   = CaseObj(UNIT, Map.empty)
+  lazy val unit: CaseObj = CaseObj(UNIT, Map.empty)
 }

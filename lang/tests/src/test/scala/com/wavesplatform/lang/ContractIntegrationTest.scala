@@ -6,16 +6,17 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
+import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Inside, Matchers, PropSpec}
@@ -23,13 +24,15 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
-  val ctx: CTX[Id] =
-      PureContext.build(Global, V3) |+|
-      CTX(sampleTypes, Map.empty, Array.empty) |+|
+  private val ctx: CTX[Environment] =
+      PureContext.build(Global, V3).withEnvironment[Environment] |+|
+      CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
-        DirectiveSet(V3, Account, DApp).explicitGet(),
-        Common.emptyBlockchainEnvironment()
+        DirectiveSet(V3, Account, DApp).explicitGet()
       )
+
+  private val environment: Environment[Id] =
+    Common.emptyBlockchainEnvironment()
 
   private val callerAddress: ByteStr      = ByteStr.fromLong(1)
   private val callerPublicKey: ByteStr    = ByteStr.fromLong(2)
@@ -143,15 +146,16 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     ContractCompiler(ctx.compilerContext, parsed) should produce("no more than 22 arguments")
   }
 
+
   def parseCompileAndEvaluate(script: String,
-                              func: String,
-                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
+                              func  : String,
+                              args  : List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
                              ): Either[(ExecutionError, Log[Id]), ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
 
     ContractEvaluator(
-      ctx.evaluationContext,
+      ctx.evaluationContext(environment),
       compiled,
       Invocation(
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
@@ -170,7 +174,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
     val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
-    EvaluatorV1().evalWithLogging(Right(ctx.evaluationContext), evalm)._2
+    EvaluatorV1().evalWithLogging(Right(ctx.evaluationContext(environment)), evalm)._2
   }
 
   property("Simple verify") {

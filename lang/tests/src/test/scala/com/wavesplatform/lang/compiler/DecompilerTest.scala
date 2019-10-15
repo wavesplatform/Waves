@@ -14,10 +14,12 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler._
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import org.scalatest.{Matchers, PropSpec}
@@ -29,11 +31,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     def shouldEq(s2: String) = s1.replace("\r\n", "\n") shouldEqual s2.replace("\r\n", "\n")
   }
 
-  val ctx: CTX[Id] =
+  val ctx: CTX[Environment] =
     Monoid.combineAll(Seq(
-      testContext,
-      CryptoContext.build(Global, V3),
-      WavesContext.build(DirectiveSet.contractDirectiveSet, Common.emptyBlockchainEnvironment())
+      testContext.withEnvironment[Environment],
+      CryptoContext.build(Global, V3).withEnvironment[Environment],
+      WavesContext.build(DirectiveSet.contractDirectiveSet)
     ))
 
   val decompilerContext = ctx.decompilerContext

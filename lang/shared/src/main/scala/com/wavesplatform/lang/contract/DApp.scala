@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.protobuf.dapp.DAppMeta
 
 case class DApp(
@@ -44,7 +44,7 @@ object DApp {
     lazy val dic = Map(invocationArgName -> com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType)
   }
   case class VerifierAnnotation(invocationArgName: String) extends Annotation {
-    lazy val dic = Map(invocationArgName -> WavesContext.verifierInput)
+    lazy val dic = Map(invocationArgName -> Types.verifierInput)
   }
 
   sealed trait AnnotatedFunction {

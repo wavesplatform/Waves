@@ -1,11 +1,9 @@
 package com.wavesplatform.lang.v1
 
-import cats.Id
-import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
@@ -15,13 +13,15 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.sumLong
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -39,19 +39,21 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
 
   val FunctionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
 
+  private val env = Common.emptyBlockchainEnvironment()
+
   protected val ctx = {
     val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(Seq(
-        PureContext.build(Global, V3),
-        CryptoContext.build(Global, V3),
-        WavesContext.build(DirectiveSet.contractDirectiveSet, Common.emptyBlockchainEnvironment()),
-        CTX[Id](
+        PureContext.build(Global, V3).withEnvironment[Environment],
+        CryptoContext.build(Global, V3).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet.contractDirectiveSet),
+        CTX[NoContext](
           Seq(transactionType),
-          Map(("tx", (transactionType, LazyVal.fromEvaluated[Id](tx)))),
+          Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),
           Array.empty
-        )
+        ).withEnvironment[Environment]
       ))
   }
 
@@ -61,7 +63,7 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
   }
 
   protected def estimate(functionCosts: Map[FunctionHeader, Coeval[Long]], script: EXPR) =
-    estimator(ctx.evaluationContext.letDefs.keySet, functionCosts, script)
+    estimator(ctx.evaluationContext(env).letDefs.keySet, functionCosts, script)
 
   property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>

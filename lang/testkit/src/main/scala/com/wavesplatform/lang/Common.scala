@@ -1,14 +1,15 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.{Contextful, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
@@ -23,11 +24,11 @@ object Common {
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
-  val addCtx: CTX[Id]            = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
+  val addCtx: CTX[NoContext]            = CTX[NoContext](Seq(dataEntryType), Map.empty, Array.empty)
 
-  def ev[T <: EVALUATED](context: EvaluationContext[Id] = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
+  def ev[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
                          expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV1().apply[T](context, expr)
+    new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
 
   trait NoShrink {
     implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
@@ -35,7 +36,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: NativeFunction[Id] =
+  val multiplierFunction: NativeFunction[NoContext] =
     NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {
       case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
       case _                                                   => ??? // suppress pattern match warning
@@ -63,7 +64,11 @@ object Common {
                                                                                UNION.create(CorD.typeList, Some("PointCD")))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Map.empty, Map("p" -> LazyVal.fromEvaluated[Id](instance)), Seq.empty)
+    EvaluationContext.build(
+      Map.empty,
+      Map("p" -> LazyVal.fromEvaluated[Id](instance)),
+      Seq.empty[BaseFunction[NoContext]]
+    )
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] = new Environment[Id] {
     override def height: Long  = h
