@@ -13,14 +13,14 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
   private val emptyEnv = new Environment[Id] {
-    lazy val unavailable = throw new RuntimeException(s"Blockchain state is unavailable")
+    lazy val unavailable                                                                                         = throw new RuntimeException(s"Blockchain state is unavailable")
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 0
     override def inputEntity: InputEntity                                                                        = unavailable
@@ -34,16 +34,20 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
     override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = unavailable
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = unavailable
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = unavailable
+    override def multiPaymentAllowed: Boolean                                                                    = unavailable
   }
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {
-    val untyped                                                = Parser.parseExpr(code).get.value
+    val untyped = Parser.parseExpr(code).get.value
     val ctx: CTX[Environment] =
-      Monoid.combineAll(Seq(
-        PureContext.build(Global, V3).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet.contractDirectiveSet),
-        CryptoContext.build(Global, V3).withEnvironment[Environment]
-      ))
+      Monoid.combineAll(
+        Seq(
+          PureContext.build(Global, V3).withEnvironment[Environment],
+          WavesContext.build(DirectiveSet.contractDirectiveSet),
+          CryptoContext.build(Global, V3).withEnvironment[Environment]
+        )
+      )
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1().apply[T](ctx.evaluationContext(emptyEnv), v._1))
   }

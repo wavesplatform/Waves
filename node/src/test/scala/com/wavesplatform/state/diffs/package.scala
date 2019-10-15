@@ -22,7 +22,7 @@ package object diffs extends WithState with Matchers {
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) = differ(state, precondition).explicitGet()
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
     }
     val totalDiff1 = differ(state, block)
@@ -34,7 +34,7 @@ package object diffs extends WithState with Matchers {
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) = differ(state, precondition).resultE.explicitGet()
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
     }
     val totalDiff1 = differ(state, block)
@@ -43,16 +43,16 @@ package object diffs extends WithState with Matchers {
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
       assertion: (Diff, Blockchain) => Unit): Unit = withLevelDBWriter(fs) { state =>
-    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.GenResult] =
+    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-      val BlockDiffer.Result(diff, fees, totalFee, _) = differ(state, prevBlock, curBlock).explicitGet()
+      val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
       state.append(diff, fees, totalFee, None, curBlock)
       Some(curBlock)
     }
 
-    val BlockDiffer.Result(diff, fees, totalFee, _) = differ(state, preconditions.lastOption, block).explicitGet()
+    val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
     val cb              = CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 

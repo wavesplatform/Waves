@@ -470,7 +470,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                 ))
           }
 
-          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr).explicitGet()).explicitGet()
+          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
           val setScriptTx    = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 

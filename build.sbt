@@ -78,6 +78,8 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node-it` % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
+lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
+
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",

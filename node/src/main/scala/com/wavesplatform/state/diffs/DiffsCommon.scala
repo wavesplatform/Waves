@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
@@ -13,6 +14,21 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 private[diffs] object DiffsCommon {
+  def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
+    Script.complexityInfo(script, estimator)
+      .map(calcVerifierComplexity(script, _))
+
+  private def calcVerifierComplexity(
+    script:     Script,
+    complexity: (Long, Map[String, Long])
+  ): Long = {
+    val (totalComplexity, cm) = complexity
+    script match {
+      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
+      case _ => totalComplexity
+    }
+  }
+
   def functionComplexity(
     script:    Script,
     estimator: ScriptEstimator,

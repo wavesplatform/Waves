@@ -68,7 +68,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](5))),
       )
     )
-    compiler.ContractCompiler(ctx, expr).map(_.meta) shouldBe Right(meta)
+    compiler.ContractCompiler(ctx, expr, V3).map(_.meta) shouldBe Right(meta)
 
     val callables = List(
       CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),

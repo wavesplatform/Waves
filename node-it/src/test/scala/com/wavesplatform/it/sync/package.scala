@@ -57,7 +57,7 @@ package object sync {
       reissuable,
       fee,
       timestamp,
-      signature.base58
+      signature.toString
     )
   }
 

@@ -1,5 +1,4 @@
 package com.wavesplatform.utils
-
 import monix.execution.{Ack, Cancelable}
 import monix.reactive.observers.Subscriber
 import monix.reactive.subjects.Subject

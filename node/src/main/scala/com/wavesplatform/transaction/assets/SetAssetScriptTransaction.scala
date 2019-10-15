@@ -37,7 +37,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
       jsonBase() ++ Json.obj(
         "version" -> version,
         "chainId" -> chainId,
-        "assetId" -> asset.id.base58,
+        "assetId" -> asset.id.toString,
         "script"  -> script.map(_.bytes().base64)
       )
     )
@@ -81,7 +81,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
                        TxValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
       _ <- Either.cond(chainId == currentChainId,
                        (),
-                       TxValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
+                       TxValidationError.WrongChain(AddressScheme.current.chainId, chainId))
     } yield SetAssetScriptTransaction(chainId, sender, assetId, script, fee, timestamp, proofs)
 
   }
@@ -112,7 +112,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
       Either
         .cond(tx.chainId == currentChainId,
               (),
-              TxValidationError.GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
+              TxValidationError.WrongChain(currentChainId, tx.chainId))
         .map(_ => tx)
         .foldToTry
     }

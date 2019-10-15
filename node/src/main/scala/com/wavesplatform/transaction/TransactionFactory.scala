@@ -14,7 +14,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTypeAndVersion, WrongChain}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
@@ -771,9 +771,9 @@ object TransactionFactory {
 
     TransactionParsers.by(typeId, version) match {
       case _ if chainId.exists(_ != AddressScheme.current.chainId) =>
-        Left(GenericError(s"Invalid chain id: ${chainId.get}, expected: ${AddressScheme.current.chainId}"))
+        Left(WrongChain(AddressScheme.current.chainId, chainId.get))
       case Some(txType) if pf.isDefinedAt(txType) => pf(txType)
-      case _                                      => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+      case _                                      => Left(UnsupportedTypeAndVersion(typeId, version))
     }
   }
 
@@ -790,7 +790,7 @@ object TransactionFactory {
         val txJson  = jsv ++ Json.obj("version" -> version)
 
         TransactionParsers.by(typeId, version) match {
-          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+          case None => Left(UnsupportedTypeAndVersion(typeId, version))
           case Some(x) =>
             x match {
               case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)

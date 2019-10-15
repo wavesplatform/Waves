@@ -1,7 +1,6 @@
 import cats.kernel.Monoid
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.directives.Directive.extractDirectives
@@ -18,6 +17,7 @@ import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.{Global, Version}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -126,7 +126,8 @@ object JsAPI {
       "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"           -> ContractLimits.MaxPaymentAmount
+      "MaxPaymentAmount"           -> ContractLimits.MaxTransferPaymentAmount,
+      "MaxAttachedPaymentAmount"   -> ContractLimits.MaxAttachedPaymentAmount
     )
   }
 

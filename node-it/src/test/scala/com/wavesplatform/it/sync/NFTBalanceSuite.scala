@@ -63,7 +63,7 @@ class NFTBalanceSuite
 
   "after activation" - {
     "returns only non-nft portfolio on /balance/{address}" in {
-      val expectedIds = simple map (_.assetId.base58)
+      val expectedIds = simple map (_.assetId.toString)
 
       val assertion =
         getPortfolio(node, issuer.stringRepr) map { ids =>
@@ -74,7 +74,7 @@ class NFTBalanceSuite
     }
 
     "returns issue transactions on /nft/{address}/limit/{limit}" in {
-      val expectedIds = nft.map(_.assetId.base58)
+      val expectedIds = nft.map(_.assetId.toString)
 
       val assertion =
         getNFTPage(node, issuer.stringRepr, 1000, None) map { ids =>
@@ -106,8 +106,8 @@ class NFTBalanceSuite
         issuerNFTs <- getNFTPage(node, issuer.stringRepr, 1000, None)
         otherNFTs  <- getNFTPage(node, other.stringRepr, 1000, None)
       } yield {
-        issuerNFTs shouldNot contain(randomTokenToTransfer.id.base58)
-        otherNFTs should contain(randomTokenToTransfer.id.base58)
+        issuerNFTs shouldNot contain(randomTokenToTransfer.id.toString)
+        otherNFTs should contain(randomTokenToTransfer.id.toString)
       }
 
       Await.result(assertion, 10.seconds)
@@ -118,7 +118,7 @@ class NFTBalanceSuite
     "works" in {
       val expectedIds = nft
         .filter(_.assetId != randomTokenToTransfer.id)
-        .map(_.assetId.base58)
+        .map(_.assetId.toString)
         .toSet
 
       val assertion = for {

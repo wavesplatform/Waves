@@ -17,12 +17,12 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDomain with WithDB with Matchers with TransactionGen with NoShrink {
+class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDomain with Matchers with TransactionGen with NoShrink {
 
   private val BlockRewardActivationHeight = 5
   private val NGActivationHeight          = 0
@@ -176,14 +176,14 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx2)), miner2, 3, ntpNow)
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
-    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result[MiningConstraint] =
+    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result =
       BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited: MiningConstraint).explicitGet()
 
     "when NG state is empty" in forAll(ngEmptyScenario) {
       case (miner1, miner2, b2s, b3, m3s) =>
         withDomain(rewardSettings) { d =>
           b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-            val BlockDiffer.Result(diff, carryFee, totalFee, _) = differ(d.levelDBWriter, prevBlock, curBlock)
+            val BlockDiffer.Result(diff, carryFee, totalFee, _, _) = differ(d.levelDBWriter, prevBlock, curBlock)
             d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock)
             Some(curBlock)
           }

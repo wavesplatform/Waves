@@ -65,7 +65,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
                        | {-# CONTENT_TYPE EXPRESSION #-}
                        | {-# SCRIPT_TYPE ASSET #-}
                        |
-                       | this.id         == base58'${asset.id.base58}' &&
+                       | this.id         == base58'${asset.id.toString}' &&
                        | this.quantity   == 100                        &&
                        | this.decimals   == 0                          &&
                        | this.reissuable == false                      &&

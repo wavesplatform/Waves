@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
@@ -26,6 +26,7 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi, assertDiffEiTraced, produce}
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
@@ -43,12 +44,6 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.collection.immutable
 
 class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
-
-  def ciFee(sc: Int = 0): Gen[Long] =
-    Gen.choose(
-      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
-      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
-    )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -225,7 +220,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           ))
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr)
+    compiler.ContractCompiler(ctx.compilerContext, expr, V3)
   }
 
   def writeSet(funcName: String, count: Int): DApp = {
@@ -292,7 +287,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           ))
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr).right.get
+    compiler.ContractCompiler(ctx.compilerContext, expr, V3).right.get
   }
 
   def simplePreconditionsAndSetContract(invokerGen: Gen[KeyPair] = accountGen,
@@ -509,10 +504,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
-                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args(0).asInstanceOf[CONST_BYTESTR].bs)
+                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
               ))
 
-            blockDiff.transactions(ci.id())._3.contains(setScript.sender) shouldBe true
+            blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
           }
         }
     }

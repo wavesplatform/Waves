@@ -18,6 +18,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.transfer._
@@ -553,17 +554,37 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   } yield FUNCTION_CALL(FunctionHeader.User(functionName), args)
 
-  val invokeScriptGen = for {
-    sender      <- accountGen
-    dappAddress <- accountGen
-    fc          <- funcCallGen
-    po <- Gen.option(for {
-      asset <- Gen.option(bytes32gen.map(ByteStr(_))).map(Asset.fromCompatId)
-      amt   <- positiveLongGen
-    } yield InvokeScriptTransaction.Payment(amt, asset))
-    fee       <- smallFeeGen
-    timestamp <- timestampGen
-  } yield InvokeScriptTransaction.selfSigned(sender, dappAddress.toAddress, Some(fc), po.toSeq, fee, Waves, timestamp).explicitGet()
+  def invokeScriptGen(paymentsGen: Gen[Seq[Payment]]): Gen[InvokeScriptTransaction] =
+    for {
+      payments    <- paymentsGen
+      sender      <- accountGen
+      dappAddress <- accountGen
+      fc          <- funcCallGen
+      fee         <- smallFeeGen
+      timestamp   <- timestampGen
+    } yield
+      InvokeScriptTransaction.selfSigned(
+        sender,
+        dappAddress.toAddress,
+        Some(fc),
+        payments,
+        fee,
+        Waves,
+        timestamp
+      ).explicitGet()
+
+  val paymentListGen: Gen[Seq[Payment]] =
+    for {
+      wavesPayment <- Gen.option(positiveLongGen.map(Payment(_, Waves)))
+      assetPayment = for {
+        asset <- bytes32gen.map(ByteStr(_)).map(IssuedAsset)
+        amt   <- positiveLongGen
+      } yield Payment(amt, asset)
+      assetPayments <- Gen.listOfN[Payment](ContractLimits.MaxAttachedPaymentAmount - 1, assetPayment)
+    } yield assetPayments ++ wavesPayment
+
+  val paymentOptionGen: Gen[Seq[Payment]] =
+    paymentListGen.map(_.headOption.toSeq)
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)

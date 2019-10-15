@@ -105,11 +105,11 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .explicitGet()
 
       notaryDataTransaction = DataTransaction
-        .selfSigned(notary, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 4)
+        .selfSigned(notary, List(BooleanDataEntry(transferFromAToB.id().toString, true)), 1000, ts + 4)
         .explicitGet()
 
       accountBDataTransaction = DataTransaction
-        .selfSigned(accountB, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 5)
+        .selfSigned(accountB, List(BooleanDataEntry(transferFromAToB.id().toString, true)), 1000, ts + 5)
         .explicitGet()
     } yield
       (Seq(genesis1, genesis2, genesis3, genesis4, genesis5),
@@ -120,10 +120,12 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        accountBDataTransaction,
        transferFromAToB)
 
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null))
 
-  def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] =
-    lazyContexts(DirectiveSet(V1, Asset, Expression).explicitGet())().evaluationContext(environment)
+  def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] = {
+    val ds = DirectiveSet(V1, Asset, Expression).explicitGet()
+    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ds)
+    lazyContexts(ds)().evaluationContext(environment)
+  }
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value

@@ -67,11 +67,14 @@ object WavesContext {
     )
   }
 
+  private lazy val fromV3Funcs =
+    extractedFuncs ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
+
   private def variableFuncs(version: StdLibVersion, proofsEnabled: Boolean) =
     version match {
       case V1 | V2 => Array(txByIdF(proofsEnabled, version))
-      case V3 =>
-        extractedFuncs ++ Array(assetInfoF, blockInfoByHeightF, transferTxByIdF(proofsEnabled, version), stringFromAddressF)
+      case V3 => fromV3Funcs :+ transferTxByIdF(proofsEnabled, version)
+      case V4 => fromV3Funcs :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
     }
 
   private def variableVars(
@@ -84,7 +87,7 @@ object WavesContext {
     version match {
       case V1 => Map(txVal)
       case V2 => Map(sell, buy, txVal)
-      case V3 =>
+      case V3 | V4 =>
         val `this` = if (isTokenContext) assetThis else accountThis
         val txO = if (contentType == Expression) Map(txVal) else Map()
         val common = Map(sell, buy, lastBlock, `this`)
@@ -93,5 +96,7 @@ object WavesContext {
   }
 
   private def variableTypes(version: StdLibVersion, proofsEnabled: Boolean) =
-    buildWavesTypes(proofsEnabled, version) ++ (if (version == V3) dAppTypes else Nil)
+    buildWavesTypes(proofsEnabled, version)           ++
+    (if (version >= V3) dAppTypes(version) else Nil)  ++
+    (if (version >= V4) List(blockHeader)  else Nil)
 }

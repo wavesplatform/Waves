@@ -54,7 +54,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val bigAssetFee      = eff1 + 1.waves
 
     assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee),
-                               "negative waves balance")
+                               "Accounts balance errors")
   }
 
   val invalidScript =
@@ -64,8 +64,8 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("base64:", "Can't parse empty script bytes"),
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
-      ("base64:AAEE", "Invalid version of script: 4"),
-      ("base64:BAEE", "Invalid version of script: 4"),
+      ("base64:AAEF", "Invalid version of script: 5"),
+      ("base64:CAEF", "Invalid version of script: 8"),
     )
 
   forAll(invalidScript) { (script: String, error: String) =>

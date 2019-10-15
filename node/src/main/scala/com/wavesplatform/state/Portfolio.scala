@@ -118,7 +118,7 @@ object Portfolio {
 
   implicit val assetMapWrites: Writes[Map[IssuedAsset, Long]] = Writes { m =>
     Json.toJson(m.map {
-      case (asset, balance) => asset.id.base58 -> JsNumber(balance)
+      case (asset, balance) => asset.id.toString -> JsNumber(balance)
     })
   }
 

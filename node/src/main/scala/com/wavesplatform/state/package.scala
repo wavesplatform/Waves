@@ -39,7 +39,7 @@ package object state {
       !balanceFromDiff.exists(_ < 0)
     }
     def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
-      diff.transactions.get(id).map(_._2)
+      diff.transactions.get(id).map(_._1)
     }
 
     def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
@@ -97,7 +97,7 @@ package object state {
 
     def withFilterAndLimit(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] =
       txs
-        .collect { case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (height, tx) }
+        .collect { case (h, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (h, tx) }
 
     Observable(
       withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),

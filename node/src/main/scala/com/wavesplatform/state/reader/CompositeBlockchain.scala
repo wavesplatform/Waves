@@ -75,7 +75,7 @@ final case class CompositeBlockchain(
         diff.transactions
           .get(asset.id)
           .collectFirst {
-            case (_, it: IssueTransaction, _) =>
+            case (it: IssueTransaction, _) =>
               AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
@@ -85,8 +85,8 @@ final case class CompositeBlockchain(
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (h, lt: LeaseTransaction, _) =>
-          LeaseDetails(lt.sender, lt.recipient, h, lt.amount, diff.leaseState(lt.id()))
+        case (lt: LeaseTransaction, _) =>
+          LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
@@ -94,7 +94,7 @@ final case class CompositeBlockchain(
     diff.transactions
       .get(id)
       .collect {
-        case (h, tx: TransferTransaction, _) => (h, tx)
+        case (tx: TransferTransaction, _) => (height, tx)
       }
       .orElse(inner.transferById(id))
   }
@@ -102,16 +102,16 @@ final case class CompositeBlockchain(
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
     diff.transactions
       .get(id)
-      .map(_._1)
+      .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
 
-  override def height: Int = inner.height + (newBlock orElse maybeDiff).fold(0)(_ => 1)
+  override def height: Int = inner.height + newBlock.fold(0)(_ => 1)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
@@ -255,7 +255,7 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
           case (id, false) => id
         }.toSet
         val addedInLiquidBlock = ng.transactions.collect {
-          case (id, (_, lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
+          case (id, (lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
         }
         innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
       case _ => innerActiveLeases

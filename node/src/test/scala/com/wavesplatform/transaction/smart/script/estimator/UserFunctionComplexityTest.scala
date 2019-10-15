@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart.script.estimator
 
-import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -23,7 +22,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null))
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ???)
 
   private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
@@ -159,6 +158,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV3 = {
     utils.functionCosts(V3)
+    val directives = DirectiveSet(V3, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(

@@ -170,7 +170,7 @@ class UtxPoolImpl(
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
+    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
       .map { diff =>
         pessimisticPortfolios.add(tx.id(), diff); true
       }
@@ -202,7 +202,7 @@ class UtxPoolImpl(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()) _
     val (reversedValidTxs, _, finalConstraint, totalIterations) = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
@@ -261,7 +261,6 @@ class UtxPoolImpl(
     def isExpired(transaction: Transaction): Boolean = {
       (time.correctedTime() - transaction.timestamp) > ExpirationTime
     }
-
     def isScripted(transaction: Transaction): Boolean = {
       transaction match {
         case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)

@@ -30,7 +30,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.Base64
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null))
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ???)
 
   private def estimate(
     expr: Terms.EXPR,
@@ -41,6 +41,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
 
   private val ctxV1 = {
     utils.functionCosts(V1)
+    val directives = DirectiveSet(V1, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
@@ -54,6 +55,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
 
   private val ctxV2 = {
     utils.functionCosts(V2)
+    val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
@@ -67,6 +69,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
 
   private val ctxV3 = {
     utils.functionCosts(V3)
+    val directives = DirectiveSet(V3, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(

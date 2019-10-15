@@ -5,6 +5,7 @@ import cats.implicits._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
@@ -16,9 +17,12 @@ import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
-object ContractCompiler {
 
-  def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[(AnnotatedFunction, List[(String, Types.FINAL)])] = {
+object ContractCompiler {
+  def compileAnnotatedFunc(
+    af: Expressions.ANNOTATEDFUNC,
+    version: StdLibVersion
+  ): CompileM[(AnnotatedFunction, List[(String, Types.FINAL)])] = {
     val annotationsM: CompileM[List[Annotation]] = af.anns.toList.traverse[CompileM, Annotation] { ann =>
       for {
         n    <- handlePart(ann.name)
@@ -28,7 +32,7 @@ object ContractCompiler {
     }
     val r = for {
       annotations <- annotationsM
-      annotationBindings = annotations.flatMap(_.dic.toList)
+      annotationBindings = annotations.flatMap(_.dic(version).toList)
       compiledBody <- local {
         for {
           _ <- modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
@@ -83,7 +87,7 @@ object ContractCompiler {
     }
   }
 
-  private def compileContract(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[DApp] = {
+  private def compileContract(ctx: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion): CompileM[DApp] = {
     for {
       decs <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       _    <- validateDuplicateVarsInContract(contract)
@@ -104,7 +108,7 @@ object ContractCompiler {
           )
         )
         .toCompileM
-      l <- contract.fs.traverse[CompileM, (AnnotatedFunction, List[(String, Types.FINAL)])](af => local(compileAnnotatedFunc(af)))
+      l <- contract.fs.traverse(func => local(compileAnnotatedFunc(func, version)))
       annotatedFuncs = l.map(_._1)
 
       duplicatedFuncNames = annotatedFuncs.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
@@ -210,17 +214,17 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, DApp] = {
-    compileContract(c, contract)
+  def apply(c: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion): Either[String, DApp] = {
+    compileContract(c, contract, version)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
   }
 
-  def compile(input: String, ctx: CompilerContext): Either[String, DApp] = {
+  def compile(input: String, ctx: CompilerContext, version: StdLibVersion): Either[String, DApp] = {
     Parser.parseContract(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
-        ContractCompiler(ctx, xs) match {
+        ContractCompiler(ctx, xs, version) match {
           case Left(err) => Left(err.toString)
           case Right(c)  => Right(c)
         }

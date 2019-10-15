@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.testing
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._

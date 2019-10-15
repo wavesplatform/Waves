@@ -66,7 +66,7 @@ object PureContext {
 
   lazy val ne: BaseFunction[NoContext] =
     UserFunction(NE_OP.func,
-                 Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1),
+                 Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1, V4 -> 1),
                  BOOLEAN,
                  ("@a", TYPEPARAM('T')),
                  ("@b", TYPEPARAM('T'))) {
@@ -78,7 +78,11 @@ object PureContext {
     case _                      => Left(defaultThrowMessage)
   }
 
-  lazy val throwNoMessage: BaseFunction[NoContext] = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1), NOTHING) {
+  lazy val throwNoMessage: BaseFunction[NoContext] = UserFunction(
+    "throw",
+    Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1, V4 -> 1),
+    NOTHING
+  ) {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage).explicitGet()))
   }
 
@@ -128,7 +132,7 @@ object PureContext {
   lazy val isDefined: BaseFunction[NoContext] =
     UserFunction(
       "isDefined",
-      Map[StdLibVersion, Long](V1 -> 35, V2 -> 35, V3 -> 1),
+      Map[StdLibVersion, Long](V1 -> 35, V2 -> 35, V3 -> 1, V4 -> 1),
       BOOLEAN,
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)))
     ) {
@@ -533,12 +537,12 @@ object PureContext {
     }
 
   lazy val uMinus: BaseFunction[NoContext] =
-    UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1), LONG, ("@n", LONG)) {
+    UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1, V4 -> 1), LONG, ("@n", LONG)) {
       FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
     }
 
   lazy val uNot: BaseFunction[NoContext] =
-    UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1), BOOLEAN, ("@p", BOOLEAN)) {
+    UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1, V4 -> 1), BOOLEAN, ("@p", BOOLEAN)) {
       IF(REF("@p"), FALSE, TRUE)
     }
 
@@ -694,7 +698,7 @@ object PureContext {
 
     version match {
       case V1 | V2 => ctx
-      case V3 =>
+      case V3 | V4 =>
         Monoid.combine(
           ctx,
           CTX[NoContext](

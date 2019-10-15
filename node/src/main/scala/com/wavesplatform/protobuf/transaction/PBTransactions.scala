@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
-  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   def create(sender: com.wavesplatform.account.PublicKey = PublicKey.empty,
              chainId: Byte = 0,

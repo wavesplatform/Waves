@@ -11,11 +11,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
@@ -39,11 +42,11 @@ class TransactionsRouteSpec
 
   implicit def scheduler = Scheduler.global
 
-  private val wallet = Wallet(WalletSettings(None, Some("qwerty"), None))
-  private val blockchain = mock[Blockchain]
-  private val utx = mock[UtxPool]
+  private val wallet              = Wallet(WalletSettings(None, Some("qwerty"), None))
+  private val blockchain          = mock[Blockchain]
+  private val utx                 = mock[UtxPool]
   private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
-  private val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+  private val route               = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -116,13 +119,13 @@ class TransactionsRouteSpec
 
     "transfer with Asset fee" - {
       "without sponsorship" in {
-        val assetId: ByteStr = issueGen.sample.get.assetId
+        val assetId: ByteStr  = issueGen.sample.get.assetId
         val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.base58,
+          "feeAssetId"      -> assetId.toString,
           "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -147,12 +150,12 @@ class TransactionsRouteSpec
 
       "with sponsorship" in {
         val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey = accountGen.sample.get
+        val sender: PublicKey    = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.id.base58,
+          "feeAssetId"      -> assetId.id.toString,
           "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -167,35 +170,39 @@ class TransactionsRouteSpec
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
         (blockchain.assetDescription _)
           .expects(assetId)
-          .returning(Some(AssetDescription(
-            issuer = accountGen.sample.get,
-            name = "foo".getBytes("UTF-8"),
-            description = "bar".getBytes("UTF-8"),
-            decimals = 8,
-            reissuable = false,
-            totalVolume = Long.MaxValue,
-            script = None,
-            sponsorship = 5
-          )))
+          .returning(
+            Some(
+              AssetDescription(
+                issuer = accountGen.sample.get,
+                name = "foo".getBytes("UTF-8"),
+                description = "bar".getBytes("UTF-8"),
+                decimals = 8,
+                reissuable = false,
+                totalVolume = Long.MaxValue,
+                script = None,
+                sponsorship = 5
+              )
+            )
+          )
           .anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.base58
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
         }
       }
 
       "with sponsorship, smart token and smart account" in {
         val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey = accountGen.sample.get
+        val sender: PublicKey    = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.id.base58,
+          "feeAssetId"      -> assetId.id.toString,
           "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -211,23 +218,27 @@ class TransactionsRouteSpec
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
         (blockchain.assetDescription _)
           .expects(assetId)
-          .returning(Some(AssetDescription(
-            issuer = accountGen.sample.get,
-            name = "foo".getBytes("UTF-8"),
-            description = "bar".getBytes("UTF-8"),
-            decimals = 8,
-            reissuable = false,
-            totalVolume = Long.MaxValue,
-            script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
-            sponsorship = 5
-          )))
+          .returning(
+            Some(
+              AssetDescription(
+                issuer = accountGen.sample.get,
+                name = "foo".getBytes("UTF-8"),
+                description = "bar".getBytes("UTF-8"),
+                decimals = 8,
+                reissuable = false,
+                totalVolume = Long.MaxValue,
+                script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
+                sponsorship = 5
+              )
+            )
+          )
           .anyNumberOfTimes()
 
         val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.base58
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
         }
       }
@@ -311,7 +322,7 @@ class TransactionsRouteSpec
       forAll(txAvailability) {
         case (tx, height) =>
           (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
-          Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
+          Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
           }
@@ -332,9 +343,9 @@ class TransactionsRouteSpec
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
             if ((r \ "version").as[Int] == 1) {
-              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).base58
+              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).toString
             } else {
-              (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.base58)
+              (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.toString)
             }
           }
         }
@@ -372,11 +383,52 @@ class TransactionsRouteSpec
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
         (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
-        Get(routePath(s"/unconfirmed/info/${tx.id().base58}")) ~> route ~> check {
+        Get(routePath(s"/unconfirmed/info/${tx.id().toString}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual tx.json()
         }
       }
+    }
+  }
+
+  routePath("/sign") - {
+    "function call without args" in {
+      val acc1       = wallet.generateNewAccount().get
+      val acc2       = wallet.generateNewAccount().get
+
+      val funcName          = "func"
+      val funcWithoutArgs   = Json.obj("function" -> funcName)
+      val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
+      val funcWithArgs = InvokeScriptTransaction.functionCallToJson(
+        FUNCTION_CALL(
+          FunctionHeader.User(funcName),
+          List(CONST_LONG(1), CONST_BOOLEAN(true))
+        )
+      )
+
+      def invoke(func: JsObject, expectedArgsLength: Int): Unit = {
+        val ist = Json.obj(
+          "type"       -> InvokeScriptTransaction.typeId,
+          "version"    -> 1,
+          "sender"     -> acc1.stringRepr,
+          "dApp"       -> acc2.stringRepr,
+          "call"       -> func,
+          "payment"    -> Seq[Payment](),
+          "fee"        -> 500000,
+          "feeAssetId" -> JsNull
+        )
+        Post(routePath("/sign"), ist) ~> ApiKeyHeader ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val jsObject = responseAs[JsObject]
+          (jsObject \ "senderPublicKey").as[String] shouldBe acc1.publicKey.toString
+          (jsObject \ "call" \ "function").as[String] shouldBe funcName
+          (jsObject \ "call" \ "args").as[JsArray].value.length shouldBe expectedArgsLength
+        }
+      }
+
+      invoke(funcWithoutArgs, 0)
+      invoke(funcWithEmptyArgs, 0)
+      invoke(funcWithArgs, 2)
     }
   }
 }

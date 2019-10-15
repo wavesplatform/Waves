@@ -10,7 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.WrongChain
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.{validation, _}
 import monix.eval.Coeval
@@ -60,7 +60,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
       Either
-        .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
+        .cond(tx.chainId == currentChainId, (), WrongChain(AddressScheme.current.chainId, tx.chainId))
         .flatMap(_ => IssueTransaction.validateIssueParams(tx))
         .map(_ => tx)
         .foldToTry
@@ -79,7 +79,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
+      _ <- Either.cond(chainId == currentChainId, (), WrongChain(currentChainId, chainId))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
       _ <- Either.cond(script.forall(_.isInstanceOf[ExprScript]),
                        (),

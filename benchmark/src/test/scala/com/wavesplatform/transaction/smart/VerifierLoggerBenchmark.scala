@@ -8,6 +8,7 @@ import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.Log
@@ -49,7 +50,7 @@ object VerifierLoggerBenchmark {
     ).explicitGet()
 
     private val dataTxObj: Terms.CaseObj = Bindings.transactionObject(
-      RealTransactionWrapper(dataTx),
+      RealTransactionWrapper(dataTx, ???, ???, ???).explicitGet(),
       proofsEnabled = true
     )
 

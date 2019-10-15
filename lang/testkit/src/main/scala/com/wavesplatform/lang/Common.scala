@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, EvaluatorV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
@@ -84,7 +84,9 @@ object Common {
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
+    override def multiPaymentAllowed: Boolean                                                                    = ???
   }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

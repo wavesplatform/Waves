@@ -33,7 +33,7 @@ private[api] class CommonTransactionsApi(
 
   def calculateFee(tx: VanillaTransaction): Either[ValidationError, (Asset, Long, Long)] =
     FeeValidation
-      .getMinFee(blockchain, blockchain.height, tx)
+      .getMinFee(blockchain, tx)
       .map {
         case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
           (asset, feeInAsset, feeInWaves)

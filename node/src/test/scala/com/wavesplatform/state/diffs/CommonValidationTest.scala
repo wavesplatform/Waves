@@ -49,11 +49,11 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withLevelDBWriter(settings) { blockchain =>
-          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
+          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
 
-          f(FeeValidation(blockchain, 1, transferTx))
+          f(FeeValidation(blockchain, transferTx))
         }
     }
   }
@@ -72,11 +72,11 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withLevelDBWriter(settings) { blockchain =>
-          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
+          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
 
-          f(FeeValidation(blockchain, 1, transferTx))
+          f(FeeValidation(blockchain, transferTx))
         }
     }
   }
@@ -128,7 +128,11 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           100,
           ts,
           Waves,
-          if (smartToken) { 1 * Constants.UnitsInWave + ScriptExtraFee } else { 1 * Constants.UnitsInWave },
+          if (smartToken) {
+            1 * Constants.UnitsInWave + ScriptExtraFee
+          } else {
+            1 * Constants.UnitsInWave
+          },
           Array.emptyByteArray
         )
         .explicitGet()
@@ -190,11 +194,11 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withLevelDBWriter(settings) { blockchain =>
-          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _) =
+          val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
 
-          f(FeeValidation(blockchain, 1, transferTx))
+          f(FeeValidation(blockchain, transferTx))
         }
     }
   }

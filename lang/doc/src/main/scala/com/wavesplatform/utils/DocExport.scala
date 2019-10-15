@@ -3,8 +3,8 @@ package com.wavesplatform.utils
 import cats.Id
 import cats.kernel.Monoid
 import com.github.mustachejava._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.DocSource
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
@@ -12,8 +12,8 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.utils.doc.RideFullContext
 
 import scala.collection.JavaConverters._
 
@@ -27,26 +27,7 @@ object DocExport {
       val outputFile  = args(3)
 
       val version = DirectiveDictionary[StdLibVersion].idMap(versionStr.toInt)
-      val wavesContext = WavesContext.build[Id](
-        DirectiveSet(version, Account, Expression).explicitGet(),
-        new Environment[Id] {
-          override def height: Long                                                                                    = ???
-          override def chainId: Byte                                                                                   = 66
-          override def inputEntity: Environment.InputEntity                                                            = ???
-          override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-          override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
-          override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
-          override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
-          override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
-          override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-          override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-          override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-          override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-          override def tthis: Recipient.Address                                                                        = ???
-        }
-      )
-
-      val cryptoContext = CryptoContext.build(Global, version)
+      val ds = DirectiveSet(version, Account, Expression).explicitGet()
 
       abstract class TypeDoc {
         val name: String
@@ -79,7 +60,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX[Id] = Monoid.combineAll(Seq(PureContext.build(Global, version), cryptoContext, wavesContext))
+      val fullContext: CTX[Environment] = RideFullContext.build(ds)
 
       def getTypes() = fullContext.types.map(v => typeRepr(v)(v.name))
 

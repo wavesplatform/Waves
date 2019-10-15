@@ -2,8 +2,10 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
 import com.wavesplatform.lang.v1.traits.domain._
@@ -58,20 +60,24 @@ object Bindings {
       case OrdType.Sell => sellType
     }), Map.empty)
 
-  def buildPayment(mpmt: Option[Tx.Pmt]): CaseObj = mpmt match {
-    case None => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-    case Some(pmt) =>
-      CaseObj(
-        paymentType,
-        Map(
-          "amount" -> CONST_LONG(pmt.amount),
-          "assetId" -> (pmt.asset match {
-            case None                 => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-            case Some(asset: ByteStr) => CONST_BYTESTR(asset).explicitGet()
-          })
-        )
-      )
+  private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
+    payments match {
+      case AttachedPayments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
+      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector)
+    }
 
+  private def mapPayment(payment: (Long, Option[ByteStr])): CaseObj = {
+    val (amount, asset) = payment
+    CaseObj(
+      paymentType,
+      Map(
+        "amount" -> CONST_LONG(amount),
+        "assetId" -> (asset match {
+          case None                 => unit
+          case Some(asset: ByteStr) => CONST_BYTESTR(asset).explicitGet()
+        })
+      )
+    )
   }
 
   def orderObject(ord: Ord, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
@@ -97,31 +103,21 @@ object Bindings {
       )
     )
 
-  def buildInvocation(
-      caller: Recipient.Address,
-      callerPk: ByteStr,
-      payment: Option[Pmt],
-      dappAddress: Recipient.Address,
-      transactionId: ByteStr,
-      fee: Long,
-      feeAssetId: Option[ByteStr]
-  ) =
-    CaseObj(
-      invocationType,
-      Map(
-        "caller"          -> mapRecipient(caller)._2,
-        "callerPublicKey" -> callerPk,
-        "payment"         -> buildPayment(payment),
-        "transactionId"   -> transactionId,
-        "fee"             -> fee,
-        "feeAssetId"      -> feeAssetId
-      )
+  def buildInvocation(i: Invocation, version: StdLibVersion): CaseObj = {
+    val fields: Map[String, EVALUATED] = Map(
+      "caller"          -> mapRecipient(i.caller)._2,
+      "callerPublicKey" -> i.callerPk,
+      "transactionId"   -> i.transactionId,
+      "fee"             -> i.fee,
+      "feeAssetId"      -> i.feeAssetId
     )
+    CaseObj(invocationType(version), fields + buildPayments(i.payments))
+  }
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType, Map("bytes" -> sender.bytes))
 
   def scriptTransfer(ct: ScriptTransfer): CaseObj =
-    transactionObject(
+    transferTransactionObject(
       Transfer(
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
                sender = ct.sender,
@@ -144,19 +140,7 @@ object Bindings {
       case Tx.Payment(p, amount, recipient) =>
         CaseObj(buildPaymentTransactionType(proofsEnabled),
                 Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
-      case Tx.Transfer(p, feeAssetId, assetId, amount, recipient, attachment) =>
-        CaseObj(
-          buildTransferTransactionType(proofsEnabled),
-          combine(
-            Map(
-              "amount"     -> amount,
-              "feeAssetId" -> feeAssetId,
-              "assetId"    -> assetId,
-              "attachment" -> attachment
-            ),
-            provenTxPart(p, proofsEnabled) + mapRecipient(recipient)
-          )
-        )
+      case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled)
       case Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           buildIssueTransactionType(proofsEnabled),
@@ -191,17 +175,17 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, addressOrAlias, maybePayment, feeAssetId, funcName, funcArgs) =>
+      case CI(p, addressOrAlias, payments, feeAssetId, funcName, funcArgs) =>
         CaseObj(
-          buildInvokeScriptTransactionType(proofsEnabled),
+          buildInvokeScriptTransactionType(proofsEnabled, version),
           combine(
             Map(
               "dApp"       -> mapRecipient(addressOrAlias)._2,
-              "payment"    -> buildPayment(maybePayment),
               "feeAssetId" -> feeAssetId,
               "function"   -> funcName,
               "args"       -> funcArgs
             ),
+            Map(buildPayments(payments)),
             provenTxPart(p, proofsEnabled)
           )
         )
@@ -263,11 +247,15 @@ object Bindings {
 
         CaseObj(
           buildDataTransactionType(proofsEnabled),
-          combine(Map("data" -> data.map(e => CaseObj(
-            dataEntryType,
-            Map("key" -> CONST_STRING(e.key).explicitGet(), "value" -> mapValue(e.value))
-          ))),
-                  provenTxPart(p, proofsEnabled)
+          combine(
+            Map(
+              "data" -> data.map(
+                e =>
+                  CaseObj(
+                    dataEntryType,
+                    Map("key" -> CONST_STRING(e.key).explicitGet(), "value" -> mapValue(e.value))
+                ))),
+            provenTxPart(p, proofsEnabled)
           )
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
@@ -286,6 +274,37 @@ object Bindings {
           )
         )
     }
+
+  def blockHeaderObject(header: BlockHeader): CaseObj =
+    CaseObj(
+      blockHeader,
+      Map[String, EVALUATED](
+        "timestamp"           -> header.timestamp,
+        "version"             -> header.version,
+        "reference"           -> header.reference,
+        "generator"           -> header.generator,
+        "generatorPublicKey"  -> header.generatorPublicKey,
+        "signature"           -> header.signature,
+        "baseTarget"          -> header.baseTarget,
+        "generationSignature" -> header.generationSignature,
+        "transactionCount"    -> header.transactionCount,
+        "featureVotes"        -> header.featureVotes.map(CONST_LONG)
+      )
+    )
+
+  def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean): CaseObj =
+    CaseObj(
+      buildTransferTransactionType(proofsEnabled),
+      combine(
+        Map(
+          "amount" -> tx.amount,
+          "feeAssetId" -> tx.feeAssetId,
+          "assetId" -> tx.assetId,
+          "attachment" -> tx.attachment
+        ),
+        provenTxPart(tx.p, proofsEnabled) + mapRecipient(tx.recipient)
+      )
+    )
 
   def buildAssetInfo(sAInfo: ScriptAssetInfo) =
     CaseObj(
@@ -314,4 +333,5 @@ object Bindings {
         "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
     )
+
 }

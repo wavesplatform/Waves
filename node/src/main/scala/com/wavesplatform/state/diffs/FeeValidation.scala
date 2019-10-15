@@ -1,10 +1,10 @@
 package com.wavesplatform.state.diffs
 
+import cats.data.Chain
 import cats.implicits._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,8 +15,6 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
-
-import cats.data.Chain
 
 object FeeValidation {
 
@@ -45,15 +43,12 @@ object FeeValidation {
     InvokeScriptTransaction.typeId   -> 5
   )
 
-  def apply(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+  def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
+    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       for {
-        feeDetails <- getMinFee(blockchain, height, tx)
-        minWaves   = feeDetails.minFeeInWaves
-        minFee     = feeDetails.minFeeInAsset
-        feeAssetId = feeDetails.asset
+        feeDetails <- getMinFee(blockchain, tx)
         _ <- Either.cond(
-          minFee <= tx.assetFee._2,
+          feeDetails.minFeeInAsset <= tx.assetFee._2,
           (),
           notEnoughFeeError(tx.builder.typeId, feeDetails, tx.assetFee._2)
         )
@@ -65,8 +60,8 @@ object FeeValidation {
 
   private def notEnoughFeeError(txType: Byte, feeDetails: FeeDetails, feeAmount: Long): ValidationError = {
     val txName      = Constants.TransactionNames(txType)
-    val actualFee   = s"$feeAmount in ${feeDetails.asset.fold("WAVES")(_.id.base58)}"
-    val requiredFee = s"${feeDetails.minFeeInWaves} WAVES${feeDetails.asset.fold("")(id => s" or ${feeDetails.minFeeInAsset} ${id.id.base58}")}"
+    val actualFee   = s"$feeAmount in ${feeDetails.asset.fold("WAVES")(_.id.toString)}"
+    val requiredFee = s"${feeDetails.minFeeInWaves} WAVES${feeDetails.asset.fold("")(id => s" or ${feeDetails.minFeeInAsset} ${id.id.toString}")}"
 
     val errorMessage = s"Fee for $txName ($actualFee) does not exceed minimal value of $requiredFee."
 
@@ -75,7 +70,7 @@ object FeeValidation {
 
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)
 
-  private def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = {
+  private def feeInUnits(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Long] = {
     FeeConstants
       .get(tx.builder.typeId)
       .map { baseFee =>
@@ -83,14 +78,11 @@ object FeeValidation {
           case tx: MassTransferTransaction =>
             baseFee + (tx.transfers.size + 1) / 2
           case tx: DataTransaction =>
-            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
+            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
           case itx: IssueTransaction =>
-            lazy val nftActivated = blockchain.activatedFeatures
-              .get(BlockchainFeatures.ReduceNFTFee.id)
-              .exists(_ <= height)
-
-            val multiplier = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+            lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+            val multiplier        = if (itx.isNFT && nftActivated) NFTMultiplier else 1
 
             (baseFee * multiplier).toLong
           case _ => baseFee
@@ -99,24 +91,24 @@ object FeeValidation {
       .toRight(UnsupportedTransactionType)
   }
 
-  private def feeAfterSponsorship(txAsset: Asset, height: Int, blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeInfo] = {
-    if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+  private def feeAfterSponsorship(txAsset: Asset, blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeInfo] = {
+    if (blockchain.height < Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
       // This could be true for private blockchains
-      feeInUnits(blockchain, height, tx).map(x => FeeInfo(None, Chain.empty, x * FeeUnit))
+      feeInUnits(blockchain, tx).map(x => FeeInfo(None, Chain.empty, x * FeeUnit))
     } else {
       for {
-        feeInUnits <- feeInUnits(blockchain, height, tx)
+        feeInUnits <- feeInUnits(blockchain, tx)
         r <- txAsset match {
           case Waves => Right(FeeInfo(None, Chain.empty, feeInUnits * FeeUnit))
           case assetId @ IssuedAsset(_) =>
             for {
               assetInfo <- blockchain
                 .assetDescription(assetId)
-                .toRight(GenericError(s"Asset ${assetId.id.base58} does not exist, cannot be used to pay fees"))
+                .toRight(GenericError(s"Asset ${assetId.id.toString} does not exist, cannot be used to pay fees"))
               wavesFee <- Either.cond(
                 assetInfo.sponsorship > 0,
                 feeInUnits * FeeUnit,
-                GenericError(s"Asset ${assetId.id.base58} is not sponsored, cannot be used to pay fees")
+                GenericError(s"Asset ${assetId.id.toString} is not sponsored, cannot be used to pay fees")
               )
             } yield FeeInfo(Some((assetId, assetInfo)), Chain.empty, wavesFee)
         }
@@ -168,8 +160,8 @@ object FeeValidation {
     FeeInfo(feeAssetInfo, extraRequeirements ++ reqs, feeAmount + extraFee)
   }
 
-  def getMinFee(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, FeeDetails] = {
-    feeAfterSponsorship(tx.assetFee._1, height, blockchain, tx)
+  def getMinFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, FeeDetails] = {
+    feeAfterSponsorship(tx.assetFee._1, blockchain, tx)
       .map(feeAfterSmartTokens(blockchain, tx))
       .map(feeAfterSmartAccounts(blockchain, tx))
       .map {

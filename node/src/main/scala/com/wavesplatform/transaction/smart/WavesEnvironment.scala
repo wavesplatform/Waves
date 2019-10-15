@@ -4,6 +4,9 @@ import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
@@ -15,24 +18,33 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
+import scala.util.Try
+
 object WavesEnvironment {
   type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
 }
 
-class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain, address: Coeval[ByteStr])
-    extends Environment[Id] {
+class WavesEnvironment(
+  nByte: Byte,
+  in: Coeval[Environment.InputEntity],
+  h: Coeval[Int],
+  blockchain: Blockchain,
+  address: Coeval[ByteStr],
+  ds: DirectiveSet
+) extends Environment[Id] {
+
   override def height: Long = h()
 
-  override def inputEntity: Environment.InputEntity = {
-    in.apply()
-      .map(InputPoly)
-  }
+  override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transactionInfo(ByteStr(id))
       .map(_._2)
-      .map(tx => RealTransactionWrapper(tx, Some(id)))
+      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, Some(ByteStr.empty))).explicitGet())
+
+  override def inputEntity: InputEntity =
+    in.value
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
@@ -121,4 +133,22 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
       generatorPublicKey = ByteStr(blockH.signerData.generator)
     )
   }
+
+  override def blockHeaderParser(bytes: Array[Byte]): Option[domain.BlockHeader] =
+    Try {
+      val header = BlockHeader.readHeaderOnly(bytes)
+
+      domain.BlockHeader(
+        header.timestamp,
+        header.version,
+        header.reference,
+        header.signerData.generator.toAddress.bytes,
+        header.signerData.generator.bytes,
+        header.signerData.signature,
+        header.consensusData.baseTarget,
+        header.consensusData.generationSignature,
+        header.transactionCount,
+        header.featureVotes.map(_.toLong).toSeq.sorted
+      )
+    }.toOption
 }
