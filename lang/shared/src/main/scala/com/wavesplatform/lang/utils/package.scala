@@ -42,6 +42,7 @@ package object utils {
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
       override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
       override def tthis: Recipient.Address                                                                        = ???
+      override def multiPaymentAllowed: Boolean                                                                    = ???
     }
     directives
       .filter(_.isRight)

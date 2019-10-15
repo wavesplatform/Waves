@@ -75,6 +75,7 @@ object JsAPI {
         override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
         override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
         override def tthis: Recipient.Address                                                                        = ???
+        override def multiPaymentAllowed: Boolean                                                                    = ???
       }
     )
 
@@ -143,7 +144,8 @@ object JsAPI {
       "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"           -> ContractLimits.MaxPaymentAmount
+      "MaxPaymentAmount"           -> ContractLimits.MaxTransferPaymentAmount,
+      "MaxAttachedPaymentAmount"   -> ContractLimits.MaxAttachedPaymentAmount
     )
   }
 

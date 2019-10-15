@@ -4,6 +4,9 @@ import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
@@ -21,20 +24,27 @@ object WavesEnvironment {
   type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
 }
 
-class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain, address: Coeval[ByteStr])
-    extends Environment {
+class WavesEnvironment(
+  nByte: Byte,
+  in: Coeval[Environment.InputEntity],
+  h: Coeval[Int],
+  blockchain: Blockchain,
+  address: Coeval[ByteStr],
+  ds: DirectiveSet
+) extends Environment {
+  
   override def height: Long = h()
 
-  override def inputEntity: Environment.InputEntity = {
-    in.apply()
-      .map(InputPoly)
-  }
+  override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transactionInfo(ByteStr(id))
       .map(_._2)
-      .map(tx => RealTransactionWrapper(tx, Some(id)))
+      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, Some(ByteStr.empty))).explicitGet())
+
+  override def inputEntity: InputEntity =
+    in.value
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
