@@ -5,8 +5,7 @@ import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
@@ -16,7 +15,7 @@ import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.validation.{validateAmount, validateAttachment, validateFee}
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, JsString, JsValue, Json}
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Try}
 
@@ -32,9 +31,10 @@ case class TransferTransaction(
     attachment: Array[Byte],
     proofs: Proofs
 ) extends VersionedTransaction
+    with SignatureField
     with FastHashId {
 
-  override val typeId: Byte                   = TransferTransaction.transactionType.toByte
+  override val typeId: Byte                   = TransferTransaction.typeId
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransferTransaction.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(TransferTransaction.bytes(this))
   override val assetFee: (Asset, Long)        = (feeAssetId, fee)
@@ -55,15 +55,13 @@ case class TransferTransaction(
     case a: IssuedAsset => Seq(a)
   }
 
-  //todo: (NODE-1915) from SignedTransaction
-  override def proofField: Seq[(String, JsValue)] =
-    super.proofField ++ (if (version == 1.toByte) Seq("signature" -> JsString(this.proofs.toSignature.toString)) else Seq())
-
   //todo: (NODE-1915) remove after refactoring
   override def builder: TransactionParser = TransferTransaction.transactionParserStub
 }
 
 object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
+  import ByteReaders._
+  import cats.instances.try_._
 
   val transactionType: TransactionType = TransactionType(4)
   val typeId: Byte                     = transactionType.toByte
@@ -113,6 +111,7 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
       .toEither
       .leftMap(_.head)
 
+  // create
   def apply(
       version: Byte,
       asset: Asset,
@@ -128,6 +127,7 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
     validate(amount, asset, fee, feeAsset, attachment)
       .map(_ => TransferTransaction(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, proofs))
 
+  // signed
   def apply(
       version: Byte,
       asset: Asset,
@@ -145,6 +145,7 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
         unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
       }
 
+  // selfSigned
   def selfSigned(
       version: Byte,
       asset: Asset,
@@ -158,51 +159,51 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
   ): Either[ValidationError, TransferTransaction] =
     apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, sender)
 
-  override def supportedVersions: Set[TransactionVersion] = Set(TransactionVersion(1), TransactionVersion(2))
+  override def supportedVersions: Set[TransactionVersion] = Versions.keySet
 
-  private val V1Body: ByteEntity[TransferTransaction] =
-    (
-      SignatureBytes(1, "Signature"),
-      ConstantByte(2, value = typeId, name = "Transaction type"),
-      PublicKeyBytes(3, "Sender's public key"),
-      OptionBytes[IssuedAsset](4, "Asset ID", AssetIdBytes(4, "Asset ID"), "flag (1 - asset, 0 - Waves)"),
-      OptionBytes[IssuedAsset](5, "Fee's asset ID", AssetIdBytes(5, "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
-      LongBytes(6, "Timestamp"),
-      LongBytes(7, "Amount"),
-      LongBytes(8, "Fee"),
-      AddressOrAliasBytes(9, "Recipient"),
-      BytesArrayUndefinedLength(10, "Attachment", TransferTransaction.MaxAttachmentSize)
-    ) mapN {
-      case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
-        require(txId == typeId, s"Signed tx id is not match")
-        TransferTransaction(
-          1.toByte,
-          timestamp,
-          senderPublicKey,
-          recipient,
-          assetId.getOrElse(Waves),
-          amount,
-          feeAssetId.getOrElse(Waves),
-          fee,
-          attachments,
-          Proofs(Seq(signature))
-        )
-    }
-
-  private val V2Body: ByteEntity[TransferTransaction] =
-    (
-      PublicKeyBytes(1, "Sender's public key"),
-      OptionBytes(2, "Asset ID", AssetIdBytes(2, "Asset ID"), "flag (1 - asset, 0 - Waves)"),
-      OptionBytes(3, "Fee's asset ID", AssetIdBytes(3, "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
-      LongBytes(4, "Timestamp"),
-      LongBytes(5, "Amount"),
-      LongBytes(6, "Fee"),
-      AddressOrAliasBytes(7, "Recipient"),
-      BytesArrayUndefinedLength(8, "Attachment", TransferTransaction.MaxAttachmentSize),
-      ProofsBytes(9)
-    ) mapN {
-      case (senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments, proofs) =>
-        TransferTransaction(
+  private val Versions: Map[TransactionVersion, Array[Byte] => Try[TransferTransaction]] = Map(
+    TransactionVersion(1) -> { body =>
+      (
+        SignatureBytes(1, "Signature"),
+        ConstantByte(2, value = typeId, name = "Transaction type"),
+        PublicKeyBytes(3, "Sender's public key"),
+        OptionBytes[IssuedAsset](4, "Asset ID", AssetIdBytes(4, "Asset ID"), "flag (1 - asset, 0 - Waves)"),
+        OptionBytes[IssuedAsset](5, "Fee's asset ID", AssetIdBytes(5, "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+        LongBytes(6, "Timestamp"),
+        LongBytes(7, "Amount"),
+        LongBytes(8, "Fee"),
+        AddressOrAliasBytes(9, "Recipient"),
+        BytesArrayUndefinedLength(10, "Attachment", TransferTransaction.MaxAttachmentSize)
+      ) mapN {
+        case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
+          require(txId == typeId, s"Signed tx id is not match")
+          TransferTransaction(
+            1.toByte,
+            timestamp,
+            senderPublicKey,
+            recipient,
+            assetId.getOrElse(Waves),
+            amount,
+            feeAssetId.getOrElse(Waves),
+            fee,
+            attachments,
+            Proofs(Seq(signature))
+          )
+      } deserializeFromByteArray body
+    },
+    TransactionVersion(2) -> { body =>
+      (
+        for {
+          senderPublicKey <- publicKeyReader
+          assetId         <- optionReader(assetIdReader)
+          feeAssetId      <- optionReader(assetIdReader)
+          timestamp       <- longReader
+          amount          <- longReader
+          fee             <- longReader
+          recipient       <- addressOrAliasReader
+          attachments     <- bytesArrayUndefinedLengthReader(TransferTransaction.MaxAttachmentSize)
+          proofs          <- proofsReader()
+        } yield TransferTransaction(
           2.toByte,
           timestamp,
           senderPublicKey,
@@ -214,18 +215,20 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
           attachments,
           proofs
         )
+      ).read(body)
     }
+  )
 
   override def parseBody(body: Array[Byte], version: TransactionVersion): Try[TransferTransaction] =
-    if (version == TransactionVersion(1)) V1Body.deserializeFromByteArray(body).flatMap { tx =>
-      validate(tx)
-        .map(_ => tx)
-        .foldToTry
-    } else if (version == TransactionVersion(2)) V2Body.deserializeFromByteArray(body).flatMap { tx =>
-      validate(tx)
-        .map(_ => tx)
-        .foldToTry
-    } else Failure(new IllegalArgumentException(s"Unknown version: $version"))
+    Versions.get(version) match {
+      case Some(reader) =>
+        reader(body).flatMap { tx =>
+          validate(tx)
+            .map(_ => tx)
+            .foldToTry
+        }
+      case None => Failure(new IllegalArgumentException(s"Unknown version: $version"))
+    }
 
   // todo: (NODE-1915) #forTypeSet used in AddressTransactions, rewrite to new parsers
   val transactionParserStub: TransactionParser = new TransactionParserFor[TransferTransaction]() {
@@ -233,9 +236,9 @@ object TransferTransaction extends FallbackVersionParser[TransferTransaction] {
 
     override def typeId: Byte                                                      = TransferTransaction.typeId
     override def supportedVersions: Set[Byte]                                      = TransferTransaction.supportedVersions.map(_.toByte)
-    override protected def parseHeader(bytes: Array[Byte]): Try[Int]               = ???
-    override protected def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = ???
-    override val byteHeaderDescription: ByteEntity[Unit]                           = BytesArrayUndefinedLength(0, "", 100).map(_ => ???)
-    override val byteTailDescription: ByteEntity[TransferTransaction]              = BytesArrayUndefinedLength(0, "", 100).map(_ => ???)
+    override protected def parseHeader(bytes: Array[Byte]): Try[Int]               = Failure(new NotImplementedError)
+    override protected def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Failure(new NotImplementedError)
+    override val byteHeaderDescription: ByteEntity[Unit]                           = Nop()
+    override val byteTailDescription: ByteEntity[TransferTransaction]              = Nop()
   }
 }
