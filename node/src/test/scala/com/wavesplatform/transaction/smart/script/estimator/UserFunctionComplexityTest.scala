@@ -158,7 +158,6 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV3 = {
     utils.functionCosts(V3)
-    val directives = DirectiveSet(V3, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
