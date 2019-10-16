@@ -17,6 +17,7 @@ def dockerImage
 def wavesVersion
 def useNodeSbtCache = false
 def dockerRegistryCreds = 'dockerhub-wavesnode-creds'
+def dockerRegistryAddress = 'https://index.docker.io/v1/'
 
 properties([
 
@@ -80,11 +81,24 @@ node('vostok'){
                                 mkdir -p ./.ivy2 ./.sbt
                             """
                             replacement="as builder\nCOPY ./.ivy2 /root/.ivy2\nCOPY ./.sbt /root/.sbt"
-                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement)
+                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement).replace('sbt "node/assembly"','true')
                         }
-                        
-                        def dockerImageBuilder = ut.buildDockerImage('', dockerRegistryCreds, 'wavesbuilder', wavesVersion, "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKCAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch} --target builder --no-cache", true)
-                        dockerImage = ut.buildDockerImage('', dockerRegistryCreds, dockerImageName, wavesVersion, "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch}", true)
+                        def dockerImageBuilder = imageIt(
+                            dockerRegistryAddress: dockerRegistryAddress,
+                            dockerRegistryCreds: dockerRegistryCreds,
+                            imageName: 'wavesbuilder',
+                            dockerTag: wavesVersion,
+                            args: "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch} --target builder --no-cache",
+                            skipPush: true
+                        )
+                        dockerImage = imageIt(
+                            dockerRegistryAddress: dockerRegistryAddress,
+                            dockerRegistryCreds: dockerRegistryCreds,
+                            imageName: dockerImageName,
+                            dockerTag: wavesVersion,
+                            args: "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch}",
+                            skipPush: true
+                        )
                         sh  """
                                 id=\$(docker create wavesbuilder:${wavesVersion})
                                 docker cp \${id}:/out "${env.WORKSPACE}"
@@ -147,9 +161,9 @@ node('vostok'){
                 }
 
                 stage ('Pushing docker image'){
-                    docker.withRegistry('', dockerRegistryCreds) {
+                    docker.withRegistry(dockerRegistryAddress, dockerRegistryCreds) {
                         if (dockerTags.contains(wavesVersion)){
-                            dockerImage.push()    
+                            dockerImage.push()
                         }
                         if (dockerTags.contains('latest')){
                             dockerImage.push("latest")
@@ -170,7 +184,7 @@ node('vostok'){
             finally{
                 sh "tar -czvf artifacts.tar.gz -C ${artifactsDir} ."
                 archiveArtifacts artifacts: 'artifacts.tar.gz'
-                ut.notifySlack("jenkins-notifications", currentBuild.result)
+                slackIt(buildStatus:currentBuild.result)
             }
         }
     }
