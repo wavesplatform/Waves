@@ -417,6 +417,9 @@ node("vostok||wavesnode"){
                             )
                             sh "cp -R kubeItOut node/${artifactsDir}"
                         }
+                        else{
+                            org.jenkinsci.plugins.pipeline.modeldefinition.Utils.markStageSkippedForConditional('Deploy Wallet')
+                        }
                     }
                 }
             }
