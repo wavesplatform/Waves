@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v2.estimator.EstimatorContext.EvalM
 import com.wavesplatform.lang.v2.estimator.EstimatorContext.Lenses._
 import monix.eval.Coeval
 
-object ScriptEstimatorV2 extends ScriptEstimator {
+abstract class NewScriptEstimator extends ScriptEstimator {
   override def apply(
     vars:  Set[String],
     funcs: Map[FunctionHeader, Coeval[Long]],
@@ -22,7 +22,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     evalExpr(expr).run(EstimatorContext(v, f)).value._2
   }
 
-  private def evalExpr(t: EXPR): EvalM[Long] =
+  protected def evalExpr(t: EXPR): EvalM[Long] =
     t match {
       case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
       case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
@@ -34,13 +34,8 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
     }
 
-  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] = {
-    val letResult = (false, evalExpr(let.value))
-    for {
-      _ <- update(lets.modify(_)(_.updated(let.name, letResult)))
-      r <- evalExpr(inner)
-    } yield r + 5
-  }
+  protected def evalLetBlock(let: LET, inner: EXPR): EvalM[Long]
+  protected def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long]
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     local {
@@ -73,21 +68,6 @@ object ScriptEstimatorV2 extends ScriptEstimator {
     update(lets.modify(_)(_.updated(key, (true, lzy))))
       .flatMap(_ => lzy)
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
-    for {
-      condComplexity             <- evalExpr(cond)
-      right@(_, rightComplexity) <- local(withCtx(evalExpr(ifTrue)))
-      left@(_, leftComplexity)   <- local(withCtx(evalExpr(ifFalse)))
-      (newCtx, complexity) = if (rightComplexity > leftComplexity) right else left
-      _ <- set[Id, EstimatorContext, ExecutionError](newCtx)
-    } yield condComplexity + complexity + 1
-
-  private def withCtx(eval: EvalM[Long]): EvalM[(EstimatorContext, Long)] =
-    for {
-      r   <- eval
-      ctx <- get[Id, EstimatorContext, ExecutionError]
-    } yield (ctx, r)
-
   private def evalGetter(expr: EXPR): EvalM[Long] =
     evalExpr(expr).map(_ + 2)
 
@@ -116,7 +96,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =
     args.traverse(evalExpr).map(_.sum)
 
-  private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
+  protected def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
     modify[Id, EstimatorContext, ExecutionError](f)
 
   private def const(l: Long): EvalM[Long] =

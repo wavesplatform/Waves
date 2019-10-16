@@ -1,70 +1,19 @@
 package com.wavesplatform.lang.v1
 
-import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{V2, V3}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ContextfulVal
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.sumLong
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v2.estimator.{ScriptEstimatorV2, ScriptEstimatorV3}
+import com.wavesplatform.lang.utils.functionCosts
 import monix.eval.Coeval
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ScriptEstimatorTest(estimator: ScriptEstimator)
-  extends PropSpec
-     with PropertyChecks
-     with Matchers
-     with ScriptGen
-     with NoShrink {
-
-  val Plus  = FunctionHeader.Native(SUM_LONG)
-  val Minus = FunctionHeader.Native(SUB_LONG)
-  val Gt    = FunctionHeader.Native(GT_LONG)
-
-  val FunctionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
-
-  private val env = Common.emptyBlockchainEnvironment()
-
-  protected val ctx = {
-    val transactionType = Types.buildTransferTransactionType(true)
-    val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
-    Monoid
-      .combineAll(Seq(
-        PureContext.build(Global, V3).withEnvironment[Environment],
-        CryptoContext.build(Global, V3).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet.contractDirectiveSet),
-        CTX[NoContext](
-          Seq(transactionType),
-          Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),
-          Array.empty
-        ).withEnvironment[Environment]
-      ))
-  }
-
-  protected def compile(code: String): EXPR = {
-    val untyped = Parser.parseExpr(code).get.value
-    ExpressionCompiler(ctx.compilerContext, untyped).map(_._1).explicitGet()
-  }
-
-  protected def estimate(functionCosts: Map[FunctionHeader, Coeval[Long]], script: EXPR) =
-    estimator(ctx.evaluationContext(env).letDefs.keySet, functionCosts, script)
-
+class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3) {
   property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
       FUNCTION_CALL(Plus, List(CONST_LONG(1), acc))
@@ -463,36 +412,5 @@ class ScriptEstimatorTest(estimator: ScriptEstimator)
         3     /* 1 + 1 param            */ +
         1     /* 1 param                */ +
         1     /* 1 param                */
-  }
-
-  property("isolated if/then blocks estimation") {
-    def expr(invokeValInThenBlock: Boolean) =
-      s"""
-         | func complex() = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
-         |
-         | let a = complex()
-         | let b = a + complex()
-         | if (true)
-         |   then WriteSet([${ if (invokeValInThenBlock) """DataEntry("a", a)""" else "" }])
-         |   else WriteSet([DataEntry("a", b)])
-      """.stripMargin
-
-    val costs = functionCosts(V3)
-    estimate(costs, compile(expr(true))) shouldBe estimate(costs, compile(expr(false)))
-  }
-
-  property("let block outer scope reach") {
-    val script =
-      """
-        | let a = 1
-        | let b = a
-        | let c = {
-        |   let unused = 1
-        |   a
-        | }
-        | c == b
-      """.stripMargin
-
-    estimate(functionCosts(V3), compile(script))  shouldBe Right(30)
   }
 }
