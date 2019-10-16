@@ -610,7 +610,7 @@ object PureContext {
   lazy val unitVarName = "unit"
 
   private def singleObj(ty: CASETYPEREF, v: Map[String,EVALUATED] = Map.empty) = {
-    ty -> LazyVal(EitherT.pure(CaseObj(ty, v))),
+    ty -> LazyVal(EitherT.pure(CaseObj(ty, v)))
   }
 
   private lazy val vars: Map[String, (FINAL, LazyVal)] = Map(

@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
@@ -9,7 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -19,16 +19,16 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi, assertDiffEiTraced, produce}
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -45,12 +45,6 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.collection.immutable
 
 class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
-
-  def ciFee(sc: Int = 0): Gen[Long] =
-    Gen.choose(
-      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + sc * FeeValidation.ScriptExtraFee,
-      FeeValidation.FeeUnit * FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * FeeValidation.ScriptExtraFee - 1
-    )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -236,13 +230,13 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             CryptoContext.build(Global, V3),
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), DirectiveSet.contractDirectiveSet)
             )
           )
         )
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr)
+    compiler.ContractCompiler(ctx.compilerContext, expr, V3)
   }
 
   def writeSet(funcName: String, count: Int): DApp = {
@@ -293,25 +287,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
 
     compileContractFromExpr(expr)
-  }
-
-  def compileContractFromExpr(expr: Expressions.DAPP): DApp = {
-    val ctx = {
-      utils.functionCosts(V3)
-      Monoid
-        .combineAll(
-          Seq(
-            PureContext.build(Global, V3),
-            CryptoContext.build(Global, V3),
-            WavesContext.build(
-              DirectiveSet(V3, Account, DAppType).explicitGet(),
-              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
-            )
-          )
-        )
-    }
-
-    compiler.ContractCompiler(ctx.compilerContext, expr).right.get
   }
 
   def simplePreconditionsAndSetContract(

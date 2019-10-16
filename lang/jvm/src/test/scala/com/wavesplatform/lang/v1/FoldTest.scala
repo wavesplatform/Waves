@@ -34,6 +34,7 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = unavailable
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = unavailable
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = unavailable
+    override def multiPaymentAllowed: Boolean                                                                    = unavailable
   }
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {

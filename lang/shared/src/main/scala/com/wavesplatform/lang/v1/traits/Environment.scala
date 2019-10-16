@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
+import monix.eval.Coeval
 import shapeless._
 
 object Environment {
@@ -23,4 +24,5 @@ trait Environment {
   def resolveAlias(name: String): Either[String, Recipient.Address]
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long]
   def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]
+  def multiPaymentAllowed: Boolean
 }

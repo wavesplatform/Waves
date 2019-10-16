@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -20,18 +21,20 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
+import com.wavesplatform.transaction.smart.buildThisValue
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import org.scalacheck.Gen
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
-class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with PathMockFactory {
   val T = 'T'.toByte
 
   def letProof(p: Proofs, prefix: String)(i: Int) =
@@ -265,7 +268,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("InvokeScriptTransaction binding") {
-    forAll(invokeScriptGen) { t =>
+    forAll(invokeScriptGen(paymentOptionGen)) { t =>
       val checkArgsScript = if (t.funcCallOpt.get.args.nonEmpty) {
         t.funcCallOpt.get.args
       .collect {
@@ -292,29 +295,65 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |   }
            |   let dappAddress = dAppAddressBytes == base58'${t.dAppAddressOrAlias.bytes.toString}'
            |
-            |   let paymentAmount = if(${t.payment.nonEmpty})
-           |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
+           |   let paymentAmount = if(${t.payments.nonEmpty})
+           |     then extract(t.payment).amount == ${t.payments.headOption.map(_.amount).getOrElse(-1)}
            |     else isDefined(t.payment) == false
            |
-            |   let paymentAssetId = if(${t.payment.nonEmpty})
-           |     then if (${t.payment.headOption.exists(_.assetId != Waves)})
-           |             then extract(t.payment).assetId == base58'${t.payment.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
+           |   let paymentAssetId = if(${t.payments.nonEmpty})
+           |     then if (${t.payments.headOption.exists(_.assetId != Waves)})
+           |             then extract(t.payment).assetId == base58'${t.payments.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
            |             else isDefined(extract(t.payment).assetId) == false
            |     else isDefined(t.payment) == false
            |
-            |   let feeAssetId = if (${t.feeAssetId != Waves})
+           |   let feeAssetId = if (${t.feeAssetId != Waves})
            |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
            |      else isDefined(t.feeAssetId) == false
            |
-            |   let checkFunc = t.function == "${t.funcCallOpt.get.function.funcName}"
+           |   let checkFunc = t.function == "${t.funcCallOpt.get.function.funcName}"
            |   $checkArgsScript
 
            |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId && checkFunc && checkArgs
            |
-            | case other => throw()
+           | case other => throw()
            | }
            |""".stripMargin
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V3)
+      result shouldBe evaluated(true)
+    }
+  }
+
+  property("InvokeScriptTransaction V4 context multiple payments") {
+    forAll(invokeScriptGen(paymentListGen)) { t =>
+      val paymentsStr = t.payments
+        .flatMap(_.assetId.maybeBase58Repr)
+        .map(a => s"base58'$a'")
+        .reverse
+        .mkString("[", ",", "]")
+
+      val script =
+        s"""
+           | func assetsAmountSum(acc: Int, p: AttachedPayment) = acc + p.amount
+           | func extractAssets(acc: List[ByteVector], p: AttachedPayment) =
+           |   match p.assetId {
+           |     case _: Unit       => acc
+           |     case a: ByteVector => a :: acc
+           |   }
+           |
+           | match tx {
+           |   case t : InvokeScriptTransaction =>
+           |     let paymentAmount = FOLD<${t.payments.size}>(t.payments, 0, assetsAmountSum) == ${t.payments.map(_.amount).sum}
+           |     let paymentAssets = FOLD<${t.payments.size}>(t.payments, nil, extractAssets) == $paymentsStr
+           |
+           |     paymentAmount && paymentAssets
+           |
+           |   case other => throw()
+           | }
+           |""".stripMargin
+
+      val blockchain  = stub[Blockchain]
+      (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+
+      val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
       result shouldBe evaluated(true)
     }
   }
@@ -596,6 +635,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
+    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
       PureContext
         .build(Global, V2) |+|
@@ -603,8 +643,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           .build(Global, V2) |+|
         WavesContext
           .build(
-            DirectiveSet(V2, Asset, Expression).explicitGet(),
-            new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null))
+            directives,
+            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(???), directives)
           )
 
     for {
@@ -619,15 +659,22 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
+    val directives = DirectiveSet(V2, Account, Expression).explicitGet()
+    val blockchain  = stub[Blockchain]
+    (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+
+    val env = new WavesEnvironment(
+      chainId,
+      Coeval(buildThisValue(t, blockchain, directives, None).explicitGet()),
+      null,
+      EmptyBlockchain,
+      Coeval(null),
+      directives
+    )
     val ctx =
       PureContext.build(Global, V2) |+|
-        CryptoContext
-          .build(Global, V2) |+|
-        WavesContext
-          .build(
-            DirectiveSet(V2, Account, Expression).explicitGet(),
-            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
-          )
+      CryptoContext.build(Global, V2) |+|
+      WavesContext.build(directives, env)
 
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)

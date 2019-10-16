@@ -1,7 +1,11 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -58,17 +62,22 @@ object RealTransactionWrapper {
     case a: Alias   => Recipient.Alias(a.name)
   }
 
-  def apply(tx: Transaction, txIdOpt: Option[ByteStr] = None): Tx = {
+  def apply(
+    tx: Transaction,
+    blockchain: Blockchain,
+    stdLibVersion: StdLibVersion,
+    target: AttachedPaymentTarget
+  ): Either[ExecutionError, Tx] =
     tx match {
-      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient)
-      case t: TransferTransaction => mapTransferTx(t)
+      case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
+      case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>
-        Tx.Issue(proven(i), i.quantity, ByteStr(i.name), ByteStr(i.description), i.reissuable, i.decimals, i.script.map(_.bytes()))
-      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable)
-      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id)
-      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient)
-      case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId)
-      case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name)
+        Tx.Issue(proven(i), i.quantity, ByteStr(i.name), ByteStr(i.description), i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
+      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
+      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
+      case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
+      case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId).asRight
+      case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name).asRight
       case ms: MassTransferTransaction =>
         Tx.MassTransfer(
           proven(ms),
@@ -77,12 +86,12 @@ object RealTransactionWrapper {
           totalAmount = ms.transfers.map(_.amount).sum,
           transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
           attachment = ByteStr(ms.attachment)
-        )
-      case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes()))
-      case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes()))
-      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient)
-      case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
-      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee)
+        ).asRight
+      case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
+      case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
+      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient).asRight
+      case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder).asRight
+      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee).asRight
       case d: DataTransaction =>
         Tx.Data(
           proven(d),
@@ -92,18 +101,20 @@ object RealTransactionWrapper {
             case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
             case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
           }.toIndexedSeq
-        )
+        ).asRight
       case ci: InvokeScriptTransaction =>
-        Tx.CI(
-          proven(ci),
-          ci.dAppAddressOrAlias,
-          ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)),
-          ci.feeAssetId.compatId,
-          ci.funcCallOpt.map(_.function.funcName),
-          ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
-        )
+        AttachedPaymentExtractor.extractPayments(ci, stdLibVersion, blockchain, target)
+            .map { payments =>
+              Tx.CI(
+                proven(ci),
+                ci.dAppAddressOrAlias,
+                payments,
+                ci.feeAssetId.compatId,
+                ci.funcCallOpt.map(_.function.funcName),
+                ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
+              )
+            }
     }
-  }
 
   def mapTransferTx(t: TransferTransaction): Tx.Transfer =
     Tx.Transfer(

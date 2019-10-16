@@ -460,19 +460,20 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           val ctx = {
             utils.functionCosts(V3)
+            val directives = DirectiveSet(V3, Account, Expression).explicitGet()
             Monoid
               .combineAll(
                 Seq(
                   PureContext.build(Global, V3),
                   CryptoContext.build(Global, V3),
                   WavesContext.build(
-                    DirectiveSet(V3, Account, Expression).explicitGet(),
-                    new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+                    directives,
+                    new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives)
                   )
                 ))
           }
 
-          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr).explicitGet()).explicitGet()
+          val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
           val setScriptTx    = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
