@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
-// todo: (NODE-1915) Rename
+// todo: (NODE-1915) Relevant name
 trait NewTransactionParser[T <: Transaction] {
   def transactionType: TransactionType
   def supportedVersions: Set[TransactionVersion]
@@ -10,29 +10,6 @@ trait NewTransactionParser[T <: Transaction] {
 }
 
 object NewTransactionParser {
-
-  val HardcodedV1Offset  = 1
-  val OneVersionOffset   = 2
-  val MultiVersionOffset = 3
-
-  def parseTypeId(bytes: Array[Byte]): Try[TransactionType] =
-    bytes match {
-      case modernTypeId(typeId) => Success(typeId)
-      case oldTypeId(typeId)    => Success(typeId)
-      case data if data.isEmpty => Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty"))
-      case data                 => Failure(new IllegalArgumentException(s"Can't determine the type of transaction: the buffer has ${data.length} bytes"))
-    }
-
-  def oldBodyOffset(bytes: Array[Byte]): Try[Int] =
-    for {
-      _ <- expectedMinSize(bytes, 2)
-    } yield OneVersionOffset
-
-  def modernBodyOffset(bytes: Array[Byte]): Try[Int] =
-    for {
-      _ <- expectedMinSize(bytes, 3)
-      _ <- Either.cond(bytes.head == 0, (), new IllegalArgumentException(s"Expected the '0' byte, but got '${bytes.head}'")).toTry
-    } yield MultiVersionOffset
 
   def expectedMinSize(bytes: Array[Byte], size: Int): Try[Unit] =
     Either
@@ -60,22 +37,6 @@ object NewTransactionParser {
         new IllegalArgumentException(s"Expected version of transaction ${supportedVersions.mkString(", ")}, but got '$parsedVersion'")
       )
       .toTry
-
-  private[this] object modernTypeId {
-    def unapply(bytes: Array[Byte]): Option[TransactionType] =
-      bytes match {
-        case data if data.length >= 2 && data.head == 0 => Some(TransactionType(data(1)))
-        case _                                          => None
-      }
-  }
-
-  private[this] object oldTypeId {
-    def unapply(bytes: Array[Byte]): Option[TransactionType] =
-      bytes match {
-        case data if data.nonEmpty => Some(TransactionType(data.head))
-        case _                     => None
-      }
-  }
 }
 
 // todo: (NODE-1915) Relevant name
@@ -88,14 +49,21 @@ trait HeadedTransactionParser[T <: Transaction] extends NewTransactionParser[T] 
 
   def parseBytes(bytes: Array[Byte]): Try[T] =
     for {
-      (offset, parsedVersion, parsedTxType) <- parseHeaderInfo(bytes)
-      _                                     <- expectedType(transactionType, parsedTxType)
-      _                                     <- expectedVersion(parsedVersion, supportedVersions)
-      tx                                    <- parseBody(bytes.drop(offset), parsedVersion)
+      (offset, parsedVersion, parsedType) <- parseHeaderInfo(bytes)
+      _                                   <- expectedType(transactionType, parsedType)
+      _                                   <- expectedVersion(parsedVersion, supportedVersions)
+      tx                                  <- parseBody(bytes.drop(offset), parsedVersion)
     } yield tx
 }
 
+object HeadedTransactionParser {
+  val HardcodedV1Offset  = 1
+  val OneVersionOffset   = 2
+  val MultiVersionOffset = 3
+}
+
 trait HardcodedV1Parser[T <: Transaction] extends HeadedTransactionParser[T] {
+  import HeadedTransactionParser._
   import NewTransactionParser._
 
   val Version1: TransactionVersion = TransactionVersion(1)
@@ -116,6 +84,7 @@ trait HardcodedV1Parser[T <: Transaction] extends HeadedTransactionParser[T] {
 }
 
 trait OneVersionParser[T <: Transaction] extends HeadedTransactionParser[T] {
+  import HeadedTransactionParser._
   import NewTransactionParser._
 
   def version: TransactionVersion
@@ -135,6 +104,7 @@ trait OneVersionParser[T <: Transaction] extends HeadedTransactionParser[T] {
 }
 
 trait FallbackVersionParser[T <: Transaction] extends HeadedTransactionParser[T] {
+  import HeadedTransactionParser._
   import NewTransactionParser._
 
   override def parseHeaderInfo(bytes: Array[Byte]): Try[(Int, TransactionVersion, TransactionType)] =

@@ -17,10 +17,6 @@ object TransactionParsers {
   val TypeLength                 = 1
   val SignatureStringLength: Int = base58Length(SignatureLength)
 
-  private val parsers: Map[TransactionType, NewTransactionParser[_ <: Transaction]] = Map(
-    TransferTransaction.transactionType -> TransferTransaction
-  )
-
   private val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
     PaymentTransaction,
@@ -71,20 +67,22 @@ object TransactionParsers {
 
   // todo: (NODE-1915) Rewrite
   def parseBytes(data: Array[Byte]): Try[Transaction] =
-    data.headOption
-      .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
-      .flatMap { headByte =>
-        for {
-          typeId <- NewTransactionParser.parseTypeId(data)
-          tx <- parsers
-            .get(typeId)
-            .fold(if (headByte == 0) modernParseBytes(data) else oldParseBytes(headByte, data))(_.parseBytes(data))
-        } yield tx
+    NewTransactionParsers
+      .parseBytes(data)
+      .recoverWith {
+        case _: UnsupportedOperationException =>
+          data.headOption
+            .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
+            .flatMap { headByte =>
+              if (headByte == 0) modernParseBytes(data)
+              else oldParseBytes(headByte, data)
+            }
       }
 
   def forTypes(types: Byte*): Set[TransactionParser] =
     forTypeSet(types.toSet)
 
+  // todo: (NODE-1915) Used in tests
   def forTypeSet(types: Set[Byte]): Set[TransactionParser] =
     (all.values.toList :+ TransferTransaction.transactionParserStub).filter(tp => types.contains(tp.typeId)).toSet
 
