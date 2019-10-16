@@ -1,6 +1,7 @@
 package com.wavesplatform.utils
 
 import cats.Id
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, TRUE}
@@ -13,7 +14,7 @@ import monix.eval.Coeval
 import org.scalatest.{FreeSpec, Matchers}
 
 class UtilsSpecification extends FreeSpec with Matchers {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ???)
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet)
 
   "estimate()" - {
     "handles functions that depend on each other" in {
