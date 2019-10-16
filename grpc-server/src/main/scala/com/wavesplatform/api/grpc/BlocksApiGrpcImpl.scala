@@ -10,6 +10,7 @@ import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.stub.StreamObserver
+import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 
 import scala.concurrent.Future

@@ -11,8 +11,10 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.state.diffs.smart.predef.chainId
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
@@ -20,22 +22,21 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet)
 
-  private def estimate(expr: EXPR, ctx: CTX, funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
-    estimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
+  private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
+    estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
   }
 
   private val ctxV1 = {
     utils.functionCosts(V1)
-    val directives = DirectiveSet(V1, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V1),
-          CryptoContext.build(Global, V1),
+          PureContext.build(Global, V1).withEnvironment[Environment],
+          CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
-            directives,
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives),
+            DirectiveSet(V1, Account, Expression).explicitGet()
           )
         ))
   }
@@ -93,15 +94,13 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV2 = {
     utils.functionCosts(V2)
-    val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V2),
-          CryptoContext.build(Global, V2),
+          PureContext.build(Global, V2).withEnvironment[Environment],
+          CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
-            directives,
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives)
+            DirectiveSet(V2, Account, Expression).explicitGet()
           )
         ))
   }
@@ -159,15 +158,13 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
 
   private val ctxV3 = {
     utils.functionCosts(V3)
-    val directives = DirectiveSet(V3, Account, Expression).explicitGet()
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V3),
-          CryptoContext.build(Global, V3),
+          PureContext.build(Global, V3).withEnvironment[Environment],
+          CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
-            directives,
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives)
+            DirectiveSet(V3, Account, Expression).explicitGet()
           )
         ))
   }

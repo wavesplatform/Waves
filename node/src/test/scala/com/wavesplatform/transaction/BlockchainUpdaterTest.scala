@@ -10,9 +10,10 @@ import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.produce
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
+
+import scala.util.Try
 
 class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithDomain {
 
@@ -35,7 +36,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
         doubleFeaturesPeriodsAfterHeight = 300,
         preActivatedFeatures = Map.empty
       )
-    ))
+    )
+  )
 
   def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(block)
@@ -200,7 +202,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   }
 
   "block processing should fail if unimplemented feature was activated on blockchain when autoShutdownOnUnsupportedFeature = yes and exit with code 38" in withDomain(
-    WavesSettings) { domain =>
+    WavesSettings
+  ) { domain =>
     val b      = domain.blockchainUpdater
     val signal = new Semaphore(1)
     signal.acquire()
@@ -220,11 +223,13 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
 
     b.processBlock(genesisBlock)
 
-    (1 to ApprovalPeriod * 2).foreach { i =>
+    (1 to ApprovalPeriod * 2 - 2).foreach { _ =>
       b.processBlock(getNextTestBlockWithVotes(b, Set(-1))).explicitGet()
     }
 
-    b.processBlock(getNextTestBlockWithVotes(b, Set(-1))) should produce("ACTIVATED ON BLOCKCHAIN")
+    Try(b.processBlock(getNextTestBlockWithVotes(b, Set(-1)))).recover {
+      case _: SecurityException => // NOP
+    }
 
     signal.tryAcquire(10, TimeUnit.SECONDS)
 

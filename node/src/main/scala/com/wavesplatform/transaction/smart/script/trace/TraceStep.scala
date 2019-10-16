@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script.trace
 
+import cats.Id
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -87,7 +88,7 @@ object TraceStep {
   private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =
     "type" -> (if (isAssetScript) "Asset" else "Account")
 
-  private def logJson(l: Log): (String, JsValueWrapper) =
+  private def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
       case (k, Right(v))  => Json.obj("name" -> k, "value" -> v.toString)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)

@@ -4,6 +4,7 @@ import java.io.BufferedWriter
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.TimeUnit
 
+import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -53,7 +54,7 @@ object VerifierLoggerBenchmark {
       proofsEnabled = true
     )
 
-    val value: (Log, Either[String, EVALUATED]) =
+    val value: (Log[Id], Either[String, EVALUATED]) =
       (
         List.fill(500)("txVal" -> Right(dataTxObj)),
         Right(CONST_BOOLEAN(true))

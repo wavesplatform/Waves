@@ -44,16 +44,17 @@ object MinerDebugInfo {
   final case class Error(error: String) extends State
 }
 
-class MinerImpl(allChannels: ChannelGroup,
-                blockchainUpdater: BlockchainUpdater with NG,
-                settings: WavesSettings,
-                timeService: Time,
-                utx: UtxPoolImpl,
-                wallet: Wallet,
-                pos: PoSSelector,
-                val minerScheduler: SchedulerService,
-                val appenderScheduler: SchedulerService)
-    extends Miner
+class MinerImpl(
+    allChannels: ChannelGroup,
+    blockchainUpdater: BlockchainUpdater with NG,
+    settings: WavesSettings,
+    timeService: Time,
+    utx: UtxPoolImpl,
+    wallet: Wallet,
+    pos: PoSSelector,
+    val minerScheduler: SchedulerService,
+    val appenderScheduler: SchedulerService
+) extends Miner
     with MinerDebugInfo
     with ScorexLogging {
 
@@ -85,12 +86,14 @@ class MinerImpl(allChannels: ChannelGroup,
     Either
       .cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
       .left
-      .flatMap(blockAge =>
-        Either.cond(
-          blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
-          (),
-          s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
-      ))
+      .flatMap(
+        blockAge =>
+          Either.cond(
+            blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
+            (),
+            s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
+          )
+      )
 
   private def checkScript(account: KeyPair): Either[String, Unit] = {
     Either.cond(!blockchainUpdater.hasScript(account), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
@@ -104,13 +107,15 @@ class MinerImpl(allChannels: ChannelGroup,
     }.delayExecution(delay)
   }
 
-  private def consensusData(height: Int,
-                            account: KeyPair,
-                            lastBlock: Block,
-                            refBlockBT: Long,
-                            refBlockTS: Long,
-                            balance: Long,
-                            currentTime: Long): Either[String, NxtLikeConsensusBlockData] = {
+  private def consensusData(
+      height: Int,
+      account: KeyPair,
+      lastBlock: Block,
+      refBlockBT: Long,
+      refBlockTS: Long,
+      balance: Long,
+      currentTime: Long
+  ): Either[String, NxtLikeConsensusBlockData] = {
     pos
       .consensusData(
         account.publicKey,
@@ -143,14 +148,17 @@ class MinerImpl(allChannels: ChannelGroup,
         .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
         .leftMap(_.toString)
         .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
-      _ = log.debug(s"Forging with ${account.stringRepr}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
-      _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
+      _ = log.debug(
+        s"Forging with ${account.toAddress}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID at $height with target $refBlockBT"
+      )
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      (unconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime))
-      _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+      (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
+        utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime)
+      )
+      unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
+      _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version), blockRewardVote(version))
         .leftMap(_.err)
@@ -217,7 +225,7 @@ class MinerImpl(allChannels: ChannelGroup,
       }
     } match {
       case Right(offset) =>
-        log.debug(s"Next attempt for acc=$account in $offset")
+        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f")
         generateOneBlockTask(account)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
@@ -255,10 +263,12 @@ class MinerImpl(allChannels: ChannelGroup,
       .runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
   }
 
-  private[this] def startMicroBlockMining(account: KeyPair,
-                                          lastBlock: Block,
-                                          constraints: MiningConstraints,
-                                          restTotalConstraint: MiningConstraint): Unit = {
+  private[this] def startMicroBlockMining(
+      account: KeyPair,
+      lastBlock: Block,
+      constraints: MiningConstraints,
+      restTotalConstraint: MiningConstraint
+  ): Unit = {
     log.info(s"Start mining microblocks")
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner

@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, BlockHeader, SignerData}
@@ -13,9 +14,11 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
@@ -100,9 +103,13 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
     )
 
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX = PureContext.build(Global, V4) |+| CryptoContext.build(Global, V4) |+| WavesContext.build(ds, env)
+    val ctx: CTX[Environment] =
+      PureContext.build(Global, V4).withEnvironment[Environment]    |+|
+      CryptoContext.build(Global, V4) .withEnvironment[Environment] |+|
+      WavesContext.build(ds)
+
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => new EvaluatorV1[Id, Environment].apply(ctx.evaluationContext(env), v._1))
   }
 
 }
