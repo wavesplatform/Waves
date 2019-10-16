@@ -4,7 +4,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
+import org.parboiled2.RuleTrace.NonTerminal
 import org.parboiled2._
+
+import scala.util.Try
 
 
 abstract class Accessor extends Positioned
@@ -13,7 +16,7 @@ case class GetterAcc(position: Pos, name: PART[String])                  extends
 case class ListIndexAcc(position: Pos, index: EXPR)                      extends Accessor
 
 case class BinaryOpWithExpr(op: BinaryOperation, expr: EXPR)
-case class IdAndTypes(id: PART[String], types: Seq[PART[String]])
+case class IdAndTypes(id: PART[String], types: Seq[(PART[String], Option[PART[String]])])
 
 class Parser2(val input: ParserInput) extends Parser {
 
@@ -21,9 +24,11 @@ class Parser2(val input: ParserInput) extends Parser {
 
 
 
-  def DAppRoot: Rule1[DAPP] = rule{push(cursor) ~ WS ~ zeroOrMore(WS ~ Decl) ~ zeroOrMore(WS ~ AnnotatedFunc) ~ WS ~ push(cursor) ~ EOI ~> parseDAppRoot _}
+  def DAppRoot: Rule1[DAPP] = rule{push(cursor) ~ WS ~ zeroOrMore(Directive ~ WS) ~ zeroOrMore(WS ~ Decl) ~ zeroOrMore(WS ~ AnnotatedFunc) ~ WS ~ push(cursor) ~ EOI ~> parseDAppRoot _}
 
   def ScriptRoot: Rule1[EXPR] = rule{push(cursor) ~ zeroOrMore(WS ~ Decl) ~ WS ~ Expr ~ push(cursor) ~> parseScriptRoot _}
+
+  def Directive: Rule0 = rule{"{-#" ~ oneOrMore(noneOf("\n#")) ~ "#-}"}
 
   def Decl: Rule1[Declaration] = rule{Func | Let}
 
@@ -31,7 +36,7 @@ class Parser2(val input: ParserInput) extends Parser {
   def Annotation: Rule1[ANNOTATION] = rule{push(cursor) ~ "@" ~ IdentifierAtom ~ WS ~ "(" ~ WS ~ zeroOrMore(IdentifierAtom).separatedBy(WS ~ "," ~ WS) ~ WS ~ ")" ~ push(cursor) ~> parseAnnotation _}
 
   def Func: Rule1[FUNC] = rule{push(cursor) ~ "func" ~ WS ~ IdentifierAtom ~ WS ~ "(" ~ WS ~ zeroOrMore(FuncArg).separatedBy(WS ~ "," ~ WS) ~ WS ~ ")" ~ WS ~ "=" ~ WS ~ Expr ~ push(cursor) ~> parseFunc _}
-  def FuncArg: Rule1[IdAndTypes] = rule{IdentifierAtom ~ WS ~ ":" ~ WS ~ TypesAtom ~> IdAndTypes}
+  def FuncArg: Rule1[IdAndTypes] = rule{IdentifierAtom ~ WS ~ ":" ~ WS ~ GenericTypesAtom ~> IdAndTypes}
 
   def Let: Rule1[LET] = rule{push(cursor) ~ "let" ~ WS ~ IdentifierAtom ~ WS ~ "=" ~ WS ~ Expr ~ push(cursor) ~> parseLet _}
 
@@ -46,7 +51,9 @@ class Parser2(val input: ParserInput) extends Parser {
   def ConsOpAtom: Rule1[EXPR] = rule{push(cursor) ~ SumGroupOpAtom ~ zeroOrMore(WS ~ CONSOP ~ WS ~ SumGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def SumGroupOpAtom: Rule1[EXPR] = rule{push(cursor) ~ MultGroupOpAtom ~ zeroOrMore(WS ~ SUM_GROUP_OP ~ WS ~ MultGroupOpAtom ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
   def MultGroupOpAtom: Rule1[EXPR] = rule{push(cursor) ~ AtomExpr ~ zeroOrMore(WS ~ MULT_GROUP_OP ~ WS ~ AtomExpr ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _}
-  def AtomExpr: Rule1[EXPR] = rule{push(cursor) ~ optional(UNARY_OP) ~ WS ~ (GettableExpr | If | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _}
+  def AtomExpr: Rule1[EXPR] = rule{push(cursor) ~ optional(UNARY_OP) ~ WS ~ (Fold | GettableExpr | If | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _}
+
+  def Fold: Rule1[EXPR] = rule{push(cursor) ~ "FOLD" ~ WS ~ "<" ~ WS ~ capture(Digits) ~ WS ~ ">" ~ WS ~ "(" ~ WS ~ Expr ~ WS ~ "," ~ WS ~ Expr ~ WS ~ "," ~ WS ~ ReferenceAtom ~ WS ~ ")" ~ push(cursor) ~> parseFoldExpr _}
 
   def GettableExpr: Rule1[EXPR] = rule{(ParExpr | Block | FunctionCall | ReferenceAtom) ~ zeroOrMore(WS ~ (ListAccess | ("." ~ WS ~ (FunctionCallAccess | IdentifierAtomAccess)))) ~ push(cursor) ~> parseGettableExpr _}
   def FunctionCallAccess: Rule1[Accessor] = rule{FunctionCall ~ push(cursor) ~> parseFunctionCallAccess _}
@@ -99,7 +106,9 @@ class Parser2(val input: ParserInput) extends Parser {
   def IdentifierAtom: Rule1[PART[String]] = rule{push(cursor) ~ capture(!ReservedWords ~ Char ~ zeroOrMore(Char | Digit)) ~ push(cursor) ~> parseIdentifierAtom _}
   def ReferenceAtom: Rule1[EXPR] = rule{push(cursor) ~ capture(!ReservedWords ~ Char ~ zeroOrMore(Char | Digit)) ~ push(cursor) ~> parseReferenceAtom _}
 
+  def GenericTypesAtom: Rule1[Seq[(PART[String], Option[PART[String]])]] = rule{oneOrMore(OneGenericTypeAtom).separatedBy(WS ~ "|" ~ WS)}
   def TypesAtom: Rule1[Seq[PART[String]]] = rule{oneOrMore(OneTypeAtom).separatedBy(WS ~ "|" ~ WS)}
+  def OneGenericTypeAtom: Rule1[(PART[String], Option[PART[String]])] = rule{capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ OneTypeAtom ~ WS ~ "]" ~ WS) ~> parseGenericTypeAtom _}
   def OneTypeAtom: Rule1[PART[String]] = rule{capture(Char ~ zeroOrMore(Char | Digit)) ~> parseOneTypeAtom _}
 
   def ByteVectorAtom: Rule1[EXPR] = rule{push(cursor) ~ capture("base" ~ ("58" | "64" | "16")) ~ "'" ~ capture(zeroOrMore(ByteBaseChar)) ~ push(cursor) ~> parseByteVectorAtom _ ~ "'"}
@@ -157,13 +166,18 @@ class Parser2(val input: ParserInput) extends Parser {
     FUNC(
       Pos(startPos, endPos),
       name,
-      argAndTypesList.map(el => (el.id, el.types)),
+      argAndTypesList.map(el => (el.id, el.types)) : FuncArgs,
       expr
     )
   }
 
   def parseLet(startPos: Int, name: PART[String], value: EXPR, endPos: Int): LET = {
     LET(Pos(startPos, endPos), name, value, Seq.empty)
+  }
+
+  // TODO Check right convertion
+  def parseFoldExpr(startPos: Int, limitNumStr: String, list: EXPR, acc: EXPR, f: EXPR, endPos: Int): EXPR = {
+    Macro.unwrapFold(Pos(startPos, endPos), limitNumStr.toInt, list, acc, f.asInstanceOf[REF])
   }
 
   // TODO проверить правильность позиции
@@ -261,6 +275,10 @@ class Parser2(val input: ParserInput) extends Parser {
     argTypeList
   }
 
+  def parseGenericTypeAtom(genericTypeName: String, typeName: Option[PART[String]]): (PART[String], Option[PART[String]]) = {
+    (PART.VALID(Pos(0, 0), genericTypeName), typeName)
+  }
+
   def parseOneTypeAtom(typeName: String): PART[String] = {
     PART.VALID(Pos(0, 0), typeName)
   }
@@ -298,12 +316,35 @@ class Parser2(val input: ParserInput) extends Parser {
 
 object Parser2 {
 
-  def parseExpression(scriptStr: String) = {
-    new Parser2(scriptStr).ScriptRoot.run().get
+  final case class ParsingError(start: Int, end: Int, message: String)
+
+  def parseExpression(scriptStr: String): Try[EXPR] = {
+    new Parser2(scriptStr).ScriptRoot.run()
   }
 
-  def parseDAPP(scriptStr: String) = {
-    val result = new Parser2(scriptStr).DAppRoot.run()
-    result
+  def parseDAPP(scriptStr: String): Either[ParseError, DAPP] = {
+
+    val source = new StringBuilder(scriptStr)
+
+    def clearChar(pos: Int): Unit = {
+      if (pos >= 0) {
+        if (" \n\r".contains(source.charAt(pos))) {
+          clearChar(pos - 1)
+        } else {
+          source.setCharAt(pos, ' ')
+        }
+      }
+    }
+
+    new Parser2(scriptStr).DAppRoot.run().toEither.left.flatMap {
+      ex =>
+        val errorLastPos = ex.asInstanceOf[ParseError].position.index
+        if (errorLastPos > 0 ) {
+          clearChar(errorLastPos - 1)
+          parseDAPP(source.toString())
+        } else {
+          Left(ex.asInstanceOf[ParseError])
+        }
+    }
   }
 }

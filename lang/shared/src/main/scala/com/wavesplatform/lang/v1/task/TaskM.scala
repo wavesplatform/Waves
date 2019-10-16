@@ -43,6 +43,13 @@ trait TaskM[S, E, R] {
       case Left(err) => f(err).inner
     }))
   }
+
+  def handleError(): TaskM[S, E, (Option[R], List[E])] = {
+    TaskM.fromKleisli(inner.flatMap({
+      case Right(v)  => Kleisli.pure((Some(v), List.empty).asRight)
+      case Left(err) => Kleisli.pure((None, List(err)).asRight)
+    }))
+  }
 }
 
 object TaskM {

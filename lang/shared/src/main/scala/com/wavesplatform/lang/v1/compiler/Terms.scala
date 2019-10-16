@@ -12,12 +12,14 @@ object Terms {
   private val DATA_TX_BYTES_MAX = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
 
   sealed abstract class DECLARATION {
+    def name: String
     def toStr: Coeval[String]
     override def toString: String = toStr()
     def isItFailed: Boolean = false
   }
-  case class FAILED_DEC(error: CompilationError) extends DECLARATION {
-    def toStr: Coeval[String] = Coeval.now(error.message)
+  case class FAILED_DEC() extends DECLARATION {
+    def name = "NO_NAME"
+    def toStr: Coeval[String] = Coeval.now("Error")
     override def isItFailed: Boolean = true
   }
   case class LET(name: String, value: EXPR)                     extends DECLARATION {
@@ -34,10 +36,12 @@ object Terms {
   sealed abstract class EXPR {
     def toStr: Coeval[String]
     override def toString: String = toStr()
+    def isItFailed: Boolean = false
   }
 
-  case class FAILED_EXPR(error: CompilationError) extends EXPR {
-    def toStr: Coeval[String] = Coeval.now(error.message)
+  case class FAILED_EXPR() extends EXPR {
+    def toStr: Coeval[String] = Coeval.now("error")
+    override def isItFailed: Boolean = true
   }
 
   case class GETTER(expr: EXPR, field: String)                         extends EXPR {
