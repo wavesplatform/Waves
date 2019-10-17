@@ -8,7 +8,7 @@ You can use it to build your own decentralised applications. Waves provides full
 
 There is a huge collection of nodes deployed by miners that store all of the network information in the chain of blocks (blockchain), process requests and can add new transactions to the network after checking their compliance with the rules. The miners are rewarded with the network coins called MRT. 
 
-The main advantage of this technology is that each node is a synchronized copy of the main blockchain: it means that the information is stored decentralized and won't be overwritten globally if one of the users changes it at one of the node storages. This can garantee that the user's information will stay fair and unchangable. 
+The main advantage of this technology is that each node is a synchronized copy of the main blockchain: it means that the information is stored decentralized and won't be overwritten globally if one of the users changes it at one of the node storages. This can guarantee that the user's information will stay fair and unchangeable. 
 
 
 
@@ -42,7 +42,7 @@ The node can be built and installed wherever java can run. For ***Ubuntu***,sbt 
 
 ```
 sudo apt-get update
-sudo apt-get install deafult-jre default-jdk
+sudo apt-get install default-jre default-jdk
 ```
 
 - ### Installing SBT
@@ -120,7 +120,7 @@ You can replace waves-all*.jar with actual jar name (it should have "all"-word):
 java -jar node/target/waves-all*.jar path/to/config/file
 ```
 
-**Note.** For OSX - homebrew is preferable choice. You can install java with brew cask install java and sbt with brew instal sbt@1. Build/Test steps are common for any OS (but you should use ‘' instead of '/' in windows). {% endprettyhint %}
+**Note.** For OSX - homebrew is preferable choice. You can install java with brew cask install java and sbt with brew install sbt@1. Build/Test steps are common for any OS (but you should use ‘' instead of '/' in windows). {% endprettyhint %}
 
 
 

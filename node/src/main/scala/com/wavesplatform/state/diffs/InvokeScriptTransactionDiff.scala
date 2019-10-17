@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
@@ -17,6 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResult}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.metrics._
@@ -25,14 +27,14 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{AttachedPaymentExtractor, DApp, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -50,43 +52,46 @@ object InvokeScriptTransactionDiff {
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(_, contract))) =>
+      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-            val environment = new WavesEnvironment(
-              AddressScheme.current.chainId,
-              Coeval(tx.asInstanceOf[In]),
-              Coeval(blockchain.height),
-              blockchain,
-              Coeval(tx.dAppAddressOrAlias.bytes)
-            )
-            val invoker                                       = tx.sender.toAddress.bytes
-            val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-            val invocation = ContractEvaluator.Invocation(
-              functioncall,
-              Recipient.Address(invoker),
-              tx.sender,
-              maybePayment,
-              tx.dAppAddressOrAlias.bytes,
-              tx.id.value,
-              tx.fee,
-              tx.feeAssetId.compatId
-            )
+            val invoker = tx.sender.toAddress.bytes
             val result = for {
-              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              directives <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
+              input <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
+              payments <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
+              invocation = ContractEvaluator.Invocation(
+                functioncall,
+                Recipient.Address(invoker),
+                tx.sender,
+                payments,
+                tx.dAppAddressOrAlias.bytes,
+                tx.id.value,
+                tx.fee,
+                tx.feeAssetId.compatId
+              )
+              environment = new WavesEnvironment(
+                AddressScheme.current.chainId,
+                Coeval.evalOnce(input),
+                Coeval(blockchain.height),
+                blockchain,
+                Coeval(tx.dAppAddressOrAlias.bytes),
+                directives
+              )
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(
                     Seq(
-                      PureContext.build(Global, V3),
-                      CryptoContext.build(Global, V3),
-                      WavesContext.build(directives, environment)
+                      PureContext.build(Global, V3).withEnvironment[Environment],
+                      CryptoContext.build(Global, V3).withEnvironment[Environment],
+                      WavesContext.build(directives)
                     )
                   )
-                  .evaluationContext,
+                  .evaluationContext(environment),
                 contract,
-                invocation
+                invocation,
+                version
               )
             } yield (evaluator, invocationComplexity)
 
@@ -160,13 +165,14 @@ object InvokeScriptTransactionDiff {
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) 1 else 0)
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               (),
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for $txName with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES.")
             )
           }
           scriptsInvoked <- TracedResult {
@@ -176,12 +182,14 @@ object InvokeScriptTransactionDiff {
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES.")
             )
           }
 
@@ -222,7 +230,7 @@ object InvokeScriptTransactionDiff {
     } else {
       val totalDataBytes = dataEntries.map(_.toBytes.length).sum
 
-      val payablePart: Map[Address, Portfolio] = tx.payment
+      val payablePart: Map[Address, Portfolio] = tx.payments
         .map {
           case InvokeScriptTransaction.Payment(amt, assetId) =>
             assetId match {
@@ -251,7 +259,7 @@ object InvokeScriptTransactionDiff {
   private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
       ps: List[(Recipient.Address, Long, Option[ByteStr])],
       dataDiff: Diff): TracedResult[ValidationError, Diff] = {
-    if (ps.length <= ContractLimits.MaxPaymentAmount) {
+    if (ps.length <= ContractLimits.MaxTransferPaymentAmount) {
       val foldResult = ps.foldLeft(TracedResult(dataDiff.asRight[ValidationError])) { (tracedDiffAcc, payment) =>
         val (addressRepr, amount, asset) = payment
         val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
@@ -289,7 +297,7 @@ object InvokeScriptTransactionDiff {
       }
       TracedResult(foldResult.resultE.map(_ => Diff.stateOps()), foldResult.trace)
     } else {
-      Left(GenericError(s"Too many ScriptTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
+      Left(GenericError(s"Too many ScriptTransfers: max: ${ContractLimits.MaxTransferPaymentAmount}, actual: ${ps.length}"))
     }
   }
 

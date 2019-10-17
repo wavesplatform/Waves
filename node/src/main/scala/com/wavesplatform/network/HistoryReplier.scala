@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.util.concurrent.UncheckedExecutionException
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
@@ -18,11 +19,13 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
 
   private implicit val s: SchedulerService = scheduler
 
+  // both caches call .get so that NoSuchElementException is thrown and only successfully loaded (micro)blocks are cached
+
   private val knownMicroBlocks = CacheBuilder
     .newBuilder()
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
     .build(new CacheLoader[MicroBlockSignature, Array[Byte]] {
-      override def load(key: MicroBlockSignature) =
+      override def load(key: MicroBlockSignature): Array[Byte] =
         ng.microBlock(key)
           .map(m => MicroBlockResponseSpec.serializeData(MicroBlockResponse(m)))
           .get
@@ -35,40 +38,48 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
       override def load(key: ByteStr) = ng.blockBytes(key).get
     })
 
+  private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Message]]): Unit =
+    loader.map {
+      case Some(msg) if ctx.channel().isOpen => ctx.writeAndFlush(msg)
+      case _                                 =>
+    }.runAsyncLogErr
+
+  private def handlingNSE[A](f: => A): Option[A] =
+    try Some(f)
+    catch {
+      case uee: UncheckedExecutionException if uee.getCause != null && uee.getCause.isInstanceOf[NoSuchElementException] => None
+    }
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) =>
-      Task {
-        val nextIds = otherSigs.view
-          .map(id => id -> ng.blockIdsAfter(id, settings.maxChainLength))
-          .collectFirst { case (parent, Some(ids)) => parent +: ids }
+      respondWith(
+        ctx,
+        Task {
+          val nextIds = otherSigs.view
+            .map(id => id -> ng.blockIdsAfter(id, settings.maxChainLength))
+            .collectFirst { case (parent, Some(ids)) => parent +: ids }
 
-        nextIds match {
-          case Some(extension) =>
-            log.debug(
-              s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent ${extension.head} and sending total of ${extension.length} signatures")
-            ctx.writeAndFlush(Signatures(extension))
-          case None =>
-            log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
+          nextIds match {
+            case Some(extension) =>
+              log.debug(
+                s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent ${extension.head} and sending total of ${extension.length} signatures"
+              )
+              Some(Signatures(extension))
+            case None =>
+              log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
+              None
+          }
         }
-      }.runAsyncLogErr
+      )
 
     case GetBlock(sig) =>
-      Task(knownBlocks.get(sig)).map(bytes => ctx.writeAndFlush(RawBytes(BlockSpec.messageCode, bytes))).logErrDiscardNoSuchElementException.runAsyncLogErr
+      respondWith(ctx, Task(handlingNSE(knownBlocks.get(sig)).map(bytes => RawBytes(BlockSpec.messageCode, bytes))))
 
-    case mbr @ MicroBlockRequest(totalResBlockSig) =>
-      Task(knownMicroBlocks.get(totalResBlockSig))
-        .map { bytes =>
-          ctx.writeAndFlush(RawBytes(MicroBlockResponseSpec.messageCode, bytes))
-          log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
-        }
-        .logErrDiscardNoSuchElementException
-        .runAsyncLogErr
+    case MicroBlockRequest(totalResBlockSig) =>
+      respondWith(ctx, Task(handlingNSE(knownMicroBlocks.get(totalResBlockSig)).map(bytes => RawBytes(MicroBlockResponseSpec.messageCode, bytes))))
 
     case _: Handshake =>
-      Task {
-        if (ctx.channel().isOpen)
-          ctx.writeAndFlush(LocalScoreChanged(ng.score))
-      }.runAsyncLogErr
+      respondWith(ctx, Task(Some(LocalScoreChanged(ng.score))))
 
     case _ => super.channelRead(ctx, msg)
   }
@@ -77,7 +88,5 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
 }
 
 object HistoryReplier {
-
   case class CacheSizes(blocks: Long, microBlocks: Long)
-
 }

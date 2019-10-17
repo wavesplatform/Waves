@@ -14,7 +14,7 @@ object JavaAdapter {
     Monoid.combineAll(
       Seq(
         CryptoContext.compilerContext(Global, version),
-        WavesContext.build(???, null).compilerContext,
+        WavesContext.build(???).compilerContext,
         PureContext.build(Global, version).compilerContext
       ))
 

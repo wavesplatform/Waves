@@ -11,13 +11,13 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with PathMockFactory with TransactionGen with NoShrink {
   "OneDimensionalMiningConstraint" - {
     "should be full if the limit is 0, but not overfilled" in {
-      val tank = createConstConstraint(0, 1)
+      val tank = createConstConstraint(0, 1, "const")
       tank shouldBe 'full
-      tank should not be ('overfilled)
+      tank should not be 'overfilled
     }
 
     "put(transaction)" - tests { (maxTxs, txs) =>
-      val constraint = createConstConstraint(maxTxs, transactionSize = 1)
+      val constraint = createConstConstraint(maxTxs, transactionSize = 1, "txSize")
       txs.foldLeft(constraint)(_.put(stub[Blockchain], _, Diff.empty))
     }
   }
@@ -30,8 +30,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items don't reach the limit" in forAll(dontReachLimitGen) { updatedConstraint =>
-      updatedConstraint should not be ('full)
-      updatedConstraint should not be ('overfilled)
+      updatedConstraint should not be 'full
+      updatedConstraint should not be 'overfilled
     }
 
     val reachSoftLimitGen: Gen[MiningConstraint] = for {
@@ -41,7 +41,7 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
 
     "multiple items reach the limit softly" in forAll(reachSoftLimitGen) { updatedConstraint =>
       updatedConstraint shouldBe 'full
-      updatedConstraint should not be ('overfilled)
+      updatedConstraint should not be 'overfilled
     }
 
     val reachHardLimitGen: Gen[MiningConstraint] = for {

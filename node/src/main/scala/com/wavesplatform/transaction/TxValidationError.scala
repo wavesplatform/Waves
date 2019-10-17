@@ -1,4 +1,5 @@
 package com.wavesplatform.transaction
+import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -48,21 +49,21 @@ object TxValidationError {
     def isAssetScript: Boolean
   }
 
-  case class ScriptExecutionError(error: String, log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType {
+  case class ScriptExecutionError(error: String, log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
       val target = if (isAssetScript) "Asset" else "Account"
       s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
     }
   }
 
-  case class TransactionNotAllowedByScript(log: Log, isAssetScript: Boolean) extends ValidationError with HasScriptType {
+  case class TransactionNotAllowedByScript(log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
       val target = if (isAssetScript) "Asset" else "Account"
       s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
     }
   }
 
-  def logToString(log: Log): String =
+  def logToString(log: Log[Id]): String =
     if (log.isEmpty) ""
     else {
       log

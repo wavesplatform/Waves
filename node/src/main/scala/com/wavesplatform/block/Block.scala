@@ -263,7 +263,8 @@ case class Block private[block] (override val timestamp: Long,
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String =
-    s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes, reward=$rewardVote)"
+    s"Block(${signerData.signature} -> ${reference.trim}, " +
+      s"txs=${transactionData.size}, features=$featureVotes${if (rewardVote >= 0) s", rewardVote=$rewardVote" else ""})"
 
   def getHeader(): BlockHeader =
     new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)

@@ -1,11 +1,12 @@
 package com.wavesplatform.lang.contract
 
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.protobuf.dapp.DAppMeta
 
 case class DApp(
@@ -19,7 +20,7 @@ object DApp {
 
   sealed trait Annotation {
     def invocationArgName: String
-    def dic: Map[String, FINAL]
+    def dic(version: StdLibVersion): Map[String, FINAL]
   }
   object Annotation {
     def parse(name: String, args: List[String]): Either[CompilationError, Annotation] = {
@@ -41,10 +42,13 @@ object DApp {
     }
   }
   case class CallableAnnotation(invocationArgName: String) extends Annotation {
-    lazy val dic = Map(invocationArgName -> com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType)
+    override def dic(version: StdLibVersion): Map[String, FINAL] =
+      Map(invocationArgName -> Types.invocationType(version))
   }
+
   case class VerifierAnnotation(invocationArgName: String) extends Annotation {
-    lazy val dic = Map(invocationArgName -> WavesContext.verifierInput)
+    override def dic(version: StdLibVersion): Map[String, FINAL] =
+      Map(invocationArgName -> Types.verifierInput)
   }
 
   sealed trait AnnotatedFunction {

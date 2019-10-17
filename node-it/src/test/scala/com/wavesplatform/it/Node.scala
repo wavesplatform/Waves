@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import java.net.{InetSocketAddress, URL}
+import java.util.concurrent.TimeUnit
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
@@ -9,6 +10,7 @@ import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.LoggerFacade
+import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory
@@ -24,6 +26,12 @@ abstract class Node(val config: Config) extends AutoCloseable {
     clientConfig()
       .setKeepAlive(false)
       .setNettyTimer(GlobalTimer.instance))
+
+  lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder.forAddress(networkAddress.getHostString, nodeExternalPort(6870))
+    .usePlaintext()
+    .keepAliveWithoutCalls(true)
+    .keepAliveTime(30, TimeUnit.SECONDS)
+    .build()
 
   val privateKey: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
   val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()

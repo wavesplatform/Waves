@@ -3,11 +3,14 @@ package com.wavesplatform.lang
 import java.math.{BigDecimal, BigInteger}
 
 import cats.implicits._
-import com.softwaremill.sttp.{FetchBackend, FetchOptions, SttpBackend}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
+import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 import scala.util.Try
@@ -111,5 +114,8 @@ object Global extends BaseGlobal {
       )
   }
 
-  override val sttpBackend: SttpBackend[Future, Nothing] = FetchBackend(FetchOptions.Default)
+  override def requestNode(url: String): Future[NodeResponse] =
+    impl.Global.httpGet(js.Dynamic.literal(url = url))
+     .toFuture
+     .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
 }

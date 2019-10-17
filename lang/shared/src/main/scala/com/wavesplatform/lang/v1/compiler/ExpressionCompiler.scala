@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import cats.implicits._
+import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
@@ -74,7 +75,7 @@ object ExpressionCompiler {
     compileExprWithCtx(expr).map(r => (r.expr, r.t, r.parseNodeExpr))
 
   def compileExprWithCtx(expr: Expressions.EXPR): CompileM[CompilationStepResultExpr] = {
-    get[CompilerContext, CompilationError].flatMap { ctx =>
+    get[Id, CompilerContext, CompilationError].flatMap { ctx =>
       // TODO MAP ERROR TO RESULT
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
         CONST_BYTESTR(b)
@@ -205,21 +206,21 @@ object ExpressionCompiler {
       cases: List[Expressions.MATCH_CASE]
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx       <- get[CompilerContext, CompilationError]
+      ctx       <- get[Id, CompilerContext, CompilationError]
       typedExpr <- compileExprWithCtx(expr)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
-        case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
+        case _        => raiseError[Id, CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }).handleError()
       exprTypes = exprTypesWithErr._1.getOrElse(NOTHING)
       tmpArgId  = ctx.tmpArgsIdx
       refTmpKey = "$match" + tmpArgId
-      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId + 1))
+      _ <- set[Id, CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId + 1))
       allowShadowVarName = typedExpr.expr match {
         case REF(k) => Some(k)
         case _      => None
       }
-      ifCasesWithErr <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](
+      ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
         updatedCtx =>
           mkIfCases(
             updatedCtx,
@@ -249,7 +250,7 @@ object ExpressionCompiler {
             .toCompileM
         })
         .handleError()
-      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
+      _ <- set[Id, CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
 
       errorList = exprTypesWithErr._2 ++ ifCasesWithErr._2 ++ checkWithErr._2
 
@@ -276,7 +277,7 @@ object ExpressionCompiler {
 
   private def validateShadowing(p: Pos, dec: Expressions.Declaration, allowedExceptions: List[String] = List.empty): CompileM[String] = {
     for {
-      ctx <- get[CompilerContext, CompilationError]
+      ctx <- get[Id, CompilerContext, CompilationError]
       letName <- handlePart(dec.name)
         .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(
           n => !ctx.varDefs.contains(n) || dec.allowShadowing || allowedExceptions.contains(n)
@@ -289,7 +290,7 @@ object ExpressionCompiler {
     for {
       letNameWithErr <- validateShadowing(p, let).handleError()
       compiledLet    <- compileExprWithCtx(let.value)
-      ctx            <- get[CompilerContext, CompilationError]
+      ctx            <- get[Id, CompilerContext, CompilationError]
       letTypesWithErr <- let.types.toList
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(
@@ -322,7 +323,7 @@ object ExpressionCompiler {
           names.toSet.size == names.size
         }
         .handleError()
-      ctx <- get[CompilerContext, CompilationError]
+      ctx <- get[Id, CompilerContext, CompilationError]
       argTypesWithErr <- func.args.toList
         .traverse {
           case (argName, argType) =>
@@ -333,14 +334,14 @@ object ExpressionCompiler {
                 .ensure(NonExistingType(p.start, p.end, funcNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(_.forall {
                   case (t, param) => param.fold(ctx.predefTypes.contains(t))(ctx.predefTypes.contains)
                 })
-              types <- liftEither(genericFlat(p, ctx.predefTypes, typeDecls))
+              types <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](genericFlat(p, ctx.predefTypes, typeDecls))
               union = UNION.reduce(UNION.create(types))
             } yield (name, union)
         }
         .handleError()
       compiledFuncBody <- local {
         val newArgs: VariableTypes = argTypesWithErr._1.getOrElse(List.empty).toMap
-        modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
+        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
           .flatMap(_ => compileExprWithCtx(func.expr))
       }
 
@@ -362,10 +363,10 @@ object ExpressionCompiler {
   }
 
   def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
-    modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> letType)))
+    modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> letType)))
 
   def updateCtx(funcName: String, typeSig: FunctionTypeSignature): CompileM[Unit] =
-    modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
+    modify[Id, CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
 
   private def compileLetBlock(
       p: Pos,
@@ -414,7 +415,7 @@ object ExpressionCompiler {
       refExpr: Expressions.EXPR
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx           <- get[CompilerContext, CompilationError]
+      ctx           <- get[Id, CompilerContext, CompilationError]
       fieldWithErr  <- handlePart(fieldPart).handleError()
       compiledRef   <- compileExprWithCtx(refExpr)
       getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
@@ -436,10 +437,10 @@ object ExpressionCompiler {
       args: List[Expressions.EXPR]
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx         <- get[CompilerContext, CompilationError]
+      ctx         <- get[Id, CompilerContext, CompilationError]
       nameWithErr <- handlePart(namePart).handleError()
       name = nameWithErr._1.getOrElse("NO_NAME")
-      signatures   <- get[CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name))
+      signatures   <- get[Id, CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name))
       compiledArgs <- args.traverse(compileExprWithCtx)
       funcCallWithErr <- (signatures match {
         case Nil           => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_.t.toString)).asLeft[(EXPR, FINAL)]
@@ -471,7 +472,7 @@ object ExpressionCompiler {
   private def compileRef(p: Pos, keyPart: PART[String]): CompileM[CompilationStepResultExpr] =
     for {
       keyWithErr <- handlePart(keyPart).handleError()
-      ctx        <- get[CompilerContext, CompilationError]
+      ctx        <- get[Id, CompilerContext, CompilationError]
       typeWithErr = ctx.varDefs
         .get(keyWithErr._1.getOrElse(""))
         .fold[(Option[FINAL], Iterable[CompilationError])]((None, List(DefNotFound(p.start, p.end, keyWithErr._1.getOrElse("")))))(

@@ -1,8 +1,8 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: "[BUG]"
-labels: bug, help wanted, question
+about: The node is not working the way it should
+title: ''
+labels: bug
 assignees: phearnot
 
 ---

@@ -3,18 +3,18 @@ package com.wavesplatform.lang.v1
 import java.math.RoundingMode
 
 import cats.implicits._
-import com.softwaremill.sttp.SttpBackend
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1, MetaVersion}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.utils
+import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
 
@@ -133,7 +133,7 @@ trait BaseGlobal {
     estimator:     ScriptEstimator
   ): Either[String, ContractInfo] =
     for {
-      dapp       <- ContractCompiler.compile(input, ctx)
+      dapp       <- ContractCompiler.compile(input, ctx, stdLibVersion)
       complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, estimator)
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)
@@ -159,18 +159,17 @@ trait BaseGlobal {
   def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
     script match {
       case ContractScriptImpl(_, dApp) =>
-        MetaMapper.dicFromProto(dApp)
-          .map(_.m.headOption)
-          .map {
-            case Some((name, Chain(paramTypes))) =>
-              val funcsName      = dApp.callableFuncs.map(_.u.name)
-              val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
-              Dic(Map(name -> paramsWithFunc))
-            case _ => Dic(Map())
-          }
-          .leftMap(ScriptParseError)
+        MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
+      case _  => Left(ScriptParseError("Expected DApp"))
+    }
 
-      case _  => Right(Dic(Map()))
+  private def combineMetaWithDApp(dic: Dic, dApp: DApp): Dic =
+    dic.m.get(MetaMapperStrategyV1.FieldName).fold(dic) {
+      case Chain(paramTypes) =>
+        val funcsName = dApp.callableFuncs.map(_.u.name)
+        val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
+        Dic(dic.m.updated(MetaMapperStrategyV1.FieldName, paramsWithFunc))
+      case _ => Dic(Map())
     }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
@@ -193,7 +192,7 @@ trait BaseGlobal {
       case BaseGlobal.RoundFloor()    => FLOOR
     }
 
-  implicit val sttpBackend: SttpBackend[Future, Nothing]
+  def requestNode(url: String): Future[NodeResponse]
 }
 
 object BaseGlobal {
