@@ -32,6 +32,7 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
           }
 
         assetIds.iterator
+          .filter(balance(address, _) > 0)
           .flatMap(ia => transactionInfo(ia.id).map(_._2))
           .collect {
             case itx: IssueTransaction if itx.isNFT => itx
@@ -72,10 +73,12 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
     AssetDistribution(dst)
   }
 
-  override def assetDistributionAtHeight(asset: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
+  override def assetDistributionAtHeight(
+      asset: IssuedAsset,
+      height: Int,
+      count: Int,
+      fromAddress: Option[Address]
+  ): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
     lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
