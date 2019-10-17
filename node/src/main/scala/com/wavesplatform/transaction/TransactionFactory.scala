@@ -28,16 +28,22 @@ object TransactionFactory {
 
   private val EmptySignature = ByteStr(Array.fill(SignatureLength)(0: Byte))
 
-  def transferAssetV1(request: TransferV1Request, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
-    transferAssetV1(request, wallet, request.sender, time)
-
-  def transferAssetV1(request: TransferV1Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, TransferTransaction] =
+  /** signed (signer == sender) */
+  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
-      sender       <- wallet.findPrivateKey(request.sender)
-      signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("Unknown signer"))
+      tx <- transferAsset(request, wallet, request.sender.get, time)
+    } yield tx
+
+  /** signed */
+  def transferAsset(request: TransferRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, TransferTransaction] =
+    for {
+      _            <- TransferRequest.validRequest(request)
+      sender       <- wallet.findPrivateKey(request.sender.get)
+      signer       <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransaction(
-        1.toByte,
+        request.version,
         Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         recipientAcc,
@@ -50,50 +56,13 @@ object TransactionFactory {
       )
     } yield tx
 
-  def transferAssetV1(request: TransferV1Request, sender: PublicKey): Either[ValidationError, TransferTransaction] =
+  /** unsigned */
+  def transferAsset(request: TransferRequest, sender: PublicKey): Either[ValidationError, TransferTransaction] =
     for {
+      _            <- TransferRequest.validRequest(request)
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx = TransferTransaction(
-        1.toByte,
-        0,
-        sender,
-        recipientAcc,
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.amount,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        Proofs.empty
-      )
-    } yield tx
-
-  def transferAssetV2(request: TransferV2Request, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
-    transferAssetV2(request, wallet, request.sender, time)
-
-  def transferAssetV2(request: TransferV2Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, TransferTransaction] =
-    for {
-      sender       <- wallet.findPrivateKey(request.sender)
-      signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx <- TransferTransaction(
-        2.toByte,
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        sender,
-        recipientAcc,
-        request.amount,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        signer
-      )
-    } yield tx
-
-  def transferAssetV2(request: TransferV2Request, sender: PublicKey): Either[ValidationError, TransferTransaction] =
-    for {
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx = TransferTransaction(
-        2.toByte,
+        request.version,
         0,
         sender,
         recipientAcc,
@@ -759,6 +728,7 @@ object TransactionFactory {
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionParserLite, Either[ValidationError, Transaction]] = {
+      case TransferTransaction       => jsv.as[TransferRequest].toTx
       case IssueTransactionV1        => jsv.as[SignedIssueV1Request].toTx
       case IssueTransactionV2        => jsv.as[SignedIssueV2Request].toTx
       case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
@@ -784,12 +754,6 @@ object TransactionFactory {
     TransactionParsers.by(typeId, version) match {
       case _ if chainId.exists(_ != AddressScheme.current.chainId) =>
         Left(WrongChain(AddressScheme.current.chainId, chainId.get))
-      case None if typeId == TransferTransaction.typeId =>
-        version match {
-          case 1 => jsv.as[SignedTransferV1Request].toTx
-          case 2 => jsv.as[SignedTransferV2Request].toTx
-          case _ => Left(UnsupportedTypeAndVersion(typeId, version))
-        }
       case Some(txType) if pf.isDefinedAt(txType) => pf(txType)
       case _                                      => Left(UnsupportedTypeAndVersion(typeId, version))
     }
@@ -808,31 +772,25 @@ object TransactionFactory {
         val txJson  = jsv ++ Json.obj("version" -> version)
 
         TransactionParsers.by(typeId, version) match {
-          case None =>
-            if (typeId == TransferTransaction.typeId) {
-              version match {
-                case 1 => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], wallet, signerAddress, time)
-                case 2 => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], wallet, signerAddress, time)
-              }
-            } else Left(UnsupportedTypeAndVersion(typeId, version))
+          case None => Left(UnsupportedTypeAndVersion(typeId, version))
           case Some(x) =>
             x match {
-              case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
-              case IssueTransactionV2       => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
-              case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
-              case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
-              case BurnTransactionV1        => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
-              case BurnTransactionV2        => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
-              case MassTransferTransaction  => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
-              case LeaseTransactionV1       => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
-              case LeaseTransactionV2       => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
-              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
-              case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
-              case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
-              case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
-              case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
-              case InvokeScriptTransaction =>
-                TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
+              case TransferTransaction       => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
+              case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
+              case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
+              case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
+              case ReissueTransactionV2      => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
+              case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
+              case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
+              case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
+              case LeaseTransactionV1        => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
+              case LeaseTransactionV2        => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
+              case LeaseCancelTransactionV1  => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
+              case LeaseCancelTransactionV2  => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
+              case CreateAliasTransactionV1  => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
+              case CreateAliasTransactionV2  => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
+              case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
+              case InvokeScriptTransaction   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
               case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
               case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
               case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)

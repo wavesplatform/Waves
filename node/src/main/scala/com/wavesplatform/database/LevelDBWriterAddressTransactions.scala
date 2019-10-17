@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.{Transaction, TransactionParser, TransactionParsers}
+import com.wavesplatform.transaction.{Transaction, TransactionParserLite, TransactionParsers}
 import monix.eval.Task
 import monix.reactive.Observable
 
@@ -21,7 +21,7 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
   import levelDBWriter.{dbSettings, readOnlyNoClose}
 
   override def addressTransactionsObservable(address: Address,
-                                             types: Set[TransactionParser],
+                                             types: Set[TransactionParserLite],
                                              fromId: Option[ByteStr]): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
@@ -72,7 +72,7 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
     }
   }
 
-  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): (Iterator[(Height, TxNum, Transaction)], () => Unit) =
+  private[this] def transactionsIterator(ofTypes: Seq[TransactionParserLite], reverse: Boolean): (Iterator[(Height, TxNum, Transaction)], () => Unit) =
     readOnlyNoClose { (snapshot, db) =>
       def iterateOverStream(prefix: Array[Byte]) = {
         import scala.collection.JavaConverters._

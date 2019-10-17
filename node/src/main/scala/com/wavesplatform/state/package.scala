@@ -86,7 +86,7 @@ package object state {
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
   def addressTransactionsCompose(at: AddressTransactions, fromDiffIter: Observable[(Height, Transaction, Set[Address])])(
       address: Address,
-      types: Set[TransactionParser],
+      types: Set[TransactionParserLite],
       fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =

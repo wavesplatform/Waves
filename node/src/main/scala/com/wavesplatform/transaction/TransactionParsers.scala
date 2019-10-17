@@ -17,7 +17,7 @@ object TransactionParsers {
   val TypeLength                 = 1
   val SignatureStringLength: Int = base58Length(SignatureLength)
 
-  private val old: Map[Byte, TransactionParserLite] = Seq[TransactionParser](
+  private val old: Map[Byte, TransactionParserLite] = Seq[TransactionParserLite](
     GenesisTransaction,
     PaymentTransaction,
     IssueTransactionV1,
@@ -27,12 +27,13 @@ object TransactionParsers {
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
     CreateAliasTransactionV1,
-    MassTransferTransaction
+    MassTransferTransaction,
+    TransferTransaction
   ).map { x =>
     x.typeId -> x
   }(collection.breakOut)
 
-  private val modern: Map[(Byte, Byte), TransactionParserLite] = Seq[TransactionParser](
+  private val modern: Map[(Byte, Byte), TransactionParserLite] = Seq[TransactionParserLite](
     DataTransaction,
     SetScriptTransaction,
     IssueTransactionV2,
@@ -44,7 +45,8 @@ object TransactionParsers {
     LeaseCancelTransactionV2,
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
-    InvokeScriptTransaction
+    InvokeScriptTransaction,
+    TransferTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
@@ -80,11 +82,4 @@ object TransactionParsers {
     }
     parser.parseBytes(bytes)
   }
-
-  // todo: (NODE-1915) Used in tests
-  def forTypeSet(types: Set[Byte]): Set[TransactionParserLite] =
-    (all.values.toList :+ TransferTransaction.transactionParserStub).filter(tp => types.contains(tp.typeId)).toSet
-
-  def allVersions(parsers: TransactionParser*): Set[TransactionParserLite] =
-    forTypeSet(parsers.map(_.typeId).toSet)
 }

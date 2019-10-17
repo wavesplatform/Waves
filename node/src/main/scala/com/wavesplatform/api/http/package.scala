@@ -62,15 +62,10 @@ package object http extends ApiMarshallers with ScorexLogging {
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
             TransactionParsers.by(typeId, version) match {
-              case None if typeId == TransferTransaction.typeId =>
-                version match {
-                  case 1 => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], senderPk)
-                  case 2 => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], senderPk)
-                  case _ => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
-                }
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
                 x match {
+                  case TransferTransaction       => TransactionFactory.transferAsset(txJson.as[TransferRequest], senderPk)
                   case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
                   case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
                   case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)
