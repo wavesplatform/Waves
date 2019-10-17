@@ -236,10 +236,11 @@ object JsAPI {
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
-      "evaluate"  -> (repl.execute _ andThen mapResult),
-      "info"      -> repl.info _,
-      "totalInfo" -> repl.totalInfo _,
-      "clear"     -> repl.clear _
+      "evaluate"    -> (repl.execute _ andThen mapResult),
+      "info"        -> repl.info _,
+      "totalInfo"   -> repl.totalInfo _,
+      "clear"       -> repl.clear _,
+      "reconfigure" -> ((u: UndefOr[NodeConnectionSettings]) => asJs(repl.reconfigure(u.toOption)))
     )
 
   private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =

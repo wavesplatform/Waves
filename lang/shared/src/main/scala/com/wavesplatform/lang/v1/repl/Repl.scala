@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.repl
 
-import cats.Functor
+import cats.{Functor, Monoid}
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
@@ -11,9 +11,19 @@ import monix.execution.atomic.Atomic
 import scala.concurrent.ExecutionContext.Implicits.{global => g}
 import scala.concurrent.Future
 
-case class Repl(settings: Option[NodeConnectionSettings] = None) {
+case class Repl(
+  settings: Option[NodeConnectionSettings] = None,
+  lastСontext: (CompilerContext, EvaluationContext[Environment, Future]) =
+    (CompilerContext.empty, Monoid[EvaluationContext[Environment, Future]].empty)
+) {
   private val environment  = buildEnvironment(settings)
-  private val initialState = state((initialCtx.compilerContext, initialCtx.evaluationContext(environment)), view)
+  private val initialState = state(
+    (
+      lastСontext._1 |+| initialCtx.compilerContext,
+      lastСontext._2 |+| initialCtx.evaluationContext(environment)
+    ),
+    view
+  )
   private val currentState = Atomic(initialState)
   private val engine = new ReplEngine[Future]()
 
@@ -21,6 +31,9 @@ case class Repl(settings: Option[NodeConnectionSettings] = None) {
   private def view(ctx: (CompilerContext, EvaluationContext[Environment, Future])) = StateView(ctx._1)
 
   def clear(): Unit = currentState.set(initialState)
+
+  def reconfigure(settings: Option[NodeConnectionSettings]): Repl =
+    Repl(settings, currentState.get()._1)
 
   def info(str: String): String = currentState.get()._2.declMap(str)
 

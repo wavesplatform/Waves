@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
-  def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
+  def await[A](f: Future[A]): A = Await.result(f, 99999 seconds)
 
   property("variable memorization") {
     val repl = Repl()
@@ -165,6 +165,35 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val url = "testnodes.wavesnodes.com"
     val settings = NodeConnectionSettings(url + "///", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
     settings.normalizedUrl shouldBe url
+  }
+
+  property("reconfigure") {
+    val address1 = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address1)
+    val repl = Repl(Some(settings))
+
+    await(repl.execute("let a = 1"))
+    await(repl.execute("func inc(a: Int) = a + 1"))
+    await(repl.execute("this")) shouldBe Right(
+      s"""
+         |res1: Address = Address(
+         |	bytes = base58'$address1'
+         |)
+       """.trim.stripMargin
+    )
+
+    val address2 = "3PDjjLFDR5aWkKgufika7KSLnGmAe8ueDpC"
+    val repl2 = repl.reconfigure(Some(settings.copy(address = address2)))
+
+    await(repl2.execute("a")) shouldBe Right("res2: Int = 1")
+    await(repl2.execute("inc(1)")) shouldBe Right("res3: Int = 2")
+    await(repl2.execute("this")) shouldBe Right(
+      s"""
+         |res4: Address = Address(
+         |	bytes = base58'$address2'
+         |)
+       """.trim.stripMargin
+    )
   }
 
   ignore("waves context") {
