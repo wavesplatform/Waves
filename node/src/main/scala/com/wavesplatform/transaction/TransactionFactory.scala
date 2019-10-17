@@ -28,52 +28,21 @@ object TransactionFactory {
 
   private val EmptySignature = ByteStr(Array.fill(SignatureLength)(0: Byte))
 
-  /** signed (signer == sender) */
+  // todo: (NODE-1915) join methods
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
-      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("Unknown signer"))
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("Invalid signer"))
       tx <- transferAsset(request, wallet, request.sender.get, time)
     } yield tx
 
-  /** signed */
   def transferAsset(request: TransferRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, TransferTransaction] =
     for {
-      _            <- TransferRequest.validRequest(request)
-      sender       <- wallet.findPrivateKey(request.sender.get)
-      signer       <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx <- TransferTransaction(
-        request.version,
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        sender,
-        recipientAcc,
-        request.amount,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        signer
-      )
-    } yield tx
-
-  /** unsigned */
-  def transferAsset(request: TransferRequest, sender: PublicKey): Either[ValidationError, TransferTransaction] =
-    for {
-      _            <- TransferRequest.validRequest(request)
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx = TransferTransaction(
-        request.version,
-        0,
-        sender,
-        recipientAcc,
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.amount,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        Proofs.empty
-      )
-    } yield tx
+      _      <- Either.cond(request.sender.isDefined, (), GenericError("Invalid sender"))
+      sender <- wallet.findPrivateKey(request.sender.get)
+      tx = request.toTx(sender)
+      signer   <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      signedTx <- TransferTransaction.sign(tx, signer)
+    } yield signedTx
 
   def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
     massTransferAsset(request, wallet, request.sender, time)

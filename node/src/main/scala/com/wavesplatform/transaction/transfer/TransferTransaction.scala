@@ -7,7 +7,7 @@ import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
@@ -169,6 +169,11 @@ object TransferTransaction extends TransactionParserLite {
       .toEither
       .leftMap(_.head)
 
+  def sign(tx: TransferTransaction, signer: PrivateKey): Either[ValidationError, TransferTransaction] =
+    for {
+      proofs <- Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes()))))
+    } yield tx.copy(proofs = proofs)
+
   // create
   def apply(
       version: Byte,
@@ -199,9 +204,7 @@ object TransferTransaction extends TransactionParserLite {
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
     apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, Proofs.empty)
-      .map { unsigned =>
-        unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
-      }
+      .flatMap(sign(_, signer))
 
   // selfSigned
   def selfSigned(

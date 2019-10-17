@@ -27,8 +27,7 @@ object TransactionParsers {
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
     CreateAliasTransactionV1,
-    MassTransferTransaction,
-    TransferTransaction
+    MassTransferTransaction
   ).map { x =>
     x.typeId -> x
   }(collection.breakOut)
@@ -76,7 +75,6 @@ object TransactionParsers {
         (typeId, version),
         throw new IllegalArgumentException(s"Unknown transaction type ($typeId) and version ($version) (modern encoding)")
       )
-
     } else {
       old.getOrElse(bytes(0), throw new IllegalArgumentException(s"Unknown transaction type (old encoding): '${bytes(0)}'"))
     }
