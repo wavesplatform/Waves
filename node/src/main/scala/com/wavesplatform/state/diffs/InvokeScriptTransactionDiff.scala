@@ -97,9 +97,9 @@ object InvokeScriptTransactionDiff {
         for {
           scriptResult <- TracedResult(
             scriptResultE,
-            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1)))
+            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
           )
-          (ScriptResult(ds, ps), invocationComplexity) = scriptResult
+          ((ScriptResult(ds, ps), log), invocationComplexity) = scriptResult
 
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
 
