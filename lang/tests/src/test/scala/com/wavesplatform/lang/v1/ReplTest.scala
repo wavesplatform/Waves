@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
-  def await[A](f: Future[A]): A = Await.result(f, 99999 seconds)
+  def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 
   property("variable memorization") {
     val repl = Repl()
@@ -183,11 +183,11 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     )
 
     val address2 = "3PDjjLFDR5aWkKgufika7KSLnGmAe8ueDpC"
-    val repl2 = repl.reconfigure(Some(settings.copy(address = address2)))
+    val reconfiguredRepl = repl.reconfigure(settings.copy(address = address2))
 
-    await(repl2.execute("a")) shouldBe Right("res2: Int = 1")
-    await(repl2.execute("inc(1)")) shouldBe Right("res3: Int = 2")
-    await(repl2.execute("this")) shouldBe Right(
+    await(reconfiguredRepl.execute("a")) shouldBe Right("res2: Int = 1")
+    await(reconfiguredRepl.execute("inc(1)")) shouldBe Right("res3: Int = 2")
+    await(reconfiguredRepl.execute("this")) shouldBe Right(
       s"""
          |res4: Address = Address(
          |	bytes = base58'$address2'
