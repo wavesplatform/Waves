@@ -240,7 +240,7 @@ object JsAPI {
       "info"        -> repl.info _,
       "totalInfo"   -> repl.totalInfo _,
       "clear"       -> repl.clear _,
-      "reconfigure" -> ((u: UndefOr[NodeConnectionSettings]) => asJs(repl.reconfigure(u.toOption)))
+      "reconfigure" -> (repl.reconfigure _ andThen asJs)
     )
 
   private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =

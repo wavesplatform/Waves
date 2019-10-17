@@ -32,8 +32,8 @@ case class Repl(
 
   def clear(): Unit = currentState.set(initialState)
 
-  def reconfigure(settings: Option[NodeConnectionSettings]): Repl =
-    Repl(settings, currentState.get()._1)
+  def reconfigure(settings: NodeConnectionSettings): Repl =
+    Repl(Some(settings), currentState.get()._1)
 
   def info(str: String): String = currentState.get()._2.declMap(str)
 
