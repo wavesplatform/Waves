@@ -167,6 +167,35 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     settings.normalizedUrl shouldBe url
   }
 
+  property("reconfigure") {
+    val address1 = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address1)
+    val repl = Repl(Some(settings))
+
+    await(repl.execute("let a = 1"))
+    await(repl.execute("func inc(a: Int) = a + 1"))
+    await(repl.execute("this")) shouldBe Right(
+      s"""
+         |res1: Address = Address(
+         |	bytes = base58'$address1'
+         |)
+       """.trim.stripMargin
+    )
+
+    val address2 = "3PDjjLFDR5aWkKgufika7KSLnGmAe8ueDpC"
+    val reconfiguredRepl = repl.reconfigure(settings.copy(address = address2))
+
+    await(reconfiguredRepl.execute("a")) shouldBe Right("res2: Int = 1")
+    await(reconfiguredRepl.execute("inc(1)")) shouldBe Right("res3: Int = 2")
+    await(reconfiguredRepl.execute("this")) shouldBe Right(
+      s"""
+         |res4: Address = Address(
+         |	bytes = base58'$address2'
+         |)
+       """.trim.stripMargin
+    )
+  }
+
   ignore("waves context") {
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
     val repl = Repl(Some(settings))
