@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, utils}
@@ -25,11 +26,9 @@ import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndSt
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
-import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
-import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -460,15 +459,13 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           val ctx = {
             utils.functionCosts(V3)
-            val directives = DirectiveSet(V3, Account, Expression).explicitGet()
             Monoid
               .combineAll(
                 Seq(
-                  PureContext.build(Global, V3),
-                  CryptoContext.build(Global, V3),
+                  PureContext.build(Global, V3).withEnvironment[Environment],
+                  CryptoContext.build(Global, V3).withEnvironment[Environment],
                   WavesContext.build(
-                    directives,
-                    new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???), directives)
+                    DirectiveSet(V3, Account, Expression).explicitGet()
                   )
                 ))
           }

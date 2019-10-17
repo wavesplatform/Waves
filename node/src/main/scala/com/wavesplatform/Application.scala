@@ -38,7 +38,7 @@ import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
-import com.wavesplatform.utils.{InvalidApiKey, LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp, forceStopApplication}
+import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -83,10 +83,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
+  // This handler is needed in case Fatal exception is thrown inside the task
+  private def stopOnAppendError(cause: Throwable): Unit = {
+    log.error("Error in Appender", cause)
+    forceStopApplication(FatalDBError)
+  }
+
+  private val appenderScheduler = singleThread("appender", stopOnAppendError)
+
   private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
   private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
   private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
-  private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = log.error("Error in Miner", _))
 
@@ -101,8 +108,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var maybeNetwork: Option[NS]                                         = None
 
   private var extensions = Seq.empty[Extension]
-
-  private val rollbackTo = (blockId: ByteStr) => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler)
 
   def apiShutdown(): Unit = {
     for {
@@ -162,11 +167,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
 
+    def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
+      Task(blockchainUpdater.removeAfter(blockId))
+        .executeOn(appenderScheduler)
+        .asyncBoundary
+        .map {
+          case Right(discardedBlocks) =>
+            allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
+            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
+            miner.scheduleMining()
+            Right(discardedBlocks)
+          case Left(error) => Left(error)
+        }
+
     // Extensions start
     val extensionContext = new Context {
       override def settings: WavesSettings                                                       = app.settings
       override def blockchain: Blockchain                                                        = app.blockchainUpdater
-      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = app.rollbackTo(blockId)
+      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = rollbackTask(blockId, returnTxsToUtx = false)
       override def time: Time                                                                    = app.time
       override def wallet: Wallet                                                                = app.wallet
       override def utx: UtxPool                                                                  = utxStorage
@@ -223,7 +241,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) { case (c, b) => processFork(c, b.blocks) }
+    ) {
+      case (c, b) =>
+        processFork(c, b.blocks).doOnFinish {
+          case None => Task.now(())
+          case Some(e) => Task(stopOnAppendError(e))
+        }
+    }
 
     rxExtensionLoaderShutdown = Some(sh)
 
@@ -232,12 +256,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     val microBlockSink = microblockData
-      .mapEval(scala.Function.tupled(processMicroBlock))
+      .mapEval(processMicroBlock.tupled)
 
     val blockSink = newBlocks
-      .mapEval(scala.Function.tupled(processBlock))
+      .mapEval(processBlock.tupled)
 
-    Observable(microBlockSink, blockSink).merge.subscribe()
+    Observable(microBlockSink, blockSink).merge
+      .onErrorHandle(stopOnAppendError)
+      .subscribe()
 
     miner.scheduleMining()
 
@@ -271,8 +297,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           peerDatabase,
           establishedConnections,
-          app.rollbackTo,
-          allChannels,
+          (id, returnTxs) => rollbackTask(id, returnTxs).map(_.map(_ => ())),
           utxStorage,
           miner,
           historyReplier,
@@ -313,8 +338,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // on unexpected shutdown
     sys.addShutdownHook {
-      Await.ready(Kamon.stopAllReporters(), 20.seconds)
-      Metrics.shutdown()
       shutdown(utxStorage, network)
     }
   }
@@ -404,6 +427,10 @@ object Application {
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
+    sys.addShutdownHook { () =>
+      Kamon.stopAllReporters()
+      Metrics.shutdown()
+    }
 
     if (config.getBoolean("kamon.enable")) {
       Kamon.addReporter(new InfluxDBReporter())

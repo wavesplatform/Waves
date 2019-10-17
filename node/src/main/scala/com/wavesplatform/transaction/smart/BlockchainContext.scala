@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
-import cats.kernel.Monoid
+import cats.implicits._
+import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
@@ -22,13 +23,18 @@ object BlockchainContext {
             blockchain: Blockchain,
             isTokenContext: Boolean,
             isContract: Boolean,
-            address: Coeval[ByteStr]): Either[ExecutionError, EvaluationContext] =
+            address: Coeval[ByteStr]): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
-    ).map(ds => WavesContext.build(ds, new WavesEnvironment(nByte, in, h, blockchain, address, ds)))
-      .map(Seq(PureContext.build(Global, version), CryptoContext.build(Global, version), _))
-      .map(Monoid.combineAll(_))
-      .map(_.evaluationContext)
+    ).map { ds =>
+      val ctx =
+        PureContext.build(Global, version).withEnvironment[Environment]   |+|
+        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+        WavesContext.build(ds)
+
+      ctx.evaluationContext(new WavesEnvironment(nByte, in, h, blockchain, address, ds))
+    }
+  }
 }

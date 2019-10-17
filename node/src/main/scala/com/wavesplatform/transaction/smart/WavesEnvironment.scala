@@ -31,8 +31,8 @@ class WavesEnvironment(
   blockchain: Blockchain,
   address: Coeval[ByteStr],
   ds: DirectiveSet
-) extends Environment {
-  
+) extends Environment[Id] {
+
   override def height: Long = h()
 
   override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment

@@ -101,13 +101,12 @@ object Dependencies {
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
         .exclude("org.typelevel", "cats-testkit_2.12"),
-      "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4"
-    ) ++ protobuf.value ++ circe.value
+    ) ++ scalapbRuntime.value ++ circe.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -160,13 +159,17 @@ object Dependencies {
 
   private[this] val protoSchemasLib =
     "com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto"
-  lazy val protobuf = Def.setting {
+
+  lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
-      protoSchemasLib        % "protobuf"
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
     )
+  }
+
+  lazy val protobuf = Def.setting {
+    scalapbRuntime.value :+ protoSchemasLib % "protobuf"
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(

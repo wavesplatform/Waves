@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
+import cats.Id
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
@@ -124,7 +125,7 @@ object WavesEnvironmentBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    val environment: Environment = {
+    val environment: Environment[Id] = {
       val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
       val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
       new WavesEnvironment(

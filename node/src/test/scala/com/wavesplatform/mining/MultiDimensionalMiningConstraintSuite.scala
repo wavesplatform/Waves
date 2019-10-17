@@ -23,25 +23,25 @@ class MultiDimensionalMiningConstraintSuite
         if isLeft || isRight
         leftMaxSize  <- if (isLeft) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- if (isRight) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
-      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1), createConstConstraint(rightMaxSize, 1))
+      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1, "leftMaxSize"), createConstConstraint(rightMaxSize, 1, "rightMaxSize"))
 
       "should be true if one dimension is full" in forAll(emptyConstraintGen) { constraint =>
         constraint shouldBe 'full
-        constraint should not be ('overfilled)
+        constraint should not be 'overfilled
       }
 
       val nonEmptyConstraintGen: Gen[MultiDimensionalMiningConstraint] = for {
         leftMaxSize  <- Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- Gen.chooseNum(1, Int.MaxValue)
-      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1), createConstConstraint(rightMaxSize, 1))
+      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1, "leftMaxSize"), createConstConstraint(rightMaxSize, 1, "rightMaxSize"))
 
       "should be false is both of two dimensions are not full" in forAll(nonEmptyConstraintGen) { constraint =>
-        constraint should not be ('full)
-        constraint should not be ('overfilled)
+        constraint should not be 'full
+        constraint should not be 'overfilled
       }
     }
 
-    "put(transaction)" - tests(createConstConstraint(_, transactionSize = 1)) { (initConstraint, txs) =>
+    "put(transaction)" - tests(createConstConstraint(_, transactionSize = 1, "txSize")) { (initConstraint, txs) =>
       txs.foldLeft(initConstraint)(_.put(stub[Blockchain], _, Diff.empty))
     }
   }
@@ -58,12 +58,12 @@ class MultiDimensionalMiningConstraintSuite
       }
 
       "no overfill" in forAll(noOverfillGen) { updatedConstraint =>
-        updatedConstraint should not be ('full)
-        updatedConstraint should not be ('overfilled)
+        updatedConstraint should not be 'full
+        updatedConstraint should not be 'overfilled
 
         updatedConstraint.constraints.map { x =>
-          x should not be ('full)
-          x should not be ('overfilled)
+          x should not be 'full
+          x should not be 'overfilled
         }
       }
 
@@ -84,8 +84,8 @@ class MultiDimensionalMiningConstraintSuite
         updatedConstraint.constraints.head shouldBe 'overfilled
 
         updatedConstraint.constraints.tail.map { x =>
-          x should not be ('full)
-          x should not be ('overfilled)
+          x should not be 'full
+          x should not be 'overfilled
         }
       }
 
@@ -102,8 +102,8 @@ class MultiDimensionalMiningConstraintSuite
         updatedConstraint shouldBe 'full
         updatedConstraint shouldBe 'overfilled
 
-        updatedConstraint.constraints.head should not be ('full)
-        updatedConstraint.constraints.head should not be ('overfilled)
+        updatedConstraint.constraints.head should not be 'full
+        updatedConstraint.constraints.head should not be 'overfilled
 
         updatedConstraint.constraints.tail.map { x =>
           x shouldBe 'full

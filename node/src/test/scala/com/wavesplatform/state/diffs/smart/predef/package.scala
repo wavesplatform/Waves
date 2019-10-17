@@ -37,7 +37,7 @@ package object predef {
                                              isTokenContext = false,
                                              isContract = false,
                                              Coeval(???))
-      r <- EvaluatorV1[T](evalContext, typedExpr)
+      r <- EvaluatorV1().apply[T](evalContext, typedExpr)
     } yield r
   }
 

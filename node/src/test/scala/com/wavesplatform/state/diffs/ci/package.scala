@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler,
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.{DAPP, EXPR}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -23,22 +24,20 @@ package object ci {
 
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
     val ctx =
-      PureContext.build(Global, version)   |+|
-      CryptoContext.build(Global, version) |+|
+      PureContext.build(Global, version).withEnvironment[Environment]   |+|
+      CryptoContext.build(Global, version).withEnvironment[Environment] |+|
       WavesContext.build(
-        DirectiveSet(version, Account, DAppType).explicitGet(),
-        Common.emptyBlockchainEnvironment()
+        DirectiveSet(version, Account, DAppType).explicitGet()
       )
     ContractCompiler(ctx.compilerContext, expr, version).explicitGet()
   }
 
   def compileExpr(expr: EXPR, version: StdLibVersion, scriptType: ScriptType): Terms.EXPR = {
     val ctx =
-      PureContext.build(Global, version)   |+|
-      CryptoContext.build(Global, version) |+|
+      PureContext.build(Global, version).withEnvironment[Environment]   |+|
+      CryptoContext.build(Global, version).withEnvironment[Environment] |+|
       WavesContext.build(
-        DirectiveSet(version, scriptType, Expression).explicitGet(),
-        Common.emptyBlockchainEnvironment()
+        DirectiveSet(version, scriptType, Expression).explicitGet()
       )
     ExpressionCompiler(ctx.compilerContext, expr).explicitGet()._1
   }

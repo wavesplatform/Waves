@@ -24,8 +24,8 @@ import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.state.extensions.Distributions
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -393,7 +393,7 @@ class UtxPoolSpecification
         val rest                  = limitByNumber(maxNumber)
         val (packed, restUpdated) = utx.packUnconfirmed(rest, 5.seconds)
 
-        packed.lengthCompare(maxNumber) should be <= 0
+        packed.get.lengthCompare(maxNumber) should be <= 0
         if (maxNumber <= utx.all.size) restUpdated shouldBe 'full
     }
 
@@ -417,11 +417,11 @@ class UtxPoolSpecification
         time.advance(offset)
 
         val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
-        packed.size shouldBe 2
+        packed.get.size shouldBe 2
         utx.all.size shouldBe 2
     }
 
-    "correctly process constrainst in packUnconfirmed" in {
+    "correctly process constraints in packUnconfirmed" in {
       withDomain(wavesplatform.history.TransfersV2ActivatedAt0WavesSettings) { d =>
         val generateBlock: Gen[(KeyPair, Block, Seq[Transaction], Seq[Transaction])] =
           for {
@@ -465,13 +465,13 @@ class UtxPoolSpecification
 
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(
-            OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber),
-            OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one)
+            OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber, "scriptRunNumber"),
+            OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one, "KeyBlock")
           )
         )
         val (packed, _) = utx.packUnconfirmed(constraint, 5.seconds)
-        packed.size shouldBe (unscripted.size + 1)
-        packed.count(scripted.contains) shouldBe 1
+        packed.get.size shouldBe (unscripted.size + 1)
+        packed.get.count(scripted.contains) shouldBe 1
       }
     }
 
@@ -633,15 +633,15 @@ class UtxPoolSpecification
 
             utxPool.putIfNew(transfer).resultE.explicitGet()
             val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
-            tx should contain(transfer)
+            tx.get should contain(transfer)
         }
       }
     }
   }
 
   private def limitByNumber(n: Int): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(
-    OneDimensionalMiningConstraint(n, TxEstimators.one),
-    OneDimensionalMiningConstraint(n, TxEstimators.one)
+    OneDimensionalMiningConstraint(n, TxEstimators.one, "one"),
+    OneDimensionalMiningConstraint(n, TxEstimators.one, "one")
   )
 
 }

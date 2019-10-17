@@ -5,7 +5,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 
 object Universe {
-  var Accounts: List[CreatedAccount] = Nil
-  var IssuedAssets: List[IssueTransaction]        = Nil
-  var Leases: List[LeaseTransaction]              = Nil
+  var Accounts: List[CreatedAccount]           = Nil
+  var IssuedAssets: List[IssueTransaction]     = Nil
+  @volatile var Leases: List[LeaseTransaction] = Nil
 }

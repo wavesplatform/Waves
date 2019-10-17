@@ -150,6 +150,20 @@ object Explorer extends ScorexLogging {
           else
             log.info(s"Correct total waves balance: $actualTotalBalance WAVELETS")
 
+        case "DA" =>
+          val addressIds = mutable.Seq[(BigInt, Address)]()
+          db.iterateOver(25: Short) { e =>
+            val address = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
+            val addressId = BigInt(e.getValue)
+            addressIds :+ (addressId -> address)
+          }
+          val addressIdToAddresses = addressIds.groupBy(_._1).mapValues(_.map(_._2))
+
+          addressIdToAddresses.find(_._2.size > 1) match {
+            case Some((addressId, addresses)) => log.error(s"Something wrong, addressId is duplicated: $addressId for (${addresses.mkString(", ")})")
+            case None                         => log.info("Correct address ids")
+          }
+
         case "B" =>
           val maybeBlockId = Base58.tryDecodeWithLimit(argument(1, "block id")).toOption.map(ByteStr.apply)
           if (maybeBlockId.isDefined) {

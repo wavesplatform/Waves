@@ -16,6 +16,8 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
@@ -637,20 +639,15 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val Success(expr, _) = Parser.parseExpr(script)
     val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
-      PureContext
-        .build(Global, V2) |+|
-        CryptoContext
-          .build(Global, V2) |+|
-        WavesContext
-          .build(
-            directives,
-            new WavesEnvironment(chainId, null, null, EmptyBlockchain, Coeval(???), directives)
-          )
+      PureContext.build(Global, V2).withEnvironment[Environment] |+|
+      CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+      WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
 
+    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(???), directives)
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1[EVALUATED](ctx.evaluationContext, typedExpr)
+      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr)
     } yield r
   }
 
@@ -659,9 +656,15 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
+
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     val blockchain  = stub[Blockchain]
     (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+
+    val ctx =
+      PureContext.build(Global, V2).withEnvironment[Environment] |+|
+      CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+      WavesContext.build(directives)
 
     val env = new WavesEnvironment(
       chainId,
@@ -671,15 +674,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       Coeval(null),
       directives
     )
-    val ctx =
-      PureContext.build(Global, V2) |+|
-      CryptoContext.build(Global, V2) |+|
-      WavesContext.build(directives, env)
 
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1[EVALUATED](ctx.evaluationContext, typedExpr)
+      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr)
     } yield r
   }
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
+import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
@@ -30,7 +31,7 @@ object ScriptRunner {
             blockchain: Blockchain,
             script: Script,
             isAssetScript: Boolean,
-            scriptContainerAddress: ByteStr): (Log, Either[ExecutionError, EVALUATED]) =
+            scriptContainerAddress: ByteStr): (Log[Id], Either[ExecutionError, EVALUATED]) =
     script match {
       case s: ExprScript =>
         val evalCtx = for {
@@ -47,8 +48,7 @@ object ScriptRunner {
             Coeval(scriptContainerAddress)
           )
         } yield ctx
-        EvaluatorV1.applyWithLogging[EVALUATED](evalCtx, s.expr)
-
+        EvaluatorV1().applyWithLogging[EVALUATED](evalCtx, s.expr)
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
          val r = for {
           ds  <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
@@ -70,7 +70,7 @@ object ScriptRunner {
               _ => ???
             )
           )
-        } yield EvaluatorV1.evalWithLogging(ctx, entity)
+        } yield EvaluatorV1().evalWithLogging(ctx, entity)
 
         r.fold(e => (Nil, e.asLeft[EVALUATED]), identity)
 
