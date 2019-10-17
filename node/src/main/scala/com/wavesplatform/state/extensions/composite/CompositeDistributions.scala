@@ -16,7 +16,7 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
       val full = getDiff().flatMap(_.portfolios.get(a)).getOrElse(Portfolio.empty)
       val nonNft = for {
         (IssuedAsset(id), balance) <- full.assets
-        (_, tx: IssueTransaction) <- blockchain.transactionInfo(id) if !tx.isNFT
+        (_, tx: IssueTransaction)  <- blockchain.transactionInfo(id) if !tx.isNFT(blockchain)
       } yield (IssuedAsset(id), balance)
       full.copy(assets = nonNft)
     }
@@ -33,10 +33,12 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
     Monoid.combine(fromInner, fromNg)
   }
 
-  override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
+  override def assetDistributionAtHeight(
+      assetId: IssuedAsset,
+      height: Int,
+      count: Int,
+      fromAddress: Option[Address]
+  ): Either[ValidationError, AssetDistributionPage] = {
     baseProvider.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
