@@ -167,6 +167,11 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     settings.normalizedUrl shouldBe url
   }
 
+  property("bytevector format display") {
+    val repl = Repl()
+    await(repl.execute("sha256(base58'')")) shouldBe Right("res1: ByteVector = base58'GKot5hBsd81kMupNCXHaqbhv3huEbxAFMLnpcX2hniwn'")
+  }  
+    
   property("reconfigure") {
     val address1 = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address1)
