@@ -465,6 +465,19 @@ object PureContext {
       )
   }
 
+  lazy val contains: BaseFunction[NoContext] =
+    UserFunction("contains", 20, BOOLEAN, ("@source", STRING), ("@substr", STRING)) {
+      FUNCTION_CALL(
+        User("isDefined"),
+        List(
+          FUNCTION_CALL(
+            Native(INDEXOF),
+            List(REF("@source"), REF("@substr"))
+          )
+        )
+      )
+    }
+
   lazy val parseInt: BaseFunction[NoContext] =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, ("str", STRING)) {
       case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).orElse(Success(unit)).toEither.left.map(_.toString)
@@ -696,33 +709,35 @@ object PureContext {
         case xs => notImplemented[Id]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
       }
 
+    val v3Ctx = Monoid.combine(
+      ctx,
+      CTX[NoContext](
+        Seq.empty,
+        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]))))),
+        Array(
+          value,
+          valueOrErrorMessage,
+          listConstructor,
+          toUtf8String,
+          toLong,
+          toLongOffset,
+          indexOf,
+          indexOfN,
+          lastIndexOf,
+          lastIndexOfWithOffset,
+          splitStr,
+          parseInt,
+          parseIntVal,
+          pow,
+          log
+        )
+      )
+    )
+
     version match {
       case V1 | V2 => ctx
-      case V3 | V4 =>
-        Monoid.combine(
-          ctx,
-          CTX[NoContext](
-            Seq.empty,
-            Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]))))),
-            Array(
-              value,
-              valueOrErrorMessage,
-              listConstructor,
-              toUtf8String,
-              toLong,
-              toLongOffset,
-              indexOf,
-              indexOfN,
-              lastIndexOf,
-              lastIndexOfWithOffset,
-              splitStr,
-              parseInt,
-              parseIntVal,
-              pow,
-              log
-            )
-          )
-        )
+      case V3 => v3Ctx
+      case V4 => v3Ctx.copy(functions = v3Ctx.functions :+ contains)
     }
   }
 }
