@@ -64,7 +64,7 @@ package object state {
             .orElse(blockchain.transactionInfo(asset.id).map(_._2))
         }
         .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT => itx
+          case Some(itx: IssueTransaction) if itx.isNFT(blockchain) => itx
         }
     }
 

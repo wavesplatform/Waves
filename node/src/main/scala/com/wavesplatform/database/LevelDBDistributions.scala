@@ -35,7 +35,7 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
           .filter(balance(address, _) > 0)
           .flatMap(ia => transactionInfo(ia.id).map(_._2))
           .collect {
-            case itx: IssueTransaction if itx.isNFT => itx
+            case itx: IssueTransaction if itx.isNFT(ldb) => itx
           }
       }
 
@@ -160,7 +160,7 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
     assets = (for {
       issuedAsset <- db.get(Keys.assetList(addressId))
       asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, it: IssueTransaction) if !it.isNFT => issuedAsset
+        case (_, it: IssueTransaction) if !it.isNFT(ldb) => issuedAsset
       }
     } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
   )
