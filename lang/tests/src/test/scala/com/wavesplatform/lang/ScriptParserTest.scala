@@ -56,7 +56,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     case x: FALSE                            => x.copy(position = Pos(0, 0))
     case x: BINARY_OP                        => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
     case x: IF                               => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
-    case x @ BLOCK(_, l: Expressions.LET, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
+    case x @ BLOCK(_, l: Expressions.LET, _, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
     case x: FUNCTION_CALL                    => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
     case _                                   => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
   }

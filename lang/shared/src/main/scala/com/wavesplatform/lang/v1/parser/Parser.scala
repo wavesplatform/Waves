@@ -159,7 +159,7 @@ object Parser {
   val functionCallArgs: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
 
   val maybeFunctionCallP: P[EXPR] = (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
-    case (start, REF(_, functionName, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
+    case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
     case (_, id, None, _)                                     => id
   }
 

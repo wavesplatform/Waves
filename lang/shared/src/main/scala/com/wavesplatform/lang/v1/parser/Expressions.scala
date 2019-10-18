@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types._
 
 object Expressions {
@@ -41,6 +42,10 @@ object Expressions {
     def resultType: Option[FINAL]
   }
 
+  trait ContextContainer {
+    def ctxOpt: CtxOpt
+  }
+
   sealed trait PART[+T] extends Positioned
   object PART {
     case class VALID[T](position: Pos, v: T) extends PART[T] {
@@ -78,6 +83,8 @@ object Expressions {
   type Type      = (PART[String], TypeParam)
   type FuncArgs  = Seq[(PART[String], Seq[Type])]
 
+  type CtxOpt = Option[CompilerContext]
+
   case class FUNC(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR) extends Declaration {
     val allowShadowing = false
   }
@@ -86,22 +93,31 @@ object Expressions {
   case class ANNOTATEDFUNC(position: Pos, anns: Seq[ANNOTATION], f: FUNC) extends Positioned {
     def name = f.name
   }
-  sealed trait EXPR                                                                                               extends Positioned with Typed
-  case class CONST_LONG(position: Pos, value: Long, resultType: Option[FINAL] = Some(LONG))                       extends EXPR
-  case class GETTER(position: Pos, ref: EXPR, field: PART[String], resultType: Option[FINAL] = None)              extends EXPR
-  case class CONST_BYTESTR(position: Pos, value: PART[ByteStr], resultType: Option[FINAL] = Some(BYTESTR))        extends EXPR
-  case class CONST_STRING(position: Pos, value: PART[String], resultType: Option[FINAL] = Some(STRING))           extends EXPR
-  case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOperation, b: EXPR, resultType: Option[FINAL] = None)  extends EXPR
-  case class BLOCK(position: Pos, let: Declaration, body: EXPR, resultType: Option[FINAL] = None)                 extends EXPR
-  case class IF(position: Pos, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, resultType: Option[FINAL] = None)         extends EXPR
-  case class REF(position: Pos, key: PART[String], resultType: Option[FINAL] = None)                              extends EXPR
-  case class TRUE(position: Pos, resultType: Option[FINAL] = Some(BOOLEAN))                                       extends EXPR
-  case class FALSE(position: Pos, resultType: Option[FINAL] = Some(BOOLEAN))                                      extends EXPR
-  case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None) extends EXPR
-  case class MATCH_CASE(position: Pos, newVarName: Option[PART[String]], types: Seq[PART[String]], expr: EXPR, resultType: Option[FINAL] = None)
-  case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE], resultType: Option[FINAL] = None) extends EXPR
+  sealed trait EXPR extends Positioned with Typed with ContextContainer {
+    def getName: String = this.getClass().getSimpleName
+  }
+  case class CONST_LONG(position: Pos, value: Long, resultType: Option[FINAL] = Some(LONG), ctxOpt: CtxOpt = None)                       extends EXPR
+  case class GETTER(position: Pos, ref: EXPR, field: PART[String], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None)              extends EXPR
+  case class CONST_BYTESTR(position: Pos, value: PART[ByteStr], resultType: Option[FINAL] = Some(BYTESTR), ctxOpt: CtxOpt = None)        extends EXPR
+  case class CONST_STRING(position: Pos, value: PART[String], resultType: Option[FINAL] = Some(STRING), ctxOpt: CtxOpt = None)           extends EXPR
+  case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOperation, b: EXPR, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None)  extends EXPR
+  case class BLOCK(position: Pos, let: Declaration, body: EXPR, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None)                 extends EXPR
+  case class IF(position: Pos, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None)         extends EXPR
+  case class REF(position: Pos, key: PART[String], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None)                              extends EXPR
+  case class TRUE(position: Pos, resultType: Option[FINAL] = Some(BOOLEAN), ctxOpt: CtxOpt = None)                                       extends EXPR
+  case class FALSE(position: Pos, resultType: Option[FINAL] = Some(BOOLEAN), ctxOpt: CtxOpt = None)                                      extends EXPR
+  case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+  case class MATCH_CASE(
+      position: Pos,
+      newVarName: Option[PART[String]],
+      types: Seq[PART[String]],
+      expr: EXPR,
+      resultType: Option[FINAL] = None,
+      ctxOpt: CtxOpt = None
+  )
+  case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
-  case class INVALID(position: Pos, message: String, resultType: Option[FINAL] = None) extends EXPR
+  case class INVALID(position: Pos, message: String, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
   case class DAPP(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
 

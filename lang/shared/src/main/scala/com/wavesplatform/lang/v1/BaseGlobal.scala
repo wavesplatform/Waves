@@ -11,9 +11,10 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
@@ -98,6 +99,29 @@ trait BaseGlobal {
     ContractSerDe.serialize(c)
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
+
+
+  def parseAndCompileExpression(
+                                 input:         String,
+                                 context:       CompilerContext,
+                                 letBlockOnly:  Boolean,
+                                 stdLibVersion: StdLibVersion,
+                                 estimator:     ScriptEstimator
+                               ): Either[String, (Array[Byte], Long, Expressions.EXPR, Iterable[CompilationError])] = {
+    for {
+      compRes <- ExpressionCompiler.compileWithParseResult(input, context)
+      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(compRes._1)
+      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
+      x = if (compRes._3.isEmpty) serializeExpression(compRes._1, stdLibVersion) else Array.empty[Byte]
+
+      vars  = utils.varNames(stdLibVersion, Expression)
+      costs = utils.functionCosts(stdLibVersion)
+      complexity <- estimator(vars, costs, compRes._1)
+    } yield (x, complexity, compRes._2, compRes._3)
+  }
+
+
+
 
   val compileExpression =
     compile(_, _, _, _, _, ExpressionCompiler.compile)

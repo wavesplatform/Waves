@@ -8,10 +8,13 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
+import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
@@ -28,6 +31,124 @@ import scala.scalajs.js.annotation.JSExportTopLevel
 import scala.scalajs.js.{Any, Dictionary, Promise, UndefOr}
 
 object JsAPI {
+
+  private def expressionToJs(ast: Expressions.EXPR): js.Object = {
+
+    def mergeJSObjects(objs: js.Dynamic*): js.Object = {
+      val result = js.Dictionary.empty[Any]
+      for (source <- objs) {
+        for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
+          result(key) = value
+      }
+      result.asInstanceOf[js.Object]
+    }
+
+    def serExpr(expr: Expressions.EXPR): js.Object = {
+
+      val commonDataObj = jObj.applyDynamic("apply")(
+        "type"       -> expr.getName,
+        "posStart"   -> expr.position.start,
+        "posEnd"     -> expr.position.end,
+        "resultType" -> expr.resultType.getOrElse(NOTHING).toString,
+        "ctx" -> serCtx(expr.ctxOpt.getOrElse(CompilerContext.empty))
+      )
+
+      expr match {
+        case x: Expressions.CONST_LONG => commonDataObj
+        case x: Expressions.CONST_BYTESTR => commonDataObj
+        case x: Expressions.CONST_STRING => commonDataObj
+        case x: Expressions.TRUE => commonDataObj
+        case x: Expressions.FALSE => commonDataObj
+
+        case x: Expressions.REF => commonDataObj
+
+        case Expressions.GETTER(_, ref, _, _, _) => {
+          val additionalDataObj = jObj.applyDynamic("apply")("ref" -> serExpr(ref))
+          mergeJSObjects(commonDataObj, additionalDataObj)
+        }
+
+        case Expressions.BLOCK(_, dec, body, _, _) => {
+          val additionalDataObj = jObj.applyDynamic("apply")(
+            "dec"        -> serDec(dec),
+            "body"       -> serExpr(body)
+          )
+          mergeJSObjects(commonDataObj, additionalDataObj)
+        }
+
+        case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) => {
+          val additionalDataObj = jObj.applyDynamic("apply")(
+            "cond"       -> serExpr(cond),
+            "ifTrue"     -> serExpr(ifTrue),
+            "ifFalse"    -> serExpr(ifFalse)
+          )
+          mergeJSObjects(commonDataObj, additionalDataObj)
+        }
+
+        case Expressions.FUNCTION_CALL(_, _, args, _, _) => {
+          val additionalDataObj = jObj.applyDynamic("apply")("args" -> args.map(serExpr).toJSArray)
+          mergeJSObjects(commonDataObj, additionalDataObj)
+        }
+
+        case Expressions.MATCH(_, expr, cases, _, ctxOpt) => {
+          val additionalDataObj = jObj.applyDynamic("apply")(
+            "expr"       -> serExpr(expr),
+            "cases"      -> cases.map(serMatchCase(_, ctxOpt.getOrElse(CompilerContext.empty))).toJSArray
+          )
+          mergeJSObjects(commonDataObj, additionalDataObj)
+        }
+
+        case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
+      }
+    }
+
+    def serMatchCase(c: Expressions.MATCH_CASE, ctx: CompilerContext): js.Object = {
+      jObj.applyDynamic("apply")(
+        "type"       -> "MATCH_CASE",
+        "posStart"   -> c.position.start,
+        "posEnd"     -> c.position.end,
+        "resultType" -> c.resultType.getOrElse(NOTHING).toString,
+        "expr"       -> serExpr(c.expr),
+        "ctx" -> serCtx(ctx)
+      )
+    }
+
+    def serDec(dec: Expressions.Declaration): js.Object = {
+      dec match {
+        case Expressions.LET(p, _, expr, _, _) =>
+          jObj.applyDynamic("apply")("type" -> "LET", "posStart" -> p.start, "posEnd" -> p.end, "expr" -> serExpr(expr))
+        case Expressions.FUNC(p, _, _, expr) =>
+          jObj.applyDynamic("apply")("type" -> "FUNC", "posStart" -> p.start, "posEnd" -> p.end, "expr" -> serExpr(expr))
+        case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
+      }
+    }
+
+    def serCtx(ctx: CompilerContext): js.Object = {
+      jObj.applyDynamic("apply")(
+        "vars" -> ctx.varDefs.map {
+          vd =>
+            jObj.applyDynamic("apply")("name" -> vd._1, "type" -> vd._2.toString)
+        }.toJSArray,
+
+        "funcs" -> ctx.functionDefs.map {
+          func =>
+            jObj.applyDynamic("apply")("name" -> func._1, "signatureList" -> func._2.map {
+              sig =>
+                jObj.applyDynamic("apply")("type" -> typeRepr(sig.result), "args" -> sig.args.map {
+                  arg =>
+                    jObj.applyDynamic("apply")("name" -> arg._1, "type" -> typeRepr(arg._2))
+                }.toJSArray)
+            }.toJSArray)
+        }.toJSArray
+      )
+    }
+
+    serExpr(ast)
+  }
+
+  private def compilationErrToJs(err: CompilationError): js.Object = {
+    jObj.applyDynamic("apply")("posStart" -> err.start, "posEnd" -> err.end, "msg" -> err.message)
+  }
+
   private def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
@@ -43,8 +164,8 @@ object JsAPI {
         case CONST_BOOLEAN(b) => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> b)
         case FUNCTION_CALL(function, args) =>
           jObj.applyDynamic("apply")("type" -> "CALL", "name" -> (function match {
-            case Native(name) => name.toString()
-            case User(internalName, _)   => internalName
+            case Native(name)          => name.toString()
+            case User(internalName, _) => internalName
           }), "args" -> args.map(r).toJSArray)
         case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
       }
@@ -93,11 +214,14 @@ object JsAPI {
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).vars
-      .map(v => js.Dynamic.literal(
-        "name" -> v._1,
-        "type" -> typeRepr(v._2._1),
-        "doc"  -> DocSource.varData((v._1, ver))
-      ))
+      .map(
+        v =>
+          js.Dynamic.literal(
+            "name" -> v._1,
+            "type" -> typeRepr(v._2._1),
+            "doc"  -> DocSource.varData((v._1, ver))
+          )
+      )
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
@@ -106,13 +230,12 @@ object JsAPI {
       .map(f => {
         val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList, ver))
         js.Dynamic.literal(
-          "name" -> f.name,
-          "doc" -> funcDoc,
+          "name"       -> f.name,
+          "doc"        -> funcDoc,
           "resultType" -> typeRepr(f.signature.result),
-          "args" -> (f.args, f.signature.args, paramsDoc).zipped.toList
-            .map { arg =>
-              js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
-            }.toJSArray
+          "args" -> (f.args, f.signature.args, paramsDoc).zipped.toList.map { arg =>
+            js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
+          }.toJSArray
         )
       })
       .toJSArray
@@ -149,11 +272,70 @@ object JsAPI {
       identity
     )
   }
+  @JSExportTopLevel("parseAndCompile")
+  def parseAndCompile(
+      input: String,
+      libraries: Dictionary[String] = Dictionary.empty
+  ): js.Dynamic = {
+    val r = for {
+      directives  <- DirectiveParser(input)
+      ds          <- extractDirectives(directives)
+      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
+      compiled    <- parseAndCompileScript(ds, linkedInput)
+    } yield compiled
+    r.fold(
+      e => js.Dynamic.literal("error" -> e),
+      identity
+    )
+  }
 
+  private def parseAndCompileScript(ds: DirectiveSet, input: String) = {
+    val stdLibVer = ds.stdLibVersion
+    ds.contentType match {
+      case Expression =>
+        val ctx = buildScriptContext(stdLibVer, ds.scriptType == Asset, ds.contentType == DAppType)
+        Global
+          .parseAndCompileExpression(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .map {
+            case (bytes, complexity, ast, errorList) =>
+              js.Dynamic.literal(
+                "result"     -> Global.toBuffer(bytes),
+                "complexity" -> complexity,
+                "exprAst"        -> expressionToJs(ast),
+                "errorList"  -> errorList.map(compilationErrToJs).toJSArray
+              )
+          }
+      case Library =>
+        val ctx = buildScriptContext(stdLibVer, ds.scriptType == Asset, ds.contentType == DAppType)
+        Global
+          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .map {
+            case (bytes, ast, complexity) =>
+              js.Dynamic.literal(
+                "result"     -> Global.toBuffer(bytes),
+                "ast"        -> toJs(ast),
+                "complexity" -> complexity
+              )
+          }
+      case DAppType =>
+        // Just ignore stdlib version here
+        Global
+          .compileContract(input, fullContractContext.compilerContext, stdLibVer, estimator)
+          .map {
+            case (bytes, ast, complexity, complexityByFunc) =>
+              js.Dynamic.literal(
+                "result"           -> Global.toBuffer(bytes),
+                "ast"              -> toJs(ast),
+                "complexity"       -> complexity,
+                "complexityByFunc" -> complexityByFunc.toJSDictionary
+              )
+          }
+    }
+  }
   @JSExportTopLevel("compile")
   def compile(
-    input:     String,
-    libraries: Dictionary[String] = Dictionary.empty
+      input: String,
+      libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
@@ -174,35 +356,38 @@ object JsAPI {
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
+        Global
+          .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
-                "result" -> Global.toBuffer(bytes),
-                "ast" -> toJs(ast),
+                "result"     -> Global.toBuffer(bytes),
+                "ast"        -> toJs(ast),
                 "complexity" -> complexity
               )
           }
       case Library =>
         val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
-        Global.compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
+        Global
+          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
-                "result" -> Global.toBuffer(bytes),
-                "ast" -> toJs(ast),
+                "result"     -> Global.toBuffer(bytes),
+                "ast"        -> toJs(ast),
                 "complexity" -> complexity
               )
           }
       case DAppType =>
         // Just ignore stdlib version here
-        Global.compileContract(input, fullContractContext.compilerContext, ver, estimator)
+        Global
+          .compileContract(input, fullContractContext.compilerContext, ver, estimator)
           .map {
             case (bytes, ast, complexity, complexityByFunc) =>
               js.Dynamic.literal(
-                "result" -> Global.toBuffer(bytes),
-                "ast" -> toJs(ast),
-                "complexity" -> complexity,
+                "result"           -> Global.toBuffer(bytes),
+                "ast"              -> toJs(ast),
+                "complexity"       -> complexity,
                 "complexityByFunc" -> complexityByFunc.toJSDictionary
               )
           }
@@ -211,14 +396,15 @@ object JsAPI {
 
   @JSExportTopLevel("decompile")
   def decompile(input: String): js.Dynamic =
-    Global.decompile(input)
+    Global
+      .decompile(input)
       .fold(
-        err => js.Dynamic.literal("error" -> err.m),
-        { case (scriptText, meta) =>
-          jObj(
-            "result" -> scriptText,
-            "meta"   -> metaConverter.foldRoot(meta)
-          )
+        err => js.Dynamic.literal("error" -> err.m), {
+          case (scriptText, meta) =>
+            jObj(
+              "result" -> scriptText,
+              "meta"   -> metaConverter.foldRoot(meta)
+            )
         }
       )
 
@@ -245,9 +431,11 @@ object JsAPI {
 
   private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =
     eval
-      .map(_.fold(
-        e => jObj("error" -> e),
-        r => jObj("result" -> r)
-      ))
+      .map(
+        _.fold(
+          e => jObj("error"  -> e),
+          r => jObj("result" -> r)
+        )
+      )
       .toJSPromise
 }
