@@ -161,8 +161,7 @@ timeout(time:90, unit:'MINUTES') {
                                 env.branch=branch
                                 ut.sbtPreconditions(jdkVersion, sbtVersion, '-Xmx3g -Xms3g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled')
                                 try{
-                                    sleep 300
-                                    // sh "SBT_THREAD_NUMBER=7 sbt \";update;clean;coverage;checkPR;coverageReport\""
+                                    sh "SBT_THREAD_NUMBER=7 sbt \";update;clean;coverage;checkPR;coverageReport\""
                                     pipelineStatus['unitTests'] = true
                                 }
                                 finally{
@@ -182,8 +181,8 @@ timeout(time:90, unit:'MINUTES') {
                                 unstash 'sources'
                                 env.branch=branch
                                 sh """
-                                    find ~/.ivy2/ -name '*SNAPSHOT*' -exec rm -rfv {} \\; || true
-                                    ps aux | grep '[s]bt ;update;clean;it/test' ||
+                                    ps -aux | grep '[s]bt' || find ~/.ivy2/ -name '*SNAPSHOT*' -exec rm -rfv {} \\; || true
+                                    ps -aux | grep '[s]bt ;update;clean;it/test' ||
                                     {
                                         docker rm -f \$(docker ps -a | grep waves | grep node | awk '{ print \$1 }') || true
                                         docker rmi -f \$(docker images | grep node | awk '{ print \$3 }') || true
