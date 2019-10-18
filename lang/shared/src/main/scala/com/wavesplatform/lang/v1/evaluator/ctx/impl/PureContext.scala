@@ -114,6 +114,21 @@ object PureContext {
       )
     }
 
+  lazy val valueOrElse: BaseFunction[NoContext] =
+    UserFunction(
+      "valueOrElse",
+      13L,
+      TYPEPARAM('T'),
+      ("@value", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))),
+      ("@alternative", TYPEPARAM('T'))
+    ) {
+      IF(
+        FUNCTION_CALL(eq, List(REF("@value"), REF("unit"))),
+        REF("@alternative"),
+        REF("@value")
+      )
+    }
+
   lazy val valueOrErrorMessage: BaseFunction[NoContext] =
     UserFunction(
       "valueOrErrorMessage",
@@ -734,10 +749,12 @@ object PureContext {
       )
     )
 
+    val v4Functions = Array(contains, valueOrElse)
+
     version match {
       case V1 | V2 => ctx
       case V3 => v3Ctx
-      case V4 => v3Ctx.copy(functions = v3Ctx.functions :+ contains)
+      case V4 => v3Ctx.copy(functions = v3Ctx.functions ++ v4Functions)
     }
   }
 }

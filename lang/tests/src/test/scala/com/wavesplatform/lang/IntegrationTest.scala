@@ -1047,4 +1047,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(""" "qwerty".contains("we") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
     eval(""" "qwerty".contains("xx") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
   }
+
+  property("valueOrElse") {
+    val script =
+      s"""
+         | let a = if (true) then 1 else unit
+         | let b = if (false) then 2 else unit
+         | let c = 3
+         |
+         | a.valueOrElse(b) == 1          &&
+         | b.valueOrElse(a) == 1          &&
+         | a.valueOrElse(c) == 1          &&
+         | b.valueOrElse(c) == c          &&
+         | c.valueOrElse(a) == c          &&
+         | b.valueOrElse(b) == unit       &&
+         | unit.valueOrElse(unit) == unit
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
 }
