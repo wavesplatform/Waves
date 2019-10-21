@@ -283,6 +283,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     complete(Validity(address, Address.fromString(address).isRight))
   }
 
+  // TODO: Remove from API
   def postData: Route = (path("data") & withAuth) {
     broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
   }
