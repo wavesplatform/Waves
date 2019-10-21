@@ -32,7 +32,8 @@ import scala.util.{Failure, Success, Try}
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with AuthRoute {
+    with AuthRoute
+    with AutoParamsDirective {
 
   import AddressApiRoute._
 
@@ -70,7 +71,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   )
   def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
     complete(
-      Address.fromString(address)
+      Address
+        .fromString(address)
         .flatMap(scriptMetaJson)
         .map(ToResponseMarshallable(_))
     )
@@ -318,19 +320,22 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   def getData: Route =
     extractScheduler(
       implicit sc =>
-        (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
-          maybeRegex match {
-            case None => complete(accountData(address))
-            case Some(regex) =>
-              complete(
-                Try(regex.r)
-                  .fold(
-                    _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
-                    r => accountData(address, r.pattern)
-                  )
-              )
-
-          }
+        (path("data" / Segment)) { address =>
+          (parameter('matches) & get) { regex =>
+            complete(
+              Try(regex.r)
+                .fold(
+                  _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+                  r => accountData(address, r.pattern)
+                )
+            )
+          } ~
+            paramList("key") { keys =>
+              complete(accountDataList(address, keys: _*))
+            } ~
+            get {
+              complete(accountData(address))
+            }
         }
     )
 
@@ -423,7 +428,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
     import cats.implicits._
-    blockchain.accountScript(account)
+    blockchain
+      .accountScript(account)
       .traverse(Global.dAppFuncTypes)
       .map(AccountScriptMeta(account.stringRepr, _))
   }
@@ -465,6 +471,14 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
       value <- commonAccountApi.data(addr, key).toRight(DataKeyDoesNotExist)
     } yield value
+    ToResponseMarshallable(result)
+  }
+
+  private def accountDataList(address: String, keys: String*): ToResponseMarshallable = {
+    val result = for {
+      addr <- Address.fromString(address).left.map(_ => InvalidAddress)
+      dataList = keys.flatMap(commonAccountApi.data(addr, _))
+    } yield dataList
     ToResponseMarshallable(result)
   }
 
@@ -547,5 +561,5 @@ object AddressApiRoute {
 
   case class AccountScriptMeta(address: String, meta: Option[Dic])
   implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
-  implicit lazy val dicFormat: Writes[Dic] = metaConverter.foldRoot
+  implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
 }

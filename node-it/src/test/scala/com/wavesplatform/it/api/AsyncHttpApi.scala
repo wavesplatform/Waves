@@ -419,6 +419,10 @@ object AsyncHttpApi extends Assertions {
 
     def getDataByKey(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
 
+    def getDataList(address: String, json: Boolean, keys: String*): Future[Seq[DataEntry[_]]] =
+      if (json) postJson(s"/addresses/data/$address", keys).as[Seq[DataEntry[_]]]
+      else get(s"/addresses/data/$address?${keys.map("key=" + _).mkString("&")}").as[Seq[DataEntry[_]]]
+
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
     def sign(json: JsValue): Future[JsObject] =
