@@ -26,12 +26,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   private def eval[T <: EVALUATED](code: String,
                                    pointInstance: Option[CaseObj] = None,
                                    pointType: FINAL = AorBorC,
-                                   ctxt: CTX[NoContext] = CTX.empty): Either[String, T] = {
+                                   ctxt: CTX[NoContext] = CTX.empty,
+                                   version: StdLibVersion = V3
+                                  ): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
     val lazyVal = ContextfulVal.pure[NoContext](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
     val ctx: CTX[NoContext] =
-      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX[NoContext](sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
+      Monoid.combineAll(Seq(PureContext.build(Global, version), CTX[NoContext](sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator.apply(ctx.evaluationContext, v._1))
   }
@@ -1038,5 +1040,31 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval[EVALUATED](script, None) should produce("Can't find a function overload 'size'")
+  }
+
+  property("string contains") {
+    eval(""" "qwerty".contains("we") """, version = V3) should produce("Can't find a function")
+    eval(""" "qwerty".contains("we") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" "qwerty".contains("xx") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+  }
+
+  property("valueOrElse") {
+    val script =
+      s"""
+         | let a = if (true) then 1 else unit
+         | let b = if (false) then 2 else unit
+         | let c = 3
+         |
+         | a.valueOrElse(b) == 1          &&
+         | b.valueOrElse(a) == 1          &&
+         | a.valueOrElse(c) == 1          &&
+         | b.valueOrElse(c) == c          &&
+         | c.valueOrElse(a) == c          &&
+         | b.valueOrElse(b) == unit       &&
+         | unit.valueOrElse(unit) == unit
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 }
