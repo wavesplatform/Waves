@@ -351,25 +351,6 @@ object PureContext {
       case xs                 => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
     }
 
-  """
-    |
-    |  func f1() = 1                               1
-    |  func f2() = if (true) then f1() else f1()   2
-    |  func f3() = if (true) then f2() else f2()   4
-    |  func f4() = if (true) then f3() else f3()   ((1 * 2 + 1) * 2 + 1) * 2 + 1
-    |
-    |  f3 f2 f1 f1 f2 f1 f1 f3 f2 f1 f1 f2 f1 f1
-    |
-    |  ...
-    |
-    |  func fn() = if (true) then fn_1() else fn_2()
-    |
-    |  fn() == fn()
-    |
-    |
-    |""".stripMargin
-
-
   lazy val listConcat: NativeFunction[NoContext] =
     NativeFunction(
       "cons",
