@@ -20,7 +20,6 @@ object BinaryOperation {
     Left(List(GT_OP, GE_OP, LT_OP, LE_OP)),
     Left(List(EQ_OP, NE_OP)),
     Right(List(CONS_OP)),
-    Left(List(LIST_APPEND_OP, LIST_CONCAT_OP)),
     Left(List(SUM_OP, SUB_OP)),
     Left(List(MUL_OP, DIV_OP, MOD_OP)),
     Left(List(LIST_APPEND_OP, LIST_CONCAT_OP))
