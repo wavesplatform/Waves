@@ -14,6 +14,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.meta.Dic
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
@@ -305,22 +306,20 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   def getData: Route =
     extractScheduler(
       implicit sc =>
-        (path("data" / Segment)) { address =>
-          (parameter('matches) & get) { regex =>
-            complete(
-              Try(regex.r)
-                .fold(
-                  _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
-                  r => accountData(address, r.pattern)
-                )
-            )
-          } ~
-            paramList("key") { keys =>
-              complete(accountDataList(address, keys: _*))
-            } ~
-            get {
-              complete(accountData(address))
-            }
+        path("data" / Segment) { address =>
+          paramPBEntity(api.DataRequest) { request =>
+            if (request.matches.nonEmpty)
+              complete(
+                Try(request.matches.r)
+                  .fold(
+                    _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+                    r => accountData(address, r.pattern)
+                  )
+              )
+            else complete(accountDataList(address, request.keys: _*))
+          } ~ get {
+            complete(accountData(address))
+          }
         }
     )
 
