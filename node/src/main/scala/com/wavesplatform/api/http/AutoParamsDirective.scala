@@ -4,19 +4,23 @@ import akka.http.scaladsl.server.{Directive1, MissingQueryParamRejection}
 import play.api.libs.json.{JsArray, Json}
 
 trait AutoParamsDirective { self: ApiRoute =>
-  def paramList(name: String): Directive1[Vector[String]] = {
+  def paramList(name: String): Directive1[Seq[String]] = {
     import scala.concurrent.duration._
 
-    val fromQuery = parameterSeq.map(_.filter(_._1 == name).map(_._2))
-    val fromPost  = formFieldSeq.map(_.filter(_._1 == name).map(_._2))
+    def fromParamSeq(parameterSeq: Directive1[collection.immutable.Seq[(String, String)]]) = {
+      parameterSeq.map(_.filter(_._1 == name).map(_._2)).recover(_ => provide(Seq.empty[String]))
+    }
+
+    val fromQuery = fromParamSeq(parameterSeq)
+    val fromPost  = fromParamSeq(formFieldSeq)
     val fromJson = extractStrictEntity(5 seconds)
-      .map(entity => Json.parse(entity.toString()).as[JsArray].value.map(_.as[String]))
+      .map(entity => Json.parse(entity.data.toArray).as[JsArray].value.map(_.as[String]))
       .recover(_ => provide(Seq.empty[String]))
 
     (for {
       q <- fromQuery
       p <- fromPost
       j <- fromJson
-    } yield (q ++ p ++ j).toVector).filter(_.nonEmpty, MissingQueryParamRejection(name))
+    } yield q ++ p ++ j).filter(_.nonEmpty, MissingQueryParamRejection(name))
   }
 }
