@@ -92,13 +92,6 @@ object ByteEntity {
   }
 }
 
-// todo: (NODE-1915) stub for TransferTransaction
-case class Nop[T]() extends ByteEntity[T] {
-  override val index: Int = 0
-  override private[description] def generateDoc: Seq[ByteEntityDescription] = Seq()
-  override private[description] def deserialize(buf: Array[Byte], offset: Int): Try[(T, Int)] = Failure(new NotImplementedError)
-}
-
 case class ConstantByte(index: Int, value: Byte, name: String) extends ByteEntity[Byte] {
 
   def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, s"$ByteType (constant, value = $value)", "1"))

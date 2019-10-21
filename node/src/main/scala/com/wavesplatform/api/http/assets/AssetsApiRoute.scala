@@ -241,7 +241,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
         path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
         path("exchange")(broadcast[SignedExchangeRequest](_.toTx)) ~
-        path("transfer")(broadcast[TransferRequest](_.toTx))
+        path("transfer")(broadcast[TransferRequest](_.toValidTx))
     )
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {

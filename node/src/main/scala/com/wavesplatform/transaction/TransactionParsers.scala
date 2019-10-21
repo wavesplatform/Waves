@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.base58Length
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 object TransactionParsers {
 
@@ -27,7 +27,8 @@ object TransactionParsers {
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
     CreateAliasTransactionV1,
-    MassTransferTransaction
+    MassTransferTransaction,
+    TransferTransaction
   ).map { x =>
     x.typeId -> x
   }(collection.breakOut)
@@ -67,17 +68,24 @@ object TransactionParsers {
   def by(typeId: Byte, version: Byte): Option[TransactionParserLite] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
-    require(bytes.length > 2, "Buffer underflow while parsing transaction")
-    val parser = if (bytes(0) == 0) {
-      val typeId = bytes(1)
+    def modernParseBytes: Try[Transaction] = {
+      val typeId  = bytes(1)
       val version = bytes(2)
-      modern.getOrElse(
-        (typeId, version),
-        throw new IllegalArgumentException(s"Unknown transaction type ($typeId) and version ($version) (modern encoding)")
-      )
-    } else {
-      old.getOrElse(bytes(0), throw new IllegalArgumentException(s"Unknown transaction type (old encoding): '${bytes(0)}'"))
+      modern.get((typeId, version)) match {
+        case Some(parser) => parser.parseBytes(bytes)
+        case None => Failure[Transaction](new IllegalArgumentException(s"Unknown transaction type ($typeId) and version ($version) (modern encoding)"))
+      }
     }
-    parser.parseBytes(bytes)
+    def oldParseBytes: Try[Transaction] = {
+      old.get(bytes(0)) match {
+        case Some(parser) => parser.parseBytes(bytes)
+        case None         => Failure[Transaction](new IllegalArgumentException(s"Unknown transaction type (old encoding): '${bytes(0)}'"))
+      }
+    }
+
+    for {
+      _ <- Either.cond(bytes.length > 2, (), new IllegalArgumentException("Buffer underflow while parsing transaction")).toTry
+      tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes
+    } yield tx
   }
 }

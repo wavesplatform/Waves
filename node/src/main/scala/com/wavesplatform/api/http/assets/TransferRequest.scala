@@ -2,80 +2,109 @@ package com.wavesplatform.api.http.assets
 
 import cats.instances.either._
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
-import com.wavesplatform.api.http.{ApiError, BroadcastRequest}
+import com.wavesplatform.api.http.BroadcastRequest
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.json._
 
 case class TransferRequest(
-    assetId: Asset,
-    feeAssetId: Asset,
+    version: Option[Byte],
+    assetId: Option[String],
+    feeAssetId: Option[String],
     amount: Long,
     fee: Long,
-    recipient: AddressOrAlias,
+    recipient: String,
     timestamp: Option[Long],
     sender: Option[String], // address
     senderPublicKey: Option[String],
-    version: Byte = 1.toByte,
-    attachment: Array[Byte] = Array.emptyByteArray,
-    signature: Proofs = Proofs.empty,
-    proofs: Proofs = Proofs.empty
+    attachment: Option[String],
+    signature: Option[String],
+    proofs: Option[List[String]]
 ) extends BroadcastRequest {
-
-  def versionedProofs: Proofs =
-    if (version.toByte == 2.toByte) proofs else signature
+  import TransferRequest._
 
   def toTx: Either[ValidationError, TransferTransaction] =
     for {
-      sender <- PublicKey.fromBase58String(senderPublicKey.get)
-    } yield toTx(sender)
+      sender <- senderPublicKey match {
+        case Some(key) => PublicKey.fromBase58String(key)
+        case None      => Left(GenericError("invalid.senderPublicKey"))
+      }
+      tx <- toTx(sender)
+    } yield tx
 
-  def toTx(sender: PublicKey): TransferTransaction =
-    TransferTransaction(
-      version,
+  def toTx(sender: PublicKey): Either[ValidationError, TransferTransaction] =
+    for {
+      validRecipient  <- AddressOrAlias.fromString(recipient)
+      validAssetId    <- toAsset(assetId, "invalid.assetId")
+      validFeeAssetId <- toAsset(feeAssetId, "invalid.feeAssetId")
+      validAttachment <- toAttachment(attachment)
+      validProofs     <- toProofs(version, signature, proofs)
+    } yield TransferTransaction(
+      version.getOrElse(1.toByte),
       timestamp.getOrElse(0L),
       sender,
-      recipient,
-      assetId,
+      validRecipient,
+      validAssetId,
       amount,
-      feeAssetId,
+      validFeeAssetId,
       fee,
-      attachment,
-      versionedProofs
+      validAttachment,
+      validProofs
     )
+
+  def toValidTx(sender: PublicKey): Either[ValidationError, TransferTransaction] =
+    for {
+      tx <- toTx(sender)
+      _  <- TransferTransaction.validate(tx)
+    } yield tx
+
+  def toValidTx: Either[ValidationError, TransferTransaction] =
+    for {
+      tx <- toTx
+      _  <- TransferTransaction.validate(tx)
+    } yield tx
 }
 
 object TransferRequest extends BroadcastRequest {
   import cats.instances.list._
+  import cats.syntax.either._
   import cats.syntax.traverse._
 
-  implicit val addressOrAliasReads: Reads[AddressOrAlias] = Reads {
-    case JsString(str) => AddressOrAlias.fromString(str).result
-    case _             => JsError("Expected string")
-  }
+  implicit val format: Format[TransferRequest] = Json.format
 
-  implicit val attachmentReads: Reads[Array[Byte]] = Reads {
-    case JsString(str) if str.nonEmpty => JsSuccess(Base58.tryDecodeWithLimit(str).get)
-    case _                             => JsSuccess(Array.emptyByteArray)
-  }
+  private def toAsset(maybeAsset: Option[String], error: String): Either[ValidationError, Asset] =
+    maybeAsset match {
+      case None    => Waves.asRight
+      case Some(v) => ByteStr.decodeBase58(v).toEither.leftMap(_ => GenericError(error)).map(IssuedAsset)
+    }
 
-  implicit val proofsReads: Reads[Proofs] = Reads {
-    case JsString(str) => parseBase58(str, "invalid.signature", SignatureStringLength).map(sig => Proofs(Seq(sig))).result
-    case proofs: JsArray =>
-      for {
-        x <- proofs.validate[List[String]]
-        y <- x.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize)).result
-        z <- Proofs.create(y).result
-      } yield z
-    case _ => JsSuccess(Proofs.empty)
-  }
+  private def toAttachment(maybeAttachment: Option[String]): Either[ValidationError, Array[Byte]] =
+    maybeAttachment match {
+      case Some(v) if v.nonEmpty => Base58.tryDecodeWithLimit(v).toEither.leftMap(_ => GenericError("invalid.attachment"))
+      case _                     => Array.emptyByteArray.asRight
+    }
 
-  implicit val reads: Reads[TransferRequest] = Json.reads
-
-  private implicit class ValidationOps[A](v: Either[ValidationError, A]) {
-    def result: JsResult[A] = v.fold(err => JsError(ApiError.fromValidationError(err).message), JsSuccess(_))
-  }
+  private def toProofs(version: Option[Byte], maybeSignature: Option[String], maybeProofs: Option[List[String]]): Either[ValidationError, Proofs] =
+    version match {
+      case Some(v) if v == 2.toByte =>
+        maybeProofs match {
+          case Some(proofs) =>
+            for {
+              proofsBytes <- proofs.traverse(s => parseBase58(s, "invalid.proofs", Proofs.MaxProofStringSize))
+              result      <- Proofs.create(proofsBytes)
+            } yield result
+          case None => Proofs.empty.asRight
+        }
+      case _ =>
+        maybeSignature match {
+          case Some(str) => parseBase58(str, "invalid.signature", SignatureStringLength).map(sig => Proofs(Seq(sig)))
+          case None      => Proofs.empty.asRight
+        }
+    }
 }

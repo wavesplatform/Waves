@@ -5,24 +5,22 @@ import java.nio.ByteBuffer
 import cats.syntax.apply._
 import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.transfer.TransferTransaction.transactionType
-import com.wavesplatform.transaction.validation.{validateAmount, validateAttachment, validateFee}
+import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.reflect.ClassTag
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 case class TransferTransaction(
     version: Byte,
@@ -45,7 +43,7 @@ case class TransferTransaction(
 
   private val _bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
-      sender.bytes.arr,
+      sender,
       assetId.byteRepr,
       feeAssetId.byteRepr,
       Longs.toByteArray(timestamp),
@@ -57,12 +55,12 @@ case class TransferTransaction(
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(version match {
-    case 1 => Array(transactionType.toByte) ++ _bytesBase()
-    case 2 => Array(transactionType.toByte, version) ++ _bytesBase()
+    case 1 => Array(typeId) ++ _bytesBase()
+    case 2 => Array(typeId, version) ++ _bytesBase()
   })
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(version match {
-    case 1 => Bytes.concat(Array(transactionType.toByte), proofs.proofs.head, bodyBytes())
+    case 1 => Bytes.concat(Array(typeId), proofs.proofs.head, bodyBytes())
     case 2 => Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes())
   })
 
@@ -82,14 +80,12 @@ case class TransferTransaction(
     case a: IssuedAsset => Seq(a)
   }
 
-  //todo: (NODE-1915) remove after refactoring
-  override def builder: TransactionParser = TransferTransaction.transactionParserStub
+  override def builder: TransactionParserLite = TransferTransaction
 }
 
 object TransferTransaction extends TransactionParserLite {
 
-  val transactionType: TransactionType = TransactionType(4)
-  val typeId: Byte                     = transactionType.toByte
+  val typeId: Byte = 4.toByte
 
   override def supportedVersions: Set[Byte] = Set(1.toByte, 2.toByte)
 
@@ -111,7 +107,17 @@ object TransferTransaction extends TransactionParserLite {
       else throw new IllegalArgumentException(s"Invalid asset id prefix: $prefix")
     }
 
-    def getAddressOrAlias: AddressOrAlias = ???
+    def getAddressOrAlias: AddressOrAlias = {
+      val prefix = buf.get(buf.position())
+      prefix match {
+        case Address.AddressVersion =>
+          Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
+        case Alias.AddressVersion =>
+          val length = buf.getShort(buf.position() + 2)
+          Alias.fromBytes(getByteArray(length + 4)).explicitGet()
+        case _ => throw new IllegalArgumentException(s"Invalid address or alias prefix: $prefix")
+      }
+    }
 
     def getByteArray(size: Int): Array[Byte] = {
       val result = new Array[Byte](size)
@@ -137,18 +143,23 @@ object TransferTransaction extends TransactionParserLite {
     TransferTransaction(version, ts, sender, recipient, assetId, amount, feeAssetId, fee, attachment, Proofs.empty)
   }
 
+  private def parseProofs(buf: ByteBuffer): Proofs =
+    Proofs.fromBytes(buf.getByteArray(buf.remaining())).explicitGet()
+
   override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transfer transaction")
 
     if (bytes(0) == 0) {
       require(bytes(1) == typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
-      val tx  = parseCommonPart(2, buf)
-      tx
+      val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      val tx     = parseCommonPart(2, buf)
+      val proofs = parseProofs(buf)
+      tx.copy(proofs = proofs)
     } else {
       require(bytes(0) == typeId, "transaction type mismatch")
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
       val signature = buf.getSignature
+      require(buf.get == typeId, "transaction type mismatch")
       parseCommonPart(1, buf).copy(proofs = Proofs(Seq(ByteStr(signature))))
     }
   }
@@ -219,16 +230,4 @@ object TransferTransaction extends TransactionParserLite {
       attachment: Array[Byte]
   ): Either[ValidationError, TransferTransaction] =
     apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, sender)
-
-  // todo: (NODE-1915) #forTypeSet used in AddressTransactions, rewrite to new parsers
-  val transactionParserStub: TransactionParser = new TransactionParserFor[TransferTransaction]() {
-    override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = TransferTransaction.parseBytes(bytes)
-
-    override def typeId: Byte                                                      = TransferTransaction.typeId
-    override def supportedVersions: Set[Byte]                                      = TransferTransaction.supportedVersions.map(_.toByte)
-    override protected def parseHeader(bytes: Array[Byte]): Try[Int]               = Failure(new NotImplementedError)
-    override protected def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Failure(new NotImplementedError)
-    override val byteHeaderDescription: ByteEntity[Unit]                           = Nop()
-    override val byteTailDescription: ByteEntity[TransferTransaction]              = Nop()
-  }
 }

@@ -1,5 +1,7 @@
 package com.wavesplatform.database
 
+import java.nio.BufferUnderflowException
+
 import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
@@ -327,7 +329,7 @@ class LevelDBWriterSpec
         writer.transferById(transactionId) shouldBe None
 
         db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
-        intercept[ArrayIndexOutOfBoundsException](writer.transferById(transactionId))
+        intercept[BufferUnderflowException](writer.transferById(transactionId))
       }
     }
   }

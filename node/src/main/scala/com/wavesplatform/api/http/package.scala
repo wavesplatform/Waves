@@ -65,7 +65,7 @@ package object http extends ApiMarshallers with ScorexLogging {
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
                 x match {
-                  case TransferTransaction       => Right(txJson.as[TransferRequest].toTx(senderPk))
+                  case TransferTransaction       => txJson.as[TransferRequest].toTx(senderPk)
                   case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
                   case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
                   case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)

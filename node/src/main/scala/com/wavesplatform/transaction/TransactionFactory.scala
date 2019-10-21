@@ -28,18 +28,17 @@ object TransactionFactory {
 
   private val EmptySignature = ByteStr(Array.fill(SignatureLength)(0: Byte))
 
-  // todo: (NODE-1915) join methods
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
-      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("Invalid signer"))
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.signer"))
       tx <- transferAsset(request, wallet, request.sender.get, time)
     } yield tx
 
   def transferAsset(request: TransferRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, TransferTransaction] =
     for {
-      _      <- Either.cond(request.sender.isDefined, (), GenericError("Invalid sender"))
-      sender <- wallet.findPrivateKey(request.sender.get)
-      tx = request.toTx(sender)
+      _        <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
+      sender   <- wallet.findPrivateKey(request.sender.get)
+      tx       <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toValidTx(sender)
       signer   <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       signedTx <- TransferTransaction.sign(tx, signer)
     } yield signedTx

@@ -11,7 +11,7 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
 
   def typeId: Byte = builder.typeId
-  def builder: TransactionParser
+  def builder: TransactionParserLite
   def assetFee: (Asset, Long)
   def timestamp: Long
   def chainByte: Option[Byte] = None
