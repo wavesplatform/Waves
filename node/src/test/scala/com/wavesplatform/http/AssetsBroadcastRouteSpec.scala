@@ -133,13 +133,13 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId"))
+          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("requirement failed"), true)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId"))
+          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("requirement failed"), true)
         }
         forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
+          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("requirement failed"), true)
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())

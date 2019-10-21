@@ -7,10 +7,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.json._
 
 case class TransferRequest(
@@ -21,7 +21,7 @@ case class TransferRequest(
     fee: Long,
     recipient: String,
     timestamp: Option[Long],
-    sender: Option[String], // address
+    sender: Option[String],
     senderPublicKey: Option[String],
     attachment: Option[String],
     signature: Option[String],
@@ -41,8 +41,8 @@ case class TransferRequest(
   def toTx(sender: PublicKey): Either[ValidationError, TransferTransaction] =
     for {
       validRecipient  <- AddressOrAlias.fromString(recipient)
-      validAssetId    <- toAsset(assetId, "invalid.assetId")
-      validFeeAssetId <- toAsset(feeAssetId, "invalid.feeAssetId")
+      validAssetId    <- toAsset(assetId)
+      validFeeAssetId <- toAsset(feeAssetId)
       validAttachment <- toAttachment(attachment)
       validProofs     <- toProofs(version, signature, proofs)
     } yield TransferTransaction(
@@ -78,15 +78,16 @@ object TransferRequest extends BroadcastRequest {
 
   implicit val format: Format[TransferRequest] = Json.format
 
-  private def toAsset(maybeAsset: Option[String], error: String): Either[ValidationError, Asset] =
+  private def toAsset(maybeAsset: Option[String]): Either[ValidationError, Asset] =
     maybeAsset match {
-      case None    => Waves.asRight
-      case Some(v) => ByteStr.decodeBase58(v).toEither.leftMap(_ => GenericError(error)).map(IssuedAsset)
+      case Some(v) if v.nonEmpty => ByteStr.decodeBase58(v).toEither.leftMap(e => GenericError(e.getMessage)).map(IssuedAsset)
+      case None                  => Waves.asRight
+      case _                     => GenericError("requirement failed: empty string").asLeft
     }
 
   private def toAttachment(maybeAttachment: Option[String]): Either[ValidationError, Array[Byte]] =
     maybeAttachment match {
-      case Some(v) if v.nonEmpty => Base58.tryDecodeWithLimit(v).toEither.leftMap(_ => GenericError("invalid.attachment"))
+      case Some(v) if v.nonEmpty => Base58.tryDecodeWithLimit(v).toEither.leftMap(e => GenericError(e.getMessage))
       case _                     => Array.emptyByteArray.asRight
     }
 
