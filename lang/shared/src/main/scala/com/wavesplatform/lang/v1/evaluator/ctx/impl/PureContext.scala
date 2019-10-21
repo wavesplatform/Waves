@@ -338,32 +338,6 @@ object PureContext {
       case xs => notImplemented[Id](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
     }
 
-  lazy val listAppend: NativeFunction[NoContext] =
-    NativeFunction(
-      "cons",
-      3,
-      LIST_APPEND_OP.func,
-      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))): TYPE,
-      ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
-      ("element", TYPEPARAM('B'))
-    ) {
-      case ARR(list) :: element :: Nil => Right(ARR(list :+ element))
-      case xs                 => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
-    }
-
-  lazy val listConcat: NativeFunction[NoContext] =
-    NativeFunction(
-      "cons",
-      10,
-      CREATE_LIST,
-      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
-      ("head", TYPEPARAM('A')),
-      ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
-    ) {
-      case h :: ARR(t) :: Nil => Right(ARR(h +: t))
-      case xs                 => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
-    }
-
   lazy val dropString: BaseFunction[NoContext] =
     NativeFunction("drop", 1, DROP_STRING, STRING, ("xs", STRING), ("number", LONG)) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(trimLongToInt(number)))
