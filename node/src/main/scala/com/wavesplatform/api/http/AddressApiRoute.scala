@@ -307,7 +307,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     extractScheduler(
       implicit sc =>
         path("data" / Segment) { address =>
-          paramPBEntity(api.DataRequest) { request =>
+          protobufEntity(api.DataRequest) { request =>
             if (request.matches.nonEmpty)
               complete(
                 Try(request.matches.r)

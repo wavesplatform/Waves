@@ -220,13 +220,15 @@ object AsyncHttpApi extends Assertions {
 
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
-    def transfer(sourceAddress: String,
-                 recipient: String,
-                 amount: Long,
-                 fee: Long,
-                 assetId: Option[String] = None,
-                 feeAssetId: Option[String] = None,
-                 version: Byte = 2): Future[Transaction] = {
+    def transfer(
+        sourceAddress: String,
+        recipient: String,
+        amount: Long,
+        fee: Long,
+        assetId: Option[String] = None,
+        feeAssetId: Option[String] = None,
+        version: Byte = 2
+    ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"       -> TransferTransaction.typeId,
@@ -237,7 +239,8 @@ object AsyncHttpApi extends Assertions {
           "version"    -> version,
           "assetId"    -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
-        ))
+        )
+      )
     }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
@@ -252,7 +255,8 @@ object AsyncHttpApi extends Assertions {
           "recipient" -> recipient,
           "fee"       -> fee,
           "version"   -> version
-        ))
+        )
+      )
     }
 
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 2): Future[Transaction] = {
@@ -263,20 +267,23 @@ object AsyncHttpApi extends Assertions {
           "txId"    -> leaseId,
           "fee"     -> fee,
           "version" -> version
-        ))
+        )
+      )
     }
 
     def activeLeases(sourceAddress: String): Future[Seq[Transaction]] = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 
-    def issue(sourceAddress: String,
-              name: String,
-              description: String,
-              quantity: Long,
-              decimals: Byte,
-              reissuable: Boolean,
-              fee: Long,
-              version: Byte = 2,
-              script: Option[String] = None): Future[Transaction] = {
+    def issue(
+        sourceAddress: String,
+        name: String,
+        description: String,
+        quantity: Long,
+        decimals: Byte,
+        reissuable: Boolean,
+        fee: Long,
+        version: Byte = 2,
+        script: Option[String] = None
+    ): Future[Transaction] = {
       val js = Json.obj(
         "type"        -> IssueTransaction.typeId,
         "name"        -> name,
@@ -302,7 +309,8 @@ object AsyncHttpApi extends Assertions {
           "sender"  -> sender,
           "fee"     -> fee,
           "script"  -> { if (script.isDefined) JsString(script.get) else JsNull }
-        ))
+        )
+      )
     }
 
     def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, version: Byte = 1): Future[Transaction] = {
@@ -314,17 +322,20 @@ object AsyncHttpApi extends Assertions {
           "sender"  -> sender,
           "fee"     -> fee,
           "script"  -> { if (script.isDefined) JsString(script.get) else JsNull }
-        ))
+        )
+      )
     }
 
-    def invokeScript(caller: String,
-                     dappAddress: String,
-                     func: Option[String],
-                     args: List[Terms.EXPR] = List.empty,
-                     payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
-                     fee: Long = 500000,
-                     feeAssetId: Option[String] = None,
-                     version: Byte = 1): Future[Transaction] = {
+    def invokeScript(
+        caller: String,
+        dappAddress: String,
+        func: Option[String],
+        args: List[Terms.EXPR] = List.empty,
+        payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+        fee: Long = 500000,
+        feeAssetId: Option[String] = None,
+        version: Byte = 1
+    ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"       -> InvokeScriptTransaction.typeId,
@@ -335,7 +346,8 @@ object AsyncHttpApi extends Assertions {
           "payment"    -> payment,
           "fee"        -> fee,
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
-        ))
+        )
+      )
     }
 
     def scriptCompile(code: String): Future[CompiledScript] = post("/utils/script/compile", code).as[CompiledScript]
@@ -347,12 +359,15 @@ object AsyncHttpApi extends Assertions {
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: Byte = 2): Future[Transaction] = {
       signAndBroadcast(
-        Json.obj("type"     -> BurnTransaction.typeId,
-                 "quantity" -> quantity,
-                 "assetId"  -> assetId,
-                 "sender"   -> sourceAddress,
-                 "fee"      -> fee,
-                 "version"  -> version))
+        Json.obj(
+          "type"     -> BurnTransaction.typeId,
+          "quantity" -> quantity,
+          "assetId"  -> assetId,
+          "sender"   -> sourceAddress,
+          "fee"      -> fee,
+          "version"  -> version
+        )
+      )
     }
 
     def debugStateChanges(invokeScriptTransactionId: String): Future[DebugStateChanges] =
@@ -378,21 +393,27 @@ object AsyncHttpApi extends Assertions {
 
     def sponsorAsset(sourceAddress: String, assetId: String, minSponsoredAssetFee: Long, fee: Long): Future[Transaction] =
       signAndBroadcast(
-        Json.obj("type"                 -> SponsorFeeTransaction.typeId,
-                 "assetId"              -> assetId,
-                 "sender"               -> sourceAddress,
-                 "fee"                  -> fee,
-                 "version"              -> 1,
-                 "minSponsoredAssetFee" -> minSponsoredAssetFee))
+        Json.obj(
+          "type"                 -> SponsorFeeTransaction.typeId,
+          "assetId"              -> assetId,
+          "sender"               -> sourceAddress,
+          "fee"                  -> fee,
+          "version"              -> 1,
+          "minSponsoredAssetFee" -> minSponsoredAssetFee
+        )
+      )
 
     def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Future[Transaction] =
       signAndBroadcast(
-        Json.obj("type"                 -> SponsorFeeTransaction.typeId,
-                 "assetId"              -> assetId,
-                 "sender"               -> sourceAddress,
-                 "fee"                  -> fee,
-                 "version"              -> 1,
-                 "minSponsoredAssetFee" -> JsNull))
+        Json.obj(
+          "type"                 -> SponsorFeeTransaction.typeId,
+          "assetId"              -> assetId,
+          "sender"               -> sourceAddress,
+          "fee"                  -> fee,
+          "version"              -> 1,
+          "minSponsoredAssetFee" -> JsNull
+        )
+      )
 
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/assets/transfer", TransferV1Request(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
@@ -406,7 +427,8 @@ object AsyncHttpApi extends Assertions {
           "fee"       -> fee,
           "version"   -> 1,
           "transfers" -> Json.toJson(transfers)
-        ))
+        )
+      )
     }
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
@@ -420,7 +442,7 @@ object AsyncHttpApi extends Assertions {
     def getDataByKey(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
 
     def getDataList(address: String, json: Boolean, keys: String*): Future[Seq[DataEntry[_]]] =
-      if (json) postJson(s"/addresses/data/$address", keys).as[Seq[DataEntry[_]]]
+      if (json) postJson(s"/addresses/data/$address", Json.obj("keys" -> keys)).as[Seq[DataEntry[_]]]
       else get(s"/addresses/data/$address?${keys.map("key=" + _).mkString("&")}").as[Seq[DataEntry[_]]]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
@@ -460,7 +482,8 @@ object AsyncHttpApi extends Assertions {
           "sender"  -> targetAddress,
           "fee"     -> fee,
           "alias"   -> alias
-        ))
+        )
+      )
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]
@@ -566,7 +589,8 @@ object AsyncHttpApi extends Assertions {
                   response
                 } else {
                   n.log.debug(
-                    s"[$id] Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+                    s"[$id] Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}"
+                  )
                   throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
                 }
               }
