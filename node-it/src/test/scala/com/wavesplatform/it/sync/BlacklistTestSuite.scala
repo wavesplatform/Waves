@@ -39,7 +39,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
 
   "and sync again" in {
     val baseHeight = nodes.map(_.height).max
-    nodes.waitForSameBlockHeadesAt(baseHeight + 5)
+    nodes.waitForSameBlockHeadersAt(baseHeight + 5)
   }
 
 }

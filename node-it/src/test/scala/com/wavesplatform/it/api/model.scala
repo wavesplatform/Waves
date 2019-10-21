@@ -1,5 +1,6 @@
 package com.wavesplatform.it.api
 
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
@@ -51,12 +52,14 @@ object DecompiledScript {
   implicit val decompiledScriptFormat: Format[DecompiledScript] = Json.format
 }
 
-case class FullAssetInfo(assetId: String,
-                         balance: Long,
-                         reissuable: Boolean,
-                         minSponsoredAssetFee: Option[Long],
-                         sponsorBalance: Option[Long],
-                         quantity: Long)
+case class FullAssetInfo(
+    assetId: String,
+    balance: Long,
+    reissuable: Boolean,
+    minSponsoredAssetFee: Option[Long],
+    sponsorBalance: Option[Long],
+    quantity: Long
+)
 object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
 }
@@ -76,17 +79,19 @@ object ScriptAssetInfo {
   implicit val scriptAssetInfoFormat: Format[ScriptAssetInfo] = Json.format
 }
 
-case class AssetInfo(assetId: String,
-                     issueHeight: Int,
-                     issueTimestamp: Long,
-                     issuer: String,
-                     name: String,
-                     description: String,
-                     decimals: Int,
-                     reissuable: Boolean,
-                     quantity: Long,
-                     minSponsoredAssetFee: Option[Long],
-                     scriptDetails: Option[ScriptAssetInfo])
+case class AssetInfo(
+    assetId: String,
+    issueHeight: Int,
+    issueTimestamp: Long,
+    issuer: String,
+    name: String,
+    description: String,
+    decimals: Int,
+    reissuable: Boolean,
+    quantity: Long,
+    minSponsoredAssetFee: Option[Long],
+    scriptDetails: Option[ScriptAssetInfo]
+)
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
@@ -108,33 +113,37 @@ trait TxInfo {
   def script: Option[String]
 }
 
-case class TransactionInfo(`type`: Int,
-                           id: String,
-                           fee: Long,
-                           timestamp: Long,
-                           sender: Option[String],
-                           height: Int,
-                           minSponsoredAssetFee: Option[Long],
-                           recipient: Option[String],
-                           script: Option[String]) extends TxInfo
+case class TransactionInfo(
+    `type`: Int,
+    id: String,
+    fee: Long,
+    timestamp: Long,
+    sender: Option[String],
+    height: Int,
+    minSponsoredAssetFee: Option[Long],
+    recipient: Option[String],
+    script: Option[String]
+) extends TxInfo
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
 
-case class OrderInfo(id: String,
-                     version: Option[Byte],
-                     sender: String,
-                     senderPublicKey: String,
-                     matcherPublicKey: String,
-                     assetPair: AssetPairResponse,
-                     orderType: String,
-                     amount: Long,
-                     price: Long,
-                     timestamp: Long,
-                     expiration: Long,
-                     matcherFee: Long,
-                     signature: String,
-                     proofs: Option[Seq[String]])
+case class OrderInfo(
+    id: String,
+    version: Option[Byte],
+    sender: String,
+    senderPublicKey: String,
+    matcherPublicKey: String,
+    assetPair: AssetPairResponse,
+    orderType: String,
+    amount: Long,
+    price: Long,
+    timestamp: Long,
+    expiration: Long,
+    matcherFee: Long,
+    signature: String,
+    proofs: Option[Seq[String]]
+)
 object OrderInfo {
   implicit val transactionFormat: Format[OrderInfo] = Json.format
 }
@@ -144,24 +153,24 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
-
-
 case class StateChangesDetails(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
 }
 
-case class DebugStateChanges(`type`: Int,
-                             id: String,
-                             fee: Long,
-                             timestamp: Long,
-                             sender: Option[String],
-                             height: Int,
-                             minSponsoredAssetFee: Option[Long],
-                             recipient: Option[String],
-                             script: Option[String],
-                             stateChanges: Option[StateChangesDetails]) extends TxInfo
-object DebugStateChanges{
+case class DebugStateChanges(
+    `type`: Int,
+    id: String,
+    fee: Long,
+    timestamp: Long,
+    sender: Option[String],
+    height: Int,
+    minSponsoredAssetFee: Option[Long],
+    recipient: Option[String],
+    script: Option[String],
+    stateChanges: Option[StateChangesDetails]
+) extends TxInfo
+object DebugStateChanges {
   implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
 }
 
@@ -181,48 +190,54 @@ object TransfersInfoResponse {
   implicit val transfersInfoResponseFormat: Format[TransfersInfoResponse] = Json.format
 }
 
-case class ExchangeTransaction(`type`: Int,
-                               version: Option[Byte],
-                               id: String,
-                               sender: String,
-                               senderPublicKey: String,
-                               fee: Long,
-                               timestamp: Long,
-                               proofs: Option[Seq[String]],
-                               order1: OrderInfo,
-                               order2: OrderInfo,
-                               amount: Long,
-                               price: Long,
-                               buyMatcherFee: Long,
-                               sellMatcherFee: Long,
-                               height: Option[Int])
+case class ExchangeTransaction(
+    `type`: Int,
+    version: Option[Byte],
+    id: String,
+    sender: String,
+    senderPublicKey: String,
+    fee: Long,
+    timestamp: Long,
+    proofs: Option[Seq[String]],
+    order1: OrderInfo,
+    order2: OrderInfo,
+    amount: Long,
+    price: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    height: Option[Int]
+)
 object ExchangeTransaction {
   implicit val transactionFormat: Format[ExchangeTransaction] = Json.format
 }
 
-case class Block(signature: String,
-                 height: Int,
-                 timestamp: Long,
-                 generator: String,
-                 transactions: Seq[Transaction],
-                 fee: Long,
-                 features: Option[Seq[Short]],
-                 reward: Option[Long],
-                 desiredReward: Option[Long])
+case class Block(
+    signature: String,
+    height: Int,
+    timestamp: Long,
+    generator: String,
+    transactions: Seq[Transaction],
+    fee: Long,
+    features: Option[Seq[Short]],
+    reward: Option[Long],
+    desiredReward: Option[Long]
+)
 object Block {
   implicit val blockFormat: Format[Block] = Json.format
 }
 
-case class BlockHeaders(signature: String,
-                        height: Int,
-                        timestamp: Long,
-                        generator: String,
-                        transactionCount: Int,
-                        blocksize: Int,
-                        features: Option[Set[Short]],
-                        reward: Option[Long],
-                        desiredReward: Option[Long],
-                        totalFee: Long)
+case class BlockHeaders(
+    signature: String,
+    height: Int,
+    timestamp: Long,
+    generator: String,
+    transactionCount: Int,
+    blocksize: Int,
+    features: Option[Set[Short]],
+    reward: Option[Long],
+    desiredReward: Option[Long],
+    totalFee: Long
+)
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
 }
@@ -257,13 +272,15 @@ object AssetDecimalsInfo {
   implicit val assetDecimalsInfoResponseFormat: Format[AssetDecimalsInfo] = Json.format
 }
 
-case class MarketData(amountAsset: String,
-                      amountAssetName: String,
-                      priceAsset: String,
-                      priceAssetName: String,
-                      created: Long,
-                      amountAssetInfo: Option[AssetDecimalsInfo],
-                      priceAssetInfo: Option[AssetDecimalsInfo])
+case class MarketData(
+    amountAsset: String,
+    amountAssetName: String,
+    priceAsset: String,
+    priceAssetName: String,
+    created: Long,
+    amountAssetInfo: Option[AssetDecimalsInfo],
+    priceAssetInfo: Option[AssetDecimalsInfo]
+)
 object MarketData {
   implicit val marketData: Format[MarketData] = Json.format
 }
@@ -278,14 +295,16 @@ object MessageMatcherResponse {
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 }
 
-case class OrderbookHistory(id: String,
-                            `type`: String,
-                            amount: Long,
-                            price: Long,
-                            timestamp: Long,
-                            filled: Int,
-                            status: String,
-                            assetPair: AssetPair) {
+case class OrderbookHistory(
+    id: String,
+    `type`: String,
+    amount: Long,
+    price: Long,
+    timestamp: Long,
+    filled: Int,
+    status: String,
+    assetPair: AssetPair
+) {
   def isActive: Boolean = status == "PartiallyFilled" || status == "Accepted"
 }
 object OrderbookHistory {
@@ -322,12 +341,14 @@ object OrderBookResponse {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 }
 
-case class MarketStatusResponse(lastPrice: Option[Long],
-                                lastSide: Option[String],
-                                bid: Option[Long],
-                                bidAmount: Option[Long],
-                                ask: Option[Long],
-                                askAmount: Option[Long])
+case class MarketStatusResponse(
+    lastPrice: Option[Long],
+    lastSide: Option[String],
+    bid: Option[Long],
+    bidAmount: Option[Long],
+    ask: Option[Long],
+    askAmount: Option[Long]
+)
 object MarketStatusResponse {
   implicit val marketResponseFormat: Format[MarketStatusResponse] = Json.format
 }
