@@ -283,22 +283,6 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     complete(Validity(address, Address.fromString(address).isRight))
   }
 
-  @Path("/data")
-  @ApiOperation(value = "Post Data to Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "com.wavesplatform.api.http.DataRequest",
-        defaultValue =
-          "{\n\t\"version\": 1,\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": [{\"key\":\"intValue\", \"type\":\"integer\", \"value\":17},{\"key\":\"stringValue\", \"type\":\"string\", \"value\":\"seventeen\"},{\"key\":\"boolValue\", \"type\":\"boolean\", \"value\":false},{\"key\":\"binaryArray\", \"type\":\"binary\", \"value\":\"EQ==\"}]\n}"
-      )
-    )
-  )
-  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def postData: Route = (path("data") & withAuth) {
     broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
   }
