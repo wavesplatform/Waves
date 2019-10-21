@@ -9,7 +9,7 @@ import com.wavesplatform.lang.contract.DApp
 
 import scala.collection.immutable.ListMap
 
-private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
+object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
   def toProto(funcTypes: List[List[FINAL]]): Either[String, DAppMeta] =
     funcTypes
       .traverse(funcToProto)
@@ -75,6 +75,8 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
     else None
   }
 
+  val FieldName = "callableFuncTypes"
+
   override def textMap(data: List[List[FINAL]], dapp: DApp): Dic = {
     val argsWithTypes = (data zip dapp.callableFuncs.map(_.u.args))
       .map { case (types, args) => args zip types }
@@ -84,6 +86,6 @@ private[meta] object MetaMapperStrategyV1 extends MetaMapperStrategy[V1.type] {
         ListMap(typedArgs : _*).mapValues(t => Single(t.name))
       )
     )
-    Dic(Map("callableFuncTypes" -> Chain(funcTypesJson)))
+    Dic(Map(FieldName -> Chain(funcTypesJson)))
   }
 }

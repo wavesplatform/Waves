@@ -6,7 +6,9 @@ import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.model.StatusCodes.BadRequest
+import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.api.grpc.AccountsApiGrpc
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -66,10 +68,8 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
-        s"\nexpected '$errorRegex'\nactual '$responseBody'"
-      )
+      Assertions.assert(statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+                        s"\nexpected '$errorRegex'\nactual '$responseBody'")
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
   }
@@ -212,16 +212,16 @@ object SyncHttpApi extends Assertions {
     def debugPortfoliosFor(address: String, considerUnspent: Boolean): Portfolio = sync(async(n).debugPortfoliosFor(address, considerUnspent))
 
     def broadcastIssue(
-        source: KeyPair,
-        name: String,
-        description: String,
-        quantity: Long,
-        decimals: Byte,
-        reissuable: Boolean,
-        fee: Long,
-        script: Option[String],
-        waitForTx: Boolean = false
-    ): Transaction = {
+                        source: KeyPair,
+                        name: String,
+                        description: String,
+                        quantity: Long,
+                        decimals: Byte,
+                        reissuable: Boolean,
+                        fee: Long,
+                        script: Option[String],
+                        waitForTx: Boolean = false
+                      ): Transaction = {
       val tx = IssueTransactionV2
         .selfSigned(
           chainId = AddressScheme.current.chainId,
@@ -518,6 +518,8 @@ object SyncHttpApi extends Assertions {
 
     def featureActivationStatus(featureNum: Short): FeatureActivationStatus =
       activationStatus.features.find(_.id == featureNum).get
+
+    def grpc: NodeExtGrpc = new NodeExtGrpc(n)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -575,4 +577,14 @@ object SyncHttpApi extends Assertions {
     }
   }
 
+  class NodeExtGrpc(n: Node) {
+    import com.wavesplatform.account.{Address => Addr}
+
+    private[this] lazy val accounts = AccountsApiGrpc.blockingStub(n.grpcChannel)
+
+    def resolveAlias(alias: String): Addr = {
+      val addr = accounts.resolveAlias(StringValue.of(alias))
+      Addr.fromBytes(addr.value.toByteArray).explicitGet()
+    }
+  }
 }

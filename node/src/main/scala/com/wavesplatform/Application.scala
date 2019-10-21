@@ -34,10 +34,11 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Schedulers._
-import com.wavesplatform.utils.{InvalidApiKey, LoggerFacade, NTP, Schedulers, ScorexLogging, SystemInformationReporter, Time, UtilApp, forceStopApplication}
+import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -181,7 +182,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) { case (c, b) => processFork(c, b.blocks) }
+    ) {
+      case (c, b) =>
+        processFork(c, b.blocks).onErrorHandle { e =>
+          log.error("Fatal DB error while processing fork, force stopping node", e)
+          forceStopApplication(FatalDBError)
+          Left(GenericError(e))
+        }
+    }
 
     rxExtensionLoaderShutdown = Some(sh)
 
@@ -201,7 +209,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val blockSink = newBlocks
       .mapEval(scala.Function.tupled(processBlock))
 
-    Observable(microBlockSink, blockSink).merge.subscribe()
+    Observable(microBlockSink, blockSink).merge
+      .onErrorHandle { e =>
+        log.error("Fatal DB error, force stopping node", e)
+        forceStopApplication(FatalDBError)
+      }
+      .subscribe()
 
     miner.scheduleMining()
 
@@ -256,8 +269,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           peerDatabase,
           establishedConnections,
-          blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
-          allChannels,
+          (blockId, returnTxsToUtx) =>
+            Task(blockchainUpdater.removeAfter(blockId))
+              .executeOn(appenderScheduler)
+              .asyncBoundary
+              .map {
+                case Right(discardedBlocks) =>
+                  allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
+                  if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
+                  miner.scheduleMining()
+                  Right(())
+                case Left(error) => Left(error)
+              },
           utxStorage,
           miner,
           historyReplier,
@@ -300,8 +323,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // on unexpected shutdown
     sys.addShutdownHook {
-      Await.ready(Kamon.stopAllReporters(), 20.seconds)
-      Metrics.shutdown()
       shutdown(utxStorage, network)
     }
   }
@@ -388,6 +409,10 @@ object Application {
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
+    sys.addShutdownHook { () =>
+      Kamon.stopAllReporters()
+      Metrics.shutdown()
+    }
 
     if (config.getBoolean("kamon.enable")) {
       Kamon.addReporter(new InfluxDBReporter())

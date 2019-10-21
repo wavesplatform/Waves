@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -16,7 +16,14 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
-class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers with TableDrivenPropertyChecks {
+class RollbackSuite
+    extends FunSuite
+    with CancelAfterFailure
+    with TransferSending
+    with NodesFromDocker
+    with ReportingTestName
+    with Matchers
+    with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -207,7 +214,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     nodes.waitForHeightArise()
 
     assert(sender.findTransactionInfo(dtx).isDefined)
-    assert(sender.findTransactionInfo(tx).isEmpty)
+    assert(sender.findTransactionInfo(tx).isDefined)
 
   }
 
@@ -216,7 +223,8 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
       ("num", "name"),
       (1, "1 of N"),
       (nodes.size, "N of N")
-    )) { (num, name) =>
+    )
+  ) { (num, name) =>
     test(s"generate more blocks and resynchronise after rollback $name") {
       val baseHeight = nodes.map(_.height).max + 5
       nodes.waitForHeight(baseHeight)
