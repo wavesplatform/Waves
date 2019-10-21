@@ -42,7 +42,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
   property("syntax errors") {
     val repl = Repl()
     await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
-    await(repl.execute(""" 1 ++ 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
+    await(repl.execute(""" 1 %% 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
   }
 
   property("logic errors") {

@@ -31,6 +31,7 @@ object PureContext {
   private lazy val defaultThrowMessage = "Explicit script termination"
   lazy val MaxStringResult             = Short.MaxValue
   lazy val MaxBytesResult              = 65536
+  lazy val MaxListResultV4             = MaxBytesResult
 
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
@@ -111,6 +112,21 @@ object PureContext {
         FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
         FUNCTION_CALL(throwWithMessage, List(CONST_STRING("value() called on unit value").explicitGet())),
         REF("@a")
+      )
+    }
+
+  lazy val valueOrElse: BaseFunction[NoContext] =
+    UserFunction(
+      "valueOrElse",
+      13L,
+      TYPEPARAM('T'),
+      ("@value", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))),
+      ("@alternative", TYPEPARAM('T'))
+    ) {
+      IF(
+        FUNCTION_CALL(eq, List(REF("@value"), REF("unit"))),
+        REF("@alternative"),
+        REF("@value")
       )
     }
 
@@ -266,10 +282,98 @@ object PureContext {
       case xs                                            => notImplemented[Id]("take(xs: String, number: Int)", xs)
     }
 
-  lazy val listConstructor: NativeFunction[NoContext] =
+  val ListSizeExceedErrorMessage = s"List size should not exceed $MaxListResultV4"
+
+  def listConstructor(checkSize: Boolean): NativeFunction[NoContext] =
     NativeFunction(
       "cons",
       2,
+      CREATE_LIST,
+      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
+      ("head", TYPEPARAM('A')),
+      ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
+    ) {
+      case h :: ARR(t) :: Nil =>
+        Either.cond(
+          if (checkSize) t.size + 1 <= MaxListResultV4 else true,
+          ARR(h +: t),
+          ListSizeExceedErrorMessage
+        )
+      case xs => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
+    }
+
+  lazy val listAppend: NativeFunction[NoContext] =
+    NativeFunction(
+      LIST_APPEND_OP.func,
+      3,
+      APPEND_LIST,
+      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
+      ("element", TYPEPARAM('B'))
+    ) {
+      case ARR(list) :: element :: Nil =>
+        Either.cond(
+          list.size + 1 <= MaxListResultV4,
+          ARR(list :+ element),
+          ListSizeExceedErrorMessage
+        )
+      case xs => notImplemented[Id](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
+    }
+
+  lazy val listConcat: NativeFunction[NoContext] =
+    NativeFunction(
+      LIST_CONCAT_OP.func,
+      10,
+      CONCAT_LIST,
+      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
+      ("list1", PARAMETERIZEDLIST(TYPEPARAM('A'))),
+      ("list2", PARAMETERIZEDLIST(TYPEPARAM('B')))
+    ) {
+      case ARR(l1) :: ARR(l2) :: Nil =>
+        Either.cond(
+          l1.size + l2.size <= MaxListResultV4,
+          ARR(l1 ++ l2),
+          ListSizeExceedErrorMessage
+        )
+      case xs => notImplemented[Id](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
+    }
+
+  lazy val listAppend: NativeFunction[NoContext] =
+    NativeFunction(
+      "cons",
+      3,
+      LIST_APPEND_OP.func,
+      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))): TYPE,
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
+      ("element", TYPEPARAM('B'))
+    ) {
+      case ARR(list) :: element :: Nil => Right(ARR(list :+ element))
+      case xs                 => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
+    }
+
+  """
+    |
+    |  func f1() = 1                               1
+    |  func f2() = if (true) then f1() else f1()   2
+    |  func f3() = if (true) then f2() else f2()   4
+    |  func f4() = if (true) then f3() else f3()   ((1 * 2 + 1) * 2 + 1) * 2 + 1
+    |
+    |  f3 f2 f1 f1 f2 f1 f1 f3 f2 f1 f1 f2 f1 f1
+    |
+    |  ...
+    |
+    |  func fn() = if (true) then fn_1() else fn_2()
+    |
+    |  fn() == fn()
+    |
+    |
+    |""".stripMargin
+
+
+  lazy val listConcat: NativeFunction[NoContext] =
+    NativeFunction(
+      "cons",
+      10,
       CREATE_LIST,
       PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
       ("head", TYPEPARAM('A')),
@@ -464,6 +568,19 @@ object PureContext {
         str.substring(offset, index) :: splitted
       )
   }
+
+  lazy val contains: BaseFunction[NoContext] =
+    UserFunction("contains", 20, BOOLEAN, ("@source", STRING), ("@substr", STRING)) {
+      FUNCTION_CALL(
+        User("isDefined"),
+        List(
+          FUNCTION_CALL(
+            Native(INDEXOF),
+            List(REF("@source"), REF("@substr"))
+          )
+        )
+      )
+    }
 
   lazy val parseInt: BaseFunction[NoContext] =
     NativeFunction("parseInt", 20, PARSEINT, optionLong, ("str", STRING)) {
@@ -696,33 +813,41 @@ object PureContext {
         case xs => notImplemented[Id]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
       }
 
+    val fromV3Funcs = Array(
+      value,
+      valueOrErrorMessage,
+      toUtf8String,
+      toLong,
+      toLongOffset,
+      indexOf,
+      indexOfN,
+      lastIndexOf,
+      lastIndexOfWithOffset,
+      splitStr,
+      parseInt,
+      parseIntVal,
+      pow,
+      log
+    )
+
+    val v3Ctx = Monoid.combine(
+      ctx,
+      CTX[NoContext](
+        Seq.empty,
+        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]))))),
+        fromV3Funcs :+ listConstructor(checkSize = false)
+      )
+    )
+
+    val v4Functions =
+      ctx.functions ++
+      fromV3Funcs   ++
+      Array(contains, valueOrElse, listAppend, listConcat, listConstructor(checkSize = true))
+
     version match {
       case V1 | V2 => ctx
-      case V3 | V4 =>
-        Monoid.combine(
-          ctx,
-          CTX[NoContext](
-            Seq.empty,
-            Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]))))),
-            Array(
-              value,
-              valueOrErrorMessage,
-              listConstructor,
-              toUtf8String,
-              toLong,
-              toLongOffset,
-              indexOf,
-              indexOfN,
-              lastIndexOf,
-              lastIndexOfWithOffset,
-              splitStr,
-              parseInt,
-              parseIntVal,
-              pow,
-              log
-            )
-          )
-        )
+      case V3 => v3Ctx
+      case V4 => v3Ctx.copy(functions = v4Functions)
     }
   }
 }
