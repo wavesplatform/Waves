@@ -122,12 +122,16 @@ object Dependencies {
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0"
   ).map(_ % Test)
 
+  lazy val logDeps = Seq(
+    logback                % Runtime,
+    janino                 % Runtime,
+    akkaModule("slf4j") % Runtime
+  )
+
   lazy val node = Def.setting(
     Seq(
       "commons-net"          % "commons-net" % "3.6",
       "com.iheart"           %% "ficus" % "1.4.2",
-      logback                % Runtime,
-      janino                 % Runtime,
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
       kamonModule("system-metrics", "1.0.0"),
@@ -141,14 +145,13 @@ object Dependencies {
       "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
       "org.bitlet"        % "weupnp" % "0.1.4",
-      akkaModule("slf4j") % Runtime,
       kindProjector,
       monixModule("reactive").value,
       nettyModule("handler"),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console
+    ) ++ protobuf.value ++ test ++ console ++ logDeps
   )
 
   private[this] val protoSchemasLib =
@@ -158,7 +161,8 @@ object Dependencies {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
+      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
     )
   }
 

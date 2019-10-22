@@ -4,13 +4,14 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.AccountsApiGrpc
-import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
@@ -27,6 +28,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
+import org.scalatest.Matchers._
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json._
@@ -41,28 +43,81 @@ object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-  def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
-    case Failure(e)                                                  => Assertions.fail(e)
-    case _                                                           => Assertions.fail("Expecting bad request")
+  case class GenericApiError(id: Int, message: String, statusCode: Int, json: JsObject)
+
+  object GenericApiError {
+    import play.api.libs.functional.syntax._
+    import play.api.libs.json.Reads._
+    import play.api.libs.json._
+
+    def apply(id: Int, message: String, code: StatusCode, json: JsObject): GenericApiError =
+      new GenericApiError(id, message, code.intValue(), json)
+
+    implicit val genericApiErrorReads: Reads[GenericApiError] = (
+      (JsPath \ "error").read[Int] and
+        (JsPath \ "message").read[String] and
+        JsPath.read[JsObject]
+    )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
+  }
+
+  case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
+
+  implicit class ApiErrorOps(error: ApiError) {
+    def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
-        s"\nexpected '$errorRegex'\nactual '$responseBody'"
-      )
+      Assertions.assert(statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+                        s"\nexpected '$errorRegex'\nactual '$responseBody'")
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
   }
 
-  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
-    case Failure(e) => Assertions.fail(e)
-    case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
-  }
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion =
+    Try(f) match {
+      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+        Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+      case Failure(e) => Assertions.fail(e)
+      case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
+    }
+
+  def assertApiErrorRaised[R](f: => R, expectedStatusCode: Int = StatusCodes.BadRequest.intValue): Assertion =
+    assertApiError(f)(_ => Assertions.succeed)
+
+  def assertApiError[R](f: => R, expectedError: AssertiveApiError): Assertion =
+    assertApiError(f) { error =>
+      error.id shouldBe expectedError.id
+      error.statusCode shouldBe expectedError.code.intValue()
+      if (expectedError.matchMessage)
+        error.message should include regex expectedError.message
+      else
+        error.message shouldBe expectedError.message
+    }
+
+  def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
+    Try(f) match {
+      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+        import play.api.libs.json._
+        parse(responseBody).validate[JsObject] match {
+          case JsSuccess(json, _) => (json - "trace") shouldBe expectedError.json
+          case JsError(_)         => Assertions.fail(s"Expecting error: ${expectedError.json}, but handle $responseBody")
+        }
+        statusCode shouldBe expectedError.code.intValue()
+      case Failure(e) => Assertions.fail(e)
+      case Success(s) => Assertions.fail(s"Expecting error: $expectedError, but handle $s")
+    }
+
+  def assertApiError[R](f: => R)(check: GenericApiError => Assertion): Assertion =
+    Try(f) match {
+      case Failure(UnexpectedStatusCodeException(_, _, code, responseBody)) =>
+        parse(responseBody).validate[GenericApiError] match {
+          case JsSuccess(error, _) => check(error.copy(statusCode = code))
+          case JsError(errors)     => Assertions.fail(errors.map { case (_, es) => es.mkString("(", ",", ")") }.mkString(","))
+        }
+      case Failure(e) => Assertions.fail(e)
+      case Success(s) => Assertions.fail(s"Expecting error but handle $s")
+    }
 
   val RequestAwaitTime: FiniteDuration = 50.seconds
 
@@ -157,16 +212,16 @@ object SyncHttpApi extends Assertions {
     def debugPortfoliosFor(address: String, considerUnspent: Boolean): Portfolio = sync(async(n).debugPortfoliosFor(address, considerUnspent))
 
     def broadcastIssue(
-        source: KeyPair,
-        name: String,
-        description: String,
-        quantity: Long,
-        decimals: Byte,
-        reissuable: Boolean,
-        fee: Long,
-        script: Option[String],
-        waitForTx: Boolean = false
-    ): Transaction = {
+                        source: KeyPair,
+                        name: String,
+                        description: String,
+                        quantity: Long,
+                        decimals: Byte,
+                        reissuable: Boolean,
+                        fee: Long,
+                        script: Option[String],
+                        waitForTx: Boolean = false
+                      ): Transaction = {
       val tx = IssueTransactionV2
         .selfSigned(
           chainId = AddressScheme.current.chainId,
@@ -334,6 +389,9 @@ object SyncHttpApi extends Assertions {
     def getDataByKey(sourceAddress: String, key: String): DataEntry[_] =
       sync(async(n).getDataByKey(sourceAddress, key))
 
+    def getDataList(sourceAddress: String, json: Boolean, keys: String*): Seq[DataEntry[_]] =
+      sync(async(n).getDataList(sourceAddress, json, keys:_*))
+
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 
@@ -490,12 +548,12 @@ object SyncHttpApi extends Assertions {
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
-    def waitForSameBlockHeadesAt(
+    def waitForSameBlockHeadersAt(
         height: Int,
         retryInterval: FiniteDuration = 5.seconds,
         conditionAwaitTime: FiniteDuration = ConditionAwaitTime
     ): Boolean =
-      sync(async(nodes).waitForSameBlockHeadesAt(height, retryInterval), conditionAwaitTime)
+      sync(async(nodes).waitForSameBlockHeadersAt(height, retryInterval), conditionAwaitTime)
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
       sync(

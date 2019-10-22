@@ -1,7 +1,9 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
@@ -45,6 +47,12 @@ package object sync {
   val scriptBase64: String = script.bytes.value.base64
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"
+  val errNotAllowedByTokenApiError: AssertiveApiError =
+    AssertiveApiError(
+      TransactionNotAllowedByAssetScript.Id,
+      TransactionNotAllowedByAssetScript.Message,
+      TransactionNotAllowedByAssetScript.Code
+    )
 
   def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
     import tx._

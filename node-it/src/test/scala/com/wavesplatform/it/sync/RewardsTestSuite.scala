@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.ReportingTestName
@@ -32,7 +33,7 @@ class RewardsTestSuite
 
     "when miner votes for increase" in {
 
-      assertBadRequestAndMessage(miner.rewardStatus(1), "Block reward feature is not activated yet", 400)
+      assertApiError(miner.rewardStatus(1), CustomValidationError("Block reward feature is not activated yet"))
       miner.waitForHeight(activationHeight - 1, 5.minutes)
       miner.balanceDetails(miner.address).available shouldBe initMinerBalance
       miner.waitForHeight(activationHeight)

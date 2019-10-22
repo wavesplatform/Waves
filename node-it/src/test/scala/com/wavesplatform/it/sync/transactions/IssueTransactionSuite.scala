@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -53,8 +54,9 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val eff1             = miner.accountBalances(firstAddress)._2
     val bigAssetFee      = eff1 + 1.waves
 
-    assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee),
-                               "negative waves balance")
+    assertApiError(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee)) { error =>
+      error.message should include("negative waves balance")
+    }
   }
 
   val invalidScript =
@@ -65,7 +67,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
       ("base64:AAEE", "Invalid version of script: 4"),
-      ("base64:BAEE", "Invalid version of script: 4"),
+      ("base64:BAEE", "Invalid version of script: 4")
     )
 
   forAll(invalidScript) { (script: String, error: String) =>
@@ -73,17 +75,9 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       val assetName        = "myasset"
       val assetDescription = "my asset description"
 
-      assertBadRequestAndMessage(
-        sender.issue(firstAddress,
-          assetName,
-          assetDescription,
-          someAssetAmount,
-          2,
-          reissuable = false,
-          issueFee,
-          version = 2,
-          script = Some(script)),
-        s"ScriptParseError($error)"
+      assertApiError(
+        sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, issueFee, script = Some(script)),
+        CustomValidationError(s"ScriptParseError($error)")
       )
     }
   }
@@ -91,37 +85,48 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   val invalidAssetValue =
     Table(
       ("assetVal", "decimals", "message"),
-      (0l, 2, "non-positive amount"),
-      (1l, 9, "Too big sequences requested"),
-      (-1l, 1, "non-positive amount"),
-      (1l, -1, "Too big sequences requested")
+      (0L, 2, NonPositiveAmount("0 of assets").assertive(true)),
+      (1L, 9, TooBigArrayAllocation.assertive()),
+      (-1L, 1, NonPositiveAmount("-1 of assets").assertive(true)),
+      (1L, -1, TooBigArrayAllocation.assertive())
     )
 
-  forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: String) =>
+  forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: AssertiveApiError) =>
     test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
       val assetName          = "myasset2"
       val assetDescription   = "my asset description 2"
       val decimalBytes: Byte = decimals.toByte
-      assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, assetVal, decimalBytes, reissuable = false, issueFee),
-                                 message)
+      assertApiError(
+        sender.issue(firstAddress, assetName, assetDescription, assetVal, decimalBytes, reissuable = false, issueFee),
+        message
+      )
+    }
+  }
+
+  test(s"Not able to create asset without name") {
+    assertApiError(sender.issue(firstAddress, null, null, someAssetAmount, 2, reissuable = false, issueFee)) { error =>
+      error.message should include regex "failed to parse json message"
+      error.json.fields.map(_._1) should contain("validationErrors")
     }
   }
 
   val invalid_assets_names =
     Table(
-      ("abc", "invalid name"),
-      (null, "failed to parse json message"),
-      ("UpperCaseAssetCoinTest", "invalid name"),
-      ("~!|#$%^&*()_+=\";:/?><|\\][{}", "invalid name")
+      "abc",
+      "UpperCaseAssetCoinTest",
+      "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
-  forAll(invalid_assets_names) { (assetName: String, message: String) =>
+  forAll(invalid_assets_names) { assetName: String =>
     test(s"Not able to create asset named $assetName") {
-      assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetName, someAssetAmount, 2, reissuable = false, issueFee), message)
+      assertApiError(
+        sender.issue(firstAddress, assetName, assetName, someAssetAmount, 2, reissuable = false, issueFee),
+        InvalidName
+      )
     }
   }
 
-  def scriptText(version: Int) = version match {
+  def scriptText(version: Int): Option[String] = version match {
     case 2 => Some(scriptBase64)
     case _ => None
   }
