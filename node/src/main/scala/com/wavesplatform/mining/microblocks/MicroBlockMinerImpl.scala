@@ -130,8 +130,8 @@ class MicroBlockMinerImpl(
             consensusData = accumulatedBlock.consensusData,
             transactionData = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account,
-            featureVotes = accumulatedBlock.featureVotes,
-            rewardVote = accumulatedBlock.rewardVote
+            featureVotes = accumulatedBlock.header.featureVotes,
+            rewardVote = accumulatedBlock.header.rewardVote
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock

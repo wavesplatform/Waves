@@ -29,7 +29,7 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
   def calcBlocksDelay(blockId: BlockId, blockNum: Int): Either[ApiError, Long] = {
     getBlockById(blockId).toRight(BlockDoesNotExist).flatMap { block =>
       blockchain
-        .parentHeader(block, blockNum)
+        .parentHeader(block.header, blockNum)
         .map(parent => (block.timestamp - parent.timestamp) / blockNum)
         .toRight(CustomValidationError(s"Cannot go $blockNum blocks back"))
     }

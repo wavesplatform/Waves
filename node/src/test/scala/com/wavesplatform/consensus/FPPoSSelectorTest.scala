@@ -74,7 +74,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val block        = forgeBlock(miner, blockchain, pos)()
 
           pos
-            .validateBlockDelay(height + 1, block, lastBlock, minerBalance)
+            .validateBlockDelay(height + 1, block, lastBlock.header, minerBalance)
             .explicitGet()
       }
     }
@@ -92,7 +92,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             .validateBlockDelay(
               height + 1,
               block,
-              lastBlock,
+              lastBlock.header,
               minerBalance
             ) should produce("less than min valid timestamp")
       }
@@ -112,8 +112,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             .validateBaseTarget(
               height + 1,
               block,
-              lastBlock,
-              blockchain.blockAt(height - 2)
+              lastBlock.header,
+              blockchain.blockAt(height - 2).map(_.header)
             ) shouldBe Right(())
       }
     }
@@ -130,8 +130,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             .validateBaseTarget(
               height + 1,
               block,
-              lastBlock,
-              blockchain.blockAt(height - 2)
+              lastBlock.header,
+              blockchain.blockAt(height - 2).map(_.header)
             ) should produce("does not match calculated baseTarget")
       }
     }
@@ -148,8 +148,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             .validateBaseTarget(
               height + 1,
               block,
-              lastBlock,
-              blockchain.blockAt(height - 2)
+              lastBlock.header,
+              blockchain.blockAt(height - 2).map(_.header)
             ) should produce("does not match calculated baseTarget")
       }
     }

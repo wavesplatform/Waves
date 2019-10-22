@@ -144,7 +144,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         assert(parsedBlock.consensusData.generationSignature == generationSignature)
         assert(parsedBlock.version.toInt == version)
         assert(parsedBlock.signerData.generator == recipient.publicKey)
-        assert(parsedBlock.featureVotes == featureVotes)
+        assert(parsedBlock.header.featureVotes == featureVotes)
     }
   }
 

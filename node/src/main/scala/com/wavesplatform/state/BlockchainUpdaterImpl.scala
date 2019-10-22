@@ -94,7 +94,7 @@ class BlockchainUpdaterImpl(
     if (height % featuresCheckPeriod == 0) {
       val approvedFeatures = blockchain
         .featureVotes(height)
-        .map { case (feature, votes) => feature -> (if (block.featureVotes.contains(feature)) votes + 1 else votes) }
+        .map { case (feature, votes) => feature -> (if (block.header.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
 
@@ -441,7 +441,7 @@ class BlockchainUpdaterImpl(
     val innerVotes = blockchain.featureVotes(height)
     ngState match {
       case Some(ng) if this.height <= height =>
-        val ngVotes = ng.base.featureVotes.map { featureId =>
+        val ngVotes = ng.base.header.featureVotes.map { featureId =>
           featureId -> (innerVotes.getOrElse(featureId, 0) + 1)
         }.toMap
 
@@ -469,7 +469,7 @@ class BlockchainUpdaterImpl(
           case Some(ng) =>
             val innerVotes = blockchain.blockRewardVotes(height)
             if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height).contains(height))
-              innerVotes :+ ng.base.rewardVote
+              innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }
       case None => Seq()
@@ -484,8 +484,8 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def liquidBlockHeaderAndSize() = ngState.map { s =>
-    (s.bestLiquidBlock, s.bestLiquidBlock.bytes().length)
+  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int)] = ngState.map { s =>
+    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length)
   }
 
   override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int)] = readLock {
@@ -580,7 +580,7 @@ class BlockchainUpdaterImpl(
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
-        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
+        if (back == 1) Some(ng.base.header) else blockchain.parentHeader(ng.base.header, back - 1)
       case _ =>
         blockchain.parentHeader(block, back)
     }
@@ -595,7 +595,7 @@ class BlockchainUpdaterImpl(
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
     if (height == blockchain.height + 1)
-      ngState.map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes().length))
+      ngState.map(x => (x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length))
     else
       blockchain.blockHeaderAndSize(height)
   }
@@ -720,7 +720,7 @@ class BlockchainUpdaterImpl(
         .data
         .keySet
 
-      (fromInner ++ fromDiff)
+      fromInner ++ fromDiff
     }
   }
 
@@ -789,7 +789,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  //noinspection ScalaStyle
+  //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")

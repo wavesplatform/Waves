@@ -53,11 +53,11 @@ object PBBlocks {
           ByteString.copyFrom(reference),
           baseTarget,
           ByteString.copyFrom(generationSignature),
-          featureVotes.map(shortToInt).toSeq,
+          header.featureVotes.map(shortToInt).toSeq,
           timestamp,
           version,
           ByteString.copyFrom(generator),
-          rewardVote
+          header.rewardVote
         )),
       ByteString.copyFrom(signature),
       transactionData.map(PBTransactions.protobuf)

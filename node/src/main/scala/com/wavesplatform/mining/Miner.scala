@@ -123,7 +123,7 @@ class MinerImpl(
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,
         refBlockTS,
-        blockchainUpdater.parentHeader(lastBlock, 2).map(_.timestamp),
+        blockchainUpdater.parentHeader(lastBlock.header, 2).map(_.timestamp),
         currentTime
       )
       .leftMap(_.toString)

@@ -110,7 +110,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         rewardVote = -1L
       )
 
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
+      unsigned.copy(header = unsigned.header.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
     }
   }
 }

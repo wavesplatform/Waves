@@ -137,5 +137,5 @@ package object history {
     (block, microBlocks)
   }
 
-  def spoilSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
+  def spoilSignature(b: Block): Block = b.copy(header = b.header.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature())))
 }

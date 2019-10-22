@@ -28,8 +28,8 @@ object TestBlock {
         consensusData = b.consensusData,
         transactionData = b.transactionData,
         signer = signer,
-        featureVotes = b.featureVotes,
-        rewardVote = b.rewardVote
+        featureVotes = b.header.featureVotes,
+        rewardVote = b.header.rewardVote
       )
       .explicitGet()
   }

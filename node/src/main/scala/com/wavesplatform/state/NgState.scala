@@ -30,12 +30,12 @@ class NgState(
   private[this] val microBlocks: MList[MicroBlock]             = MList.empty // fresh head
 
   def cancelExpiredLeases(diff: Diff): Diff =
-      leasesToCancel
-        .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
-        .foldLeft(diff) {
-          case (d, ld) =>
-            Monoid.combine(d, ld)
-        }
+    leasesToCancel
+      .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
+      .foldLeft(diff) {
+        case (d, ld) =>
+          Monoid.combine(d, ld)
+      }
 
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)
@@ -79,7 +79,8 @@ class NgState(
           cachedBlock
 
         case None =>
-          val block = base.copy(signerData = base.signerData.copy(signature = microBlocks.head.totalResBlockSig), transactionData = transactions)
+          val signerData = base.signerData.copy(signature = microBlocks.head.totalResBlockSig)
+          val block      = base.copy(header = base.header.copy(signerData = signerData), transactionData = transactions)
           internalCaches.bestBlockCache = Some(block)
           block
       }
@@ -94,7 +95,8 @@ class NgState(
   /** HACK: this method returns LPOS portfolio as though expired leases have already been cancelled.
     * It was added to make sure miner gets proper generating balance when scheduling next mining attempt.
     */
-  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio = cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
+  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio =
+    cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
 
   def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.uniqueId)(_.totalResBlockSig))
 
@@ -141,12 +143,19 @@ class NgState(
 
           maybeFound.map {
             case (sig, discarded) =>
-              (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discarded)
+              (
+                base.copy(
+                  header = base.header.copy(signerData = base.signerData.copy(signature = sig)),
+                  transactionData = base.transactionData ++ accumulatedTxs
+                ),
+                discarded
+              )
           }
         }
       }
     )
 
+  //noinspection TypeAnnotation
   private[this] object internalCaches {
     val blockDiffCache = CacheBuilder
       .newBuilder()
