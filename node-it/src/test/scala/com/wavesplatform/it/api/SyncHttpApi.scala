@@ -443,6 +443,10 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
     }
 
+    def signAndTraceBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).signAndTraceBroadcast(tx)), waitForTx)
+    }
+
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 

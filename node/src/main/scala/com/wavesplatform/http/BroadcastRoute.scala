@@ -17,7 +17,7 @@ trait BroadcastRoute { _: ApiRoute =>
       ApiError.fromValidationError,
       tx => {
         val p = utxPoolSynchronizer.publish(tx)
-        p.transformE(r => r.bimap(ApiError.fromValidationError, t => tx.json() ++ params.get("trace").fold(Json.obj())(_ => Json.obj("trace" -> p.trace))))
+        p.transformE(r => r.bimap(ApiError.fromValidationError, t => tx.json() ++ params.get("trace").fold(Json.obj())(_ => Json.obj("trace" -> p.trace.map(_.loggedJson)))))
       }
     )
   }
