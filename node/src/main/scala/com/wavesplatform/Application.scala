@@ -20,7 +20,7 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.database.{Keys, openDB, DBExt}
+import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -42,6 +42,7 @@ import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
+import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
@@ -198,7 +199,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    val utxSynchronizerScheduler = Schedulers.fixedPool(settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val timer = new HashedWheelTimer()
+    val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
         utxSynchronizerScheduler
@@ -334,6 +336,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // on unexpected shutdown
     sys.addShutdownHook {
+      timer.stop()
       shutdown(utxStorage, network)
     }
   }
