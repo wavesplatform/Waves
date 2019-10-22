@@ -118,7 +118,7 @@ object GenesisBlockGenerator extends App {
   report(
     addrInfos = shares.map(x => (x._1, x._2)),
     settings = GenesisSettings(
-      genesisBlock.header.timestamp,
+      genesisBlock.timestamp,
       timestamp,
       settings.initialBalance,
       Some(signature),
