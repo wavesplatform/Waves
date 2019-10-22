@@ -24,12 +24,12 @@ import scala.concurrent.Future
   * And IDEA can't find the Global class in the "shared" module, but it must!
   */
 trait BaseGlobal {
-  val MaxBase58Bytes   = 64
-  val MaxBase58String  = 100
-  val MaxBase64Bytes   = 32 * 1024
-  val MaxBase64String  = 44 * 1024
-  val MaxLiteralLength = 12 * 1024
-  val MaxAddressLength = 36
+  val MaxBase58Bytes               = 64
+  val MaxBase58String              = 100
+  val MaxBase64Bytes               = 32 * 1024
+  val MaxBase64String              = 44 * 1024
+  val MaxLiteralLength             = 12 * 1024
+  val MaxAddressLength             = 36
   val MaxByteStrSizeForVerifyFuncs = 32 * 1024
 
   def base58Encode(input: Array[Byte]): Either[String, String]
@@ -38,12 +38,12 @@ trait BaseGlobal {
   def base64Encode(input: Array[Byte]): Either[String, String]
   def base64Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  val hex : Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
+  val hex: Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
   def base16Encode(input: Array[Byte]): Either[String, String] = {
     val output = new StringBuilder(input.size * 2)
     for (b <- input) {
-       output.append(hex((b >> 4) & 0xf))
-       output.append(hex(b & 0xf))
+      output.append(hex((b >> 4) & 0xf))
+      output.append(hex(b & 0xf))
     }
     Right(output.result)
   }
@@ -62,21 +62,20 @@ trait BaseGlobal {
 
   def base16Decode(input: String): Either[String, Array[Byte]] = {
     val size = input.size
-    if(size % 2 == 1) {
+    if (size % 2 == 1) {
       Left("Need internal bytes number")
     } else {
       val bytes = new Array[Byte](size / 2)
-      for( i <- 0 to size/2-1 ) {
-        (base16Dig(input(i*2)), base16Dig(input(i*2 + 1))) match {
-          case (Right(h), Right(l)) => bytes(i) = ((16:Byte)*h + l).toByte
-          case (Left(e),_) => return Left(e)
-          case (_,Left(e)) => return Left(e)
+      for (i <- 0 to size / 2 - 1) {
+        (base16Dig(input(i * 2)), base16Dig(input(i * 2 + 1))) match {
+          case (Right(h), Right(l)) => bytes(i) = ((16: Byte) * h + l).toByte
+          case (Left(e), _)         => return Left(e)
+          case (_, Left(e))         => return Left(e)
         }
       }
       Right(bytes)
     }
   }
-
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
@@ -96,28 +95,56 @@ trait BaseGlobal {
   }
 
   def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] =
-    ContractSerDe.serialize(c)
+    ContractSerDe
+      .serialize(c)
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
 
 
+
+
+
+
+
+
+
+
+
+
+
   def parseAndCompileExpression(
-                                 input:         String,
-                                 context:       CompilerContext,
-                                 letBlockOnly:  Boolean,
-                                 stdLibVersion: StdLibVersion,
-                                 estimator:     ScriptEstimator
-                               ): Either[String, (Array[Byte], Long, Expressions.EXPR, Iterable[CompilationError])] = {
+      input: String,
+      context: CompilerContext,
+      letBlockOnly: Boolean,
+      stdLibVersion: StdLibVersion,
+      estimator: ScriptEstimator
+  ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     for {
       compRes <- ExpressionCompiler.compileWithParseResult(input, context)
-      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(compRes._1)
+      (compExpr, exprScript, compErrorList) = compRes
+      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      x = if (compRes._3.isEmpty) serializeExpression(compRes._1, stdLibVersion) else Array.empty[Byte]
+      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion)
-      complexity <- estimator(vars, costs, compRes._1)
-    } yield (x, complexity, compRes._2, compRes._3)
+      complexity <- estimator(vars, costs, compExpr)
+    } yield (bytes, complexity, exprScript, compErrorList)
+  }
+
+  def parseAndCompileContract(
+      input: String,
+      ctx: CompilerContext,
+      stdLibVersion: StdLibVersion,
+      estimator: ScriptEstimator
+  ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
+    for {
+      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion)
+      (compDAppOpt, exprDApp, compErrorList) = compRes
+      complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
+      else Right((0L, Map.empty[String, Long]))
+      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
+    } yield (bytes, complexityWithMap, exprDApp, compErrorList)
   }
 
 
@@ -130,12 +157,12 @@ trait BaseGlobal {
     compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
-    input:         String,
-    context:       CompilerContext,
-    letBlockOnly:  Boolean,
-    stdLibVersion: StdLibVersion,
-    estimator:     ScriptEstimator,
-    compiler:      (String, CompilerContext) => Either[String, EXPR]
+      input: String,
+      context: CompilerContext,
+      letBlockOnly: Boolean,
+      stdLibVersion: StdLibVersion,
+      estimator: ScriptEstimator,
+      compiler: (String, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
     for {
       ex <- compiler(input, context)
@@ -151,10 +178,10 @@ trait BaseGlobal {
   type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
 
   def compileContract(
-    input:         String,
-    ctx:           CompilerContext,
-    stdLibVersion: StdLibVersion,
-    estimator:     ScriptEstimator
+      input: String,
+      ctx: CompilerContext,
+      stdLibVersion: StdLibVersion,
+      estimator: ScriptEstimator
   ): Either[String, ContractInfo] =
     for {
       dapp       <- ContractCompiler.compile(input, ctx, stdLibVersion)
@@ -184,13 +211,13 @@ trait BaseGlobal {
     script match {
       case ContractScriptImpl(_, dApp) =>
         MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
-      case _  => Left(ScriptParseError("Expected DApp"))
+      case _ => Left(ScriptParseError("Expected DApp"))
     }
 
   private def combineMetaWithDApp(dic: Dic, dApp: DApp): Dic =
     dic.m.get(MetaMapperStrategyV1.FieldName).fold(dic) {
       case Chain(paramTypes) =>
-        val funcsName = dApp.callableFuncs.map(_.u.name)
+        val funcsName      = dApp.callableFuncs.map(_.u.name)
         val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
         Dic(dic.m.updated(MetaMapperStrategyV1.FieldName, paramsWithFunc))
       case _ => Dic(Map())
@@ -200,12 +227,12 @@ trait BaseGlobal {
 
   // Math functions
 
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long]
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long]
 
   import RoundingMode._
 
-  protected def roundMode(round: BaseGlobal.Rounds) : RoundingMode =
+  protected def roundMode(round: BaseGlobal.Rounds): RoundingMode =
     round match {
       case BaseGlobal.RoundUp()       => UP
       case BaseGlobal.RoundHalfUp()   => HALF_UP
@@ -221,11 +248,11 @@ trait BaseGlobal {
 
 object BaseGlobal {
   sealed trait Rounds
-  case class RoundDown() extends Rounds
-  case class RoundUp() extends Rounds
+  case class RoundDown()     extends Rounds
+  case class RoundUp()       extends Rounds
   case class RoundHalfDown() extends Rounds
-  case class RoundHalfUp() extends Rounds
+  case class RoundHalfUp()   extends Rounds
   case class RoundHalfEven() extends Rounds
-  case class RoundCeiling() extends Rounds
-  case class RoundFloor() extends Rounds
+  case class RoundCeiling()  extends Rounds
+  case class RoundFloor()    extends Rounds
 }

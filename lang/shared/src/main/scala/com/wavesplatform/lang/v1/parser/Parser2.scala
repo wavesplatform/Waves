@@ -22,7 +22,7 @@ class Parser2(val input: ParserInput) extends Parser {
     push(cursor) ~ WS ~ zeroOrMore(Directive ~ WS) ~ zeroOrMore(WS ~ Decl) ~ zeroOrMore(WS ~ AnnotatedFunc) ~ WS ~ push(cursor) ~ EOI ~> parseDAppRoot _
   }
 
-  def ScriptRoot: Rule1[EXPR] = rule {
+  def ScriptRoot: Rule1[SCRIPT] = rule {
     push(cursor) ~ WS ~ zeroOrMore(Directive ~ WS) ~ zeroOrMore(WS ~ Decl) ~ WS ~ Expr ~ push(cursor) ~> parseScriptRoot _
   }
 
@@ -45,6 +45,7 @@ class Parser2(val input: ParserInput) extends Parser {
   def Let: Rule1[LET] = rule { push(cursor) ~ "let" ~ WS ~ IdentifierAtom ~ WS ~ "=" ~ WS ~ Expr ~ push(cursor) ~> parseLet _ }
 
   def Block: Rule1[EXPR] = rule { push(cursor) ~ "{" ~ zeroOrMore(WS ~ Decl) ~ WS ~ Expr ~ WS ~ "}" ~ push(cursor) ~> parseBlock _ }
+  def BlockWithoutPar: Rule1[EXPR] = rule { push(cursor) ~ zeroOrMore(WS ~ Decl) ~ WS ~ Expr ~ push(cursor) ~> parseBlock _ }
 
   def Expr: Rule1[EXPR] = rule { OrOpAtom }
 
@@ -104,7 +105,7 @@ class Parser2(val input: ParserInput) extends Parser {
     push(cursor) ~ "match" ~ WS ~ Expr ~ WS ~ "{" ~ oneOrMore(WS ~ MatchCase) ~ WS ~ "}" ~ push(cursor) ~> parseMatch _
   }
   def MatchCase: Rule1[MATCH_CASE] = rule {
-    push(cursor) ~ "case" ~ WS ~ ((IdentifierAtom ~ WS ~ ":" ~ WS ~ TypesAtom) | DefaultMatchCase) ~ WS ~ "=>" ~ WS ~ Expr ~ push(cursor) ~> parseMatchCase _
+    push(cursor) ~ "case" ~ WS ~ ((IdentifierAtom ~ WS ~ ":" ~ WS ~ TypesAtom) | DefaultMatchCase) ~ WS ~ "=>" ~ WS ~ BlockWithoutPar ~ push(cursor) ~> parseMatchCase _
   }
   def DefaultMatchCase: Rule2[PART[String], Seq[PART[String]]] = rule { "_" ~ push(PART.VALID(Pos(0, 0), "_")) ~ push(Seq.empty[PART[String]]) }
 
@@ -179,10 +180,15 @@ class Parser2(val input: ParserInput) extends Parser {
     DAPP(Pos(startPos, endPos), decList.toList, annFuncList.toList)
   }
 
-  def parseScriptRoot(startPos: Int, decList: Seq[Declaration], expr: EXPR, endPos: Int): EXPR = {
-    decList.foldRight(expr) { (dec, resExpr) =>
-      BLOCK(dec.position, dec, resExpr)
+  def parseScriptRoot(startPos: Int, decList: Seq[Declaration], expr: EXPR, endPos: Int): SCRIPT = {
+    val resExpr = decList.foldRight(expr) { (dec, combExpr) =>
+      BLOCK(
+        Pos(dec.position.start, expr.position.end),
+        dec,
+        combExpr
+      )
     }
+    SCRIPT(Pos(startPos, endPos), resExpr)
   }
 
   def parseBlock(startPos: Int, decList: Seq[Declaration], expr: EXPR, endPos: Int): EXPR = {
@@ -353,23 +359,34 @@ class Parser2(val input: ParserInput) extends Parser {
 
 object Parser2 {
 
+  type RemovedCharPos = Pos
+
   final case class ParsingError(start: Int, end: Int, message: String)
 
-  def parseExpression(scriptStr: String): Either[Throwable, EXPR] = {
-    parseWithError[EXPR](
-      new StringBuilder(scriptStr),
-      new Parser2(scriptStr).ScriptRoot.run().toEither.asInstanceOf[Either[Throwable, EXPR]],
-      parseExpression
-    )
+  def parseExpression(scriptStr: String): Either[Throwable, (SCRIPT, Option[RemovedCharPos])] = {
 
+    def parse(str: String): Either[Throwable, SCRIPT] = new Parser2(str).ScriptRoot.run().toEither
+
+    parseWithError[SCRIPT](
+      new StringBuilder(scriptStr),
+      parse
+    ).map {
+      exprAndErrorIndexes =>
+        val removedCharPosOpt = if (exprAndErrorIndexes._2.isEmpty) None else Some(Pos(exprAndErrorIndexes._2.min, exprAndErrorIndexes._2.max))
+        (exprAndErrorIndexes._1, removedCharPosOpt)
+    }
   }
 
-  def parseDAPP(scriptStr: String): Either[Throwable, DAPP] = {
-    parseWithError[DAPP](
-      new StringBuilder(scriptStr),
-      new Parser2(scriptStr).DAppRoot.run().toEither.asInstanceOf[Either[Throwable, DAPP]],
-      parseDAPP
-    )
+  def parseDAPP(scriptStr: String): Either[Throwable, (DAPP, Option[RemovedCharPos])] = {
+
+    def parse(str: String): Either[Throwable, DAPP] = new Parser2(str).DAppRoot.run().toEither
+
+    parseWithError[DAPP](new StringBuilder(scriptStr), parse
+    ).map {
+      dAppAndErrorIndexes =>
+        val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
+        (dAppAndErrorIndexes._1, removedCharPosOpt)
+    }
   }
 
   private def clearChar(source: StringBuilder, pos: Int): Unit = {
@@ -384,19 +401,21 @@ object Parser2 {
 
   private def parseWithError[T](
       source: StringBuilder,
-      firstParseResult: Either[Throwable, T],
       parse: String => Either[Throwable, T]
-  ): Either[Throwable, T] = {
-    firstParseResult.left.flatMap {
-      case ex: ParseError =>
-        val errorLastPos = ex.position.index
-        if (errorLastPos > 0) {
-          clearChar(source, errorLastPos - 1)
-          parseWithError(source, parse(source.toString()), parse)
-        } else {
-          Left(ex)
-        }
-      case ex: Throwable => Left(ex)
+  ): Either[Throwable, (T, Iterable[Int])] = {
+    parse(source.toString())
+      .map(dApp => (dApp, Nil))
+      .left
+      .flatMap {
+        case ex: ParseError =>
+          val errorLastPos = ex.position.index
+          if (errorLastPos > 0) {
+            clearChar(source, errorLastPos - 1)
+            parseWithError(source, parse).map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, errorLastPos :: dAppAndErrorIndexes._2.toList))
+          } else {
+            Left(ex)
+          }
+        case ex: Throwable => Left(ex)
     }
   }
 }

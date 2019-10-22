@@ -309,11 +309,25 @@ object ContractCompiler {
       version: StdLibVersion
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     Parser2.parseDAPP(input) match {
-      case Right(parseResult) =>
+      case Right((parseResult, removedCharPosOpt)) =>
         compileContract(ctx, parseResult, version)
           .run(ctx)
           .map(
             _._2
+              .map { compRes =>
+                val errorList =
+                  compRes._3 ++
+                    (if (removedCharPosOpt.isEmpty) Nil
+                     else
+                       List(
+                         Generic(
+                           removedCharPosOpt.get.start,
+                           removedCharPosOpt.get.end,
+                           "Parsing failed. Some chars was removed as result of recovery process."
+                         )
+                       ))
+                (compRes._1, compRes._2, errorList)
+              }
               .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
           )
           .value

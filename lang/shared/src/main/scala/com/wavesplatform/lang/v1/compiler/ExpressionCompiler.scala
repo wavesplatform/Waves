@@ -46,18 +46,29 @@ object ExpressionCompiler {
     }
   }
 
-  def compileWithParseResult(input: String, ctx: CompilerContext): Either[String, (EXPR, Expressions.EXPR, Iterable[CompilationError])] = {
+  def compileWithParseResult(input: String, ctx: CompilerContext): Either[String, (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] = {
     val res = Parser2.parseExpression(input)
     res match {
-      case Right(parseResult) =>
-        compileExprWithCtx(parseResult)
+      case Right((parseResult, removedCharPosOpt)) =>
+        compileExprWithCtx(parseResult.expr)
           .run(ctx)
           .value
           ._2
-          .map{
-            compRes =>
-              val errorList = compRes.errors ++ (if (compRes.t equivalent BOOLEAN) Nil else List(Generic(0, 0, "Script should return boolean")))
-              (compRes.expr, compRes.parseNodeExpr, errorList)
+          .map { compRes =>
+            val errorList =
+              compRes.errors ++
+                (if (compRes.t equivalent BOOLEAN) Nil else List(Generic(0, 0, "Script should return boolean"))) ++
+                (if (removedCharPosOpt.isEmpty)
+                   Nil
+                 else
+                   List(
+                     Generic(
+                       removedCharPosOpt.get.start,
+                       removedCharPosOpt.get.end,
+                       "Parsing failed. Some chars was removed as result of recovery process."
+                     )
+                   ))
+            (compRes.expr, parseResult.copy(expr = compRes.parseNodeExpr), errorList)
           }
           .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
 
@@ -91,11 +102,11 @@ object ExpressionCompiler {
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
 
       expr match {
-        case x: Expressions.CONST_LONG                   => CompilationStepResultExpr(ctx, CONST_LONG(x.value): EXPR, LONG: FINAL, x: Expressions.EXPR).pure[CompileM]
-        case x: Expressions.CONST_BYTESTR                => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
-        case x: Expressions.CONST_STRING                 => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
-        case x: Expressions.TRUE                         => CompilationStepResultExpr(ctx, TRUE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
-        case x: Expressions.FALSE                        => CompilationStepResultExpr(ctx, FALSE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.CONST_LONG                      => CompilationStepResultExpr(ctx, CONST_LONG(x.value): EXPR, LONG: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.CONST_BYTESTR                   => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
+        case x: Expressions.CONST_STRING                    => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
+        case x: Expressions.TRUE                            => CompilationStepResultExpr(ctx, TRUE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.FALSE                           => CompilationStepResultExpr(ctx, FALSE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
         case Expressions.GETTER(p, ref, field, _, _)        => compileGetter(p, field, ref)
         case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body)
         case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse)
@@ -130,7 +141,7 @@ object ExpressionCompiler {
       ifTrue  <- local(compileExprWithCtx(ifTrueExpr))
       ifFalse <- local(compileExprWithCtx(ifFalseExpr))
 
-      ctx = ifFalse.ctx
+      ctx           = ifFalse.ctx
       t             = TypeInferrer.findCommonType(ifTrue.t, ifFalse.t)
       parseNodeExpr = Expressions.IF(p, condWithErr._1.parseNodeExpr, ifTrue.parseNodeExpr, ifFalse.parseNodeExpr, ctxOpt = Some(ctx))
       errorList     = condWithErr._1.errors ++ ifTrue.errors ++ ifFalse.errors
@@ -236,7 +247,9 @@ object ExpressionCompiler {
       compiledMatch <- compileLetBlock(
         p,
         Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty),
-        ifCasesWithErr._1.getOrElse(Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = Some(ctx)))
+        ifCasesWithErr._1.getOrElse(
+          Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = Some(ctx))
+        )
       )
       checkWithErr <- cases
         .flatMap(_.types)
@@ -260,7 +273,13 @@ object ExpressionCompiler {
       result = if (errorList.isEmpty) {
         compiledMatch.copy(errors = compiledMatch.errors ++ typedExpr.errors)
       } else {
-        CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = Some(ctx)), errorList ++ typedExpr.errors)
+        CompilationStepResultExpr(
+          ctx,
+          FAILED_EXPR(),
+          NOTHING,
+          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = Some(ctx)),
+          errorList ++ typedExpr.errors
+        )
       }
 
     } yield result
@@ -384,7 +403,13 @@ object ExpressionCompiler {
           .flatMap(_ => compileExprWithCtx(body))
       }
 
-      parseNodeExpr = Expressions.BLOCK(p, compLetResult.parseNodeExpr, compiledBody.parseNodeExpr, compiledBody.parseNodeExpr.resultType, ctxOpt = Some(compiledBody.ctx))
+      parseNodeExpr = Expressions.BLOCK(
+        p,
+        compLetResult.parseNodeExpr,
+        compiledBody.parseNodeExpr,
+        compiledBody.parseNodeExpr.resultType,
+        ctxOpt = Some(compiledBody.ctx)
+      )
       result = if (!compLetResult.dec.isItFailed) {
         LET_BLOCK(compLetResult.dec.asInstanceOf[LET], compiledBody.expr)
       } else {
@@ -407,8 +432,14 @@ object ExpressionCompiler {
           .flatMap(_ => compileExprWithCtx(body))
       }
 
-      expr          = BLOCK(compFuncStepRes.dec, compiledBody.expr)
-      parseNodeExpr = Expressions.BLOCK(p, compFuncStepRes.parseNodeExpr, compiledBody.parseNodeExpr, compiledBody.parseNodeExpr.resultType, ctxOpt = Some(compFuncStepRes.ctx))
+      expr = BLOCK(compFuncStepRes.dec, compiledBody.expr)
+      parseNodeExpr = Expressions.BLOCK(
+        p,
+        compFuncStepRes.parseNodeExpr,
+        compiledBody.parseNodeExpr,
+        compiledBody.parseNodeExpr.resultType,
+        ctxOpt = Some(compFuncStepRes.ctx)
+      )
     } yield CompilationStepResultExpr(compiledBody.ctx, expr, compiledBody.t, parseNodeExpr, compFuncStepRes.errors ++ compiledBody.errors)
   }
 
@@ -485,7 +516,12 @@ object ExpressionCompiler {
       errorList = keyWithErr._2 ++ typeWithErr._2
 
       result = if (errorList.isEmpty) {
-        CompilationStepResultExpr(ctx, REF(keyWithErr._1.get), typeWithErr._1.get, Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = Some(ctx)))
+        CompilationStepResultExpr(
+          ctx,
+          REF(keyWithErr._1.get),
+          typeWithErr._1.get,
+          Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = Some(ctx))
+        )
       } else {
         CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.REF(p, keyPart, ctxOpt = Some(ctx)), errorList)
       }

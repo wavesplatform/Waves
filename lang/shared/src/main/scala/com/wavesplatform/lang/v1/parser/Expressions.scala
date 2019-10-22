@@ -121,6 +121,8 @@ object Expressions {
 
   case class DAPP(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
 
+  case class SCRIPT(position: Pos, expr: EXPR)
+
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {
       case Expressions.PART.VALID(_, x)         => Right(x)
