@@ -111,27 +111,4 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
     minerBlocks.size shouldEqual (height - 1)
     nonMinerBlocks shouldBe empty
   }
-
-  test("able to get block info via gRPC methods") {
-    val baseHeight = nodes.map(_.height).max
-    Await.result(processRequests(generateTransfersToRandomAddresses(30, nodeAddresses)), 2.minutes)
-    nodes.waitForHeight(baseHeight + 3)
-    val grpcBlockAt        = notMiner.grpc.blockAt(baseHeight + 1)
-    val blockAt            = notMiner.blockAt(baseHeight + 1)
-    val grpcBlockSeq       = notMiner.grpc.blockSeq(baseHeight + 1, baseHeight + 3)
-    val blockSeq           = notMiner.blockSeq(baseHeight + 1, baseHeight + 3)
-
-    grpcBlockAt.signerData.generator.stringRepr shouldBe blockAt.generator
-    grpcBlockAt.timestamp shouldBe blockAt.timestamp
-    grpcBlockAt.signerData.signature.base58 shouldBe blockAt.signature
-    grpcBlockAt.transactionData.size shouldBe blockAt.transactions.size
-
-    grpcBlockSeq.zip(blockSeq).foreach {
-      case (grpcBlock, block) =>
-        grpcBlock.signerData.generator.stringRepr shouldBe block.generator
-        grpcBlock.timestamp shouldBe block.timestamp
-        grpcBlock.signerData.signature.base58 shouldBe block.signature
-        grpcBlock.transactionData.size shouldBe block.transactions.size
-    }
-  }
 }
