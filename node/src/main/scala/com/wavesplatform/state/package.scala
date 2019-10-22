@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Gener
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.utils.Paged
+import com.wavesplatform.utils.{Paged, ScorexLogging}
 import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
@@ -22,7 +22,7 @@ import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
-package object state {
+package object state extends ScorexLogging {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
@@ -37,19 +37,19 @@ package object state {
         balanceChange <- portfolio.assets.get(asset)
       } yield balanceChange
 
-      !changeFromDiff.exists(_ < 0)
+      changeFromDiff.forall(_ >= 0)
     }
 
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
+    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] =
       diff.transactions.get(id).map(_._2)
-    }
 
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
-      diff.portfolios
-        .get(address)
-        .toIterable
-        .flatMap(_.assets.keys)
-    }
+    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
+      for {
+        portfolio <- diff.portfolios
+          .get(address)
+          .toIterable
+        (asset, balance) <- portfolio.assets if balance > 0
+      } yield asset
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
       maybeAfter

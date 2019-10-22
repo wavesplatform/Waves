@@ -87,14 +87,11 @@ class TransferNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChec
 
   test("NFT should correctly be transferred via mass transfer transaction") {
     val nftAsset = sender.issue(firstAddress, assetName, assetDescription, 1, 0, reissuable = false, 1.waves / 1000, waitForTx = true).id
-    val transfers = List(Transfer(thirdAddress, 1))
-    val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-
-    sender.massTransfer(firstAddress, transfers, massTransferTransactionFee, Some(nftAsset), waitForTx = true)
+    sender.massTransfer(firstAddress, List(Transfer(thirdAddress, 1)), calcMassTransferFee(1), Some(nftAsset), waitForTx = true)
 
     sender.assetBalance(firstAddress, nftAsset).balance shouldBe 0
     sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) shouldNot contain atLeastOneElementOf List(nftAsset)
-    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 1
-    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) should contain oneElementOf List(nftAsset)
+    sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) should contain oneElementOf List(nftAsset)
   }
 }
