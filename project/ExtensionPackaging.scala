@@ -65,7 +65,8 @@ object ExtensionPackaging extends AutoPlugin {
           s"""#!/bin/sh
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
-      )
+      ),
+      libraryDependencies ++= Dependencies.logDeps
     ) ++ nameFix ++ inScope(Global)(nameFix) ++ maintainerFix
 
   private def maintainerFix = inConfig(Linux)(

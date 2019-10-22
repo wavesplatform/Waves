@@ -105,7 +105,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
         )
         .explicitGet()
 
-    assertBadRequest(sender.signedBroadcast(mkInvData().json()))
+    assertApiErrorRaised(sender.signedBroadcast(mkInvData().json()))
 
     def async = com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi _
 
@@ -118,7 +118,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
     val result = Future
       .sequence(requests)
       .map {
-        _.forall(_ == TransactionNotAllowedByAccountScript.ErrorCode)
+        _.forall(_ == TransactionNotAllowedByAccountScript.Id)
       }
 
     Await.result(result, 1.minute) shouldBe true
