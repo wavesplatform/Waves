@@ -389,6 +389,9 @@ object SyncHttpApi extends Assertions {
     def getDataByKey(sourceAddress: String, key: String): DataEntry[_] =
       sync(async(n).getDataByKey(sourceAddress, key))
 
+    def getDataList(sourceAddress: String, json: Boolean, keys: String*): Seq[DataEntry[_]] =
+      sync(async(n).getDataList(sourceAddress, json, keys:_*))
+
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 

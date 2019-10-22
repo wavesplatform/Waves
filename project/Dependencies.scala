@@ -161,7 +161,8 @@ object Dependencies {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
+      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
     )
   }
 

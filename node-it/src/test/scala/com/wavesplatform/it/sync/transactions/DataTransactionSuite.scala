@@ -45,10 +45,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def data(entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
-             fee: Long = 100000,
-             timestamp: Long = System.currentTimeMillis,
-             version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
+    def data(
+        entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
+        fee: Long = 100000,
+        timestamp: Long = System.currentTimeMillis,
+        version: Byte = DataTransaction.supportedVersions.head
+    ): DataTransaction =
       DataTransaction.selfSigned(sender.privateKey, entries, fee, timestamp).explicitGet()
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)
@@ -134,6 +136,13 @@ class DataTransactionSuite extends BaseTransactionSuite {
     ((json \ "data")(2) \ "value").as[String].startsWith("base64:") shouldBe true
   }
 
+  test("queries for multiple keys") {
+    val list     = sender.getDataList(secondAddress, json = false, "int", "bool", "str").map(_.value)
+    val jsonList = sender.getDataList(secondAddress, json = true, "int", "bool", "str").map(_.value)
+    list shouldBe jsonList
+    list shouldBe Seq(-127, false, "BBBB")
+  }
+
   test("queries for nonexistent data") {
     def assertNotFound(url: String): Assertion = Try(sender.get(url)) match {
       case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
@@ -174,8 +183,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-                                "value is missing or not an integer")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+      "value is missing or not an integer"
+    )
 
     val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
 
@@ -185,26 +196,32 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
-                                "value is missing or not a boolean")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+      "value is missing or not a boolean"
+    )
 
     val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
-                                "Illegal base64 character")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
+      "Illegal base64 character"
+    )
   }
 
   test("transaction requires a valid proof") {
     def request: JsObject = {
       val rs = sender.postJsonWithApiKey(
         "/transactions/sign",
-        Json.obj("version" -> 1,
-                 "type"    -> DataTransaction.typeId,
-                 "sender"  -> firstAddress,
-                 "data"    -> List(IntegerDataEntry("int", 333)),
-                 "fee"     -> 100000)
+        Json.obj(
+          "version" -> 1,
+          "type"    -> DataTransaction.typeId,
+          "sender"  -> firstAddress,
+          "data"    -> List(IntegerDataEntry("int", 333)),
+          "fee"     -> 100000
+        )
       )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
@@ -234,8 +251,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), TooBig)
     assertBadRequestAndResponse(sender.putData(firstAddress, List(IntegerDataEntry("", 4)), 100000), "Empty key found")
-    assertBadRequestAndResponse(sender.putData(firstAddress, List(IntegerDataEntry("abc", 4), IntegerDataEntry("abc", 5)), 100000),
-                                "Duplicate keys found")
+    assertBadRequestAndResponse(
+      sender.putData(firstAddress, List(IntegerDataEntry("abc", 4), IntegerDataEntry("abc", 5)), 100000),
+      "Duplicate keys found"
+    )
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, 1.waves), TooBig)
@@ -261,14 +280,16 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to make address with 1000 DataEntries") {
-    val dataSet = 0 until 200 flatMap (i =>
-      List(
-        IntegerDataEntry(s"int$i", 1000 + i),
-        BooleanDataEntry(s"bool$i", false),
-        BinaryDataEntry(s"blob$i", ByteStr(Array[Byte](127.toByte, 0, 1, 1))),
-        StringDataEntry(s"str$i", s"hi there! + $i"),
-        IntegerDataEntry(s"integer$i", 1000 - i)
-      ))
+    val dataSet = 0 until 200 flatMap (
+        i =>
+          List(
+            IntegerDataEntry(s"int$i", 1000 + i),
+            BooleanDataEntry(s"bool$i", false),
+            BinaryDataEntry(s"blob$i", ByteStr(Array[Byte](127.toByte, 0, 1, 1))),
+            StringDataEntry(s"str$i", s"hi there! + $i"),
+            IntegerDataEntry(s"integer$i", 1000 - i)
+          )
+      )
 
     val txIds = dataSet.grouped(100).map(_.toList).map(data => sender.putData(thirdAddress, data, calcDataFee(data)).id)
     txIds foreach nodes.waitForTransaction
