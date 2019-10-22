@@ -59,7 +59,7 @@ trait IntegrationSuiteWithThreeAddresses
     }
 
     def makeTransfers(accounts: Seq[String]): Seq[String] = accounts.map { acc =>
-      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransactionV1.typeId)).id
+      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransaction.typeId)).id
 
     }
 

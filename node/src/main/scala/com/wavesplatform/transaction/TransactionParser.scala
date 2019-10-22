@@ -6,15 +6,17 @@ import com.wavesplatform.transaction.description.{ByteEntity, ConstantByte, OneB
 import scala.reflect.ClassTag
 import scala.util.Try
 
-trait TransactionParser {
-
+trait TransactionParserLite {
   type TransactionT <: Transaction
 
   def classTag: ClassTag[TransactionT]
   def typeId: Byte
   def supportedVersions: Set[Byte]
+  def parseBytes(bytes: Array[Byte]): Try[TransactionT]
+}
 
-  def parseBytes(bytes: Array[Byte]): Try[TransactionT] =
+trait TransactionParser extends TransactionParserLite {
+  override def parseBytes(bytes: Array[Byte]): Try[TransactionT] =
     parseHeader(bytes) flatMap (offset => parseTail(bytes drop offset))
 
   /** @return offset */

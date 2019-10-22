@@ -133,13 +133,13 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId"))
+          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("requirement failed"), true)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId"))
+          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("requirement failed"), true)
         }
         forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
+          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("requirement failed"), true)
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())
@@ -156,36 +156,33 @@ class AssetsBroadcastRouteSpec
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      TransferTransactionV1
-        .selfSigned(
-          assetId = Asset.Waves,
-          sender = senderPrivateKey,
-          recipient = receiverPrivateKey.toAddress,
-          amount = 1 * Waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.Waves,
-          feeAmount = Waves / 3,
-          attachment = Array.emptyByteArray
-        )
-        .right
-        .get
+      TransferTransaction(
+        version = 1.toByte,
+        asset = Asset.Waves,
+        sender = senderPrivateKey,
+        recipient = receiverPrivateKey.toAddress,
+        amount = 1 * Waves,
+        timestamp = System.currentTimeMillis(),
+        feeAsset = Asset.Waves,
+        fee = Waves / 3,
+        attachment = Array.emptyByteArray,
+        signer = senderPrivateKey
+      ).right.get
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      TransferTransactionV2
-        .create(
-          assetId = Asset.Waves,
-          sender = senderPrivateKey,
-          recipient = receiverPrivateKey.toAddress,
-          amount = 1 * Waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.Waves,
-          feeAmount = Waves / 3,
-          attachment = Array.emptyByteArray,
-          proofs = Proofs(Seq.empty)
-        )
-        .right
-        .get
+      TransferTransaction(
+        version = 2.toByte,
+        asset = Asset.Waves,
+        sender = senderPrivateKey,
+        recipient = receiverPrivateKey.toAddress,
+        amount = 1 * Waves,
+        timestamp = System.currentTimeMillis(),
+        feeAsset = Asset.Waves,
+        fee = Waves / 3,
+        attachment = Array.emptyByteArray,
+        proofs = Proofs(Seq.empty)
+      ).right.get
     )
 
     "/transfer" - {
@@ -193,22 +190,21 @@ class AssetsBroadcastRouteSpec
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransactionV1] shouldBe defined
+        responseAs[TransferTransaction].version shouldBe 1.toByte
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransactionV2] shouldBe defined
+        responseAs[TransferTransaction].version shouldBe 2.toByte
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
-
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
     import tx._
     SignedTransferV1Request(
       Base58.encode(tx.sender),
@@ -219,11 +215,11 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.toString
+      proofs.toSignature.toString
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
       Base58.encode(tx.sender),

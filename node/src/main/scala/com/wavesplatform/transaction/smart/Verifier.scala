@@ -41,17 +41,19 @@ object Verifier extends ScorexLogging {
         (pt, blockchain.accountScript(pt.sender)) match {
           case (stx: SignedTransaction, None) =>
             stats.signatureVerification
-              .measureForType(stx.builder.typeId)(stx.signaturesValid())
+              .measureForType(stx.typeId)(stx.signaturesValid())
           case (et: ExchangeTransaction, scriptOpt) =>
             verifyExchange(et, blockchain, scriptOpt)
+          case (tx: SignatureField, Some(_)) if tx.isVersion1 => // todo: (NODE-1915) All Signed transactions with Version 1
+            Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_: SignedTransaction, Some(_)) =>
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_, Some(script)) =>
             stats.accountScriptExecution
-              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, pt, None))
+              .measureForType(pt.typeId)(verifyTx(blockchain, script, pt, None))
           case _ =>
             stats.signatureVerification
-              .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
+              .measureForType(tx.typeId)(verifyAsEllipticCurveSignature(pt))
         }
     }
     validatedTx.flatMap { tx =>
@@ -64,7 +66,7 @@ object Verifier extends ScorexLogging {
           txr.flatMap(
             tx =>
               stats.assetScriptExecution
-                .measureForType(tx.builder.typeId)(verifyTx(blockchain, assetInfo._1, tx, Some(assetInfo._2.id)))
+                .measureForType(tx.typeId)(verifyTx(blockchain, assetInfo._1, tx, Some(assetInfo._2.id)))
           )
         }
     }
@@ -92,21 +94,21 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = Try {
-        val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
-        val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
-        val scriptResult = eval match {
-          case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
-          case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
-          case (_, Right(TRUE))       => Right(transaction)
-          case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
-        }
-        val logId = s"transaction ${transaction.id()}"
-        logIfNecessary(scriptResult, logId, eval)
-        scriptResult
-      } match {
-        case Failure(e) =>
-          Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
-        case Success(s) => s
+      val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
+      val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
+      val scriptResult = eval match {
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
+        case (_, Right(TRUE))       => Right(transaction)
+        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
+      }
+      val logId = s"transaction ${transaction.id()}"
+      logIfNecessary(scriptResult, logId, eval)
+      scriptResult
+    } match {
+      case Failure(e) =>
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
+      case Success(s) => s
     }
     val error2Trace: Option[ValidationError] => List[TraceStep] =
       e => {
@@ -150,7 +152,7 @@ object Verifier extends ScorexLogging {
       matcherScriptOpt: Option[Script]
   ): TracedResult[ValidationError, Transaction] = {
 
-    val typeId    = et.builder.typeId
+    val typeId    = et.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
 

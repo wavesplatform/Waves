@@ -50,7 +50,7 @@ object FeeValidation {
         _ <- Either.cond(
           feeDetails.minFeeInAsset <= tx.assetFee._2,
           (),
-          notEnoughFeeError(tx.builder.typeId, feeDetails, tx.assetFee._2)
+          notEnoughFeeError(tx.typeId, feeDetails, tx.assetFee._2)
         )
       } yield ()
     } else {
@@ -72,7 +72,7 @@ object FeeValidation {
 
   private def feeInUnits(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Long] = {
     FeeConstants
-      .get(tx.builder.typeId)
+      .get(tx.typeId)
       .map { baseFee =>
         tx match {
           case tx: MassTransferTransaction =>

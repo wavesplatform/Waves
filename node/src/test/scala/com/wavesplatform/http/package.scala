@@ -4,13 +4,12 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs}
 import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import shapeless.{:+:, CNil, Coproduct}
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
@@ -86,45 +85,30 @@ package object http {
     Writes(x => JsString(x.bytes.toString))
   )
 
-  implicit val transferTransactionFormat: Format[TransferTransactionV1] = (
-    (JsPath \ "assetId").format[Asset] and
-      (JsPath \ "sender").format[PublicKey] and
-      (JsPath \ "recipient").format[AddressOrAlias] and
-      (JsPath \ "amount").format[Long] and
-      (JsPath \ "timestamp").format[Long] and
-      (JsPath \ "feeAsset").format[Asset] and
-      (JsPath \ "fee").format[Long] and
-      (JsPath \ "attachment")
-        .format[String]
-        .inmap[Array[Byte]](
-          _.getBytes(StandardCharsets.UTF_8),
-          xs => new String(xs, StandardCharsets.UTF_8)
-        ) and
-      (JsPath \ "signature").format[ByteStr]
-  )(TransferTransactionV1.apply, unlift(TransferTransactionV1.unapply))
-
-  implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
-    (JsPath \ "sender").format[PublicKey] and
-      (JsPath \ "recipient").format[AddressOrAlias] and
-      (JsPath \ "assetId").format[Asset] and
-      (JsPath \ "amount").format[Long] and
-      (JsPath \ "timestamp").format[Long] and
-      (JsPath \ "feeAssetId").format[Asset] and
-      (JsPath \ "fee").format[Long] and
-      (JsPath \ "attachment")
-        .format[String]
-        .inmap[Array[Byte]](
-          _.getBytes(StandardCharsets.UTF_8),
-          xs => new String(xs, StandardCharsets.UTF_8)
-        ) and
-      (JsPath \ "proofs").format[Proofs]
-  )(TransferTransactionV2.apply, unlift(TransferTransactionV2.unapply))
-
-  type TransferTransactions = TransferTransactionV1 :+: TransferTransactionV2 :+: CNil
-  implicit val autoTransferTransactionsReads: Reads[TransferTransactions] = Reads { json =>
-    (json \ "version").asOpt[Int] match {
-      case None | Some(1) => transferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
-      case _              => versionedTransferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
-    }
+  implicit val versionedTransferTransactionFormat: Reads[TransferTransaction] = (
+    (JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "sender").read[PublicKey] and
+      (JsPath \ "recipient").read[AddressOrAlias] and
+      (JsPath \ "assetId").read[Asset] and
+      (JsPath \ "amount").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "feeAssetId").read[Asset] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "attachment").read[String].map[Array[Byte]](_.getBytes(StandardCharsets.UTF_8)) and
+      (JsPath \ "proofs").readNullable[Proofs] and
+      (JsPath \ "signature").readNullable[ByteStr]
+  ) { (version, sender, recipient, asset, amount, timestamp, feeAsset, fee, attachment, proofs, signature) =>
+    TransferTransaction(
+      version.getOrElse(1.toByte),
+      asset,
+      sender,
+      recipient,
+      amount,
+      timestamp,
+      feeAsset,
+      fee,
+      attachment,
+      proofs.orElse(signature.map(s => Proofs(Seq(s)))).get
+    ).explicitGet()
   }
 }

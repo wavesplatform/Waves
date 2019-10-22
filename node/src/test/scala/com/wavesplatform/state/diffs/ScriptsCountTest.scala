@@ -76,7 +76,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
       BlockchainFeatures.Ride4DApps.id          -> Int.MaxValue
-    ))
+    )
+  )
 
   private val fs1 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -88,7 +89,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
       BlockchainFeatures.Ride4DApps.id          -> 0
-    ))
+    )
+  )
 
   val allAllowed = ExprScript(TRUE).explicitGet()
 
@@ -111,16 +113,18 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
         .explicitGet()
       issueScr = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId,
-                    master,
-                    assetName,
-                    description,
-                    quantity + 1000000000L,
-                    decimals,
-                    true,
-                    Some(allAllowed),
-                    iFee,
-                    timestamp)
+        .selfSigned(
+          AddressScheme.current.chainId,
+          master,
+          assetName,
+          description,
+          quantity + 1000000000L,
+          decimals,
+          true,
+          Some(allAllowed),
+          iFee,
+          timestamp
+        )
         .explicitGet()
       burnScr = BurnTransactionV2.selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransactionV2
@@ -130,11 +134,11 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .create(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
       data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
-      tr1 = TransferTransactionV2
-        .selfSigned(Waves, master, acc, 10000000000L, timestamp, Waves, fee, ByteStr(Array()))
+      tr1 = TransferTransaction
+        .selfSigned(2.toByte, Waves, master, acc, 10000000000L, timestamp, Waves, fee, ByteStr(Array()))
         .explicitGet()
-      tr2 = TransferTransactionV2
-        .selfSigned(IssuedAsset(issueScr.id()), master, acc, 1000000000L, timestamp, Waves, fee, ByteStr(Array()))
+      tr2 = TransferTransaction
+        .selfSigned(2.toByte, IssuedAsset(issueScr.id()), master, acc, 1000000000L, timestamp, Waves, fee, ByteStr(Array()))
         .explicitGet()
       mt1 = MassTransferTransaction.selfSigned(Waves, master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array())).explicitGet()
       mt2 = MassTransferTransaction
@@ -158,16 +162,18 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
 
       setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId,
-                    acc,
-                    assetName,
-                    description,
-                    quantity + 1000000000L,
-                    decimals,
-                    true,
-                    Some(allAllowed),
-                    iFee,
-                    timestamp)
+        .selfSigned(
+          AddressScheme.current.chainId,
+          acc,
+          assetName,
+          description,
+          quantity + 1000000000L,
+          decimals,
+          true,
+          Some(allAllowed),
+          iFee,
+          timestamp
+        )
         .explicitGet()
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
       o1b        = Order.buy(master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1, 2: Byte)
@@ -178,24 +184,24 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
     } yield {
       val txs = Seq[Transaction](
         setContract,
-        issueSp, // 1
-        sponsorTx, // 1
-        issueScr, // 1
-        burnSp, // 1
-        burnScr, // 2
-        reissueSp, // 1
-        reissueScr, // 2
+        issueSp,       // 1
+        sponsorTx,     // 1
+        issueScr,      // 1
+        burnSp,        // 1
+        burnScr,       // 2
+        reissueSp,     // 1
+        reissueScr,    // 2
         resetContract, // 1
-        assetScript, // 1
-        data, // 1
-        tr1, // 1
-        tr2, // 2
-        mt1, // 1
-        mt2, // 2
-        l, // 1
-        lc, // 1
-        exchange, // 2
-        exchangea, // 1
+        assetScript,   // 1
+        data,          // 1
+        tr1,           // 1
+        tr2,           // 2
+        mt1,           // 1
+        mt2,           // 2
+        l,             // 1
+        lc,            // 1
+        exchange,      // 2
+        exchangea,     // 1
         issueScrB,
         setContractB,
         exchangeB // 4
@@ -240,16 +246,18 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
         .explicitGet()
       issueScr = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId,
-                    master,
-                    assetName,
-                    description,
-                    quantity + 1000000000L,
-                    decimals,
-                    true,
-                    Some(allAllowed),
-                    iFee,
-                    timestamp)
+        .selfSigned(
+          AddressScheme.current.chainId,
+          master,
+          assetName,
+          description,
+          quantity + 1000000000L,
+          decimals,
+          true,
+          Some(allAllowed),
+          iFee,
+          timestamp
+        )
         .explicitGet()
       burnScr = BurnTransactionV2.selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransactionV2
@@ -259,11 +267,11 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .create(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
       data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
-      tr1 = TransferTransactionV2
-        .selfSigned(Waves, master, acc, 10000000000L, timestamp, Waves, fee, ByteStr(Array()))
+      tr1 = TransferTransaction
+        .selfSigned(2.toByte, Waves, master, acc, 10000000000L, timestamp, Waves, fee, ByteStr(Array()))
         .explicitGet()
-      tr2 = TransferTransactionV2
-        .selfSigned(IssuedAsset(issueScr.id()), master, acc, 1000000000L, timestamp, Waves, fee, ByteStr(Array()))
+      tr2 = TransferTransaction
+        .selfSigned(2.toByte, IssuedAsset(issueScr.id()), master, acc, 1000000000L, timestamp, Waves, fee, ByteStr(Array()))
         .explicitGet()
       mt1 = MassTransferTransaction.selfSigned(Waves, master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array())).explicitGet()
       mt2 = MassTransferTransaction
@@ -287,16 +295,18 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
 
       setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId,
-                    acc,
-                    assetName,
-                    description,
-                    quantity + 1000000000L,
-                    decimals,
-                    true,
-                    Some(allAllowed),
-                    iFee,
-                    timestamp)
+        .selfSigned(
+          AddressScheme.current.chainId,
+          acc,
+          assetName,
+          description,
+          quantity + 1000000000L,
+          decimals,
+          true,
+          Some(allAllowed),
+          iFee,
+          timestamp
+        )
         .explicitGet()
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
       o1b        = Order.buy(master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1, 2: Byte)
@@ -307,30 +317,32 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
     } yield {
       assertDiffAndState(
         Seq(TestBlock.create(Seq(genesis))),
-        TestBlock.create(Seq(
-          setContract,
-          issueSp, // 1
-          sponsorTx, // 1
-          issueScr, // 1
-          burnSp, // 1
-          burnScr, // 2
-          reissueSp, // 1
-          reissueScr, // 2
-          resetContract, // 1
-          assetScript, // 2
-          data, // 1
-          tr1, // 1
-          tr2, // 2
-          mt1, // 1
-          mt2, // 2
-          l, // 1
-          lc, // 1
-          exchange, // 3
-          exchangea, // 2
-          issueScrB,
-          setContractB,
-          exchangeB // 5
-        )),
+        TestBlock.create(
+          Seq(
+            setContract,
+            issueSp,       // 1
+            sponsorTx,     // 1
+            issueScr,      // 1
+            burnSp,        // 1
+            burnScr,       // 2
+            reissueSp,     // 1
+            reissueScr,    // 2
+            resetContract, // 1
+            assetScript,   // 2
+            data,          // 1
+            tr1,           // 1
+            tr2,           // 2
+            mt1,           // 1
+            mt2,           // 2
+            l,             // 1
+            lc,            // 1
+            exchange,      // 3
+            exchangea,     // 2
+            issueScrB,
+            setContractB,
+            exchangeB // 5
+          )
+        ),
         fs1
       ) {
         case (blockDiff, _) =>

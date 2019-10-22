@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.FreeSpec
 import play.api.libs.json._
 
@@ -87,8 +87,9 @@ class NFTBalanceSuite
     "returns only nft with balance > 0 on /nft/{address}/limit/{limit}" in {
       val other = KeyPair("other".getBytes)
 
-      val transfer = TransferTransactionV1
+      val transfer = TransferTransaction
         .selfSigned(
+          1.toByte,
           randomTokenToTransfer,
           issuer,
           other,

@@ -57,7 +57,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   val repeatedCancelAllowed = Gen.choose(0, allowMultipleLeaseCancelTransactionUntilTimestamp - 1)
   val repeatedCancelForbidden = Gen.choose(allowMultipleLeaseCancelTransactionUntilTimestamp + 1, Long.MaxValue)
 
-  def cancelLeaseTwice(ts: Long): Gen[(GenesisTransaction, TransferTransactionV1, LeaseTransaction, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
+  def cancelLeaseTwice(ts: Long): Gen[(GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
     master   <- accountGen
     recpient <- accountGen suchThat (_ != master)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()

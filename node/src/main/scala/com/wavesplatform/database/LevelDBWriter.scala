@@ -399,7 +399,7 @@ class LevelDBWriter(
       val txTypeNumSeq = txIds.map { txId =>
         val (tx, num) = transactions(txId)
 
-        (tx.builder.typeId, num)
+        (tx.typeId, num)
       }
       rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
       rw.put(kk, nextSeqNr)
@@ -586,7 +586,7 @@ class LevelDBWriter(
                   ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
               }
 
-              if (tx.builder.typeId != GenesisTransaction.typeId) {
+              if (tx.typeId != GenesisTransaction.typeId) {
                 rw.delete(Keys.transactionAt(h, num))
                 rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
               }

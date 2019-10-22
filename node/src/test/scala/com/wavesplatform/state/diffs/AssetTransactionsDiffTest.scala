@@ -192,7 +192,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransactionV1.selfSigned(assetId, issuer, holder, quantity - 1, timestamp, Waves, fee, attachment).explicitGet()
+      transfer = TransferTransaction.selfSigned(1.toByte, assetId, issuer, holder, quantity - 1, timestamp, Waves, fee, attachment).explicitGet()
       reissue  = ReissueTransactionV1.selfSigned(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
@@ -224,33 +224,35 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransaction, ReissueTransactionV1)] =
     for {
       version            <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
       accountB           <- accountGen
-      smallFee           <- Gen.choose(1l, 10l)
+      smallFee           <- Gen.choose(1L, 10L)
       genesisTx1 = GenesisTransaction.create(accountA, initialWavesAmount, timestamp).explicitGet()
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
       issue = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId,
-                    accountA,
-                    assetName,
-                    description,
-                    quantity,
-                    decimals,
-                    reissuable,
-                    Some(createScript(code)),
-                    smallFee,
-                    timestamp + 1)
+        .selfSigned(
+          AddressScheme.current.chainId,
+          accountA,
+          assetName,
+          description,
+          quantity,
+          decimals,
+          reissuable,
+          Some(createScript(code)),
+          smallFee,
+          timestamp + 1
+        )
         .explicitGet()
       assetId = IssuedAsset(issue.id())
-      transfer = TransferTransactionV1
-        .selfSigned(assetId, accountA, accountB, issue.quantity, timestamp + 2, Waves, smallFee, Array.empty)
+      transfer = TransferTransaction
+        .selfSigned(1.toByte, assetId, accountA, accountB, issue.quantity, timestamp + 2, Waves, smallFee, Array.empty)
         .explicitGet()
       reissue = ReissueTransactionV1.selfSigned(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
@@ -265,14 +267,17 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {
           case (blockDiff, newState) =>
             newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
-              AssetDescription(issue.sender,
-                               issue.name,
-                               issue.description,
-                               issue.decimals,
-                               issue.reissuable,
-                               BigInt(issue.quantity),
-                               issue.script,
-                               0L))
+              AssetDescription(
+                issue.sender,
+                issue.name,
+                issue.description,
+                issue.decimals,
+                issue.reissuable,
+                BigInt(issue.quantity),
+                issue.script,
+                0L
+              )
+            )
             blockDiff.transactions.get(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldEqual true
@@ -295,16 +300,18 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   property("Cannot transfer when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
       case (gen, issue, transfer, _) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS)(ei =>
-          ei should produce("TransactionNotAllowedByScript"))
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS)(
+          ei => ei should produce("TransactionNotAllowedByScript")
+        )
     }
   }
 
   property("Cannot reissue when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
       case (gen, issue, _, reissue) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS)(ei =>
-          ei should produce("TransactionNotAllowedByScript"))
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS)(
+          ei => ei should produce("TransactionNotAllowedByScript")
+        )
     }
   }
 

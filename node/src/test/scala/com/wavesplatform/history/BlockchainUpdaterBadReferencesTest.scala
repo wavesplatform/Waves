@@ -17,14 +17,14 @@ class BlockchainUpdaterBadReferencesTest
     with Matchers
     with TransactionGen {
 
-  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransactionV1, TransferTransactionV1, TransferTransactionV1)] = for {
+  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)] = for {
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    payment: TransferTransactionV1  <- wavesTransferGeneratorP(ts, master, recipient)
-    payment2: TransferTransactionV1 <- wavesTransferGeneratorP(ts, master, recipient)
-    payment3: TransferTransactionV1 <- wavesTransferGeneratorP(ts, master, recipient)
+    payment: TransferTransaction  <- wavesTransferGeneratorP(ts, master, recipient)
+    payment2: TransferTransaction <- wavesTransferGeneratorP(ts, master, recipient)
+    payment3: TransferTransaction <- wavesTransferGeneratorP(ts, master, recipient)
   } yield (genesis, payment, payment2, payment3)
 
   property("microBlock: referenced (micro)block doesn't exist") {

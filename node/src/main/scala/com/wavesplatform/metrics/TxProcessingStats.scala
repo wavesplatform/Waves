@@ -1,26 +1,19 @@
 package com.wavesplatform.metrics
 
 import com.google.common.base.CaseFormat
-import com.wavesplatform.transaction.TransactionParsers
+import com.wavesplatform.settings.Constants
 import kamon.Kamon
 import kamon.metric.TimerMetric
 import supertagged._
 
 object TxProcessingStats {
   val typeToName: Map[Byte, String] = {
-    val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
+    def timerName(name: String): String =
+      CaseFormat.UPPER_CAMEL
+        .converterTo(CaseFormat.LOWER_HYPHEN)
+        .convert(name.replace("Transaction", ""))
 
-    TransactionParsers.byName.map {
-      case (name, builder) =>
-        val typeName = converter.convert(
-          name
-            .replace("V1", "")
-            .replace("V2", "")
-            .replace("Transaction", "")
-        )
-
-        (builder.typeId, typeName)
-    }
+    Constants.TransactionNames.mapValues(timerName)
   }
 
   object TxTimer extends TaggedType[TimerMetric]
@@ -37,7 +30,7 @@ object TxProcessingStats {
   }
 
   val invokedScriptExecution: TxTimer    = TxTimer(Kamon.timer("tx.processing.script-execution.invoked"))
-  val accountScriptExecution: TxTimer      = TxTimer(Kamon.timer("tx.processing.script-execution.account"))
+  val accountScriptExecution: TxTimer    = TxTimer(Kamon.timer("tx.processing.script-execution.account"))
   val assetScriptExecution: TxTimer      = TxTimer(Kamon.timer("tx.processing.script-execution.asset"))
   val signatureVerification: TxTimer     = TxTimer(Kamon.timer("tx.processing.validation.signature"))
   val balanceValidation: TxTimer         = TxTimer(Kamon.timer("tx.processing.validation.balance"))

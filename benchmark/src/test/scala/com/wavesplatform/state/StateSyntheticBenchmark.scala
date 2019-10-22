@@ -42,7 +42,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
-      } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, ts, Waves, 100000, Array.emptyByteArray).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, Waves, sender, recipient, amount, ts, Waves, 100000, Array.emptyByteArray).explicitGet()
   }
 
   @State(Scope.Benchmark)
@@ -57,8 +57,9 @@ object StateSyntheticBenchmark {
         recipient: KeyPair <- accountGen
         amount                    <- Gen.choose(1, waves(1))
       } yield
-        TransferTransactionV2
+        TransferTransaction
           .selfSigned(
+            2.toByte,
             Waves,
             sender,
             recipient.toAddress,

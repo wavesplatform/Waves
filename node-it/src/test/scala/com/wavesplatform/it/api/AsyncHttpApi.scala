@@ -395,7 +395,7 @@ object AsyncHttpApi extends Assertions {
                  "minSponsoredAssetFee" -> JsNull))
 
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/transfer", TransferV1Request(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+      postJson("/assets/transfer", TransferRequest(Some(1.toByte), None, None, amount, fee, recipient, None, Some(sourceAddress), None, None, None, None)).as[Transaction]
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] = {
       signAndBroadcast(
@@ -443,8 +443,8 @@ object AsyncHttpApi extends Assertions {
     def signedIssue(issue: SignedIssueV2Request): Future[Transaction] =
       signedBroadcast(issue.toTx.explicitGet().json())
 
-    def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-      import SignedTransferV2Request.writes
+    def batchSignedTransfer(transfers: Seq[TransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
+      import TransferRequest.format
       Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 

@@ -16,7 +16,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -164,11 +164,31 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
   "Miner receives reward and fees" - {
     val ngEmptyScenario = for {
       (sourceAddress, issuer, miner1, miner2, genesisBlock) <- genesis
-      tx1 = TransferTransactionV1
-        .selfSigned(Waves, issuer, sourceAddress, 10 * Constants.UnitsInWave, ntpTime.getTimestamp(), Waves, OneTotalFee, Array.emptyByteArray)
+      tx1 = TransferTransaction
+        .selfSigned(
+          1.toByte,
+          Waves,
+          issuer,
+          sourceAddress,
+          10 * Constants.UnitsInWave,
+          ntpTime.getTimestamp(),
+          Waves,
+          OneTotalFee,
+          Array.emptyByteArray
+        )
         .explicitGet()
-      tx2 = TransferTransactionV1
-        .selfSigned(Waves, issuer, sourceAddress, 10 * Constants.UnitsInWave, ntpTime.getTimestamp(), Waves, OneTotalFee, Array.emptyByteArray)
+      tx2 = TransferTransaction
+        .selfSigned(
+          1.toByte,
+          Waves,
+          issuer,
+          sourceAddress,
+          10 * Constants.UnitsInWave,
+          ntpTime.getTimestamp(),
+          Waves,
+          OneTotalFee,
+          Array.emptyByteArray
+        )
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner1)
       b3        = mkEmptyBlock(b2.uniqueId, miner1)
@@ -209,8 +229,18 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
     val betterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
-      tx = TransferTransactionV1
-        .selfSigned(Waves, issuer, sourceAddress, 10 * Constants.UnitsInWave, ntpTime.getTimestamp(), Waves, OneTotalFee, Array.emptyByteArray)
+      tx = TransferTransaction
+        .selfSigned(
+          1.toByte,
+          Waves,
+          issuer,
+          sourceAddress,
+          10 * Constants.UnitsInWave,
+          ntpTime.getTimestamp(),
+          Waves,
+          OneTotalFee,
+          Array.emptyByteArray
+        )
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)
@@ -242,11 +272,31 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
     val sameButBetterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
-      tx1 = TransferTransactionV1
-        .selfSigned(Waves, issuer, sourceAddress, 10 * Constants.UnitsInWave, ntpTime.getTimestamp(), Waves, OneTotalFee, Array.emptyByteArray)
+      tx1 = TransferTransaction
+        .selfSigned(
+          1.toByte,
+          Waves,
+          issuer,
+          sourceAddress,
+          10 * Constants.UnitsInWave,
+          ntpTime.getTimestamp(),
+          Waves,
+          OneTotalFee,
+          Array.emptyByteArray
+        )
         .explicitGet()
-      tx2 = TransferTransactionV1
-        .selfSigned(Waves, issuer, sourceAddress, 10 * Constants.UnitsInWave, ntpTime.getTimestamp(), Waves, OneTotalFee, Array.emptyByteArray)
+      tx2 = TransferTransaction
+        .selfSigned(
+          1.toByte,
+          Waves,
+          issuer,
+          sourceAddress,
+          10 * Constants.UnitsInWave,
+          ntpTime.getTimestamp(),
+          Waves,
+          OneTotalFee,
+          Array.emptyByteArray
+        )
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)
@@ -277,19 +327,19 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     }
 
     val blockWithoutFeesScenario = for {
-    (_, _, miner1, miner2, genesisBlock) <- genesis
-                                            b2 = mkEmptyBlock(genesisBlock.uniqueId, miner1)
-                                                   b3 = mkEmptyBlock(b2.uniqueId, miner1)
-                                                          b4 = mkEmptyBlock(b3.uniqueId, miner1)
-                                                                 b5 = mkEmptyBlockIncReward(b4.uniqueId, miner1)
-                                                                        b6s = Range
-                                                                              .inclusive(BlockRewardActivationHeight + 1, BlockRewardActivationHeight + rewardSettings.blockchainSettings.rewardsSettings.term)
-    .foldLeft(Seq(b5)) {
-      case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
-        prev :+ mkEmptyBlockIncReward(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
-      case (prev, i) => prev :+ mkEmptyBlock(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
-    }
-      .tail
+      (_, _, miner1, miner2, genesisBlock) <- genesis
+      b2 = mkEmptyBlock(genesisBlock.uniqueId, miner1)
+      b3 = mkEmptyBlock(b2.uniqueId, miner1)
+      b4 = mkEmptyBlock(b3.uniqueId, miner1)
+      b5 = mkEmptyBlockIncReward(b4.uniqueId, miner1)
+      b6s = Range
+        .inclusive(BlockRewardActivationHeight + 1, BlockRewardActivationHeight + rewardSettings.blockchainSettings.rewardsSettings.term)
+        .foldLeft(Seq(b5)) {
+          case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
+            prev :+ mkEmptyBlockIncReward(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
+          case (prev, i) => prev :+ mkEmptyBlock(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
+        }
+        .tail
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, b6s.init, b6s.last)
 
     "when all blocks without fees" in forAll(blockWithoutFeesScenario) {
