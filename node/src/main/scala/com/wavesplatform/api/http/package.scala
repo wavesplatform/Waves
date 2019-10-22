@@ -129,6 +129,15 @@ package object http extends ApiMarshallers with ScorexLogging {
       }
     }) ~ get(complete(StatusCodes.MethodNotAllowed))
 
+  def jsonParammedPost[A: Reads](f: (A, Map[String, String]) => ToResponseMarshallable): Route =
+    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
+      parameterMap { params =>
+        entity(as[A]) { a =>
+          complete(f(a, params))
+        }
+      }
+    }) ~ get(complete(StatusCodes.MethodNotAllowed))
+
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
   private val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
