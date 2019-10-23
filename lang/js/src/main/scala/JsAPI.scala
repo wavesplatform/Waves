@@ -8,13 +8,12 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
-import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
@@ -38,36 +37,36 @@ object JsAPI {
 
       def serAnnotation(ann: Expressions.ANNOTATION): js.Object = {
         jObj.applyDynamic("apply")(
-          "type"       -> "ANNOTATION",
-          "posStart"   -> annFunc.position.start,
-          "posEnd"     -> annFunc.position.end
+          "type"     -> "ANNOTATION",
+          "posStart" -> annFunc.position.start,
+          "posEnd"   -> annFunc.position.end
         )
       }
 
       jObj.applyDynamic("apply")(
-        "type"       -> "ANNOTATEDFUNC",
-        "posStart"   -> annFunc.position.start,
-        "posEnd"     -> annFunc.position.end,
-        "annList" -> annFunc.anns.map(serAnnotation).toJSArray,
-        "func" -> serDec(annFunc.f)
+        "type"     -> "ANNOTATEDFUNC",
+        "posStart" -> annFunc.position.start,
+        "posEnd"   -> annFunc.position.end,
+        "annList"  -> annFunc.anns.map(serAnnotation).toJSArray,
+        "func"     -> serDec(annFunc.f)
       )
     }
 
     jObj.applyDynamic("apply")(
-      "type"       -> "DAPP",
-      "posStart"   -> ast.position.start,
-      "posEnd"     -> ast.position.end,
-      "decList" -> ast.decs.map(serDec).toJSArray,
+      "type"        -> "DAPP",
+      "posStart"    -> ast.position.start,
+      "posEnd"      -> ast.position.end,
+      "decList"     -> ast.decs.map(serDec).toJSArray,
       "annFuncList" -> ast.fs.map(serAnnFunc)
     )
   }
 
   private def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object = {
     jObj.applyDynamic("apply")(
-      "type"       -> "SCRIPT",
-      "posStart"   -> ast.position.start,
-      "posEnd"     -> ast.position.end,
-      "expr" -> serExpr(ast.expr)
+      "type"     -> "SCRIPT",
+      "posStart" -> ast.position.start,
+      "posEnd"   -> ast.position.end,
+      "expr"     -> serExpr(ast.expr)
     )
   }
 
@@ -88,7 +87,10 @@ object JsAPI {
       case x: Expressions.TRUE          => commonDataObj
       case x: Expressions.FALSE         => commonDataObj
 
-      case x: Expressions.REF => commonDataObj
+      case x: Expressions.REF => {
+        val additionalDataObj = jObj.applyDynamic("apply")("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
+        mergeJSObjects(commonDataObj, additionalDataObj)
+      }
 
       case Expressions.GETTER(_, ref, _, _, _) => {
         val additionalDataObj = jObj.applyDynamic("apply")("ref" -> serExpr(ref))
@@ -112,8 +114,11 @@ object JsAPI {
         mergeJSObjects(commonDataObj, additionalDataObj)
       }
 
-      case Expressions.FUNCTION_CALL(_, _, args, _, _) => {
-        val additionalDataObj = jObj.applyDynamic("apply")("args" -> args.map(serExpr).toJSArray)
+      case Expressions.FUNCTION_CALL(_, name, args, _, _) => {
+        val additionalDataObj = jObj.applyDynamic("apply")(
+          "name" -> Expressions.PART.toOption[String](name).getOrElse("").toString,
+          "args" -> args.map(serExpr).toJSArray
+        )
         mergeJSObjects(commonDataObj, additionalDataObj)
       }
 
@@ -169,10 +174,22 @@ object JsAPI {
 
   private def serDec(dec: Expressions.Declaration): js.Object = {
     dec match {
-      case Expressions.LET(p, _, expr, _, _) =>
-        jObj.applyDynamic("apply")("type" -> "LET", "posStart" -> p.start, "posEnd" -> p.end, "expr" -> serExpr(expr))
-      case Expressions.FUNC(p, _, _, expr) =>
-        jObj.applyDynamic("apply")("type" -> "FUNC", "posStart" -> p.start, "posEnd" -> p.end, "expr" -> serExpr(expr))
+      case Expressions.LET(p, name, expr, _, _) =>
+        jObj.applyDynamic("apply")(
+          "type"     -> "LET",
+          "posStart" -> p.start,
+          "posEnd"   -> p.end,
+          "name"     -> Expressions.PART.toOption[String](name).getOrElse("").toString,
+          "expr"     -> serExpr(expr)
+        )
+      case Expressions.FUNC(p, name, _, expr) =>
+        jObj.applyDynamic("apply")(
+          "type"     -> "FUNC",
+          "posStart" -> p.start,
+          "posEnd"   -> p.end,
+          "name"     -> Expressions.PART.toOption[String](name).getOrElse("").toString,
+          "expr"     -> serExpr(expr)
+        )
       case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
     }
   }
@@ -308,19 +325,6 @@ object JsAPI {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   @JSExportTopLevel("parseAndCompile")
   def parseAndCompile(
       input: String,
@@ -372,15 +376,17 @@ object JsAPI {
           .map {
             case (bytes, complexityWithMap, exprDApp, compErrorList) =>
               js.Dynamic.literal(
-                "result"     -> Global.toBuffer(bytes),
-                "complexity" -> complexityWithMap._1,
+                "result"           -> Global.toBuffer(bytes),
+                "complexity"       -> complexityWithMap._1,
                 "complexityByFunc" -> complexityWithMap._2.toJSDictionary,
-                "dAppAst"    ->  dAppToJs(exprDApp),
-                "errorList"  -> compErrorList.map(compilationErrToJs).toJSArray
+                "dAppAst"          -> dAppToJs(exprDApp),
+                "errorList"        -> compErrorList.map(compilationErrToJs).toJSArray
               )
           }
     }
   }
+
+
 
 
 
@@ -492,4 +498,6 @@ object JsAPI {
         )
       )
       .toJSPromise
+
+
 }

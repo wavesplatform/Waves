@@ -113,9 +113,9 @@ class Parser2(val input: ParserInput) extends Parser {
   def ANDOP: Rule1[BinaryOperation] = rule { "&&" ~ push(AND_OP) }
 
   def COMPARE_GROUP_OP: Rule1[BinaryOperation] = rule { GTOP | GEOP | LTOP | LEOP }
-  def GTOP: Rule1[BinaryOperation]             = rule { ">" ~ push(GT_OP) }
+  def GTOP: Rule1[BinaryOperation]             = rule { ">" ~ noneOf("=") ~ push(GT_OP) }
   def GEOP: Rule1[BinaryOperation]             = rule { ">=" ~ push(GE_OP) }
-  def LTOP: Rule1[BinaryOperation]             = rule { "<" ~ push(LT_OP) }
+  def LTOP: Rule1[BinaryOperation]             = rule { "<" ~ noneOf("=") ~ push(LT_OP) }
   def LEOP: Rule1[BinaryOperation]             = rule { "<=" ~ push(LE_OP) }
 
   def EQUALITY_GROUP_OP: Rule1[BinaryOperation] = rule { EQOP | NEOP }
@@ -171,6 +171,7 @@ class Parser2(val input: ParserInput) extends Parser {
   def Digits: Rule0            = rule { oneOrMore(CharPredicate.Digit) }
   def Digit: Rule0             = rule { CharPredicate.Digit }
 
+  def Comment: Rule0 = rule { noneOf("{") ~ noneOf("-") ~ "#" ~ noneOf("-") ~ noneOf("}") ~ zeroOrMore(noneOf("\n")) ~ "\n" }
   def WhiteSpace: Rule0 = rule { zeroOrMore(anyOf(" \n\r\t\f")) }
   def WS: Rule0         = WhiteSpace
 
