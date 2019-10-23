@@ -82,7 +82,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
         """.stripMargin
     val script      = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(secondAddress, Some(script), setScriptFee, waitForTx = true)
-    def invokeTransfer(caller: String, functionName: String, args: List[Terms.EXPR] = List.empty, payment: Seq[InvokeScriptTransaction.Payment]): Transaction = {
+    def invokeTransfer(caller: String, functionName: String, args: List[Terms.EXPR] = List.empty, payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty): Transaction = {
     sender.invokeScript(
       caller,
       secondAddress,
@@ -90,34 +90,43 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       payment = payment,
       args = args,
       fee = 1300000,
-      waitForTx = true
-    )
+      waitForTx = true)
     }
-    for(functionName <- Seq(
-      "nftTransferToDapp",
-      "transferFromDappToAddress",
-      "nftTransferToSelf",
-      "nftPaymentTransferToThirdAddress",
-      "transferAsPayment")) {
+    val nftPayment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset))))
 
-      val (caller, transferSender, recipient, functionArgs, payment) = functionName match {
-        case "nftTransferToDapp" => (firstAddress, firstAddress, secondAddress, List.empty, Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
-        case "transferFromDappToAddress" => (firstAddress, secondAddress, thirdAddress, List(Terms.CONST_STRING(thirdAddress).explicitGet()), Seq.empty)
-        case "nftTransferToSelf" => (thirdAddress, secondAddress, thirdAddress, List.empty, Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
-        case "nftPaymentTransferToThirdAddress" => (thirdAddress, thirdAddress, firstAddress, List(Terms.CONST_STRING(firstAddress).explicitGet()),
-          Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
-        case "transferAsPayment" => (firstAddress, firstAddress, secondAddress, List.empty, Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
-      }
-      invokeTransfer(caller, functionName, functionArgs, payment)
-      if(functionName.equals("nftPaymentTransferToThirdAddress")) {
-        sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
-        sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
-      }
-      sender.assetBalance(transferSender, nftAsset).balance shouldBe 0
-      sender.nftAssetsBalance(transferSender, 10).map(info => info.assetId) shouldNot contain (nftAsset)
-      sender.assetBalance(recipient, nftAsset).balance shouldBe 1
-      sender.nftAssetsBalance(recipient, 10).map(info => info.assetId) should contain (nftAsset)
-    }
+    invokeTransfer(firstAddress,"nftTransferToDapp",payment = nftPayment)
+    sender.assetBalance(firstAddress, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) should contain (nftAsset)
+
+    invokeTransfer(firstAddress, "transferFromDappToAddress",args = List(Terms.CONST_STRING(thirdAddress).explicitGet()))
+    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) should contain (nftAsset)
+
+    invokeTransfer(thirdAddress, "nftTransferToSelf",payment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
+    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) should contain (nftAsset)
+
+    invokeTransfer(thirdAddress, "nftPaymentTransferToThirdAddress",
+      args = List(Terms.CONST_STRING(firstAddress).explicitGet()),
+      payment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
+    sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(firstAddress, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) should contain (nftAsset)
+
+    invokeTransfer(firstAddress, "transferAsPayment",payment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
+    sender.assetBalance(firstAddress, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) should contain (nftAsset)
   }
 
   test("NFT should be correctly transferred via mass transfer transaction") {
