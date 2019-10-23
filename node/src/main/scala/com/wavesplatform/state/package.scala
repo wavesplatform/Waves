@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Gener
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.utils.{Paged, ScorexLogging}
+import com.wavesplatform.utils.Paged
 import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
@@ -22,7 +22,7 @@ import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
-package object state extends ScorexLogging {
+package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
