@@ -137,11 +137,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("queries for multiple keys") {
-    val list     = sender.getDataList(secondAddress,"int", "bool", "str").map(_.value)
-    val jsonList = sender.getDataListJson(secondAddress, "int", "bool", "str").map(_.value)
-    val postList = sender.getDataListPost(secondAddress, "int", "bool", "str").map(_.value)
+    val list     = sender.getDataList(secondAddress,"int", "bool", "blob", "str").map(_.value)
+    val jsonList = sender.getDataListJson(secondAddress, "int", "bool", "blob", "str").map(_.value)
+    val postList = sender.getDataListPost(secondAddress, "int", "bool", "blob", "str").map(_.value)
 
-    list shouldBe Seq(-127, false, "BBBB")
+    list shouldBe Seq(-127, false, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "BBBB")
     jsonList shouldBe list
     postList shouldBe list
   }
