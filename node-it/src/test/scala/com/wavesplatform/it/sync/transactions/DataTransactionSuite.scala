@@ -120,7 +120,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val boolEntry2         = BooleanDataEntry("bool", false)
     val blobEntry2         = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
     val stringEntry2       = StringDataEntry("str", "BBBB")
-    val unicodeStringEntry = StringDataEntry("?&$#^123\\/.a:;'\"\r\n\t\0|%è", "specïal")
+    val unicodeStringEntry = StringDataEntry("?&$#^123\\/.a:;'\"\r\n\t\0|%è&", "specïal")
     val dataAllTypes       = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
     val fee                = calcDataFee(dataAllTypes)
     val txId               = sender.putData(secondAddress, dataAllTypes, fee).id
@@ -139,8 +139,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("queries for multiple keys") {
-    val keys   = Seq("int", "bool", "blob", "str", "?&$#^123\\/.a:;'\"\r\n\t\0|%è")
-    val values = Seq[Any](-127, false, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "BBBB", "specïal")
+    val tooBigKey = "toobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkey"
+    val keys   = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\0|%è&", "str", "inexisted_key", tooBigKey)
+    val values = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal","BBBB")
 
     val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
     val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)
