@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v2.estimator.EstimatorContext.EvalM
 import com.wavesplatform.lang.v2.estimator.EstimatorContext.Lenses._
 import monix.eval.Coeval
 
-abstract class NewScriptEstimator extends ScriptEstimator {
+object ScriptEstimatorV2 extends ScriptEstimator {
   override def apply(
     vars:  Set[String],
     funcs: Map[FunctionHeader, Coeval[Long]],
@@ -22,7 +22,7 @@ abstract class NewScriptEstimator extends ScriptEstimator {
     evalExpr(expr).run(EstimatorContext(v, f)).value._2
   }
 
-  protected def evalExpr(t: EXPR): EvalM[Long] =
+  private def evalExpr(t: EXPR): EvalM[Long] =
     t match {
       case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
       case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
@@ -34,8 +34,21 @@ abstract class NewScriptEstimator extends ScriptEstimator {
       case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
     }
 
-  protected def evalLetBlock(let: LET, inner: EXPR): EvalM[Long]
-  protected def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long]
+  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
+    local {
+      val letResult = (false, evalExpr(let.value))
+      for {
+        _ <- update(lets.modify(_)(_.updated(let.name, letResult)))
+        r <- evalExpr(inner)
+      } yield r + 5
+    }
+
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
+    for {
+      condComplexity  <- evalExpr(cond)
+      rightComplexity <- evalExpr(ifTrue)
+      leftComplexity  <- evalExpr(ifFalse)
+    } yield condComplexity + Math.max(leftComplexity, rightComplexity) + 1
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     local {
@@ -96,7 +109,7 @@ abstract class NewScriptEstimator extends ScriptEstimator {
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =
     args.traverse(evalExpr).map(_.sum)
 
-  protected def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
+  private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
     modify[Id, EstimatorContext, ExecutionError](f)
 
   private def const(l: Long): EvalM[Long] =
