@@ -52,17 +52,16 @@ class NetworkSeparationTestSuite
     val txId = nodeA.transfer(nodeA.address, nodeB.address, issueAmount / 2, minFee, Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    val heightBeforeDis = nodeA.height
     docker.disconnectFromNetwork(dockerNodes().head)
 
     val burnNoOwnerTxTd = nodeB.burn(nodeB.address, issuedAssetId, issueAmount / 2, minFee).id
     Await.ready(waitForTxsToReachAllNodes(Seq(nodeB), Seq(burnNoOwnerTxTd)), 2.minute)
+    val heightAfter = nodeB.height
 
     Thread.sleep(60.seconds.toMillis)
     docker.disconnectFromNetwork(dockerNodes().last)
     docker.connectToNetwork(Seq(dockerNodes().head))
 
-    val heightAfter = heightBeforeDis + 3
     nodeA.waitForHeight(heightAfter)
     val block = nodeA.blockAt(heightAfter)
 

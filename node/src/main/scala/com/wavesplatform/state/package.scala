@@ -37,19 +37,19 @@ package object state {
         balanceChange <- portfolio.assets.get(asset)
       } yield balanceChange
 
-      !changeFromDiff.exists(_ < 0)
+      changeFromDiff.forall(_ >= 0)
     }
 
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
+    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] =
       diff.transactions.get(id).map(_._2)
-    }
 
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
-      diff.portfolios
-        .get(address)
-        .toIterable
-        .flatMap(_.assets.keys)
-    }
+    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
+      for {
+        portfolio <- diff.portfolios
+          .get(address)
+          .toIterable
+        (asset, balance) <- portfolio.assets if balance > 0
+      } yield asset
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
       maybeAfter
