@@ -73,9 +73,9 @@ class BlockchainUpdaterLiquidBlockTest
               case x =>
                 val txNumberByMicroBlock = microBlocks.map(_.transactionData.size)
                 fail(
-                  s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionCount}, " +
+                  s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionData.length}, " +
                     s"microblock txs: ${txNumberByMicroBlock.mkString(", ")} (total: ${txNumberByMicroBlock.sum}), " +
-                    s"total txs: ${keyBlock.transactionCount + txNumberByMicroBlock.sum}"
+                    s"total txs: ${keyBlock.transactionData.length + txNumberByMicroBlock.sum}"
                 )
             }
           }

@@ -265,7 +265,7 @@ class LevelDBWriter(
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
+    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block.header, block.bytes().length)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size

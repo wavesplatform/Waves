@@ -24,21 +24,23 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Try}
 
-class BlockHeader(val timestamp: Long,
-                  val version: Byte,
-                  val reference: ByteStr,
-                  val signerData: SignerData,
-                  val consensusData: NxtLikeConsensusBlockData,
-                  val transactionCount: Int,
-                  val featureVotes: Set[Short],
-                  val rewardVote: Long) {
-  protected val versionField: ByteBlockField               = ByteBlockField("version", version)
-  protected val timestampField: LongBlockField             = LongBlockField("timestamp", timestamp)
-  protected val referenceField: BlockIdField               = BlockIdField("reference", reference.arr)
-  protected val signerField: SignerDataBlockField          = SignerDataBlockField("signature", signerData)
-  protected val consensusField: NxtConsensusBlockField     = NxtConsensusBlockField(consensusData)
-  protected val supportedFeaturesField: FeaturesBlockField = FeaturesBlockField(version, featureVotes)
-  protected val rewardVoteField: RewardBlockField          = RewardBlockField(version, rewardVote)
+case class BlockHeader(
+    timestamp: Long,
+    version: Byte,
+    reference: ByteStr,
+    signerData: SignerData,
+    consensusData: NxtLikeConsensusBlockData,
+    transactionCount: Int,
+    featureVotes: Set[Short],
+    rewardVote: Long
+) {
+  private[block] val versionField: ByteBlockField               = ByteBlockField("version", version)
+  private[block] val timestampField: LongBlockField             = LongBlockField("timestamp", timestamp)
+  private[block] val referenceField: BlockIdField               = BlockIdField("reference", reference.arr)
+  private[block] val signerField: SignerDataBlockField          = SignerDataBlockField("signature", signerData)
+  private[block] val consensusField: NxtConsensusBlockField     = NxtConsensusBlockField(consensusData)
+  private[block] val supportedFeaturesField: FeaturesBlockField = FeaturesBlockField(version, featureVotes)
+  private[block] val rewardVoteField: RewardBlockField          = RewardBlockField(version, rewardVote)
 
   val uniqueId: ByteStr = signerData.signature
 
@@ -49,7 +51,8 @@ class BlockHeader(val timestamp: Long,
       consensusField.json() ++
       supportedFeaturesField.json() ++
       rewardVoteField.json() ++
-      signerField.json())
+      signerField.json()
+  )
 }
 
 object BlockHeader extends ScorexLogging {
@@ -100,7 +103,7 @@ object BlockHeader extends ScorexLogging {
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
 
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote = if (version > 3) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
@@ -195,44 +198,48 @@ object BlockHeader extends ScorexLogging {
 
 }
 
-case class Block private[block] (override val timestamp: Long,
-                                 override val version: Byte,
-                                 override val reference: ByteStr,
-                                 override val signerData: SignerData,
-                                 override val consensusData: NxtLikeConsensusBlockData,
-                                 transactionData: Seq[Transaction],
-                                 override val featureVotes: Set[Short],
-                                 override val rewardVote: Long)
-    extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
-    with Signed {
-
+case class Block private[block] (
+    timestamp: Long,
+    version: Byte,
+    reference: ByteStr,
+    signerData: SignerData,
+    consensusData: NxtLikeConsensusBlockData,
+    transactionData: Seq[Transaction],
+    featureVotes: Set[Short],
+    rewardVote: Long
+) extends Signed {
   import Block._
 
-  val sender = signerData.generator
+  val sender: PublicKey = signerData.generator
+
+  def header: BlockHeader = BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
+  val uniqueId: BlockId = header.uniqueId
 
   private val transactionField = TransactionsBlockField(version.toInt, transactionData)
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    val h           = header
     val txBytesSize = transactionField.bytes().length
     val txBytes     = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes()
 
-    val cBytesSize = consensusField.bytes().length
-    val cBytes     = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusField.bytes()
+    val cBytesSize = h.consensusField.bytes().length
+    val cBytes     = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ h.consensusField.bytes()
 
-    versionField.bytes() ++
-      timestampField.bytes() ++
-      referenceField.bytes() ++
+    h.versionField.bytes() ++
+      h.timestampField.bytes() ++
+      h.referenceField.bytes() ++
       cBytes ++
       txBytes ++
-      supportedFeaturesField.bytes() ++
-      rewardVoteField.bytes() ++
-      signerField.bytes()
+      h.supportedFeaturesField.bytes() ++
+      h.rewardVoteField.bytes() ++
+      h.signerField.bytes()
   }
 
   val json: Coeval[JsObject] = Coeval.evalOnce(
-    BlockHeader.json(this, bytes().length) ++
+    BlockHeader.json(header, bytes().length) ++
       Json.obj("fee" -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
-      transactionField.json())
+      transactionField.json()
+  )
 
   val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
@@ -350,14 +357,16 @@ object Block extends ScorexLogging {
     )
   }
 
-  def build(version: Byte,
-            timestamp: Long,
-            reference: ByteStr,
-            consensusData: NxtLikeConsensusBlockData,
-            transactionData: Seq[Transaction],
-            signerData: SignerData,
-            featureVotes: Set[Short],
-            rewardVote: Long): Either[GenericError, Block] = {
+  def build(
+      version: Byte,
+      timestamp: Long,
+      reference: ByteStr,
+      consensusData: NxtLikeConsensusBlockData,
+      transactionData: Seq[Transaction],
+      signerData: SignerData,
+      featureVotes: Set[Short],
+      rewardVote: Long
+  ): Either[GenericError, Block] = {
     (for {
       _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
       _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
@@ -367,16 +376,18 @@ object Block extends ScorexLogging {
     } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes, rewardVote)).left.map(GenericError(_))
   }
 
-  def buildAndSign(version: Byte,
-                   timestamp: Long,
-                   reference: ByteStr,
-                   consensusData: NxtLikeConsensusBlockData,
-                   transactionData: Seq[Transaction],
-                   signer: KeyPair,
-                   featureVotes: Set[Short],
-                   rewardVote: Long): Either[GenericError, Block] =
-    build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes, rewardVote).right.map(unsigned =>
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
+  def buildAndSign(
+      version: Byte,
+      timestamp: Long,
+      reference: ByteStr,
+      consensusData: NxtLikeConsensusBlockData,
+      transactionData: Seq[Transaction],
+      signer: KeyPair,
+      featureVotes: Set[Short],
+      rewardVote: Long
+  ): Either[GenericError, Block] =
+    build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes, rewardVote).right
+      .map(unsigned => unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
@@ -420,17 +431,16 @@ object Block extends ScorexLogging {
         (),
         GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $genesisTransactionsSum")
       )
-    } yield
-      Block(
-        timestamp = timestamp,
-        version = GenesisBlockVersion,
-        reference = ByteStr(reference),
-        signerData = SignerData(genesisSigner, ByteStr(signature)),
-        consensusData = consensusGenesisData,
-        transactionData = transactionGenesisData,
-        featureVotes = Set.empty,
-        rewardVote = -1L
-      )
+    } yield Block(
+      timestamp = timestamp,
+      version = GenesisBlockVersion,
+      reference = ByteStr(reference),
+      signerData = SignerData(genesisSigner, ByteStr(signature)),
+      consensusData = consensusGenesisData,
+      transactionData = transactionGenesisData,
+      featureVotes = Set.empty,
+      rewardVote = -1L
+    )
   }
 
   val GenesisBlockVersion: Byte = 1

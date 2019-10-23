@@ -49,7 +49,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b, b.bytes().length))
+      c._3.map(b => (b.header, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(height)
     }
@@ -59,7 +59,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b, b.bytes().length))
+      c._3.map(b => (b.header, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(blockId)
     }

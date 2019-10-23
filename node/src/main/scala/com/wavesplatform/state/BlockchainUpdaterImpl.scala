@@ -484,8 +484,8 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def liquidBlockHeaderAndSize() = ngState.map { s =>
-    (s.bestLiquidBlock, s.bestLiquidBlock.bytes().length)
+  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int)] = ngState.map { s =>
+    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length)
   }
 
   override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int)] = readLock {
@@ -580,7 +580,7 @@ class BlockchainUpdaterImpl(
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
-        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
+        if (back == 1) Some(ng.base.header) else blockchain.parentHeader(ng.base.header, back - 1)
       case _ =>
         blockchain.parentHeader(block, back)
     }
@@ -595,7 +595,7 @@ class BlockchainUpdaterImpl(
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
     if (height == blockchain.height + 1)
-      ngState.map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes().length))
+      ngState.map(x => (x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length))
     else
       blockchain.blockHeaderAndSize(height)
   }

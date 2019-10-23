@@ -211,7 +211,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       (if (includeTransactions) {
          commonApi.lastBlock().map(_.json())
        } else {
-         commonApi.lastBlock().map(block => BlockHeader.json(block, block.bytes().length))
+         commonApi.lastBlock().map(block => BlockHeader.json(block.header, block.bytes().length))
        }).map(_.addBlockFields(height))
     }
   }
