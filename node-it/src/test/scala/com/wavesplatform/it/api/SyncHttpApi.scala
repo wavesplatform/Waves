@@ -443,8 +443,10 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
     }
 
-    def signAndTraceBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
-      maybeWaitForTransaction(sync(async(n).signAndTraceBroadcast(tx)), waitForTx)
+    def signAndTraceBroadcast(tx: JsValue, waitForTx: Boolean = false): (Transaction, JsValue) = {
+      sync(async(n).signAndTraceBroadcast(tx)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
     }
 
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
@@ -517,8 +519,10 @@ object SyncHttpApi extends Assertions {
         feeAssetId: Option[String] = None,
         version: Byte = 1,
         waitForTx: Boolean = false
-    ): Transaction = {
-      maybeWaitForTransaction(sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)), waitForTx)
+    ): (Transaction, JsValue) = {
+      sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
     }
 
     def waitForUtxIncreased(fromSize: Int): Int = sync(async(n).waitForUtxIncreased(fromSize))

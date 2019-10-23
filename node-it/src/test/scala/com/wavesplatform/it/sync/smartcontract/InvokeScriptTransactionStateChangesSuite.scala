@@ -90,10 +90,10 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo             = sender.transactionInfo(invokeTx.id)
+    val txInfo             = sender.transactionInfo(invokeTx._1.id)
     val callerTxs          = sender.transactionsByAddress(caller.stringRepr, 100)
     val dAppTxs            = sender.transactionsByAddress(contract.stringRepr, 100)
-    val txStateChanges     = sender.debugStateChanges(invokeTx.id)
+    val txStateChanges     = sender.debugStateChanges(invokeTx._1.id)
     val callerStateChanges = sender.debugStateChangesByAddress(caller.stringRepr, 100)
     val dAppStateChanges   = sender.debugStateChangesByAddress(contract.stringRepr, 100)
 
@@ -125,11 +125,11 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo(invokeTx.id)
+    val txInfo                = sender.transactionInfo(invokeTx._1.id)
     val callerTxs             = sender.transactionsByAddress(caller.stringRepr, 100)
     val dAppTxs               = sender.transactionsByAddress(contract.stringRepr, 100)
     val recipientTxs          = sender.transactionsByAddress(recipient.stringRepr, 100)
-    val txStateChanges        = sender.debugStateChanges(invokeTx.id)
+    val txStateChanges        = sender.debugStateChanges(invokeTx._1.id)
     val callerStateChanges    = sender.debugStateChangesByAddress(caller.stringRepr, 100)
     val dAppStateChanges      = sender.debugStateChangesByAddress(contract.stringRepr, 100)
     val recipientStateChanges = sender.debugStateChangesByAddress(recipient.stringRepr, 100)
@@ -167,11 +167,11 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo(invokeTx.id)
+    val txInfo                = sender.transactionInfo(invokeTx._1.id)
     val callerTxs             = sender.transactionsByAddress(caller.stringRepr, 100)
     val dAppTxs               = sender.transactionsByAddress(contract.stringRepr, 100)
     val recipientTxs          = sender.transactionsByAddress(recipient.stringRepr, 100)
-    val txStateChanges        = sender.debugStateChanges(invokeTx.id)
+    val txStateChanges        = sender.debugStateChanges(invokeTx._1.id)
     val callerStateChanges    = sender.debugStateChangesByAddress(caller.stringRepr, 100)
     val dAppStateChanges      = sender.debugStateChangesByAddress(contract.stringRepr, 100)
     val recipientStateChanges = sender.debugStateChangesByAddress(recipient.stringRepr, 100)

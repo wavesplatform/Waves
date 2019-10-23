@@ -335,7 +335,7 @@ object AsyncHttpApi extends Assertions {
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
         version: Byte = 1
-    ): Future[Transaction] = {
+    ): Future[(Transaction, JsValue)] = {
       signAndTraceBroadcast(
         Json.obj(
           "type"       -> InvokeScriptTransaction.typeId,
@@ -463,12 +463,12 @@ object AsyncHttpApi extends Assertions {
     def signedBroadcast(json: JsValue): Future[Transaction] =
       post("/transactions/broadcast", stringify(json)).as[Transaction]
 
-    def signedTraceBroadcast(json: JsValue): Future[Transaction] =
-      post("/transactions/broadcast?trace=yes", stringify(json)).as[Transaction]
+    def signedTraceBroadcast(json: JsValue): Future[(Transaction, JsValue)] =
+      post("/transactions/broadcast?trace=yes", stringify(json)).as[JsValue].map(r => (r.as[Transaction], r))
 
     def signAndBroadcast(json: JsValue): Future[Transaction] = sign(json).flatMap(signedBroadcast)
 
-    def signAndTraceBroadcast(json: JsValue): Future[Transaction] = sign(json).flatMap(signedTraceBroadcast)
+    def signAndTraceBroadcast(json: JsValue): Future[(Transaction, JsValue)] = sign(json).flatMap(signedTraceBroadcast)
 
     def signedIssue(issue: SignedIssueV1Request): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
