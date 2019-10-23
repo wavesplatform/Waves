@@ -162,6 +162,9 @@ object SyncHttpApi extends Assertions {
 
     def blockHeadersAt(height: Int): BlockHeaders = sync(async(n).blockHeadersAt(height))
 
+    def postForm(path: String, params: (String, String)*): Response =
+      sync(async(n).postForm(path, params:_*))
+
     def postJson[A: Writes](path: String, body: A): Response =
       sync(async(n).postJson(path, body))
 
@@ -389,8 +392,14 @@ object SyncHttpApi extends Assertions {
     def getDataByKey(sourceAddress: String, key: String): DataEntry[_] =
       sync(async(n).getDataByKey(sourceAddress, key))
 
-    def getDataList(sourceAddress: String, json: Boolean, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataList(sourceAddress, json, keys:_*))
+    def getDataList(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
+      sync(async(n).getDataList(sourceAddress, keys:_*))
+
+    def getDataListJson(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
+      sync(async(n).getDataListJson(sourceAddress, keys:_*))
+
+    def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
+      sync(async(n).getDataListPost(sourceAddress, keys:_*))
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))

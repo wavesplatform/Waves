@@ -84,6 +84,13 @@ object AsyncHttpApi extends Assertions {
     def post(path: String, body: String): Future[Response] =
       post(s"${n.nodeApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json;charset=utf-8").setBody(body))
 
+    def postForm(path: String, params: (String, String)*): Future[Response] =
+      post(
+        s"${n.nodeApiEndpoint}$path",
+        (rb: RequestBuilder) =>
+          rb.setHeader("Content-type", "application/x-www-form-urlencoded").setBody(params.map(p => p._1 + "=" + p._2).mkString("&"))
+      )
+
     def blacklist(address: InetSocketAddress): Future[Unit] =
       post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
 
@@ -441,9 +448,14 @@ object AsyncHttpApi extends Assertions {
 
     def getDataByKey(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
 
-    def getDataList(address: String, json: Boolean, keys: String*): Future[Seq[DataEntry[_]]] =
-      if (json) postJson(s"/addresses/data/$address", Json.obj("keys" -> keys)).as[Seq[DataEntry[_]]]
-      else get(s"/addresses/data/$address?${keys.map("key=" + _).mkString("&")}").as[Seq[DataEntry[_]]]
+    def getDataListJson(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
+      postJson(s"/addresses/data/$address", Json.obj("keys" -> keys)).as[Seq[DataEntry[_]]]
+
+    def getDataListPost(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
+      postForm(s"/addresses/data/$address", keys.map("key" -> _): _*).as[Seq[DataEntry[_]]]
+
+    def getDataList(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
+      get(s"/addresses/data/$address?${keys.map("key=" + _).mkString("&")}").as[Seq[DataEntry[_]]]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
