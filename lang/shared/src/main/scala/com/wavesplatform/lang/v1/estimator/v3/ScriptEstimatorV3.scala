@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v2.estimator
+package com.wavesplatform.lang.v1.estimator.v3
 
 import cats.implicits._
 import cats.{Id, Monad}
@@ -7,8 +7,8 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.v2.estimator.EstimatorV3Context.EvalM3
-import com.wavesplatform.lang.v2.estimator.EstimatorV3Context.Lenses._
+import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
+import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
 import monix.eval.Coeval
 
 object ScriptEstimatorV3 extends ScriptEstimator {
@@ -18,10 +18,10 @@ object ScriptEstimatorV3 extends ScriptEstimator {
     expr:  EXPR
   ): Either[ExecutionError, Long] = {
     val f = funcs.mapValues(_.value)
-    evalExpr(expr).run(EstimatorV3Context(f)).value._2
+    evalExpr(expr).run(EstimatorContext(f)).value._2
   }
 
-  private def evalExpr(t: EXPR): EvalM3[Long] =
+  private def evalExpr(t: EXPR): EvalM[Long] =
     t match {
       case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
       case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
@@ -33,58 +33,58 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
     }
 
-  private def evalHoldingFuncs(expr: EXPR): EvalM3[Long] =
+  private def evalHoldingFuncs(expr: EXPR): EvalM[Long] =
     for {
-      startCtx <- get[Id, EstimatorV3Context, ExecutionError]
+      startCtx <- get[Id, EstimatorContext, ExecutionError]
       cost     <- evalExpr(expr)
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cost
 
-  private def evalLetBlock(let: LET, inner: EXPR): EvalM3[Long] =
+  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
     for {
-      startCtx <- get[Id, EstimatorV3Context, ExecutionError]
+      startCtx <- get[Id, EstimatorContext, ExecutionError]
       overlap   = startCtx.usedRefs.contains(let.name)
       _        <- update(usedRefs.modify(_)(_ - let.name))
       letEval   = evalHoldingFuncs(let.value)
       nextCost <- evalExpr(inner)
-      ctx      <- get[Id, EstimatorV3Context, ExecutionError]
+      ctx      <- get[Id, EstimatorContext, ExecutionError]
       letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else const(0L)
       _        <- update(usedRefs.modify(_)(r => if (overlap) r + let.name else r - let.name))
     } yield nextCost + letCost
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM3[Long] =
+  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     for {
       funcCost <- evalHoldingFuncs(func.body)
       _        <- update(funcs.modify(_)(_ + (FunctionHeader.User(func.name) -> funcCost)))
       nextCost <- evalExpr(inner)
     } yield nextCost
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM3[Long] =
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
     for {
-      startCtx <- get[Id, EstimatorV3Context, ExecutionError]
+      startCtx <- get[Id, EstimatorContext, ExecutionError]
       cond     <- evalHoldingFuncs(cond)
       right    <- evalHoldingFuncs(ifTrue)
       left     <- evalHoldingFuncs(ifFalse)
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cond + Math.max(right, left) + 1
 
-  private def markRef(key: String): EvalM3[Long] =
+  private def markRef(key: String): EvalM[Long] =
     update(usedRefs.modify(_)(_ + key)).map(_ => 1)
 
-  private def evalGetter(expr: EXPR): EvalM3[Long] =
+  private def evalGetter(expr: EXPR): EvalM[Long] =
     evalExpr(expr).map(_ + 1)
 
-  private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM3[Long] =
+  private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
-      ctx      <- get[Id, EstimatorV3Context, ExecutionError]
+      ctx      <- get[Id, EstimatorContext, ExecutionError]
       bodyCost <- funcs.get(ctx).get(header).map(const)
-        .getOrElse(raiseError[Id, EstimatorV3Context, ExecutionError, Long](s"function '$header' not found"))
+        .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, Long](s"function '$header' not found"))
       argsCost <- args.traverse(evalHoldingFuncs)
     } yield argsCost.sum + bodyCost
 
-  private def update(f: EstimatorV3Context => EstimatorV3Context): EvalM3[Unit] =
-    modify[Id, EstimatorV3Context, ExecutionError](f)
+  private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
+    modify[Id, EstimatorContext, ExecutionError](f)
 
-  private def const[A](a: A): EvalM3[A] =
-    Monad[EvalM3].pure(a)
+  private def const[A](a: A): EvalM[A] =
+    Monad[EvalM].pure(a)
 }

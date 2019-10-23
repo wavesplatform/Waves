@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v2.estimator.{ScriptEstimatorV2, ScriptEstimatorV3}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
 class ScriptEstimatorV2V3Test extends ScriptEstimatorTestBase(ScriptEstimatorV2, ScriptEstimatorV3) {
   property("transitive ref usage") {

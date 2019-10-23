@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.ScriptEstimatorBenchmark.St
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import monix.eval.Coeval
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole

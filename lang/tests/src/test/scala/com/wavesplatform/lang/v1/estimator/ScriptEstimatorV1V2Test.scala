@@ -1,15 +1,13 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.{V2, V3}
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.sumLong
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import monix.eval.Coeval
 
 class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2) {

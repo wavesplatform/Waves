@@ -1,10 +1,8 @@
 package com.wavesplatform.lang.v1.estimator
 
-import com.wavesplatform.lang.directives.values.{V2, V3}
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.functionCosts
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
 class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   property("multiple func calls") {

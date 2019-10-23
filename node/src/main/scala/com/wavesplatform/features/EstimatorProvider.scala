@@ -5,7 +5,8 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
-import com.wavesplatform.lang.v2.estimator.{ScriptEstimatorV2, ScriptEstimatorV3}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.DiffsCommon
