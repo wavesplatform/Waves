@@ -33,6 +33,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
 
   test("NFT should be correctly transferred via invoke script transaction") {
     val nftAsset = sender.issue(firstAddress, assetName, assetDescription, 1, 0, reissuable = false, 1.waves / 1000, waitForTx = true).id
+    val dApp = secondAddress
     val scriptText =
       s"""
          |{-# STDLIB_VERSION 3 #-}
@@ -81,11 +82,11 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
          |}
         """.stripMargin
     val script      = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setScript(secondAddress, Some(script), setScriptFee, waitForTx = true)
+    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
     def invokeTransfer(caller: String, functionName: String, args: List[Terms.EXPR] = List.empty, payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty): Transaction = {
     sender.invokeScript(
       caller,
-      secondAddress,
+      dApp,
       Some(functionName),
       payment = payment,
       args = args,
@@ -97,18 +98,18 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
     invokeTransfer(firstAddress,"nftTransferToDapp",payment = nftPayment)
     sender.assetBalance(firstAddress, nftAsset).balance shouldBe 0
     sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
-    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 1
-    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) should contain (nftAsset)
+    sender.assetBalance(dApp, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(dApp, 10).map(info => info.assetId) should contain (nftAsset)
 
     invokeTransfer(firstAddress, "transferFromDappToAddress",args = List(Terms.CONST_STRING(thirdAddress).explicitGet()))
-    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
-    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(dApp, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(dApp, 10).map(info => info.assetId) shouldNot contain (nftAsset)
     sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 1
     sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) should contain (nftAsset)
 
     invokeTransfer(thirdAddress, "nftTransferToSelf",payment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
-    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
-    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(dApp, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(dApp, 10).map(info => info.assetId) shouldNot contain (nftAsset)
     sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 1
     sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) should contain (nftAsset)
 
@@ -117,16 +118,16 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       payment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
     sender.assetBalance(thirdAddress, nftAsset).balance shouldBe 0
     sender.nftAssetsBalance(thirdAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
-    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 0
-    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
+    sender.assetBalance(dApp, nftAsset).balance shouldBe 0
+    sender.nftAssetsBalance(dApp, 10).map(info => info.assetId) shouldNot contain (nftAsset)
     sender.assetBalance(firstAddress, nftAsset).balance shouldBe 1
     sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) should contain (nftAsset)
 
     invokeTransfer(firstAddress, "transferAsPayment",payment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset)))))
     sender.assetBalance(firstAddress, nftAsset).balance shouldBe 0
     sender.nftAssetsBalance(firstAddress, 10).map(info => info.assetId) shouldNot contain (nftAsset)
-    sender.assetBalance(secondAddress, nftAsset).balance shouldBe 1
-    sender.nftAssetsBalance(secondAddress, 10).map(info => info.assetId) should contain (nftAsset)
+    sender.assetBalance(dApp, nftAsset).balance shouldBe 1
+    sender.nftAssetsBalance(dApp, 10).map(info => info.assetId) should contain (nftAsset)
   }
 
   test("NFT should be correctly transferred via mass transfer transaction") {
