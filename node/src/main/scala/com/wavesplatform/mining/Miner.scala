@@ -139,7 +139,7 @@ class MinerImpl(
     val refBlockTS          = referencedBlockInfo.timestamp
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
-    lazy val blockDelay     = currentTime - lastBlock.timestamp
+    lazy val blockDelay     = currentTime - lastBlock.header.timestamp
     lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
@@ -184,13 +184,13 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.header.uniqueId)
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       for {
         expectedTS <- pos
-          .getValidBlockDelay(height, account, block.consensusData.baseTarget, balance)
-          .map(_ + block.timestamp)
+          .getValidBlockDelay(height, account, block.header.consensusData.baseTarget, balance)
+          .map(_ + block.header.timestamp)
           .leftMap(_.toString)
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,

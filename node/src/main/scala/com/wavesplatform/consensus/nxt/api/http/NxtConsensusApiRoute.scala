@@ -43,14 +43,14 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
     ))
   def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
-      complete(Json.obj("generationSignature" -> block.consensusData.generationSignature.toString))
+      complete(Json.obj("generationSignature" -> block.header.consensusData.generationSignature.toString))
     }
   }
 
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> blockchain.lastBlock.get.consensusData.generationSignature.toString))
+    complete(Json.obj("generationSignature" -> blockchain.lastBlock.get.header.consensusData.generationSignature.toString))
   }
 
   @Path("/basetarget/{blockId}")
@@ -61,7 +61,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
     ))
   def baseTargetId: Route = (path("basetarget" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
-      complete(Json.obj("baseTarget" -> block.consensusData.baseTarget))
+      complete(Json.obj("baseTarget" -> block.header.consensusData.baseTarget))
     }
   }
 
@@ -70,7 +70,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   def basetarget: Route = (path("basetarget") & get) {
     complete(
       Json.obj(
-        "baseTarget" -> blockchain.lastBlock.get.consensusData.baseTarget,
+        "baseTarget" -> blockchain.lastBlock.get.header.consensusData.baseTarget,
         "score"      -> blockchain.score.toString()
       ))
   }

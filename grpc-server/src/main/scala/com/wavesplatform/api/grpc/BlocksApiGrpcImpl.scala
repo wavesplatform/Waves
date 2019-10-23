@@ -52,7 +52,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       case Request.BlockId(blockId) =>
         commonApi
           .blockBySignature(blockId)
-          .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
+          .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.header.uniqueId).get))
 
       case Request.Height(height) =>
         commonApi

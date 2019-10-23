@@ -113,12 +113,12 @@ object GenesisBlockGenerator extends App {
       .explicitGet()
   }
 
-  val signature = genesisBlock.signerData.signature
+  val signature = genesisBlock.header.signerData.signature
 
   report(
     addrInfos = shares.map(x => (x._1, x._2)),
     settings = GenesisSettings(
-      genesisBlock.timestamp,
+      genesisBlock.header.timestamp,
       timestamp,
       settings.initialBalance,
       Some(signature),

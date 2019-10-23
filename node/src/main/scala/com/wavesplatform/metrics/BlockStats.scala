@@ -44,8 +44,8 @@ object BlockStats {
   def received(b: Block, source: Source, ch: Channel): Unit = write(
     block(b, source)
       .addField("from", nodeName(ch))
-      .addField("prop-time", System.currentTimeMillis() - b.timestamp)
-      .addField("bt", b.consensusData.baseTarget),
+      .addField("prop-time", System.currentTimeMillis() - b.header.timestamp)
+      .addField("bt", b.header.consensusData.baseTarget),
     Event.Received,
     Seq.empty
   )
@@ -66,9 +66,9 @@ object BlockStats {
 
   def mined(b: Block, baseHeight: Int): Unit = write(
     block(b, Source.Broadcast)
-      .tag("parent-id", id(b.reference))
+      .tag("parent-id", id(b.header.reference))
       .addField("txs", b.transactionData.size)
-      .addField("bt", b.consensusData.baseTarget)
+      .addField("bt", b.header.consensusData.baseTarget)
       .addField("height", baseHeight),
     Event.Mined,
     Seq.empty
@@ -114,7 +114,7 @@ object BlockStats {
 
   private def block(b: Block, source: Source): Point.Builder =
     measurement(Type.Block)
-      .tag("id", id(b.uniqueId))
+      .tag("id", id(b.header.uniqueId))
       .tag("source", source.name)
 
   private def micro(m: MicroBlock): Point.Builder =

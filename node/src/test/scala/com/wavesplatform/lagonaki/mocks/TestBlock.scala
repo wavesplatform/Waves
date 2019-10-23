@@ -22,14 +22,14 @@ object TestBlock {
   def sign(signer: KeyPair, b: Block): Block = {
     Block
       .buildAndSign(
-        version = b.version,
-        timestamp = b.timestamp,
-        reference = b.reference,
-        consensusData = b.consensusData,
+        version = b.header.version,
+        timestamp = b.header.timestamp,
+        reference = b.header.reference,
+        consensusData = b.header.consensusData,
         transactionData = b.transactionData,
         signer = signer,
-        featureVotes = b.featureVotes,
-        rewardVote = b.rewardVote
+        featureVotes = b.header.featureVotes,
+        rewardVote = b.header.rewardVote
       )
       .explicitGet()
   }

@@ -41,7 +41,7 @@ class BlockchainUpdaterLiquidBlockTest
       )
 
       val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-        totalRefTo = prevBlock.signerData.signature,
+        totalRefTo = prevBlock.header.signerData.signature,
         base = keyBlockTxs,
         micros = microTxs.grouped(math.max(1, txNumberInMicros / 5)).toSeq,
         signer = TestBlock.defaultSigner,

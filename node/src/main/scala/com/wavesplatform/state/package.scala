@@ -123,14 +123,14 @@ package object state {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
-    def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
+    def contains(block: Block): Boolean       = blockchain.contains(block.header.uniqueId)
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
     def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
     def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
-    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
-    def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.timestamp)
+    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.header.uniqueId)
+    def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.header.timestamp)
 
     def lastBlocks(howMany: Int): Seq[Block] = {
       (Math.max(1, blockchain.height - howMany + 1) to blockchain.height).flatMap(blockchain.blockAt).reverse

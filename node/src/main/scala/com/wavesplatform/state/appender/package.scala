@@ -98,13 +98,13 @@ package object appender extends ScorexLogging {
     metrics.blockConsensusValidation
       .measureSuccessful {
 
-        val blockTime = block.timestamp
+        val blockTime = block.header.timestamp
 
         for {
-          height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-          parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+          height <- blockchain.heightOf(block.header.reference).toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
+          parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
-          effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
+          effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
           _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
@@ -121,9 +121,9 @@ package object appender extends ScorexLogging {
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either
       .cond(
-        exceptions.contains((height, block.uniqueId)),
+        exceptions.contains((height, block.header.uniqueId)),
         (),
-        GenericError(s"Block time ${block.timestamp} less than expected")
+        GenericError(s"Block time ${block.header.timestamp} less than expected")
       )
   }
 
@@ -131,8 +131,8 @@ package object appender extends ScorexLogging {
     val version3Height = fs.blockVersion3AfterHeight
     Either.cond(
       height > version3Height
-        || block.version == Block.GenesisBlockVersion
-        || block.version == Block.PlainBlockVersion,
+        || block.header.version == Block.GenesisBlockVersion
+        || block.header.version == Block.PlainBlockVersion,
       (),
       GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
     )

@@ -17,7 +17,7 @@ package object wavesplatform extends ScorexLogging {
       }
     } else {
       val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeaderAndSize(1).map(_._1.signerData.signature)
-      Either.cond(existingGenesisBlockId.fold(false)(_ == block.uniqueId),
+      Either.cond(existingGenesisBlockId.fold(false)(_ == block.header.uniqueId),
                   (),
                   GenericError("Mismatched genesis blocks in configuration and blockchain"))
     }

@@ -199,23 +199,14 @@ object BlockHeader extends ScorexLogging {
 }
 
 case class Block private[block] (
-    timestamp: Long,
-    version: Byte,
-    reference: ByteStr,
-    signerData: SignerData,
-    consensusData: NxtLikeConsensusBlockData,
     transactionData: Seq[Transaction],
-    featureVotes: Set[Short],
-    rewardVote: Long
+    header: BlockHeader
 ) extends Signed {
   import Block._
 
-  val sender: PublicKey = signerData.generator
+  val sender: PublicKey = header.signerData.generator
 
-  def header: BlockHeader = BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
-  val uniqueId: BlockId = header.uniqueId
-
-  private val transactionField = TransactionsBlockField(version.toInt, transactionData)
+  private val transactionField = TransactionsBlockField(header.version.toInt, transactionData)
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val h           = header
@@ -243,7 +234,7 @@ case class Block private[block] (
 
   val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
+  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.consensusData.baseTarget).ensuring(_ > 0))
 
   val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
     val assetFees: Seq[(Asset, Long)] = transactionData.map(_.assetFee)
@@ -263,21 +254,33 @@ case class Block private[block] (
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-    val publicKey = signerData.generator
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signerData.signature.arr, bytesWithoutSignature(), publicKey)
+    val publicKey = header.signerData.generator
+    !crypto.isWeakPublicKey(publicKey) && crypto.verify(header.signerData.signature.arr, bytesWithoutSignature(), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String =
-    s"Block(${signerData.signature} -> ${reference.trim}, " +
-      s"txs=${transactionData.size}, features=$featureVotes${if (rewardVote >= 0) s", rewardVote=$rewardVote" else ""})"
-
-  def getHeader(): BlockHeader =
-    new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
+    s"Block(${header.signerData.signature} -> ${header.reference.trim}, " +
+      s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
+
+  def apply(
+      timestamp: Long,
+      version: Byte,
+      reference: ByteStr,
+      signerData: SignerData,
+      consensusData: NxtLikeConsensusBlockData,
+      transactionData: Seq[Transaction],
+      featureVotes: Set[Short],
+      rewardVote: Long
+  ): Block =
+    new Block(
+      transactionData,
+      BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
+    )
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
@@ -307,7 +310,7 @@ object Block extends ScorexLogging {
         case Block.NgBlockVersion | Block.RewardBlockVersion =>
           val size = ByteBuffer.wrap(bytes, 0, 4).getInt()
           (bytes.drop(4), size)
-        case _ => ???
+        case _ => throw new NotImplementedError(s"Unknown block version $version")
       }
 
       val txs = Seq.newBuilder[Transaction]
@@ -387,7 +390,9 @@ object Block extends ScorexLogging {
       rewardVote: Long
   ): Either[GenericError, Block] =
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes, rewardVote).right
-      .map(unsigned => unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
+      .map { unsigned =>
+        unsigned.copy(header = unsigned.header.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
+      }
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>

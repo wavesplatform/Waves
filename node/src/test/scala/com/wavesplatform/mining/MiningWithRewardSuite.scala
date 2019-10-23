@@ -51,8 +51,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         } yield {
           blockchain.balance(account) should be(newBalance)
           blockchain.height should be(3)
-          blockchain.blockAt(2).get.version should be(Block.RewardBlockVersion)
-          blockchain.blockAt(3).get.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(2).get.header.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(3).get.header.version should be(Block.RewardBlockVersion)
         }
     }
   }
@@ -124,7 +124,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
             (ts + 1, Seq[Block](genesisBlock))
           } {
             case ((ts, chain), bp) =>
-              (ts + 3, bp(ts + 3, chain.head.uniqueId, account) +: chain)
+              (ts + 3, bp(ts + 3, chain.head.header.uniqueId, account) +: chain)
           }._2
           added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b)))
           _   = added.foreach(_.explicitGet())

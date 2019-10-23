@@ -58,7 +58,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
+    if (c._3.exists(_.header.uniqueId == blockId)) {
       c._3.map(b => (b.header, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(blockId)
@@ -78,7 +78,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
     val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
+    if (c._3.exists(_.header.uniqueId == blockId)) {
       c._3.map(_.bytes())
     } else {
       loadBlockBytes(blockId)
@@ -88,7 +88,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadHeightOf(blockId: ByteStr): Option[Int]
   override def heightOf(blockId: ByteStr): Option[Int] = {
     val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
+    if (c._3.exists(_.header.uniqueId == blockId)) {
       Some(c._1)
     } else {
       loadHeightOf(blockId)
@@ -116,7 +116,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       0 -> Long.MaxValue
     }
     oldestStoredBlockTimestamp = oldestTs
-    val bts = lastBlock.fold(0L)(_.timestamp) - dbSettings.rememberBlocks.toMillis
+    val bts = lastBlock.fold(0L)(_.header.timestamp) - dbSettings.rememberBlocks.toMillis
     blocksTs.entrySet().removeIf(_.getValue < bts)
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
@@ -313,7 +313,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
-    blocksTs.put(newHeight, block.timestamp)
+    blocksTs.put(newHeight, block.header.timestamp)
 
     accountDataCache.putAll(newData.asJava)
 

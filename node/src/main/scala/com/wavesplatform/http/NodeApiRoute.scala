@@ -45,7 +45,7 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = (get & path("status")) {
-    val lastUpdated = blockchain.lastBlock.get.timestamp
+    val lastUpdated = blockchain.lastBlock.get.header.timestamp
     complete(
       Json.obj(
         "blockchainHeight" -> blockchain.height,

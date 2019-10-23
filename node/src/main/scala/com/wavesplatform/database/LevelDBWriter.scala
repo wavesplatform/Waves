@@ -266,7 +266,7 @@ class LevelDBWriter(
       }.toMap
 
     rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block.header, block.bytes().length)))
-    rw.put(Keys.heightOf(block.uniqueId), Some(height))
+    rw.put(Keys.heightOf(block.header.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
 
@@ -419,7 +419,7 @@ class LevelDBWriter(
       val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
       val newlyApprovedFeatures = featureVotes(height)
         .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-        .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
+        .collect { case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
 
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)

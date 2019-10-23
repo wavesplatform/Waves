@@ -55,10 +55,10 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
     recipient2    <- accountGen
     txCount1      <- Gen.choose(10, 50)
     transactions1 <- Gen.listOfN(txCount1, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress)))
-    block1 = mkBlock(sender, genesisBlock.uniqueId, transactions1)
+    block1 = mkBlock(sender, genesisBlock.header.uniqueId, transactions1)
     txCount2      <- Gen.choose(10, 50)
     transactions2 <- Gen.listOfN(txCount2, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress)))
-    block2 = mkBlock(sender, block1.uniqueId, transactions2)
+    block2 = mkBlock(sender, block1.header.uniqueId, transactions2)
   } yield {
     (sender, recipient1, recipient2, Seq(genesisBlock, block1, block2))
   }

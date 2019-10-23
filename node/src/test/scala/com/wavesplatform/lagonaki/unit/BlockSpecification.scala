@@ -76,9 +76,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           val parsedBlock = Block.parseBytes(block.bytes()).get
           assert(block.signaturesValid().isRight)
           assert(parsedBlock.signaturesValid().isRight)
-          assert(parsedBlock.consensusData.generationSignature == generationSignature)
-          assert(parsedBlock.version.toInt == version)
-          assert(parsedBlock.signerData.generator == recipient.publicKey)
+          assert(parsedBlock.header.consensusData.generationSignature == generationSignature)
+          assert(parsedBlock.header.version.toInt == version)
+          assert(parsedBlock.header.signerData.generator == recipient.publicKey)
       }
     }
   }
@@ -141,10 +141,10 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         val parsedBlock = Block.parseBytes(block.bytes()).get
         assert(block.signaturesValid().isRight)
         assert(parsedBlock.signaturesValid().isRight)
-        assert(parsedBlock.consensusData.generationSignature == generationSignature)
-        assert(parsedBlock.version.toInt == version)
-        assert(parsedBlock.signerData.generator == recipient.publicKey)
-        assert(parsedBlock.featureVotes == featureVotes)
+        assert(parsedBlock.header.consensusData.generationSignature == generationSignature)
+        assert(parsedBlock.header.version.toInt == version)
+        assert(parsedBlock.header.signerData.generator == recipient.publicKey)
+        assert(parsedBlock.header.featureVotes == featureVotes)
     }
   }
 

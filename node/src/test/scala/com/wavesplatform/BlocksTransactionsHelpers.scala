@@ -79,7 +79,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def unsafeMicro(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair, version: Byte, ts: Long): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
+      val unsigned      = new MicroBlock(version, signer, txs, prevTotal.header.uniqueId, newTotalBlock.header.uniqueId, ByteStr.empty)
       val signature     = crypto.sign(signer, unsigned.bytes())
       val signed        = unsigned.copy(signature = ByteStr(signature))
       (newTotalBlock, signed)
@@ -93,7 +93,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         timestamp: Long,
         bTarget: Long = DefaultBaseTarget
     ): Block = {
-      val unsigned = Block(
+      val unsigned: Block = Block(
         version = version,
         timestamp = timestamp,
         reference = reference,
@@ -109,8 +109,8 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         featureVotes = Set.empty,
         rewardVote = -1L
       )
-
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
+      val signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))
+      unsigned.copy(header = unsigned.header.copy(signerData = signerData))
     }
   }
 }

@@ -84,8 +84,8 @@ package object history {
       .buildAndSign(
         generator = signer,
         transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
+        prevResBlockSig = prevTotal.header.uniqueId,
+        totalResBlockSig = newTotalBlock.header.uniqueId
       )
       .explicitGet()
     (newTotalBlock, nonSigned)
@@ -97,8 +97,8 @@ package object history {
       .buildAndSign(
         generator = signer,
         transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
+        prevResBlockSig = prevTotal.header.uniqueId,
+        totalResBlockSig = newTotalBlock.header.uniqueId
       )
       .explicitGet()
     (newTotalBlock, nonSigned)
@@ -110,7 +110,7 @@ package object history {
     def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
       case (x :: xs) =>
         val block = buildBlockOfTxs(refTo, x)
-        block +: chainBlocksR(block.uniqueId, xs)
+        block +: chainBlocksR(block.header.uniqueId, xs)
       case _ => Seq.empty
     }
 
@@ -137,5 +137,5 @@ package object history {
     (block, microBlocks)
   }
 
-  def spoilSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
+  def spoilSignature(b: Block): Block = b.copy(header = b.header.copy(signerData = b.header.signerData.copy(signature = TestBlock.randomSignature())))
 }

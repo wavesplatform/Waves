@@ -46,7 +46,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
   }
 
   override def getBaseTarget(request: Empty): Future[BaseTargetResponse] = Future {
-    BaseTargetResponse(blockchain.lastBlock.get.consensusData.baseTarget)
+    BaseTargetResponse(blockchain.lastBlock.get.header.consensusData.baseTarget)
   }
 
   override def getCumulativeScore(request: Empty): Future[ScoreResponse] = Future {

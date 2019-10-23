@@ -45,7 +45,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                 .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
                 .getOrElse(fork1.head)
 
-            calcDelay(blockForHit, fork1.head.consensusData.baseTarget, miner1, miner1Balance)
+            calcDelay(blockForHit, fork1.head.header.consensusData.baseTarget, miner1, miner1Balance)
           }
 
           val fork2Delay = {
@@ -55,7 +55,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                 .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
                 .getOrElse(fork2.head)
 
-            calcDelay(blockForHit, fork2.head.consensusData.baseTarget, miner1, miner1Balance)
+            calcDelay(blockForHit, fork2.head.header.consensusData.baseTarget, miner1, miner1Balance)
           }
 
           fork1Delay shouldEqual fork2Delay
@@ -252,7 +252,7 @@ object FPPoSSelectorTest {
       val gs =
         PoSCalculator
           .generatorSignature(
-            blockForHit.consensusData.generationSignature.arr,
+            blockForHit.header.consensusData.generationSignature.arr,
             miner
           )
 
@@ -261,17 +261,17 @@ object FPPoSSelectorTest {
       val bt = FairPoSCalculator.calculateBaseTarget(
         60,
         height + ind - 1,
-        forkChain.head.consensusData.baseTarget,
-        forkChain.head.timestamp,
-        (forkChain.lift(2) orElse blockchain.blockAt(height + ind - 3)) map (_.timestamp),
-        forkChain.head.timestamp + delay
+        forkChain.head.header.consensusData.baseTarget,
+        forkChain.head.header.timestamp,
+        (forkChain.lift(2) orElse blockchain.blockAt(height + ind - 3)) map (_.header.timestamp),
+        forkChain.head.header.timestamp + delay
       )
 
       val newBlock = Block
         .buildAndSign(
           3: Byte,
-          forkChain.head.timestamp + delay,
-          forkChain.head.uniqueId,
+          forkChain.head.header.timestamp + delay,
+          forkChain.head.header.uniqueId,
           NxtLikeConsensusBlockData(bt, ByteStr(gs)),
           Seq.empty,
           miner,
@@ -289,14 +289,14 @@ object FPPoSSelectorTest {
                                                                                              updateGS: ByteStr => ByteStr = identity): Block = {
     val height       = blockchain.height
     val lastBlock    = blockchain.lastBlock.get
-    val ggParentTS   = blockchain.blockAt(height - 2).map(_.timestamp)
+    val ggParentTS   = blockchain.blockAt(height - 2).map(_.header.timestamp)
     val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
       pos
         .getValidBlockDelay(
           height,
           miner,
-          lastBlock.consensusData.baseTarget,
+          lastBlock.header.consensusData.baseTarget,
           minerBalance
         )
         .explicitGet()
@@ -307,17 +307,17 @@ object FPPoSSelectorTest {
         miner,
         height,
         60.seconds,
-        lastBlock.consensusData.baseTarget,
-        lastBlock.timestamp,
+        lastBlock.header.consensusData.baseTarget,
+        lastBlock.header.timestamp,
         ggParentTS,
-        lastBlock.timestamp + delay
+        lastBlock.header.timestamp + delay
       )
       .explicitGet()
 
     val updatedCData = cData.copy(updateBT(cData.baseTarget), updateGS(cData.generationSignature))
 
     Block
-      .buildAndSign(3: Byte, lastBlock.timestamp + delay, lastBlock.uniqueId, updatedCData, Seq.empty, miner, Set.empty, 0.toByte)
+      .buildAndSign(3: Byte, lastBlock.header.timestamp + delay, lastBlock.header.uniqueId, updatedCData, Seq.empty, miner, Set.empty, 0.toByte)
       .explicitGet()
   }
 
@@ -346,7 +346,7 @@ object FPPoSSelectorTest {
           val newBlock = TestBlock
             .create(
               lastTxTimestamp + 1 + d,
-              blocks.head.uniqueId,
+              blocks.head.header.uniqueId,
               Seq.empty
             )
           newBlock :: blocks
@@ -361,7 +361,7 @@ object FPPoSSelectorTest {
     val gs =
       PoSCalculator
         .generatorSignature(
-          blockForHit.consensusData.generationSignature.arr,
+          blockForHit.header.consensusData.generationSignature.arr,
           minerPK
         )
 

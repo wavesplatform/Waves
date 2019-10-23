@@ -43,6 +43,7 @@ object PBBlocks {
 
   def protobuf(block: VanillaBlock): PBBlock = {
     import block._
+    import header._
     import consensusData._
     import signerData._
 
@@ -53,11 +54,11 @@ object PBBlocks {
           ByteString.copyFrom(reference),
           baseTarget,
           ByteString.copyFrom(generationSignature),
-          featureVotes.map(shortToInt).toSeq,
-          timestamp,
-          version,
+          header.featureVotes.map(shortToInt).toSeq,
+          header.timestamp,
+          header.version,
           ByteString.copyFrom(generator),
-          rewardVote
+          header.rewardVote
         )),
       ByteString.copyFrom(signature),
       transactionData.map(PBTransactions.protobuf)
