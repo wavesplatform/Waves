@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
 import java.io.IOException
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URLEncoder}
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 
@@ -452,10 +452,10 @@ object AsyncHttpApi extends Assertions {
       postJson(s"/addresses/data/$address", Json.obj("keys" -> keys)).as[Seq[DataEntry[_]]]
 
     def getDataListPost(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
-      postForm(s"/addresses/data/$address", keys.map("key" -> _): _*).as[Seq[DataEntry[_]]]
+      postForm(s"/addresses/data/$address", keys.map("key" -> URLEncoder.encode(_, "UTF-8")): _*).as[Seq[DataEntry[_]]]
 
     def getDataList(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
-      get(s"/addresses/data/$address?${keys.map("key=" + _).mkString("&")}").as[Seq[DataEntry[_]]]
+      get(s"/addresses/data/$address?${keys.map("key=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[DataEntry[_]]]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
