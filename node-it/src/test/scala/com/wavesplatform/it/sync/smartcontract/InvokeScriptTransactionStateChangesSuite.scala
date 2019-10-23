@@ -81,19 +81,26 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   }
 
   test("write") {
+    val data = 10l
     val invokeTx = sender.invokeScript(
       caller.stringRepr,
       contract.stringRepr,
       func = Some("write"),
-      args = List(CONST_LONG(10)),
+      args = List(CONST_LONG(data)),
       fee = 0.005.waves,
       waitForTx = true
     )
 
-    val txInfo             = sender.transactionInfo(invokeTx._1.id)
+    val id = invokeTx._1.id
+    val js = invokeTx._2
+
+    (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "name").as[String] shouldBe "value"
+    (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "value").as[String] shouldBe data.toString
+
+    val txInfo             = sender.transactionInfo(id)
     val callerTxs          = sender.transactionsByAddress(caller.stringRepr, 100)
     val dAppTxs            = sender.transactionsByAddress(contract.stringRepr, 100)
-    val txStateChanges     = sender.debugStateChanges(invokeTx._1.id)
+    val txStateChanges     = sender.debugStateChanges(id)
     val callerStateChanges = sender.debugStateChangesByAddress(caller.stringRepr, 100)
     val dAppStateChanges   = sender.debugStateChangesByAddress(contract.stringRepr, 100)
 
