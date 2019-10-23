@@ -13,29 +13,29 @@ import play.api.libs.json.Json
 class TransferTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("VersionedTransferTransactionSpecification serialization roundtrip") {
-    forAll(transferV2Gen) { tx: TransferTransactionV2 =>
-      val recovered = TransferTransactionV2.parseBytes(tx.bytes()).get
+    forAll(transferV2Gen) { tx: TransferTransaction =>
+      val recovered = TransferTransaction.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
 
   property("VersionedTransferTransactionSpecification serialization from TypedTransaction") {
-    forAll(transferV2Gen) { tx: TransferTransactionV2 =>
+    forAll(transferV2Gen) { tx: TransferTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
-      assertTxs(recovered.asInstanceOf[TransferTransactionV2], tx)
+      assertTxs(recovered.asInstanceOf[TransferTransaction], tx)
     }
   }
 
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
     forAll(accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
       case (acc1, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransactionV2.create(Waves, acc2, acc2.toAddress, 1, 1, Waves, 1, attachment, proofs1).explicitGet()
-        val tx2 = TransferTransactionV2.create(Waves, acc2, acc2.toAddress, 1, 1, Waves, 1, attachment, proofs2).explicitGet()
+        val tx1 = TransferTransaction(2.toByte, Waves, acc2, acc2.toAddress, 1, 1, Waves, 1, attachment, proofs1).explicitGet()
+        val tx2 = TransferTransaction(2.toByte, Waves, acc2, acc2.toAddress, 1, 1, Waves, 1, attachment, proofs2).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
   }
 
-  private def assertTxs(first: TransferTransactionV2, second: TransferTransactionV2): Unit = {
+  private def assertTxs(first: TransferTransaction, second: TransferTransaction): Unit = {
     first.sender.stringRepr shouldEqual second.sender.stringRepr
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
@@ -68,8 +68,8 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
                        "attachment": "4t2Xazb2SX"}
     """)
 
-    val tx = TransferTransactionV2
-      .create(
+    val tx = TransferTransaction(
+        2.toByte,
         Waves,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),

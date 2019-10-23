@@ -75,15 +75,15 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   test("can send from acc0 using multisig of acc1 and acc2") {
     val unsigned =
-      TransferTransactionV2
-        .create(
-          assetId = Waves,
+      TransferTransaction(
+          version = 2.toByte,
+          asset = Waves,
           sender = acc0,
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee + 0.004.waves,
+          feeAsset = Waves,
+          fee = minFee + 0.004.waves,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )

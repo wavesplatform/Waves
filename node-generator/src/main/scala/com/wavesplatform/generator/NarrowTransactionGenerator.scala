@@ -57,8 +57,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
 
     val tradeAssetDistribution = {
       (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
-        TransferTransactionV2
-          .selfSigned(
+        TransferTransaction
+            .selfSigned(
+              2.toByte,
             IssuedAsset(tradeAssetIssue.id()),
             issueTransactionSender,
             acc,
@@ -121,15 +122,16 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 )
             )
 
-          case TransferTransactionV2 =>
+          case TransferTransaction =>
             (
               for {
                 (sender, asset) <- randomSenderAndAsset(validIssueTxs)
                 useAlias = random.nextBoolean()
                 recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
                 tx <- logOption(
-                  TransferTransactionV2
+                  TransferTransaction
                     .selfSigned(
+                      2.toByte,
                       Asset.fromCompatId(asset),
                       sender,
                       recipient,
@@ -486,7 +488,7 @@ object NarrowTransactionGenerator {
     }
   }
 
-  final case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
+  final case class Settings(transactions: Int, probabilities: Map[TransactionParserLite, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30

@@ -17,13 +17,14 @@ object Dependencies {
   private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
+  private val paradise      = compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
 
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect")
@@ -146,8 +147,10 @@ object Dependencies {
       "org.bitlet"        % "weupnp" % "0.1.4",
       akkaModule("slf4j") % Runtime,
       kindProjector,
+      paradise,
       monixModule("reactive").value,
       nettyModule("handler"),
+      "io.estatico"                       %% "newtype" % "0.4.3",
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test

@@ -19,7 +19,6 @@ trait AddressOrAlias {
 }
 
 object AddressOrAlias {
-
   def fromBytes(bytes: Array[Byte], position: Int): Either[ValidationError, (AddressOrAlias, Int)] = {
     bytes(position) match {
       case Address.AddressVersion =>

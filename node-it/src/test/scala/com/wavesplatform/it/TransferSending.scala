@@ -4,7 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.assets.SignedTransferV2Request
+import com.wavesplatform.api.http.assets.TransferRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -113,15 +113,16 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (x, i) =>
           createSignedTransferRequest(
-            TransferTransactionV2
+            TransferTransaction
               .selfSigned(
-                assetId = Waves,
+                version = 2.toByte,
+                asset = Waves,
                 sender = KeyPair(Base58.decode(x.senderSeed)),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,
-                feeAssetId = Waves,
-                feeAmount = x.fee,
+                feeAsset = Waves,
+                fee = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
                 } else Array.emptyByteArray
@@ -144,18 +145,21 @@ trait TransferSending extends ScorexLogging {
       .map(_.flatten)
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): TransferRequest = {
     import tx._
-    SignedTransferV2Request(
-      Base58.encode(tx.sender),
+    TransferRequest(
+      Some(2.toByte),
       assetId.maybeBase58Repr,
-      recipient.stringRepr,
-      amount,
       feeAssetId.maybeBase58Repr,
+      amount,
       fee,
-      timestamp,
+      recipient.stringRepr,
+      Some(timestamp),
+      None,
+      Some(Base58.encode(tx.sender)),
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.base58().toList
+      None,
+      Some(proofs.base58().toList)
     )
   }
 

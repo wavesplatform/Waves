@@ -13,7 +13,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val ownLessThatLeaseOut: Gen[(GenesisTransaction, TransferTransactionV1, LeaseTransaction, LeaseTransaction, TransferTransactionV1)] = for {
+  val ownLessThatLeaseOut: Gen[(GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseTransaction, TransferTransaction)] = for {
     master <- accountGen
     alice  <- accountGen
     bob    <- accountGen
@@ -21,8 +21,8 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
     ts     <- positiveIntGen
     amt    <- positiveLongGen
     fee    <- smallFeeGen
-    genesis: GenesisTransaction                   = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    masterTransfersToAlice: TransferTransactionV1 = createWavesTransfer(master, alice, amt, fee, ts).explicitGet()
+    genesis: GenesisTransaction                 = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    masterTransfersToAlice: TransferTransaction = createWavesTransfer(master, alice, amt, fee, ts).explicitGet()
     (aliceLeasesToBob, _)    <- leaseAndCancelGeneratorP(alice, bob) suchThat (_._1.amount < amt)
     (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice) suchThat (_._1.amount > aliceLeasesToBob.amount)
     transferAmt              <- Gen.choose(amt - fee - aliceLeasesToBob.amount, amt - fee)

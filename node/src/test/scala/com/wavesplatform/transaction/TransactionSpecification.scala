@@ -31,12 +31,12 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender    = KeyPair(senderSeed)
         val recipient = KeyPair(recipientSeed)
         val tx        = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
-        val txAfter   = TransferTransactionV1.parseBytes(tx.bytes()).get
+        val txAfter   = TransferTransaction.parseBytes(tx.bytes()).get
 
         txAfter.getClass.shouldBe(tx.getClass)
 
-        tx.signature shouldEqual txAfter.signature
-        tx.sender shouldEqual txAfter.asInstanceOf[TransferTransactionV1].sender
+        tx.proofs shouldEqual txAfter.proofs
+        tx.sender shouldEqual txAfter.sender
         tx.recipient shouldEqual txAfter.recipient
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount
@@ -50,12 +50,12 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender    = KeyPair(senderSeed)
         val recipient = KeyPair(recipientSeed)
         val tx        = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
-        val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransactionV1]
+        val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
 
-        tx.signature shouldEqual txAfter.signature
-        tx.sender shouldEqual txAfter.asInstanceOf[TransferTransactionV1].sender
+        tx.proofs shouldEqual txAfter.proofs
+        tx.sender shouldEqual txAfter.sender
         tx.recipient shouldEqual txAfter.recipient
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount

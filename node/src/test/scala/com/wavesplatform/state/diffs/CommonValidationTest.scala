@@ -23,12 +23,12 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
 
   property("disallows double spending") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransactionV1)] = for {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransaction)] = for {
       master    <- accountGen
       recipient <- otherAccountGen(candidate = master)
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      transfer: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
+      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
     } yield (genesis, transfer)
 
     forAll(preconditionsAndPayment) {
@@ -116,12 +116,13 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .selfSigned(richAcc, "test".getBytes("UTF-8"), "desc".getBytes("UTF-8"), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
             .explicitGet()
 
-      val transferWavesTx = TransferTransactionV1
-        .selfSigned(Waves, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, Waves, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+      val transferWavesTx = TransferTransaction
+        .selfSigned(1.toByte, Waves, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, Waves, 1 * Constants.UnitsInWave, Array.emptyByteArray)
         .explicitGet()
 
-      val transferAssetTx = TransferTransactionV1
+      val transferAssetTx = TransferTransaction
         .selfSigned(
+          1.toByte,
           IssuedAsset(issueTx.id()),
           richAcc,
           recipientAcc,
@@ -164,8 +165,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           )
         else Seq.empty
 
-      val transferBackTx = TransferTransactionV1
+      val transferBackTx = TransferTransaction
         .selfSigned(
+          1.toByte,
           IssuedAsset(issueTx.id()),
           recipientAcc,
           richAcc,

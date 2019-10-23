@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.CancelAfterFailure
 
 class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -63,8 +63,8 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransactionV2
-          .selfSigned(Waves, acc0, acc1.toAddress, 1000, ts, Waves, minFee, Array())
+        TransferTransaction
+          .selfSigned(2.toByte, Waves, acc0, acc1.toAddress, 1000, ts, Waves, minFee, Array())
           .explicitGet()
           .json()),
       "not a boolean"

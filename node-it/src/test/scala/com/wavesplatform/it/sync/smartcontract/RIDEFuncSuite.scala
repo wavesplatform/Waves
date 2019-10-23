@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.CancelAfterFailure
 
 class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -53,16 +53,17 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransactionV2
-          .selfSigned(Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
+        TransferTransaction
+          .selfSigned(2.toByte, Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
           .explicitGet()
           .json()),
       "Transaction is not allowed by account-script"
     )
 
     sender.signedBroadcast(
-      TransferTransactionV2
-        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get),
+      TransferTransaction
+        .selfSigned(2.toByte,
+                    IssuedAsset(ByteStr.decodeBase58(asset).get),
                     acc0,
                     pkNewAddress,
                     100000000,
@@ -76,8 +77,8 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     )
 
     val transfer = sender.signedBroadcast(
-      TransferTransactionV2
-        .selfSigned(Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
+      TransferTransaction
+        .selfSigned(2.toByte, Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
         .explicitGet()
         .json())
     nodes.waitForHeightAriseAndTxPresent(transfer.id)
@@ -99,16 +100,17 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransactionV2
-          .selfSigned(Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
+        TransferTransaction
+          .selfSigned(2.toByte, Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
           .explicitGet()
           .json()),
       "Transaction is not allowed by account-script"
     )
 
     sender.signedBroadcast(
-      TransferTransactionV2
-        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get),
+      TransferTransaction
+        .selfSigned(2.toByte,
+                    IssuedAsset(ByteStr.decodeBase58(asset).get),
                     acc0,
                     pkNewAddress,
                     800000000,
@@ -122,8 +124,8 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     )
 
     val transferAfterUpd = sender.signedBroadcast(
-      TransferTransactionV2
-        .selfSigned(Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
+      TransferTransaction
+        .selfSigned(2.toByte, Waves, pkNewAddress, pkNewAddress, 1.waves, System.currentTimeMillis(), Waves, smartMinFee, Array())
         .explicitGet()
         .json())
     nodes.waitForHeightAriseAndTxPresent(transferAfterUpd.id)
@@ -162,7 +164,8 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransactionV2.selfSigned(
+    val transfer = TransferTransaction.selfSigned(
+      2.toByte,
       Waves,
       pkNewAddress,
       pkNewAddress,

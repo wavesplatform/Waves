@@ -35,7 +35,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
   )
 
   private def transfer(sender: KeyPair, recipient: Address, amount: Long) =
-    TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, nextTs, Waves, 1, Array.empty[Byte]).explicitGet()
+    TransferTransaction(1.toByte, Waves, sender, recipient, amount, nextTs, Waves, 1, Array.empty[Byte], sender).explicitGet()
 
   private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -47,8 +47,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         List(
           MassTransferTransaction
             .selfSigned(Waves, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
-            .explicitGet())
-      case _ => List(TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, nextTs, Waves, 1000, Array.empty[Byte]).explicitGet())
+            .explicitGet()
+        )
+      case _ => List(TransferTransaction(1.toByte, Waves, sender, recipient, amount, nextTs, Waves, 1000, Array.empty[Byte], sender).explicitGet())
     }
   }
 
@@ -92,7 +93,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
                 nextTs,
                 d.lastBlockId,
                 transfer
-              ))
+              )
+            )
           }
 
           val stransactions1 = d.addressTransactions(sender).sortBy(_._2.timestamp)
@@ -106,7 +108,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
                 nextTs,
                 d.lastBlockId,
                 transfer
-              ))
+              )
+            )
           }
 
           val stransactions2 = d.addressTransactions(sender).sortBy(_._2.timestamp)
@@ -136,7 +139,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
                 nextTs,
                 d.lastBlockId,
                 Seq.fill(tc)(transfer(sender, recipient, transferAmount))
-              ))
+              )
+            )
           }
 
           d.portfolio(recipient).balance shouldBe (transferAmount * totalTxCount)
@@ -170,7 +174,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               blockWithLeaseId,
               Seq(LeaseCancelTransactionV1.selfSigned(sender, lt.id(), 1, nextTs).explicitGet())
-            ))
+            )
+          )
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, false))
           d.portfolio(sender).lease.out shouldEqual 0
           d.portfolio(recipient).lease.in shouldEqual 0
@@ -200,7 +205,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               genesisBlockId,
               Seq(issueTransaction)
-            ))
+            )
+          )
 
           val blockIdWithIssue = d.lastBlockId
 
@@ -212,10 +218,21 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               d.lastBlockId,
               Seq(
-                TransferTransactionV1
-                  .selfSigned(IssuedAsset(issueTransaction.id()), sender, recipient, assetAmount, nextTs, Waves, 1, Array.empty[Byte])
-                  .explicitGet())
-            ))
+                TransferTransaction(
+                  1.toByte,
+                  IssuedAsset(issueTransaction.id()),
+                  sender,
+                  recipient,
+                  assetAmount,
+                  nextTs,
+                  Waves,
+                  1,
+                  Array.empty[Byte],
+                  sender
+                ).explicitGet()
+              )
+            )
+          )
 
           d.portfolio(sender).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual 0
           d.portfolio(recipient).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual assetAmount
@@ -241,26 +258,33 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               genesisBlockId,
               Seq(issueTransaction)
-            ))
+            )
+          )
 
           val blockIdWithIssue = d.lastBlockId
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0))
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0)
+          )
 
           d.appendBlock(
-            TestBlock.create(nextTs,
-                             blockIdWithIssue,
-                             Seq(
-                               ReissueTransactionV1.selfSigned(sender, IssuedAsset(issueTransaction.id()), 2000, false, 1, nextTs).explicitGet()
-                             )))
+            TestBlock.create(
+              nextTs,
+              blockIdWithIssue,
+              Seq(
+                ReissueTransactionV1.selfSigned(sender, IssuedAsset(issueTransaction.id()), 2000, false, 1, nextTs).explicitGet()
+              )
+            )
+          )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0))
+            AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0)
+          )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0))
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0)
+          )
 
           d.removeAfter(genesisBlockId)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
@@ -279,7 +303,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               genesisBlockId,
               Seq(CreateAliasTransactionV1.selfSigned(sender, alias, 1, nextTs).explicitGet())
-            ))
+            )
+          )
 
           d.blockchainUpdater.resolveAlias(alias) shouldBe Right(sender.toAddress)
           d.removeAfter(genesisBlockId)
@@ -299,7 +324,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               genesisBlockId,
               Seq(DataTransaction.selfSigned(sender, List(dataEntry), 1, nextTs).explicitGet())
-            ))
+            )
+          )
 
           d.blockchainUpdater.accountData(sender, dataEntry.key) should contain(dataEntry)
 
@@ -321,7 +347,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               genesisBlockId,
               Seq(SetScriptTransaction.selfSigned(sender, Some(script), 400000, nextTs).explicitGet())
-            ))
+            )
+          )
 
           val blockWithScriptId = d.lastBlockId
 
@@ -332,7 +359,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               blockWithScriptId,
               Seq(SetScriptTransaction.selfSigned(sender, None, 800000, nextTs).explicitGet())
-            ))
+            )
+          )
 
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
 
@@ -371,7 +399,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               ts,
               genesisBlockId,
               Seq(issueTransaction)
-            ))
+            )
+          )
 
           val blockIdWithIssue = d.lastBlockId
 
@@ -380,7 +409,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               ts + 2,
               d.lastBlockId,
               Seq(sponsor1)
-            ))
+            )
+          )
 
           val blockIdWithSponsor = d.lastBlockId
 
@@ -392,7 +422,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               ts + 2,
               d.lastBlockId,
               Seq(cancel)
-            ))
+            )
+          )
 
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe 0
 
@@ -406,7 +437,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               ts + 2,
               d.lastBlockId,
               Seq(sponsor2)
-            ))
+            )
+          )
 
           d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
@@ -474,8 +506,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val interval = (3 * 60 * 60 * 1000 + 30 * 60 * 1000) / txCount.size
 
           val transfers =
-            txCount.zipWithIndex.map(tc =>
-              Range(0, tc._1).map(i => randomOp(sender, recipient, transferAmount, tc._1 % 3, ts + interval * tc._2 + i)).flatten)
+            txCount.zipWithIndex.map(
+              tc => Range(0, tc._1).map(i => randomOp(sender, recipient, transferAmount, tc._1 % 3, ts + interval * tc._2 + i)).flatten
+            )
 
           val blocks = for ((transfer, i) <- transfers.zipWithIndex) yield {
             val tsb   = ts + interval * i
@@ -494,7 +527,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
                 middleBlock._2 + 10,
                 middleBlock._1,
                 transfers(0)
-              ))
+              )
+            )
             throw new Exception("Duplicate transaction wasn't checked")
           } catch {
             case e: Throwable => Assertions.assert(e.getMessage().contains("AlreadyInTheState"))

@@ -22,7 +22,8 @@ case class TransferV1Request(
     @(ApiModelProperty @field)(dataType = "string", example = "3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef") sender: String,
     @(ApiModelProperty @field)(dataType = "string", example = "Thank you for your kindness", required = false) attachment: Option[String],
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") recipient: String,
-    @(ApiModelProperty @field)(dataType = "long", example = "1533832573000", required = false) timestamp: Option[Long] = None)
+    @(ApiModelProperty @field)(dataType = "long", example = "1533832573000", required = false) timestamp: Option[Long] = None
+)
 
 object TransferV1Request {
   implicit val format: Format[TransferV1Request] = Json.format

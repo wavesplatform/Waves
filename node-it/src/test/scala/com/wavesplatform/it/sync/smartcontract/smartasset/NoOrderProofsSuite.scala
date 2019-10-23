@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 import scala.concurrent.duration._
 
@@ -74,8 +74,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       )
       .id
 
-    val incorrectTrTx = TransferTransactionV2
-      .create(
+    val incorrectTrTx = TransferTransaction(
+        2.toByte,
         IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
         pkByAddress(firstAddress),
         pkByAddress(thirdAddress),
