@@ -61,11 +61,9 @@ object ScriptEstimatorV3 extends ScriptEstimator {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
     for {
-      startCtx <- get[Id, EstimatorContext, ExecutionError]
       cond     <- evalHoldingFuncs(cond)
       right    <- evalHoldingFuncs(ifTrue)
       left     <- evalHoldingFuncs(ifFalse)
-      _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cond + Math.max(right, left) + 1
 
   private def markRef(key: String): EvalM[Long] =
